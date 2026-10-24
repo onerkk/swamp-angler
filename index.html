@@ -575,8 +575,8 @@ function setTime(hour, force){
   U.uDay.value = lerp(a.day, b.day, f);
   U.uCloud.value = lerp(a.cl, b.cl, f);
   { const cK=wx.cloud, rK=wx.rain, fK=wx.fog; U.uCloud.value=Math.max(U.uCloud.value,cK*.98); U.uRain.value=rK;
-    for(const v of [U.uZenith.value,U.uHorizon.value,U.uFogCol.value]){ const g=(v.x+v.y+v.z)/3; v.lerp(tv.set(g,g,g*1.03),cK*.6).multiplyScalar(1-.28*cK-.12*rK); }
-    U.uGlow.value.multiplyScalar(1-.8*cK); U.uFogDen.value*=1+fK*2.2+rK*.7; U.uMist.value=Math.min(1.3,U.uMist.value+fK*.7+rK*.3); U.uCShadow.value=cK*(1-cK)*3.2*Math.min(1,U.uDay.value*2); }
+    for(const v of [U.uZenith.value,U.uHorizon.value,U.uFogCol.value]){ const g=(v.x+v.y+v.z)/3; v.lerp(tv.set(g,g,g*1.03),cK*.75).multiplyScalar(1-.36*cK-.25*rK); }
+    U.uGlow.value.multiplyScalar(1-.8*cK); U.uFogDen.value*=1+fK*4+rK*1.6; U.uMist.value=Math.min(1.4,U.uMist.value+fK*.9+rK*.45); U.uCShadow.value=cK*(1-cK)*3.2*Math.min(1,U.uDay.value*2); }
   const si = lerp(a.si, b.si, f);
   const sunCol = tv.copy(a.sun).lerp(b.sun, f).clone();
   const el = 62*DEG*Math.sin(Math.PI*(h-6)/12.4);
@@ -597,7 +597,7 @@ function setTime(hour, force){
   U.uMoonDir.value.copy(moonDir);
   U.uMoonCol.value.copy(MOON).multiplyScalar(night*0.9);
   U.uSunVis.value = (direct*vis + wM)/(direct + wM + 1e-4);
-  renderer.toneMappingExposure = lerp(a.exp, b.exp, f)*(1+.18*wx.cloud);
+  renderer.toneMappingExposure = lerp(a.exp, b.exp, f)*(1+.1*wx.cloud);
   const lc = U.uLightCol.value;
   sunLight.color.setRGB(lc.x, lc.y, lc.z); sunLight.intensity = 0.85;
   sunLight.position.copy(ld).multiplyScalar(60);
@@ -1475,17 +1475,18 @@ function updateEagle(dt,t){
 }
 
 /* ---------- 天氣 ---------- */
-let wxType=WXT[save.wxCur]?save.wxCur:'clear', wxT=rand(150,360);
+let wxType=WXT[save.wxCur]?save.wxCur:'cloudy', wxT=rand(45,90);
 const cur={c:WXT[wxType].c,r:WXT[wxType].r,f:WXT[wxType].f,w:WXT[wxType].w};
 let windAng=Math.random()*6.283, windNow=1, wt=0;
 let thT=rand(20,40), flash=0, sT=rand(3,8), lastIcon='';
 const wxIcon=$id=>document.getElementById($id);
-function pickWx(){ let r=Math.random(); if(ctx.period()==='dawn'&&r<.3) return 'fog'; r=Math.random(); for(const [k,w] of [['clear',.3],['breezy',.15],['cloudy',.18],['drizzle',.1],['rain',.12],['storm',.06],['fog',.09]]){ r-=w; if(r<=0) return k; } return 'clear'; }
+function pickWx(){ for(let k=0;k<8;k++){ const n=pickWx0(); if(n!==wxType) return n; } return 'cloudy'; }
+function pickWx0(){ let r=Math.random(); if(ctx.period()==='dawn'&&r<.3) return 'fog'; r=Math.random(); for(const [k,w] of [['clear',.3],['breezy',.15],['cloudy',.18],['drizzle',.1],['rain',.12],['storm',.06],['fog',.09]]){ r-=w; if(r<=0) return k; } return 'clear'; }
 function updateWeather(dt){
   const mode=save.wxMode||'auto';
   if(mode!=='auto'&&WXT[mode]) wxType=mode;
-  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; toast('天氣轉為'+WXT[n].n+' '+WXT[n].i); } wxT=rand(150,360); save.wxCur=wxType; } }
-  const tg=WXT[wxType], k=Math.min(1,dt*.08);
+  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; toast('天氣轉為'+WXT[n].n+' '+WXT[n].i); } wxT=rand(70,150); save.wxCur=wxType; } }
+  const tg=WXT[wxType], k=Math.min(1,dt*.22);
   cur.c+=(tg.c-cur.c)*k; cur.r+=(tg.r-cur.r)*k; cur.f+=(tg.f-cur.f)*k;
   wt+=dt; cur.w+=(tg.w-cur.w)*k; windAng+=dt*.012*Math.sin(wt*.05);
   windNow=Math.max(0,cur.w*(1+tg.g*(Math.sin(wt*.37)*.35+Math.sin(wt*1.13+1.7)*.25+Math.sin(wt*2.9+.4)*.12)));
@@ -1501,7 +1502,7 @@ function updateRain(dt){
   const ws=clamp(windNow/12,0,1), wvx=Math.cos(windAng)*ws, wvz=Math.sin(windAng)*ws;
   for(let i=0;i<NR;i++){ let y=roff[i*3+1]-dt*10; roff[i*3]+=wvx*dt*6; roff[i*3+2]+=wvz*dt*6; if(roff[i*3]>10) roff[i*3]-=20; if(roff[i*3]<-10) roff[i*3]+=20; if(roff[i*3+2]>10) roff[i*3+2]-=20; if(roff[i*3+2]<-10) roff[i*3+2]+=20; if(cw.y+y<-.1) y+=14; roff[i*3+1]=y; const x=roff[i*3], z=roff[i*3+2];
     rpos[i*6]=x; rpos[i*6+1]=y; rpos[i*6+2]=z; rpos[i*6+3]=x-wvx*.35+.01; rpos[i*6+4]=y+.38; rpos[i*6+5]=z-wvz*.35; }
-  rgeo.attributes.position.needsUpdate=true; rmat.opacity=.3*cur.r; rmat.color.setScalar(.75*clamp(W.info.light,.2,1));
+  rgeo.attributes.position.needsUpdate=true; rmat.opacity=.45*cur.r; rmat.color.setScalar(.75*clamp(W.info.light,.2,1));
 }
 
 const OBST=[[-33,-30,.6],[-22,-35,.6],[-36,-17,.6],[-18,-29,.6],[-29,-39,.6],[-40,-26,.6],[-24,-28,1.8]];
