@@ -1118,7 +1118,7 @@ const SPECIES=[
   sh:{H:.12,W:.05,prof:1.3,eyeT:.87,eye:.034,tail:.26,fork:.7,dorsal:[[-.3,0],[-.2,.14],[.05,.12],[.15,0]],anal:[[-.32,0],[-.25,.1],[-.1,.08],[-.05,0]]},
   col:{back:'#5a8ab8',flank:'#a8d8f0',belly:'#e8f8ff',fin:'#8ad0ff',eye:'#9ff4ff'},pat:{t:'plain'},scale:.6,metal:.3,
   f:{pow:1.4,spd:2.0,agi:1.8,jump:.6,stam:1.2,win:.8},time:{dawn:0,day:0,dusk:.3,night:1.6},desc:'只在夜裡出現，身體半透明、會發出藍光，有人說牠是落進水裡的月光。'},
- {id:'mermaid',name:'美人魚',sci:'Sirena paludis（幻想）',rar:5,lvl:[88,99],len:[150,185],k:4.5,price:120,special:'mermaid',
+ {id:'mermaid',loc:'both',name:'美人魚',sci:'Sirena paludis（幻想）',rar:5,lvl:[88,99],len:[150,185],k:4.5,price:120,special:'mermaid',
   sh:{H:.075,W:.06,prof:4.2,eyeT:.9,eye:.02,tail:.26,fork:.9,dorsal:[[0,0],[.01,0]],anal:[[0,0],[.01,0]]},
   col:{back:'#1f6f78',flank:'#3fb8b0',belly:'#bff0e0',fin:'#5fe0d0',eye:'#2a1a1a'},pat:{t:'plain'},scale:1.6,metal:.6,
   f:{pow:2.2,spd:1.7,agi:1.5,jump:.2,stam:2.0,win:1.4},time:{dawn:.2,day:0,dusk:.4,night:1.5},desc:'濕地最古老的傳說。她不能被賣掉；送她回家，她會留下一份謝禮。'},
@@ -2555,7 +2555,7 @@ function update(dt,t){
     const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);
     yacht.position.set(b.x,h0*.9-.05,b.z); yacht.rotation.set((hf-h0)/3*.7,G.head,(hs-h0)/1.5*-.5,'YXZ'); }
 }
-return {hullClear,hullOut,setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
+return {hullClear,hullOut,hullDims:()=>({HX,HZ0,HZ1}),setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
 }
 /* ===== 雨打水面、大白鯊奪魚、閃避 ===== */
 const SH4={};
@@ -2678,6 +2678,25 @@ function updSnatch(rdt){
   if(q>.95&&!J.s2){ J.s2=true; const sx=p.x+o.x*3, sz=p.z+o.z*3; for(let i=0;i<5;i++) P.splash(sx+rand(-1.5,1.5),0,sz+rand(-1.5,1.5),60,2.6); W.addRipple(sx,sz,1.6); AT.ring(sx,sz,4); c.Snd.splash(2.5); shake=1.2; }
   if(t>2.4){ shark.visible=false; snatchJob=null; slow=0; }
 }
+/* 出水瞬間：大白鯊從船的一側躍出、橫越船頭上空咬走魚、落到另一側（軌跡已驗證高過欄杆） */
+let overJob=null; const ow=new T.Vector3(), od=new T.Vector3(), camW=new T.Vector3(), nP=new T.Vector3();
+function overPos(J,u,out){ const t=2*u-1, lx=J.s*J.Wd*t, y=J.yb+(J.ya-J.yb)*(1-Math.pow(Math.abs(t),6)), b=G.base, cs=Math.cos(G.head), sn=Math.sin(G.head);
+  return out.set(b.x+lx*cs+J.zc*sn,y,b.z-lx*sn+J.zc*cs); }
+function snatchOver(p,onBite){ const hd=c.hullDims?c.hullDims():{HX:1.6,HZ0:-6.3}; W.camera.getWorldPosition(camW);
+  overJob={u:0,s:Math.random()<.5?1:-1,Wd:hd.HX+4,zc:Math.max(hd.HZ0+.6,-4.2),ya:camW.y+1.2,yb:-2.2,bit:false,onBite,drip:0,s1:false,s2:false};
+  shark.visible=true; slow=1; if(sharkR&&sharkR.loaded) sharkR.play('Bite'); c.vib([100,50,250]); c.toast('🦈 大白鯊躍出水面！','bad',2200); c.Snd.gator(); }
+function updOver(rdt){ const J=overJob; if(!J) return;
+  J.u+=rdt*((J.u>.34&&J.u<.66)?.3:1)/1.5; const u=Math.min(J.u,1);
+  overPos(J,u,ow); overPos(J,u+.005,od); od.sub(ow).normalize();
+  shark.quaternion.setFromUnitVectors(zA,od); shark.rotateZ(Math.sin(u*Math.PI)*.5*J.s); shark.position.copy(ow);
+  nP.copy(ow).addScaledVector(od,2.1);
+  if(!J.bit&&G.fish&&u>.3) G.fish.group.position.lerp(nP,Math.min(1,rdt*7));
+  if(u>.04&&!J.s1){ J.s1=true; overPos(J,0,nP); for(let i=0;i<5;i++) P.splash(nP.x+rand(-1,1),0,nP.z+rand(-1,1),55,2.4); W.addRipple(nP.x,nP.z,1.5); c.Snd.splash(2.2); shake=.9; }
+  J.drip-=rdt; if(ow.y>.3&&J.drip<=0){ J.drip=.05; P.splash(ow.x,ow.y-.3,ow.z,5,.35); }
+  if(u>=.5&&!J.bit){ J.bit=true; if(G.fish) G.fish.group.visible=false; c.vib([150,40,150]); shake=1.5; if(J.onBite) J.onBite(); }
+  if(u>.96&&!J.s2){ J.s2=true; overPos(J,1,nP); for(let i=0;i<6;i++) P.splash(nP.x+rand(-1.5,1.5),0,nP.z+rand(-1.5,1.5),65,2.8); W.addRipple(nP.x,nP.z,1.8); AT.ring(nP.x,nP.z,4); c.Snd.splash(2.6); shake=1.1; }
+  if(J.u>=1.08){ shark.visible=false; overJob=null; slow=0; }
+}
 const qEl=$('qte'), qBar=$('qteBar'); let qte=null;
 function offerDodge(onOk){ if(qte) return; qte={n:0,t:2.2,onOk}; qEl.classList.remove('hidden'); qBar.style.width='0%'; c.vib([30,30,30]); }
 qEl.addEventListener('pointerdown',e=>{ e.preventDefault(); if(!qte) return; qte.n++; qBar.style.width=Math.min(100,qte.n/7*100)+'%'; c.vib(15);
@@ -2689,10 +2708,10 @@ function update(dt,t){
   rU.uRain.value=rain>.03?Math.min(1,rain*1.2):0; rings.visible=drops.visible=rain>.03&&!c.underwater();
   const L=clamp(W.info.light,.15,1); rU.uCol.value.setRGB(.85*L,.9*L,.95*L);
   dU.uScale.value=window.innerHeight*W.getPR()/(2*Math.tan(W.camera.fov*Math.PI/360));
-  updSnatch(dt); updQte(dt);
+  updSnatch(dt); updOver(dt); updQte(dt);
   if(shake>0){ shake=Math.max(0,shake-dt*1.8); W.head.position.set((Math.random()-.5)*.08*shake,(Math.random()-.5)*.08*shake,0); } else W.head.position.set(0,0,0);
 }
-return {update,snatch,offerDodge,busy:()=>!!snatchJob};
+return {update,snatch,snatchOver,offerDodge,busy:()=>!!(snatchJob||overJob)};
 }
 /* ===== 商店循環：素材掉落、裝備強化、道具、流浪商人、魚市行情、外觀 ===== */
 const MATS={scale:{n:'魚鱗',i:'🐟'},bone:{n:'魚骨',i:'🦴'},pearl:{n:'珍珠',i:'⚪'},crystal:{n:'海晶',i:'💎'}};
@@ -2716,7 +2735,7 @@ const fxOn=id=>(S.fx[id]||0)>now();
 /* 強化 */
 const lvOf=(k,i)=>(S.enh[k]&&S.enh[k][i])||0;
 function enhance(g){ const r=lvOf('rod',S.eq.rod), l=lvOf('line',S.eq.line), e=lvOf('reel',S.eq.reel);
-  return {rod:Object.assign({},g.rod,{cast:g.rod.cast*(1+.02*r),tens:g.rod.tens*(1-.015*r)}),line:Object.assign({},g.line,{s:g.line.s*(1+.04*l)}),reel:Object.assign({},g.reel,{spd:g.reel.spd*(1+.03*e),drag:g.reel.drag*(1-.02*e)})}; }
+  return {rod:Object.assign({},g.rod,{cast:g.rod.cast*(1+.02*r),tens:g.rod.tens*(1-.025*r)}),line:Object.assign({},g.line,{s:g.line.s*(1+.06*l)}),reel:Object.assign({},g.reel,{spd:g.reel.spd*(1+.04*e),drag:g.reel.drag*(1-.03*e)})}; }
 function enhCost(lv,tier){ const coins=Math.round(300*Math.pow(1.5,lv)*(1+tier*.5)/10)*10, m={};
   if(lv<3) m.scale=4*(lv+1); else if(lv<6) m.bone=lv-1; else if(lv<9) m.pearl=lv-4; else m.crystal=lv-7; return {coins,m}; }
 const TIER=['scale','bone','pearl','crystal'];
@@ -2742,7 +2761,7 @@ const day=()=>Math.floor(now()/86400000);
 let mk=null, mkDay=-1;
 function market(){ if(mkDay===day()) return mk; mkDay=day(); const r=rng(mkDay*7919+13), pool=c.SPECIES.filter(s=>!s.special), pick=[];
   while(pick.length<4&&pool.length) pick.push(pool.splice(Math.floor(r()*pool.length),1)[0]);
-  mk=[{sp:pick[0],m:3},{sp:pick[1],m:2},{sp:pick[2],m:1.5},{sp:pick[3],m:.6}]; return mk; }
+  mk=[{sp:pick[0],m:2},{sp:pick[1],m:1.6},{sp:pick[2],m:1.3},{sp:pick[3],m:.6}]; return mk; }
 function priceMul(id){ const e=market().find(x=>x.sp.id===id); return e?e.m:1; }
 /* 流浪商人（每 4 小時換貨） */
 const ROT=4*3600000, rot=()=>Math.floor(now()/ROT);
@@ -2775,7 +2794,7 @@ function render(tab,GEAR){
     h+='<div class="note">釣魚會掉落素材。越稀有的魚掉越好的素材，強化越後面越需要稀有素材。</div>';
     [['rod','釣竿'],['line','釣線'],['reel','捲線器']].forEach(([k,label])=>{ const idx=S.eq[k], it=GEAR[k][idx], lv=lvOf(k,idx);
       const st='★'.repeat(Math.min(lv,10))+'☆'.repeat(Math.max(0,10-lv));
-      const eff=k==='rod'?`拋投 +${lv*2}%、張力 −${(lv*1.5).toFixed(1)}%`:k==='line'?`強度 +${lv*4}%`:`收線 +${lv*3}%、爆線累積 −${lv*2}%`;
+      const eff=k==='rod'?`拋投 +${lv*2}%、張力 −${(lv*2.5).toFixed(1)}%`:k==='line'?`強度 +${lv*6}%`:`收線 +${lv*4}%、爆線累積 −${lv*3}%`;
       if(lv>=10){ h+=row(`${label}：${it.name} +10`,`${st}<br>${eff}`,'<span class="eqd">已滿級</span>'); return; }
       const cs=enhCost(lv,idx), pl=plan(cs.m), cOk=S.coins>=cs.coins, ok=cOk&&!!pl;
       let st2=''; if(!cOk) st2+=`<span class="bad">金幣差 ${(cs.coins-S.coins).toLocaleString()}</span> `;
@@ -3019,9 +3038,15 @@ function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.
 
 /* ---------- 選魚 ---------- */
 function specialK(sp){ if(!sp.special) return 1; const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone>=3||G.spot>=3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; return 1; }
+/* 魚群警覺：同一個方向一直釣，魚會變少、變小、變慢咬；換方向或換釣點就恢復（每分鐘消退 1） */
+const DEPL={};
+function depKey(){ const A=((G.head+G.yaw)%(2*Math.PI)+2*Math.PI)%(2*Math.PI); return (WL.zoneId?WL.zoneId():'')+':'+Math.floor(A/(Math.PI/3)); }
+function depNow(k){ const e=DEPL[k]; return e?Math.max(0,e.v-(performance.now()-e.t)/60000):0; }
+function depAdd(k,n){ const v=depNow(k)+n, w=v>=2&&DEPL[k]&&DEPL[k].warned; DEPL[k]={v,t:performance.now(),warned:w}; if(v>=4&&!w){ DEPL[k].warned=true; setTimeout(()=>toast('這一帶的魚變警覺了，轉個方向或換釣點吧','warn',2600),1800); } }
+const reachK=()=>clamp((G.castDist-4)/24,0,1);
 function pickSpecies(){
   const per=period(G.hour), pw=clamp((G.castDist-6)/30,0,1); let tot=0;
-  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(window.__ECO&&window.__ECO.fxOn('luck')?.4:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*WL.spotAff(sp.id)*WL.wxAff(sp.id)*(((sp.loc||'lake')===(G.loc||'lake'))?1:0)*(bt.aff[sp.id]||1)*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
+  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(window.__ECO&&window.__ECO.fxOn('luck')?.4:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*WL.spotAff(sp.id)*WL.wxAff(sp.id)*((sp.loc==='both'||(sp.loc||'lake')===(G.loc||'lake'))?1:0)*Math.pow(.12+.88*reachK(),sp.rar)/(1+.3*depNow(G.depK||'')*sp.rar)*(bt.aff[sp.id]||1)*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
   let x=Math.random()*tot; for(let i=0;i<ws.length;i++){ x-=ws[i]; if(x<=0) return SPECIES[i]; } return SPECIES[0];
 }
 
@@ -3038,15 +3063,15 @@ function cast(){
 }
 function landBobber(){
   G.state='wait'; P.splash(G.to.x,0,G.to.z,16,.7); W.addRipple(G.to.x,G.to.z,.55); Snd.plop();
-  G.timer=rand(2.5,7)*PER_WAIT[period(G.hour)]*(1-G.luck*.6)*(G.baitUsed?G.baitUsed.wait:1)*WL.waitK()*(window.__ECO&&window.__ECO.fxOn('glow')?.6:1); G.nib=Math.floor(rand(0,3.99)); G.approach=0; G.sp=null; G.fd=null;
+  G.timer=rand(2.5,7)*PER_WAIT[period(G.hour)]*(1-G.luck*.6)*(G.baitUsed?G.baitUsed.wait:1)*WL.waitK()*(window.__ECO&&window.__ECO.fxOn('glow')?.6:1)*(1+.2*depNow(depKey())); G.nib=Math.floor(rand(0,3.99)); G.approach=0; G.sp=null; G.fd=null;
   FUN.castTag(G.castDist); G.hot=FUN.inHot(G.to); if(G.hot){ G.timer*=.3; toast('正中魚群！','good',1200); }
 }
 function startRetrieve(msg,cls){ exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
 function nibble(){ G.dip=.28; W.addRipple(G.to.x,G.to.z,.18); Snd.nibble(); vib(12); G.approach=Math.max(G.approach,.01); }
 function prepFish(){ if(Math.random()<.085){ const it=FUN.rollItem(); G.sp=FUN.ITEM_SP; G.fd={sp:FUN.ITEM_SP,item:it,L:it.size,w:it.w*rand(.85,1.15),lvl:1,value:Math.round(it.val*rand(.8,1.25)),u:.5,xpMul:0}; return; }
-  const sp=pickSpecies(), pw=clamp((G.castDist-6)/30,0,1), u=Math.pow(Math.random(),(1.6-.5*pw)/WL.sizeB());
+  G.depK=depKey(); const sp=pickSpecies(), pw=clamp((G.castDist-6)/30,0,1), u=Math.pow(Math.random(),(1.6-.5*pw)/WL.sizeB()*(1+(1-reachK())*1.2+.15*depNow(G.depK)));
   const L=lerp(sp.len[0],sp.len[1],u)/100, w=sp.k*L*L*L*rand(.9,1.12);
-  G.sp=sp; G.fd={sp,L,w,u,lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; }
+  G.sp=sp; G.fd={sp,L,w,u,lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*.5*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; }
 function bite(){ if(!G.fd) prepFish(); UW.bite(); G.state='bite'; G.biteT=0; FUN.hookStart(G.fd); W.addRipple(G.to.x,G.to.z,.75); P.splash(G.to.x,0,G.to.z,8,.5); Snd.bite(); vib([60,40,60]); }
 function missBite(){ FUN.hookEnd(); G.combo=0; FUN.combo(0); G.state='wait'; G.timer=rand(2,5); G.nib=Math.floor(rand(0,2.99)); G.sp=null; G.fd=null; exitUW(); vib(40); }
 function hook(q){
@@ -3072,12 +3097,13 @@ function startJump(){ const f=G.f; f.jumpT=f.jumpDur=.85+.25*Math.sqrt(G.fd.L); 
   toast('魚躍出水面！先放手！','warn',1100); vib(30); G.fish.group.visible=true; }
 function dispDist(){ return Math.max(.38,G.fd.L*(G.fd.sp.sh.snout?2.5:2.1))*(W.camera.aspect<1?1:.8); }
 function land(){
-  if(G.loc==='sea'&&!G.fd.item&&!G.fd.sp.special&&G.fd.sp.id!=='shark'&&G.fd.sp.id!=='gwhite'&&Math.random()<.12&&!KK.busy()&&!(window.__ECO&&window.__ECO.fxOn('repel'))){ G.state='snatch'; fishPos(tv,-.05); toast('就在魚出水的瞬間……','warn',1200); KK.snatch(tv.clone(),()=>{ G.state='fight'; lose('shark'); }); return; }
+  if(G.loc==='sea'&&!G.fd.item&&!G.fd.sp.special&&G.fd.sp.id!=='shark'&&G.fd.sp.id!=='gwhite'&&Math.random()<.12&&!KK.busy()&&!(window.__ECO&&window.__ECO.fxOn('repel'))){ G.state='snatch'; fishPos(tv,-.05); toast('就在魚出水的瞬間……','warn',1200); KK.snatchOver(tv.clone(),()=>{ G.state='fight'; lose('shark'); }); return; }
   G.state='land'; G.stT=0; endFightUI(); WL.endChase(); SEA.endChase(); G.combo=(G.combo||0)+1; FUN.combo(G.combo); save.maxCombo=Math.max(save.maxCombo||0,G.combo); fishPos(G.landFrom,-.05); P.splash(G.landFrom.x,0,G.landFrom.z,40,1.3); W.addRipple(G.landFrom.x,G.landFrom.z,1);
   Snd.splash(1.2); vib([30,40,30]); const g=G.fish.group; g.visible=G.fd.sp.special!=='mermaid'; if(g.parent!==W.scene) W.scene.attach(g);
   g.position.copy(G.landFrom); te.set(0,G.f.az0+G.f.theta+Math.PI/2,0); g.quaternion.setFromEuler(te); G.landQ.copy(g.quaternion); P.shadow.material.opacity=0;
 }
 function showCard(){
+  if(G.fd&&!G.fd.item) depAdd(G.depK||depKey(),1+.5*G.fd.sp.rar);
   if(G.fd.item){ save.items=(save.items||0)+1; if(G.fd.item.id==='chest') save.chests=(save.chests||0)+1; if(window.__ECO) window.__ECO.dropItem(G.fd.item); persist(); FUN.goalsDot();
     return FUN.itemCard(G.fd,()=>{ ui.catch.classList.remove('hidden'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden'); document.body.classList.add('catching'); }); }
   { const cb=1+.1*Math.min(G.combo||0,10); G.fd.value=Math.round(G.fd.value*cb*(window.__ECO&&window.__ECO.fxOn('coin2')?2:1)); G.fd.xpMul=(G.fd.xpMul||1)*cb; }
@@ -3148,7 +3174,7 @@ const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G
 const AT=createAtmos(W,P,Snd,WL,{underwater:()=>UW.active(),period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,spot:()=>G.spot,toast});
 const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPECIES.length,period:()=>period(G.hour)}); window.__FUN=FUN;
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
-const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
+const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
 { const s=SPOTS[save.spot]; G.spot=save.spot; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; WL.setSpot(save.spot); SEA.setLoc(s.loc||'lake'); }
 function goSpot(i){ if(G.state!=='idle'){ toast('先收線再移動','warn'); return; } const s=SPOTS[i]; G.state='travel'; fadeEl.classList.add('on'); Snd.paddle(); setTimeout(()=>Snd.paddle(),380);
@@ -3210,7 +3236,7 @@ function updateFight(dt){
   const dive=(f.ev&&f.ev.k==='dive')?1:0;
   if(shake&&!f.shV) vib(30); f.shV=shake;
   const stamF=.4+.6*f.stam/100;
-  const F=fs.pow*(.8+.25*Math.pow(fd.w,.45))*stamF*(f.run?ST.mul:1)*(dive?1.35:1);
+  const F=fs.pow*(.8+.25*Math.pow(fd.w,.45))*(1+.22*sp.rar)*stamF*(f.run?ST.mul:1)*(dive?1.35:1);
   const good=-f.latDir*G.rodSide, steerMul=1-.28*clamp(good,0,1)+.15*clamp(-good,0,1);
   let Tt=(F*(G.held?1:.35)+(G.held?.5:0))/(META.gear().line.s*DF.line)*steerMul*META.gear().rod.tens;
   if(f.jumpT>0&&G.held) Tt+=.45;
