@@ -2359,6 +2359,18 @@ const yacht=new T.Group(); yacht.visible=false; S.add(yacht);
   rp.forEach((p,i)=>{ if(i===3) return; const s=new T.Mesh(new T.CylinderGeometry(.018,.018,.78,8),steel); s.position.set(p.x,2.07,p.z); yacht.add(s); });
   yacht.traverse(o=>{ o.frustumCulled=false; }); }
 
+/* ---------- 船體避讓：所有靠近遊艇的東西都要在船殼外 ---------- */
+const HX=1.6, HZ0=-6.3, HZ1=2;
+function hullLocal(p){ const b=base(), h=G.head, cs=Math.cos(h), sn=Math.sin(h), dx=p.x-b.x, dz=p.z-b.z; return [dx*cs-dz*sn, dx*sn+dz*cs, cs, sn, b]; }
+function hullClear(p,m){ if(!yacht.visible) return false; const [lx,lz,cs,sn,b]=hullLocal(p), x0=-HX-m, x1=HX+m, z0=HZ0-m, z1=HZ1+m;
+  if(!(lx>x0&&lx<x1&&lz>z0&&lz<z1)) return false;
+  const dl=[lx-x0,x1-lx,lz-z0,z1-lz], k=dl.indexOf(Math.min(...dl)); let nx=lx, nz=lz;
+  if(k===0) nx=x0; else if(k===1) nx=x1; else if(k===2) nz=z0; else nz=z1;
+  p.x=b.x+nx*cs+nz*sn; p.z=b.z-nx*sn+nz*cs; return true; }
+function hullOut(p,o){ const b=base(); if(!yacht.visible){ o.set(p.x-b.x,0,p.z-b.z); if(o.lengthSq()<1e-4) o.set(0,0,-1); return o.normalize(); }
+  const [lx,lz,cs,sn]=hullLocal(p); let vx=lx-clamp(lx,-HX,HX), vz=lz-clamp(lz,HZ0,HZ1);
+  if(vx*vx+vz*vz<1e-6){ vx=lx<0?-1:1; vz=0; } const l=Math.hypot(vx,vz); vx/=l; vz/=l; return o.set(vx*cs+vz*sn,0,-vx*sn+vz*cs); }
+
 /* ---------- 海豚 ---------- */
 const dTex=gradTex([62,74,90],[214,220,226],.42);
 const dMat=new T.MeshPhysicalMaterial({map:dTex,roughness:.35,clearcoat:.8,clearcoatRoughness:.2});
@@ -2458,22 +2470,22 @@ function updEv(dt,t,wx,day){
   else if(ev.id==='dolphin'){ d.p.addScaledVector(d.v,dt);
     for(const o of dolphins){ if(!o.on) continue; o.t+=dt; const cy=o.cyc, ph=(o.t%cy)/cy, jump=ph>.55; const g=o.g;
       tv.copy(d.p).add(o.off); const s=(ph-.55)/.45;
-      if(jump){ g.visible=true; const h=1.6; g.position.set(tv.x+d.v.x*.1*s,4*h*s*(1-s)-.3,tv.z+d.v.z*.1*s); g.lookAt(tv2.copy(g.position).add(d.v)); g.rotateX(-(1-2*s)*.9);
+      if(jump){ g.visible=true; const h=1.6; g.position.set(tv.x+d.v.x*.1*s,4*h*s*(1-s)-.3,tv.z+d.v.z*.1*s); hullClear(g.position,1.4); g.lookAt(tv2.copy(g.position).add(d.v)); g.rotateX(-(1-2*s)*.9);
         if(!o.inA&&s>.02){ o.inA=true; P.splash(g.position.x,0,g.position.z,14,.8); AT.ring(g.position.x,g.position.z,.8); }
         if(s>.96&&o.inA){ o.inA=false; P.splash(g.position.x,0,g.position.z,22,1); W.addRipple(g.position.x,g.position.z,.5); } }
       else g.visible=false; } }
   else if(ev.id==='whale'){ const p=d.p, tt=ev.t;
     if(tt<2&&d.stage===0){ d.stage=1; for(let i=0;i<3;i++) P.splash(p.x,1.5,p.z,40,4.5); c.Snd.splash(.6); }
-    whale.position.set(p.x,-1.2+1.0*Math.sin(clamp((tt-3)/8,0,1)*Math.PI),p.z); whale.rotation.set(-.05,G.head+1.2,0); whale.visible=tt>3&&tt<11;
+    whale.position.set(p.x,-1.2+1.0*Math.sin(clamp((tt-3)/8,0,1)*Math.PI),p.z); hullClear(whale.position,8); whale.rotation.set(-.05,G.head+1.2,0); whale.visible=tt>3&&tt<11;
     if(tt>11&&tt<13&&d.stage===1){ d.stage=2; P.splash(p.x,1.5,p.z,40,4.5); }
-    if(tt>14&&tt<20){ fluke.visible=true; const q=(tt-14)/6; fluke.position.set(p.x+4,(q<.45?-3+6.5*sstep(0,.45,q):3.5-7*sstep(.45,1,q)),p.z); fluke.rotation.set(.25*(1-q),G.head+1.2,0); fluke.scale.setScalar(1.3); } else fluke.visible=false;
-    if(d.breach&&tt>21&&tt<25){ const q=(tt-21)/4; whale.visible=true; whale.position.set(p.x-15,-6+15*Math.sin(q*Math.PI),p.z+10); whale.rotation.set(-1.1+2.2*q,G.head+1.2,.3);
+    if(tt>14&&tt<20){ fluke.visible=true; const q=(tt-14)/6; fluke.position.set(p.x+4,(q<.45?-3+6.5*sstep(0,.45,q):3.5-7*sstep(.45,1,q)),p.z); hullClear(fluke.position,3); fluke.rotation.set(.25*(1-q),G.head+1.2,0); fluke.scale.setScalar(1.3); } else fluke.visible=false;
+    if(d.breach&&tt>21&&tt<25){ const q=(tt-21)/4; whale.visible=true; whale.position.set(p.x-15,-6+15*Math.sin(q*Math.PI),p.z+10); hullClear(whale.position,8); whale.rotation.set(-1.1+2.2*q,G.head+1.2,.3);
       if(q>.95&&d.stage<3){ d.stage=3; for(let i=0;i<5;i++) P.splash(p.x-15+rand(-4,4),0,p.z+10+rand(-4,4),60,3); W.addRipple(p.x-15,p.z+10,1.5); c.Snd.splash(2); } } }
-  else if(ev.id==='shark'&&!chase){ d.a+=dt*.22; const b=base(); sfin.position.set(b.x+Math.cos(d.a)*d.r,0,b.z+Math.sin(d.a)*d.r); sfin.rotation.y=-d.a; sfin.visible=true;
+  else if(ev.id==='shark'&&!chase){ d.a+=dt*.22; const b=base(); sfin.position.set(b.x+Math.cos(d.a)*d.r,0,b.z+Math.sin(d.a)*d.r); hullClear(sfin.position,.6); sfin.rotation.y=-d.a; sfin.visible=true;
     if(Math.random()<dt*3) AT.ring(sfin.position.x,sfin.position.z,.35); }
   else if(ev.id==='flyfish'){ for(const f of flyers){ if(!f.on) continue; f.t+=dt; if(f.t<0){ f.g.visible=false; continue; } const q=f.t/1.4;
       if(q>1){ f.t=-rand(.5,2.5); P.splash(f.g.position.x,0,f.g.position.z,6,.4); f.p.add(tv.set(-Math.sin(f.a)*9,0,-Math.cos(f.a)*9)); continue; }
-      f.g.visible=true; f.g.position.set(f.p.x-Math.sin(f.a)*9*q,.15+.6*Math.sin(q*Math.PI),f.p.z-Math.cos(f.a)*9*q); f.g.rotation.set(0,f.a+Math.PI,0); f.g.scale.setScalar(1.6);
+      f.g.visible=true; f.g.position.set(f.p.x-Math.sin(f.a)*9*q,.15+.6*Math.sin(q*Math.PI),f.p.z-Math.cos(f.a)*9*q); hullClear(f.g.position,.4); f.g.rotation.set(0,f.a+Math.PI,0); f.g.scale.setScalar(1.6);
       if(q<.03) P.splash(f.g.position.x,0,f.g.position.z,4,.3); } }
   if(ev.t>=ev.dur) endAll();
 }
@@ -2481,7 +2493,7 @@ function updEv(dt,t,wx,day){
 let chase=null, stolenF=false;
 function onHook(fd,get){ chase=null; stolenF=false; if(loc==='sea'&&fd.sp.rar>=2&&Math.random()<.2&&!(window.__ECO&&window.__ECO.fxOn('repel'))) chase={delay:rand(3,7),get,p:null}; }
 function updChase(dt){ if(!chase) return; if(chase.delay>0){ chase.delay-=dt; if(chase.delay<=0){ const f=chase.get(); chase.p=new T.Vector3(f.x+rand(-14,14),0,f.z+rand(-14,14)); sfin.visible=true; c.toast('⚠️ 鯊魚衝過來了！快收線！','bad',2400); c.vib([60,60,60]); } return; }
-  const f=chase.get(); tv.subVectors(f,chase.p); tv.y=0; const d=tv.length(); tv.normalize(); chase.p.addScaledVector(tv,Math.min(d,1.6*dt));
+  const f=chase.get(); tv.subVectors(f,chase.p); tv.y=0; const d=tv.length(); tv.normalize(); chase.p.addScaledVector(tv,Math.min(d,1.6*dt)); hullClear(chase.p,.6);
   sfin.position.copy(chase.p); sfin.rotation.y=Math.atan2(tv.x,tv.z)-Math.PI/2; if(Math.random()<dt*4) AT.ring(chase.p.x,chase.p.z,.4);
   if(!chase.q&&d<9){ chase.q=true; const back=tv.clone(); if(window.__KK) window.__KK.offerDodge(()=>{ if(chase) chase.p.addScaledVector(back,-12); if(G.f) G.f.d=Math.max(2.8,G.f.d-3); }); }
   if(d<1.2){ chase=null; sfin.visible=false; if(window.__KK) window.__KK.snatch(f.clone(),()=>{ stolenF=true; }); else stolenF=true; } }
@@ -2507,7 +2519,7 @@ function update(dt,t){
     const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);
     yacht.position.set(b.x,h0*.9-.05,b.z); yacht.rotation.set((hf-h0)/3*.7,G.head,(hs-h0)/1.5*-.5,'YXZ'); }
 }
-return {setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
+return {hullClear,hullOut,setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
 }
 /* ===== 雨打水面、大白鯊奪魚、閃避 ===== */
 const SH4={};
@@ -2607,19 +2619,26 @@ const shark=new T.Group(), jaw=new T.Group(); shark.visible=false; S.add(shark);
 
 /* ---------- 慢動作、晃動、閃避按鈕 ---------- */
 let slow=0, shake=0, snatchJob=null;
+/* 咬點固定在鯊魚嘴上，身體一律在咬點的船外側，不會穿過船殼 */
+const HL=2.3*1.15, uV=new T.Vector3(), nose=new T.Vector3(), mtx=new T.Matrix4(), zA=new T.Vector3(0,0,1);
 function snatch(p,onBite){
-  const b=G.base; const dx=p.x-b.x, dz=p.z-b.z, a=Math.atan2(dx,dz);
-  snatchJob={t:0,p:p.clone(),yaw:a+Math.PI+rand(-.6,.6),bit:false,onBite};
+  const q=p.clone(); q.y=0; c.hullClear(q,1.2); const out=c.hullOut(q,new T.Vector3());
+  snatchJob={t:0,p:q,out,tan:new T.Vector3(-out.z,0,out.x).multiplyScalar(Math.random()<.5?1:-1),bit:false,onBite};
   shark.visible=true; slow=1; c.vib([80,60,200]); c.toast('🦈 大白鯊！','bad',1800); c.Snd.gator(); }
 function updSnatch(rdt){
-  const J=snatchJob; if(!J) return; J.t+=rdt*(slow>0?.4:1); const t=J.t, p=J.p;
-  const q=clamp(t/1.4,0,1), h=-2.2+5.2*Math.sin(Math.min(q,1)*Math.PI*.62)-(q>.62?(q-.62)*6:0);
-  shark.position.set(p.x+Math.sin(J.yaw)*(1-q)*-3,h,p.z+Math.cos(J.yaw)*(1-q)*-3);
-  shark.rotation.set(-1.15+1.9*q,J.yaw,.45*Math.sin(q*3));
-  jaw.rotation.x=q<.45?.9*sstep(0,.35,q):.9*(1-sstep(.45,.55,q));
-  if(q>.06&&!J.s1){ J.s1=true; for(let i=0;i<4;i++) P.splash(p.x+rand(-1,1),0,p.z+rand(-1,1),50,2.2); W.addRipple(p.x,p.z,1.4); c.Snd.splash(2); shake=.8; }
+  const J=snatchJob; if(!J) return; J.t+=rdt*(slow>0?.4:1); const t=J.t, p=J.p, o=J.out;
+  const q=clamp(t/1.4,0,1), up=q<.48, a=sstep(0,.48,q), b=sstep(.48,1,q);
+  const off=up?1.4*(1-a):2.6*b, ny=up?-3.2+4.8*a:1.6-3.9*b;
+  nose.set(p.x+o.x*off,ny,p.z+o.z*off);
+  const pitch=up?.85+.45*a:1.3-1.75*b;
+  const hx=up?-o.x:(-o.x*(1-b)+J.tan.x*b), hz=up?-o.z:(-o.z*(1-b)+J.tan.z*b), hl=Math.hypot(hx,hz)||1;
+  uV.set(hx/hl*Math.cos(pitch),Math.sin(pitch),hz/hl*Math.cos(pitch));
+  shark.quaternion.setFromUnitVectors(zA,uV); shark.rotateZ(up?0:b*1.2);
+  shark.position.copy(nose).addScaledVector(uV,-HL);
+  jaw.rotation.x=up?.9*sstep(0,.35,q):.9*(1-sstep(.48,.58,q));
+  if(q>.06&&!J.s1){ J.s1=true; for(let i=0;i<4;i++) P.splash(p.x+o.x*1.2+rand(-.8,.8),0,p.z+o.z*1.2+rand(-.8,.8),50,2.2); W.addRipple(p.x+o.x,p.z+o.z,1.4); c.Snd.splash(2); shake=.8; }
   if(q>.48&&!J.bit){ J.bit=true; if(G.fish) G.fish.group.visible=false; c.vib(120); shake=1; if(J.onBite) J.onBite(); }
-  if(q>.95&&!J.s2){ J.s2=true; for(let i=0;i<5;i++) P.splash(p.x+rand(-2,2),0,p.z+rand(-2,2),60,2.6); W.addRipple(p.x,p.z,1.6); AT.ring(p.x,p.z,4); c.Snd.splash(2.5); shake=1.2; }
+  if(q>.95&&!J.s2){ J.s2=true; const sx=p.x+o.x*3, sz=p.z+o.z*3; for(let i=0;i<5;i++) P.splash(sx+rand(-1.5,1.5),0,sz+rand(-1.5,1.5),60,2.6); W.addRipple(sx,sz,1.6); AT.ring(sx,sz,4); c.Snd.splash(2.5); shake=1.2; }
   if(t>2.4){ shark.visible=false; snatchJob=null; slow=0; }
 }
 const qEl=$('qte'), qBar=$('qteBar'); let qte=null;
@@ -2894,7 +2913,7 @@ function hook(q){
   ui.fight.classList.remove('hidden'); WL.onHook(G.fd,()=>fishPos(G.chaseV,0)); SEA.onHook(G.fd,()=>fishPos(G.chaseV,0));
   const fish=G.fd.item?FUN.itemFish(G.fd.item):P.getFish(sp); G.fish=fish; fish.group.scale.setScalar(L); fish.group.visible=false; if(!fish.group.parent) W.scene.add(fish.group);
 }
-function fishPos(out,y){ const az=G.f.az0+G.f.theta; return out.set(G.base.x-Math.sin(az)*G.f.d,y,G.base.z-Math.cos(az)*G.f.d); }
+function fishPos(out,y){ const az=G.f.az0+G.f.theta; out.set(G.base.x-Math.sin(az)*G.f.d,y,G.base.z-Math.cos(az)*G.f.d); if(G.loc==='sea') SEA.hullClear(out,.35); return out; }
 function sizeWord(w){ return w<.6?'小傢伙':w<2.5?'中型魚':w<8?'大魚！':'巨物！！'; }
 function endFightUI(){ ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); }
 function lose(reason){
@@ -2982,7 +3001,7 @@ const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G
 const AT=createAtmos(W,P,Snd,WL,{underwater:()=>UW.active(),period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,spot:()=>G.spot,toast});
 const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPECIES.length,period:()=>period(G.hour)}); window.__FUN=FUN;
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
-const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active()}); window.__KK=KK;
+const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
 { const s=SPOTS[save.spot]; G.spot=save.spot; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; WL.setSpot(save.spot); SEA.setLoc(s.loc||'lake'); }
 function goSpot(i){ if(G.state!=='idle'){ toast('先收線再移動','warn'); return; } const s=SPOTS[i]; G.state='travel'; fadeEl.classList.add('on'); Snd.paddle(); setTimeout(()=>Snd.paddle(),380);
