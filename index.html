@@ -317,6 +317,7 @@ uniform float uYaw;
 uniform float uExpo;
 uniform float uSea;
 uniform vec3 uSeaCol;
+uniform float uReef;
 uniform float uLightK;
 float hash11(float p){ p = fract(p*0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
 float hash21(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y)*p3.z); }
@@ -539,6 +540,11 @@ uniform float uWave;
 uniform float uSunVis;
 varying vec3 vW;
 vec3 TM(vec3 x){ if(uPhoto < 0.5) return x; x *= uExpo; return clamp((x*(2.51*x + 0.03))/(x*(2.43*x + 0.59) + 0.14), 0.0, 1.0); }
+float causF(vec2 p, float t){
+  vec2 q = p*1.7 + 0.8*vec2(noise2(p*0.35 + t*0.12), noise2(p*0.35 - t*0.1 + 5.3));
+  float a = abs(sin(q.x*2.3 + t*0.8) + sin(q.y*2.1 - t*0.7) + sin((q.x - q.y)*1.6 + t*0.6));
+  return pow(clamp(1.0 - a*0.5, 0.0, 1.0), 5.0);
+}
 vec2 wv(vec2 p, vec2 d, float len, float amp, float dist){
   float k = 6.2831853/len; float w = sqrt(9.81*k);
   float ph = dot(d, p)*k - w*uTime;
@@ -634,7 +640,25 @@ void main(){
   #endif
   vec3 bodyD = TM(body);
   if(uSea > 0.5){
-    bodyD = uSeaCol*(0.22 + 0.78*uLightK)*(0.72 + 0.56*clamp(dot(N, normalize(vec3(uSunDir.x, 0.6, uSunDir.z))), 0.0, 1.0));
+    float lk = 0.22 + 0.78*uLightK;
+    vec3 deepC = uSeaCol*lk*(0.72 + 0.56*clamp(dot(N, normalize(vec3(uSunDir.x, 0.6, uSunDir.z))), 0.0, 1.0));
+    bodyD = deepC;
+    if(uReef > 0.01){
+      vec3 Vr = refract(-V, N, 0.75);
+      float iy = 1.0/max(-Vr.y, 0.12);
+      vec2 b0 = vW.xz + Vr.xz*4.5*iy;
+      float rf_ = noise2(b0*0.08)*0.6 + noise2(b0*0.23 + 3.1)*0.4;
+      float reefK = smoothstep(0.46, 0.56, rf_), grass = smoothstep(0.38, 0.46, rf_)*(1.0 - reefK);
+      float Dd = 4.5 - 1.6*reefK, Lp = Dd*iy;
+      vec2 bp = vW.xz + Vr.xz*Lp;
+      float cs = causF(bp, uTime) + 0.6*causF(bp*1.7 + 9.0, uTime*1.2);
+      vec3 rk = mix(vec3(0.10, 0.13, 0.11), vec3(0.04, 0.06, 0.06), noise2(bp*0.9));
+      vec3 bed = mix(mix(vec3(0.92, 0.88, 0.72), vec3(0.45, 0.50, 0.35), grass*0.6), rk, reefK);
+      bed *= lk*(0.6 + 0.75*cs*uLightK*(0.35 + 0.65*uSunVis)*(1.0 - 0.6*reefK)*(1.0 - smoothstep(6.0, 40.0, dist)));
+      vec3 Tr = exp(-vec3(0.38, 0.075, 0.055)*(Lp + Dd));
+      vec3 shal = bed*Tr + vec3(0.02, 0.30, 0.36)*lk*(1.0 - Tr);
+      bodyD = mix(deepC, shal, uReef*(1.0 - smoothstep(25.0, 130.0, dist)));
+    }
     #ifdef SEAGRID
     bodyD += vec3(0.04, 0.24, 0.26)*smoothstep(-0.1, 0.9, vH)*uLightK*(0.4 + 0.6*clamp(dot(N, normalize(vec3(uSunDir.x, 0.25, uSunDir.z))), 0.0, 1.0));
     #endif
@@ -698,7 +722,7 @@ const head = new T.Group(); head.rotation.x = -0.16; player.add(head); head.add(
 const V = () => new T.Vector3();
 const U = { uTime:{value:0}, uSunDir:{value:new T.Vector3(0,1,0)}, uLightCol:{value:V()}, uSunDisk:{value:new T.Vector3(0,1,0)},
   uSunCol:{value:V()}, uMoonDir:{value:new T.Vector3(0,1,0)}, uMoonCol:{value:V()}, uZenith:{value:V()}, uHorizon:{value:V()},
-  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.035,.25,.40)}, uLightK:{value:1} };
+  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.035,.25,.40)}, uReef:{value:0}, uLightK:{value:1} };
 
 // 天空球（含樹林遠景）
 const skyMat = new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:SH.common+SH.skyFS, side:T.BackSide, depthWrite:false, depthTest:false});
@@ -1835,7 +1859,7 @@ function update(dt,t){
   sT-=dt; if(sT<=0){ sT=rand(3,9); if(cur.r<.5){ const per=ctx.period(); if(per==='night'||per==='dusk') Snd.frog(); else Snd.bird(); } }
 }
 return {
-  update, paddle, obstacles:OBST, setZone(i){ zoneI=i; }, setSpot(i){ spotI=i; zoneI=i; gs={mode:'off'}; gator.visible=false; },
+  update, paddle, obstacles:OBST, setZone(i){ zoneI=i; }, zoneId:()=>SPOTS[zoneI].id, setSpot(i){ spotI=i; zoneI=i; gs={mode:'off'}; gator.visible=false; },
   spotAff:id=>sp().aff[id]||1, sizeB:()=>sp().size, rareB:()=>sp().rare+.15*cur.f,
   wxAff(id){ let m=1; if(cur.r>.5&&['lmbass','smbass','channel','bowfin'].includes(id)) m*=1.3; if(cur.c>.5&&['lmbass','smbass'].includes(id)) m*=1.15; return m; },
   waitK:()=>1-.2*cur.r,
@@ -3107,6 +3131,7 @@ $('bRel').addEventListener('click',()=>{ if(G.state==='catch') finishCatch(false
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
 const META=createMeta({save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS,goSpot,curSpot:()=>G.spot,setHour:h=>{ G.hour=h; W.setTime(h,true); }});
 const UW=createUnderwater(W,P);
+const tvSea=new THREE.Vector3();
 window.__MDL=createModels(W); const MDL=window.__MDL; MDL.preload('lake');
 const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head});
 const AT=createAtmos(W,P,Snd,WL,{underwater:()=>UW.active(),period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,spot:()=>G.spot,toast});
@@ -3304,6 +3329,8 @@ function update(dt){
   if(st!=='fight'&&st!=='wait') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
   P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt);
+  { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
+    const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
   G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
   W.head.rotation.x=-.16+Math.sin(G.t*.5)*.004; W.camera.rotation.z=Math.sin(G.t*.37)*.003;
   showLightSet(showing);
