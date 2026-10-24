@@ -3235,14 +3235,19 @@ const st=document.createElement('style'); st.textContent=`
 #moonBox .mb{width:min(560px,100%);max-height:84vh;overflow:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:linear-gradient(180deg,rgba(18,30,58,.98),rgba(12,18,34,.98));border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));color:#e6f0ff;border-top:1px solid rgba(150,200,255,.35)}
 #moonBox h3{margin:0 0 6px;font-size:19px;display:flex;justify-content:space-between;align-items:center;color:#cfe6ff}
 #moonBox .ch{margin:14px 0;padding:12px 14px;border-radius:14px;background:rgba(120,170,255,.08);line-height:1.75;font-size:15px}
-#moonBox .ch b{display:block;color:#ffd56a;margin-bottom:4px;font-size:14px}#moonBox .pg{font-size:13px;color:#9fb8d8}`;
+#moonBox .ch b{display:block;color:#ffd56a;margin-bottom:4px;font-size:14px}#moonBox .ch.lock{opacity:.55;padding:10px 14px}#moonBox .ch.lock b{color:#9fb8d8}#moonBox .ch small{color:#9fb8d8;font-size:12px}#moonBox .ch.tip{background:rgba(255,213,106,.1);border:1px solid rgba(255,213,106,.35)}#moonBox .ch.tip b{color:#ffd56a}#moonBox .ch em{font-style:normal;font-weight:800;color:#ffe9a8}#moonBox .pg{font-size:13px;color:#9fb8d8}`;
 document.head.appendChild(st);
 const tb=document.createElement('button'); tb.id='moonTalk'; tb.className='hidden'; tb.textContent='🧜‍♀️ 與汐月說話'; document.body.appendChild(tb);
 const box=document.createElement('div'); box.id='moonBox'; box.className='hidden'; box.innerHTML='<div class="mb"></div>'; document.body.appendChild(box);
 const unlocked=()=>MS.done?7:MS.met?Math.min(6,MS.sc):0;
-function render(){ const n=unlocked();
-  let h=`<h3>汐月<button class="sbtn" data-m="x">✕</button></h3><div class="pg">月鱗 ${Math.min(7,MS.sc)}/7${MS.done?'・故事完結':MS.sc>=6?'・最後一片在月神鯉身上':''}</div>`;
+function render(){ const n=unlocked(), sc=Math.min(7,MS.sc);
+  const pips='🌙'.repeat(sc)+'○'.repeat(7-sc);
+  let h=`<h3>汐月<button class="sbtn" data-m="x">✕</button></h3><div class="pg">月鱗 ${sc}/7　${pips}</div>`;
+  if(!MS.done){ const next=MS.sc>=6?'最後一片在<em>月神鯉</em>的肚子裡。在月光灣的深夜釣起牠。':'在<em>月光灣</em>的<em>深夜（約 19:48～04:48）</em>釣魚，每釣到一條魚有 45% 機率從魚肚裡找到一片月鱗。';
+    h+=`<div class="ch tip"><b>🧭 怎麼找月鱗</b>${next}<br><small>找到後回來找汐月，就會解鎖下一段故事。</small></div>`; }
   for(let i=n;i>=0;i--) h+=`<div class="ch"><b>${MOON_STORY[i].t}</b>${MOON_STORY[i].b}</div>`;
+  for(let i=n+1;i<MOON_STORY.length;i++){ const name=i===7?'終章・？？？':MOON_STORY[i].t, cond=i===7?'集齊 7 片月鱗後解鎖':i===6?`找到第 6 片月鱗後解鎖`:`找到第 ${i} 片月鱗後解鎖`;
+    h+=`<div class="ch lock"><b>🔒 ${name}</b><small>${cond}</small></div>`; }
   box.firstChild.innerHTML=h; }
 tb.addEventListener('click',()=>{ if(!MS.met){ MS.met=true; c.toast('🌙 任務：在月夜的月光灣釣魚，找回 7 片月鱗','good',3200); }
   MS.read=unlocked(); c.persist(); render(); box.classList.remove('hidden'); tb.classList.remove('dot'); });
