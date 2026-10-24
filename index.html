@@ -3158,7 +3158,7 @@ const st=document.createElement('style'); st.textContent=`
 #talBtn{position:relative}#talBtn.dot::after{content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:#ff5a4a}
 #talBox{position:fixed;inset:0;z-index:9;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
 #talBox.hidden{display:none}
-#talBox .tb{width:min(560px,100%);max-height:86vh;overflow:auto;background:rgba(18,22,26,.97);border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));color:var(--fg)}
+#talBox .tb{width:min(560px,100%);max-height:86vh;overflow:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:rgba(18,22,26,.97);border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));color:var(--fg)}
 #talBox h3{margin:0 0 4px;font-size:20px;display:flex;justify-content:space-between;align-items:center}
 #talBox .pt{font-size:13px;color:#ffd56a;margin-bottom:6px}#talBox .sec{margin:14px 0 4px;font-size:13px;color:var(--fg-dim)}
 #talBox .pips{letter-spacing:2px;color:#ffd56a}#talBox .lock{color:var(--fg-dim);font-size:12px}#talBox .on{color:#7ff0a8;font-weight:800}`;
@@ -3232,7 +3232,7 @@ const st=document.createElement('style'); st.textContent=`
  background:linear-gradient(90deg,rgba(40,80,140,.9),rgba(70,50,140,.9));color:#eaf4ff;font-weight:800;font-size:15px;box-shadow:0 0 18px rgba(110,180,255,.55);font-family:inherit}
 #moonTalk.hidden,#moonBox.hidden{display:none}#moonTalk.dot::after{content:' ●';color:#ffd56a}
 #moonBox{position:fixed;inset:0;z-index:9;background:rgba(4,10,24,.72);display:flex;align-items:flex-end;justify-content:center}
-#moonBox .mb{width:min(560px,100%);max-height:84vh;overflow:auto;background:linear-gradient(180deg,rgba(18,30,58,.98),rgba(12,18,34,.98));border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));color:#e6f0ff;border-top:1px solid rgba(150,200,255,.35)}
+#moonBox .mb{width:min(560px,100%);max-height:84vh;overflow:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:linear-gradient(180deg,rgba(18,30,58,.98),rgba(12,18,34,.98));border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));color:#e6f0ff;border-top:1px solid rgba(150,200,255,.35)}
 #moonBox h3{margin:0 0 6px;font-size:19px;display:flex;justify-content:space-between;align-items:center;color:#cfe6ff}
 #moonBox .ch{margin:14px 0;padding:12px 14px;border-radius:14px;background:rgba(120,170,255,.08);line-height:1.75;font-size:15px}
 #moonBox .ch b{display:block;color:#ffd56a;margin-bottom:4px;font-size:14px}#moonBox .pg{font-size:13px;color:#9fb8d8}`;
