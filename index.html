@@ -482,7 +482,40 @@ SH.waterVS = `
 varying vec3 vW;
 void main(){ vec4 wp = modelMatrix*vec4(position, 1.0); vW = wp.xyz; gl_Position = projectionMatrix*viewMatrix*wp; }
 `;
+SH.seaVS = `
+uniform float uTime;
+uniform vec3 uWind;
+varying vec3 vW;
+varying vec3 vNs;
+varying float vH;
+vec3 gW(vec2 p0, vec2 d, float L, float A, float Q, inout vec3 n){
+  float k = 6.2831853/L; float w = sqrt(9.81*k); float th = k*dot(d, p0) - w*uTime; float c = cos(th); float s = sin(th);
+  n.x -= d.x*k*A*c; n.z -= d.y*k*A*c; n.y -= Q*k*A*s;
+  return vec3(Q*A*d.x*c, A*s, Q*A*d.y*c);
+}
+void main(){
+  vec4 wp = modelMatrix*vec4(position, 1.0); vec2 p0 = wp.xz;
+  vec2 rel = wp.xz - modelMatrix[3].xz;
+  float edge = 1.0 - smoothstep(105.0, 148.0, max(abs(rel.x), abs(rel.y)));
+  vec2 wd = normalize(uWind.xy + vec2(1e-4)); float s = (0.45 + 1.1*uWind.z)*edge;
+  vec2 d2 = vec2(wd.x*0.77 - wd.y*0.64, wd.y*0.77 + wd.x*0.64); vec2 d3 = vec2(wd.x*0.77 + wd.y*0.64, wd.y*0.77 - wd.x*0.64);
+  vec2 d4 = vec2(wd.x*0.34 - wd.y*0.94, wd.y*0.34 + wd.x*0.94);
+  vec3 n = vec3(0.0, 1.0, 0.0); vec3 off = vec3(0.0);
+  off += gW(p0, wd, 38.0, 0.42*s, 0.45, n);
+  off += gW(p0, d2, 23.0, 0.28*s, 0.5, n);
+  off += gW(p0, d3, 15.0, 0.18*s, 0.5, n);
+  off += gW(p0, d4, 9.0, 0.11*s, 0.55, n);
+  off += gW(p0, vec2(0.6, 0.8), 5.5, 0.06*s, 0.6, n);
+  off += gW(p0, vec2(-0.8, 0.6), 3.2, 0.035*s, 0.6, n);
+  wp.xyz += off; vW = wp.xyz; vNs = normalize(n); vH = off.y/(1.1*s + 1e-3);
+  gl_Position = projectionMatrix*viewMatrix*wp;
+}
+`;
 SH.waterFS = `
+#ifdef SEAGRID
+varying vec3 vNs;
+varying float vH;
+#endif
 uniform vec4 uRip[12];
 uniform vec3 uDeep;
 uniform vec3 uScatter;
@@ -493,7 +526,7 @@ vec3 TM(vec3 x){ if(uPhoto < 0.5) return x; x *= uExpo; return clamp((x*(2.51*x 
 vec2 wv(vec2 p, vec2 d, float len, float amp, float dist){
   float k = 6.2831853/len; float w = sqrt(9.81*k);
   float ph = dot(d, p)*k - w*uTime;
-  float fade = 1.0 - smoothstep(len*22.0, len*80.0, dist);
+  float fade = 1.0 - smoothstep(len*22.0*(1.0 + 3.0*uSea), len*80.0*(1.0 + 4.0*uSea), dist);
   return d*(amp*k*cos(ph)*fade);
 }
 vec3 noised(vec2 x){
@@ -503,6 +536,9 @@ vec3 noised(vec2 x){
 }
 void main(){
   vec3 Vv = cameraPosition - vW; float dist = length(Vv); vec3 V = Vv/dist;
+  #ifndef SEAGRID
+  if(uSea > 0.5 && length(vW.xz - cameraPosition.xz) < 138.0) discard;
+  #endif
   if(uPhoto > 0.5){ vec3 dv = normalize(vW - uEye); float ev = asin(clamp(dv.y, -1.0, 1.0));
     if(ev > -0.2094){ float uu = fract(atan(dv.x, -dv.z)*0.15915494 + uYaw); if(texture2D(uMask, vec2(uu, clamp((ev + 0.2094)/0.2094, 0.0, 1.0))).r < 0.5) discard; } }
   vec2 p = vW.xz;
@@ -529,11 +565,13 @@ void main(){
   g += wv(p, vec2(0.196, -0.981), 0.37, 0.0007, dist);
   g += wv(p, wd, 0.8, 0.0035*uWind.z, dist) + wv(p, vec2(wd.x*0.9 - wd.y*0.42, wd.y*0.9 + wd.x*0.42), 0.5, 0.0022*uWind.z, dist);
   g *= amp;
+  #ifndef SEAGRID
   g += uSea*(wv(p, vec2(0.8, 0.6), 18.0, 0.32, dist) + wv(p, vec2(0.3, -0.954), 11.0, 0.18, dist) + wv(p, vec2(-0.707, 0.707), 7.0, 0.1, dist))*(0.6 + 0.8*uWind.z);
+  #endif
   vec2 gd = vec2(0.0); float na = 0.005; float nf = 1.4;
   vec2 drift = vec2(uTime*0.11, uTime*0.07);
   for(int i = 0; i < 4; i++){
-    float fade = 1.0 - smoothstep(50.0/nf, 180.0/nf, dist);
+    float fade = 1.0 - smoothstep(50.0*(1.0 + 2.0*uSea)/nf, 180.0*(1.0 + 2.0*uSea)/nf, dist);
     gd += noised(p*nf + drift).yz*nf*na*fade;
     nf *= 2.2; na *= 0.5; drift = vec2(-drift.y, drift.x)*1.3;
   }
@@ -561,6 +599,9 @@ void main(){
       g += (dv/d)*sin(x*55.0)*exp(-x*x*700.0)*(1.0 - ph)*rf*1.4;
     }
   }
+  #ifdef SEAGRID
+  g += vec2(-vNs.x, -vNs.z)/max(vNs.y, 0.2);
+  #endif
   vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
   float NdV = max(dot(N, V), 0.0);
   float F = 0.02 + 0.98*pow(1.0 - NdV, 5.0);
@@ -572,16 +613,22 @@ void main(){
   float ndl = max(uSunDir.y, 0.0);
   vec3 body = uDeep*(amb*0.7 + uLightCol*ndl*uSunVis*0.22*csh)
             + uScatter*(amb*0.25 + uLightCol*0.12*uSunVis)*(0.5 + 0.5*clamp(dot(N, normalize(uSunDir + vec3(0.0, 0.5, 0.0))), 0.0, 1.0));
+  #ifdef SEAGRID
+  body += uScatter*(amb*0.5 + uLightCol*0.3*uSunVis)*smoothstep(-0.2, 0.8, vH)*0.9;
+  #endif
   vec3 col = mix(TM(body), refl, F) + TM(glint*(0.25 + 0.75*F));
   vec3 dwc = vec3(0.09, 0.19, 0.024)*(0.65 + 0.55*mix(0.5, leaf, fadeD))*(amb*0.75 + uLightCol*ndl*uSunVis*0.42*csh + 0.02);
   col = mix(col, TM(dwc), dw);
   float foamS = (1.0 - smoothstep(0.3, 2.5, Rs - rp))*(0.5 + 0.5*noise2(p*1.3 + uTime*0.05))*(1.0 - uSea);
   float cap = smoothstep(0.16, 0.3, length(g))*clamp((uWind.z - 0.45)*2.2, 0.0, 1.0)*(0.5 + 0.5*noise2(p*2.0 - uCloudOff*30.0));
+  #ifdef SEAGRID
+  cap += smoothstep(0.55, 0.95, vH)*clamp(uWind.z*1.5 - 0.2, 0.0, 1.0)*(0.4 + 0.6*noise2(p*1.7 - uCloudOff*25.0));
+  #endif
   float foam = clamp(foamS*0.55 + cap*0.8, 0.0, 0.9)*(1.0 - dw);
   col = mix(col, TM((amb*0.9 + uLightCol*ndl*0.5*csh)*0.55), foam);
   float mist = uMist*0.4*smoothstep(12.0, 90.0, dist);
   vec3 fogC = uPhoto > 0.5 ? photoEnv(normalize(vec3(-V.x, 0.015, -V.z))) : fogColor(-V);
-  col = mix(col, fogC, clamp(fogF(dist)*0.9 + mist, 0.0, 0.95));
+  col = mix(col, fogC, clamp((fogF(dist)*0.9 + mist)*(1.0 - 0.6*uSea), 0.0, 0.95));
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <encodings_fragment>
@@ -643,6 +690,8 @@ for(let i=0;i<=SEG;i++){ const az=-Math.PI+2*Math.PI*i/SEG, R=1500; wpos.push(Ma
 for(let i=1;i<=SEG;i++) widx.push(0, i+1, i);
 const wgeo = new T.BufferGeometry(); wgeo.setAttribute('position', new T.Float32BufferAttribute(wpos,3)); wgeo.setIndex(widx);
 const water = new T.Mesh(wgeo, waterMat); water.frustumCulled = false; scene.add(water);
+const seaMat = new T.ShaderMaterial({uniforms:WU, vertexShader:SH.seaVS, fragmentShader:SH.common+SH.waterFS, defines:{SEAGRID:1}, extensions:{derivatives:true}});
+const seaGrid = new T.Mesh(new T.PlaneGeometry(300,300,220,220).rotateX(-Math.PI/2), seaMat); seaGrid.visible=false; seaGrid.frustumCulled=false; scene.add(seaGrid);
 
 // 光源
 const sunLight = new T.DirectionalLight(0xffffff, 0.9); scene.add(sunLight); scene.add(sunLight.target);
@@ -731,9 +780,13 @@ function setTime(hour, force){
 
 const ripS = []; for(let i=0;i<12;i++) ripS.push({x:0,z:0,age:9,amp:0}); let ripI = 0;
 function addRipple(x, z, amp){ const r = ripS[ripI]; ripI = (ripI+1)%12; r.x=x; r.z=z; r.age=0; r.amp=amp; }
-function swell(x, z, t){ return 0.006*Math.sin(t*1.9+x*0.7) + 0.004*Math.sin(t*2.6+z*0.9+1.3); }
+function seaH(x,z,t){ const w=U.uWind.value, L=Math.hypot(w.x,w.y)||1, dx=w.x/L, dz=w.y/L, s=.45+1.1*w.z;
+  const D=[[dx,dz],[dx*.77-dz*.64,dz*.77+dx*.64],[dx*.77+dz*.64,dz*.77-dx*.64],[dx*.34-dz*.94,dz*.34+dx*.94],[.6,.8],[-.8,.6]], LL=[38,23,15,9,5.5,3.2], A=[.42,.28,.18,.11,.06,.035];
+  let h=0; for(let i=0;i<6;i++){ const k=6.2831853/LL[i]; h+=A[i]*s*Math.sin(k*(D[i][0]*x+D[i][1]*z)-Math.sqrt(9.81*k)*t); } return h; }
+function swell(x, z, t){ if(seaMode) return seaH(x,z,t); return 0.006*Math.sin(t*1.9+x*0.7) + 0.004*Math.sin(t*2.6+z*0.9+1.3); }
 function update(dt, t){
   U.uTime.value = t; camera.getWorldPosition(U.uEye.value);
+  if(seaGrid.visible) seaGrid.position.set(Math.round(U.uEye.value.x/1.5)*1.5, 0, Math.round(U.uEye.value.z/1.5)*1.5);
   { const w=U.uWind.value, k=(.002+.01*w.z)*dt; U.uCloudOff.value.x+=w.x*k; U.uCloudOff.value.y+=w.y*k; }
   for(let i=0;i<12;i++){ const r = ripS[i]; r.age += dt; rip[i].set(r.x, r.z, r.age, r.age < 5 ? r.amp : 0); }
 }
@@ -743,10 +796,10 @@ function resize(w, h){ lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ?
 function setPR(v){ pr = v; renderer.setPixelRatio(pr); renderer.setSize(lw, lh); }
 function render(){ renderer.render(scene, camera); }
 
-function setSea(on){ seaMode=on; U.uSea.value=on?1:0; if(on){ WU.uDeep.value.set(.004,.02,.04); WU.uScatter.value.set(.01,.07,.09); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
+function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=on; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
 let photoHook=null;
 function setPhotoHook(f){ photoHook=f; }
-function setPhotoActive(){ U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; }
+function setPhotoActive(){ U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; seaMat.toneMapped=false; seaMat.needsUpdate=true; }
 function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 return { setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
@@ -1740,7 +1793,7 @@ function update(dt,t){
   const s=sp(), bx=s.pos[0], bz=s.pos[1];
   if(s.kayak){ const sw=W.swell(bx,bz,t)*2.2; boat.visible=true; boat.position.set(bx,sw,bz); boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
     W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=Math.sin(t*1.1)*.012+paddleTilt.z*.5; }
-  else if(s.yacht){ boat.visible=false; const sw=W.swell(bx,bz,t)*4; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=Math.sin(t*.7)*.02; }
+  else if(s.yacht){ boat.visible=false; const sw=W.swell(bx,bz,t)*.9; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=(W.swell(bx+1.5,bz,t)-W.swell(bx-1.5,bz,t))*-.12; }
   else { boat.visible=false; W.player.position.set(0,2.4,0); W.head.rotation.z=0; }
   updateWeather(dt); updateRain(dt); updateGator(dt); updateEagle(dt,t);
   gEye.emissiveIntensity=(1-W.info.day)*2.2;
@@ -2417,7 +2470,9 @@ function update(dt,t){
   const wx=c.wx(), day=W.info.day;
   if(wx.r>.4) lastRain=60; else lastRain=Math.max(0,lastRain-dt);
   updEv(dt,t,wx,day); updChase(dt);
-  if(yacht.visible){ const b=base(); yacht.position.set(b.x,W.swell(b.x,b.z,t)*4-.05,b.z); yacht.rotation.set(Math.sin(t*.6)*.015,G.head,Math.sin(t*.7)*.02); }
+  if(yacht.visible){ const b=base(); const h0=W.swell(b.x,b.z,t), fx=-Math.sin(G.head), fz=-Math.cos(G.head);
+    const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);
+    yacht.position.set(b.x,h0*.9-.05,b.z); yacht.rotation.set((hf-h0)/3*.7,G.head,(hs-h0)/1.5*-.5,'YXZ'); }
 }
 return {setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
 }
