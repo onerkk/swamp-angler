@@ -1374,7 +1374,7 @@ function getFish(sp){
 const showLight=new T.PointLight(0xfff4e8,0,6,1.2); showLight.position.set(.5,.6,.3); head.add(showLight);
 
 function setRodLook(col,gold){ blankMat.color.set(col); const gm=gold?goldMat:chromeMat; guides.forEach(g=>{ g.material=gm; }); tipTop.material=gm; }
-return { dockMats:{plankMat,postMat,beamMat}, setRodLook, rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
+return { dockMats:{plankMat,postMat,beamMat}, reelObj:reel, crankObj:crank, setRodLook, rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
 }
 /* ===== 第 2 段 · 水下鏡頭、釣具店、等級與任務 ===== */
 const SH2 = {};
@@ -2920,7 +2920,7 @@ const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger 
   ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
   ['斑點叉尾鮰','Channel catfish','faerbogdan99'],['扁頭鯰','Flathead Catfish','faerbogdan99'],['鱷雀鱔','Alligator Gar','Jay_Tano'],['錦鯉','Koi Fish','7plus'],
   ['石斑','lowpoly freshwater grouper','Arrangemonk9'],['黑鮪魚','Bluefin Tuna','voltairevill'],['旗魚','Blue Marlin','Gotta_go_evi'],['飛魚','Exocoetidae','victorberdug'],
-  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
+  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
 
 function createModels(W){
 'use strict';
@@ -3268,6 +3268,47 @@ function update(dt){ W.camera.getWorldPosition(cam);
   if(near&&MS.read<unlocked()) tb.classList.add('dot'); }
 return {update,onCatch,koiK,active};
 }
+/* ===== 第一人稱雙手（Sketchfab「First Person arms」by bumstrum，CC-BY） ===== */
+function createArms(W,P){
+'use strict';
+const T=THREE, S=W.scene, reel=P.reelObj, crank=P.crankObj;
+const arms=[]; let ready=false;
+// 左手：往前握前握把（捲線器座標：x 沿竿向前、y 向上、z 搖柄側）；右手：轉右側的搖柄把手
+const GRIP=new T.Vector3(.17,-.025,-.01), KNOB=new T.Vector3(0,-.05,.03);
+const SH_R=new T.Vector3(.3,-.62,.08), SH_L=new T.Vector3(-.16,-.6,.02);
+function setup(g){
+  for(const side of ['R','L']){
+    const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene.clone(true);
+    let wrist=null, root=null, other=null;
+    o.traverse(b=>{ if(!b.isBone) return; const n=b.name;
+      if(n.indexOf(side+'_wrist')===0) wrist=b; if(n.indexOf(side+'_arm')===0) root=b; if(n.indexOf((side==='R'?'L':'R')+'_arm')===0) other=b; });
+    if(!wrist||!root) continue;
+    if(other) other.scale.setScalar(1e-4);
+    o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ m.renderOrder=2; (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.8; }); } });
+    const grp=new T.Group(); grp.add(o); S.add(grp); grp.updateMatrixWorld(true);
+    const wl=new T.Vector3().setFromMatrixPosition(wrist.matrixWorld), rl=new T.Vector3().setFromMatrixPosition(root.matrixWorld);
+    const ld=new T.Vector3().subVectors(wl,rl), L0=ld.length(); ld.normalize();
+    arms.push({side,grp,wl,rl,ld,L0});
+    if(W.reflHide) W.reflHide(grp);
+  }
+  ready=arms.length===2; window.__ARMS_INFO=arms.map(a=>({side:a.side,L0:+a.L0.toFixed(3)})); }
+if(T.GLTFLoader) new T.GLTFLoader().load('models/arms.glb',setup);
+const tg=new T.Vector3(), sh=new T.Vector3(), wd=new T.Vector3(), q=new T.Quaternion(), q2=new T.Quaternion(), upW=new T.Vector3(), upM=new T.Vector3(), tmp=new T.Vector3();
+function update(show){
+  if(!ready) return;
+  for(const a of arms){ a.grp.visible=show; if(!show) continue;
+    if(a.side==='L') reel.localToWorld(tg.copy(GRIP)); else crank.localToWorld(tg.copy(KNOB));
+    W.camera.localToWorld(sh.copy(a.side==='R'?SH_R:SH_L));
+    wd.subVectors(tg,sh); const L=wd.length(); wd.normalize();
+    // 1) 前臂方向對準「肩→手」；2) 以前臂為軸旋轉，讓手背朝向鏡頭上方
+    q.setFromUnitVectors(a.ld,wd);
+    upM.set(0,1,0).applyQuaternion(q); upW.set(0,1,0).applyQuaternion(W.camera.getWorldQuaternion(q2));
+    upM.addScaledVector(wd,-upM.dot(wd)).normalize(); upW.addScaledVector(wd,-upW.dot(wd)).normalize();
+    const ang=Math.atan2(tmp.crossVectors(upM,upW).dot(wd),upM.dot(upW)); q2.setFromAxisAngle(wd,ang+(a.side==='R'?.6:-.6)); q.premultiply(q2);
+    const s=.42/a.L0; a.grp.scale.setScalar(s); a.grp.quaternion.copy(q);
+    a.grp.position.copy(tg).sub(tmp.copy(a.wl).multiplyScalar(s).applyQuaternion(q)); } }
+return {update};
+}
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
 'use strict';
@@ -3502,6 +3543,7 @@ const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPEC
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 const SKY=createNightSky(W,G); window.__SKY=SKY; window.__W=W;
+const ARMS=createArms(W,P); window.__ARMS=ARMS;
 window.__MOON=createMoonBay(W,{G,save,persist,toast,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
 window.__TAL=createTalents({save,persist,toast,Snd,vib,setCoins,loc:()=>G.loc||'lake',zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour)}); window.__SEA=SEA;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
@@ -3695,7 +3737,7 @@ function update(dt){
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light);
   if(st!=='fight'&&st!=='wait') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
-  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); window.__MOON.update(dt); SKY.update(dt,((G.hour%24)+24)%24);
+  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); window.__MOON.update(dt); ARMS.update(!UW.active()); SKY.update(dt,((G.hour%24)+24)%24);
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
     const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
   G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
