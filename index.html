@@ -89,6 +89,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 #intro p{color:var(--fg-dim);font-size:14px;line-height:1.75;margin:14px 0 18px;max-width:34em}
 #intro p b{color:var(--fg)}
 #startBtn{height:56px;border-radius:16px;border:0;background:var(--accent);color:#1d1606;font-family:inherit;font-size:18px;font-weight:900;letter-spacing:.1em;cursor:pointer;max-width:480px}
+#loadNote{margin-top:10px;font-size:13px;color:var(--fg-dim);text-align:center;max-width:480px}
 #err{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:30px;text-align:center;background:var(--bg);font-size:16px;line-height:1.7}
 .fly{position:fixed;z-index:9;font-weight:900;color:var(--accent);font-size:20px;pointer-events:none;text-shadow:0 2px 6px rgba(0,0,0,.7);animation:fly .9s ease-in forwards}
 @keyframes fly{to{transform:translate(var(--dx),var(--dy)) scale(.6);opacity:0}}
@@ -137,6 +138,8 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 @media (prefers-reduced-motion:reduce){#actBtn.hot{animation:none}#tag,.card{animation:none}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
 </head>
 <body>
 <canvas id="c"></canvas>
@@ -193,6 +196,7 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
   <div class="en">SWAMP ANGLER</div>
   <p><b>按住</b>按鈕蓄力，在力道最滿時放開拋竿。浮標被拉進水裡時<b>立刻點擊</b>提竿。拉扯時<b>按住收線</b>；魚衝刺就放手，並往魚游走的<b>反方向滑動</b>拉竿，別讓張力爆表。拖曳畫面可以轉向瞄準。</p>
   <button id="startBtn">開始釣魚</button>
+  <div id="loadNote">正在載入真實場景…</div>
 </div>
 <div id="err" class="hidden"></div>
 <script>
@@ -227,6 +231,15 @@ uniform float uRain;
 uniform vec3 uWind;
 uniform vec2 uCloudOff;
 uniform float uCShadow;
+uniform sampler2D uBandA;
+uniform sampler2D uBandB;
+uniform sampler2D uFullA;
+uniform sampler2D uFullB;
+uniform sampler2D uMask;
+uniform float uPMix;
+uniform float uPhoto;
+uniform float uYaw;
+uniform float uExpo;
 float hash11(float p){ p = fract(p*0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
 float hash21(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y)*p3.z); }
 float hash31(vec3 p3){ p3 = fract(p3*0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y)*p3.z); }
@@ -332,7 +345,7 @@ vec4 farLayer(float s, float y, float dist, vec3 rd){
   return vec4(col, a);
 }
 
-vec3 envRay(vec3 P, vec3 dir, bool disks, bool lite){
+vec3 envRayProc(vec3 P, vec3 dir, bool disks, bool lite){
   vec3 col = skyBase(dir, disks, lite);
   float hl = length(dir.xz);
   if(hl < 1e-4) return col;
@@ -358,6 +371,35 @@ vec3 envRay(vec3 P, vec3 dir, bool disks, bool lite){
   vec4 nl = nearLayer(az*R, y, length(vec3(H.x - uEye.x, y - uEye.y, H.y - uEye.z)), dir, lite);
   col = mix(col, nl.rgb, nl.a);
   return col;
+}
+vec3 photoS(sampler2D band, sampler2D full, vec3 d){
+  float u = fract(atan(d.x, -d.z)*0.15915494 + uYaw);
+  float e = asin(clamp(d.y, -1.0, 1.0));
+  float vb = (e + 0.2094395)/1.0471976;
+  vec3 c = (vb > 0.003 && vb < 0.997) ? texture2D(band, vec2(u, vb)).rgb : texture2D(full, vec2(u, e*0.31830989 + 0.5)).rgb;
+  return pow(c, vec3(2.2));
+}
+vec3 photoEnv(vec3 dir){
+  vec3 d = normalize(dir);
+  vec3 c = mix(photoS(uBandA, uFullA, d), photoS(uBandB, uFullB, d), uPMix);
+  float g = dot(c, vec3(0.3, 0.59, 0.11));
+  c = mix(c, vec3(g)*vec3(0.94, 0.97, 1.02), clamp(uCloud - 0.3, 0.0, 1.0)*0.75);
+  c *= 1.0 - 0.35*clamp(uCloud - 0.4, 0.0, 1.0) - 0.25*uRain;
+  if(d.y > 0.0){
+    vec2 cuv = d.xz/(d.y + 0.10)*0.6 + uCloudOff;
+    float n = fbm5(cuv);
+    float cov = smoothstep(0.66 - uCloud*0.38, 0.95 - uCloud*0.3, n)*clamp((uCloud - 0.35)*1.8, 0.0, 1.0);
+    float n2 = fbm3(cuv + uSunDir.xz*0.08);
+    float lit = clamp(0.55 + (n - n2)*2.8, 0.0, 1.0);
+    c = mix(c, mix(vec3(g*0.55), vec3(g*1.15), lit), cov*smoothstep(0.0, 0.16, d.y)*0.92);
+  }
+  float hz = exp(-abs(d.y)*10.0);
+  c = mix(c, vec3(g)*0.9 + uFogCol*0.15, clamp(hz*(uMist*0.35 + max(uFogDen - 0.006, 0.0)*35.0), 0.0, 0.8));
+  return c;
+}
+vec3 envRay(vec3 P, vec3 dir, bool disks, bool lite){
+  if(uPhoto > 0.5) return photoEnv(dir);
+  return envRayProc(P, dir, disks, lite);
 }
 `;
 SH.skyVS = `
@@ -385,6 +427,7 @@ uniform vec3 uScatter;
 uniform float uWave;
 uniform float uSunVis;
 varying vec3 vW;
+vec3 TM(vec3 x){ if(uPhoto < 0.5) return x; x *= uExpo; return clamp((x*(2.51*x + 0.03))/(x*(2.43*x + 0.59) + 0.14), 0.0, 1.0); }
 vec2 wv(vec2 p, vec2 d, float len, float amp, float dist){
   float k = 6.2831853/len; float w = sqrt(9.81*k);
   float ph = dot(d, p)*k - w*uTime;
@@ -398,6 +441,8 @@ vec3 noised(vec2 x){
 }
 void main(){
   vec3 Vv = cameraPosition - vW; float dist = length(Vv); vec3 V = Vv/dist;
+  if(uPhoto > 0.5){ vec3 dv = normalize(vW - uEye); float ev = asin(clamp(dv.y, -1.0, 1.0));
+    if(ev > -0.2094){ float uu = fract(atan(dv.x, -dv.z)*0.15915494 + uYaw); if(texture2D(uMask, vec2(uu, clamp((ev + 0.2094)/0.2094, 0.0, 1.0))).r < 0.5) discard; } }
   vec2 p = vW.xz;
   float rp = length(p); float Rs = shoreR(atan(p.x, -p.y));
   float nearShore = 1.0 - smoothstep(2.0, 20.0, Rs - rp);
@@ -464,15 +509,16 @@ void main(){
   float ndl = max(uSunDir.y, 0.0);
   vec3 body = uDeep*(amb*0.7 + uLightCol*ndl*uSunVis*0.22*csh)
             + uScatter*(amb*0.25 + uLightCol*0.12*uSunVis)*(0.5 + 0.5*clamp(dot(N, normalize(uSunDir + vec3(0.0, 0.5, 0.0))), 0.0, 1.0));
-  vec3 col = mix(body, refl, F) + glint*(0.25 + 0.75*F);
+  vec3 col = mix(TM(body), refl, F) + TM(glint*(0.25 + 0.75*F));
   vec3 dwc = vec3(0.09, 0.19, 0.024)*(0.65 + 0.55*mix(0.5, leaf, fadeD))*(amb*0.75 + uLightCol*ndl*uSunVis*0.42*csh + 0.02);
-  col = mix(col, dwc, dw);
+  col = mix(col, TM(dwc), dw);
   float foamS = (1.0 - smoothstep(0.3, 2.5, Rs - rp))*(0.5 + 0.5*noise2(p*1.3 + uTime*0.05));
   float cap = smoothstep(0.16, 0.3, length(g))*clamp((uWind.z - 0.45)*2.2, 0.0, 1.0)*(0.5 + 0.5*noise2(p*2.0 - uCloudOff*30.0));
   float foam = clamp(foamS*0.55 + cap*0.8, 0.0, 0.9)*(1.0 - dw);
-  col = mix(col, (amb*0.9 + uLightCol*ndl*0.5*csh)*0.55, foam);
+  col = mix(col, TM((amb*0.9 + uLightCol*ndl*0.5*csh)*0.55), foam);
   float mist = uMist*0.4*smoothstep(12.0, 90.0, dist);
-  col = mix(col, fogColor(-V), clamp(fogF(dist)*0.9 + mist, 0.0, 0.95));
+  vec3 fogC = uPhoto > 0.5 ? photoEnv(normalize(vec3(-V.x, 0.015, -V.z))) : fogColor(-V);
+  col = mix(col, fogC, clamp(fogF(dist)*0.9 + mist, 0.0, 0.95));
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <encodings_fragment>
@@ -516,7 +562,7 @@ const head = new T.Group(); head.rotation.x = -0.16; player.add(head); head.add(
 const V = () => new T.Vector3();
 const U = { uTime:{value:0}, uSunDir:{value:new T.Vector3(0,1,0)}, uLightCol:{value:V()}, uSunDisk:{value:new T.Vector3(0,1,0)},
   uSunCol:{value:V()}, uMoonDir:{value:new T.Vector3(0,1,0)}, uMoonCol:{value:V()}, uZenith:{value:V()}, uHorizon:{value:V()},
-  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0} };
+  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1} };
 
 // 天空球（含樹林遠景）
 const skyMat = new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:SH.common+SH.skyFS, side:T.BackSide, depthWrite:false, depthTest:false});
@@ -528,7 +574,7 @@ const rip = []; for(let i=0;i<12;i++) rip.push(new T.Vector4(0,0,0,0));
 const WU = Object.assign({}, U, { uRip:{value:rip}, uDeep:{value:new T.Vector3(0.010,0.019,0.011)}, uScatter:{value:new T.Vector3(0.018,0.045,0.026)}, uWave:{value:1.0} });
 const waterMat = new T.ShaderMaterial({uniforms:WU, vertexShader:SH.waterVS, fragmentShader:SH.common+SH.waterFS, extensions:{derivatives:true}});
 const SEG = 256, wpos = [0,0,0], widx = [];
-for(let i=0;i<=SEG;i++){ const az=-Math.PI+2*Math.PI*i/SEG, R=shoreR(az)+0.3; wpos.push(Math.sin(az)*R, 0, -Math.cos(az)*R); }
+for(let i=0;i<=SEG;i++){ const az=-Math.PI+2*Math.PI*i/SEG, R=1500; wpos.push(Math.sin(az)*R, 0, -Math.cos(az)*R); }
 for(let i=1;i<=SEG;i++) widx.push(0, i+1, i);
 const wgeo = new T.BufferGeometry(); wgeo.setAttribute('position', new T.Float32BufferAttribute(wpos,3)); wgeo.setIndex(widx);
 const water = new T.Mesh(wgeo, waterMat); water.frustumCulled = false; scene.add(water);
@@ -609,6 +655,10 @@ function setTime(hour, force){
   hemi.color.setRGB((z.x+hz.x)*0.6, (z.y+hz.y)*0.6, (z.z+hz.z)*0.6);
   hemi.groundColor.setRGB(0.012, 0.022, 0.014);
   info.day = U.uDay.value; info.light = Math.min(1.2, 0.08 + (lc.x+lc.y+lc.z)/3*0.35 + (hz.x+hz.y+hz.z)/3*0.5);
+  if(photoHook){ const o=photoHook(h,wx); if(o){
+    U.uSunDir.value.copy(o.dir); U.uSunDisk.value.copy(o.dir); U.uLightCol.value.set(o.lc[0],o.lc[1],o.lc[2]); U.uSunVis.value=1-wx.cloud*.85;
+    renderer.toneMappingExposure=o.exp; U.uExpo.value=o.exp; sunLight.color.setRGB(o.lc[0],o.lc[1],o.lc[2]); sunLight.intensity=.35*(1-wx.cloud*.8);
+    sunLight.position.copy(o.dir).multiplyScalar(60); hemi.intensity=0; info.light=o.light; return info; } }
   let dh = Math.abs(h - envHour); if(dh > 12) dh = 24 - dh;
   if(force || dh > 0.35 || wxDirty){ wxDirty = false; envHour = h; regenEnv(); }
   return info;
@@ -628,8 +678,11 @@ function resize(w, h){ lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ?
 function setPR(v){ pr = v; renderer.setPixelRatio(pr); renderer.setSize(lw, lh); }
 function render(){ renderer.render(scene, camera); }
 
+let photoHook=null;
+function setPhotoHook(f){ photoHook=f; }
+function setPhotoActive(){ U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; }
 function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
-return { setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
 const SCAN_TINT=`#include <map_fragment>
 { vec3 al_ = diffuseColor.rgb; float L_ = dot(al_, vec3(0.3, 0.59, 0.11));
@@ -1059,7 +1112,7 @@ function getFish(sp){
 const showLight=new T.PointLight(0xfff4e8,0,6,1.2); showLight.position.set(.5,.6,.3); head.add(showLight);
 
 function setRodLook(col,gold){ blankMat.color.set(col); const gm=gold?goldMat:chromeMat; guides.forEach(g=>{ g.material=gm; }); tipTop.material=gm; }
-return { setRodLook, rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
+return { dockMats:{plankMat,postMat,beamMat}, setRodLook, rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
 }
 /* ===== 第 2 段 · 水下鏡頭、釣具店、等級與任務 ===== */
 const SH2 = {};
@@ -1362,6 +1415,7 @@ function render(){
     h+=tg('uw','水下鏡頭','魚靠近餌時切到水下看牠咬餌',save.uw!==false);
     h+=tg('imm','沉浸模式','隱藏上方大部分介面，只留設定和動作按鈕',!!save.imm);
     h+='<div class="note">真實魚模型：Barramundi Fish © Microsoft 2017，CC0 授權（Khronos glTF Sample Assets）</div>';
+    h+='<div class="note">實拍湖景、HDR 光照、碼頭與泥灘材質、枯木樹樁岩石蕨類模型：Poly Haven（CC0）</div>';
     h+=row('重置存檔','金幣、等級、裝備、圖鑑全部清除',`<button class="sbtn danger" data-a="reset">${resetArm?'再按一次確認':'重置'}</button>`);
   }
   else if(cur==='spot'){
@@ -1807,6 +1861,86 @@ function update(dt,t){
 }
 return {update,ring};
 }
+/* ===== 真實場景：360° 實拍環境、HDR 光照、掃描 3D 模型（素材：Poly Haven，CC0） ===== */
+function createReal(W,P,cb){
+'use strict';
+const T=THREE, U=W.U;
+const clamp=(x,a,b)=>x<a?a:x>b?b:x, sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+// 三張同一腳架拍攝的湖景：dawn=破曉/黃昏、day=日出後白天、night=入夜
+const META={dawn:{u:.3633,el:6.33,exp:.252,lc:[1.0,.72,.52],li:1.2,light:.7},
+            day:{u:.3496,el:5.62,exp:1.0,lc:[1.0,.86,.7],li:2.4,light:1},
+            night:{u:.6865,el:44.3,exp:.14,lc:[.55,.62,.85],li:.5,light:.3}};
+const YAW=.25; U.uYaw.value=YAW;
+let total=0, errors=0;
+const mgr=new T.LoadingManager();
+mgr.onProgress=(u,l,t)=>{ total=t; if(cb) cb(l/t,false,errors); };
+mgr.onError=()=>{ errors++; if(cb) cb(0,false,errors); };
+const tl=new T.TextureLoader(mgr);
+const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter=T.LinearFilter; t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; return t; };
+const tex={}, env={};
+function loadKey(k){ const o={ready:false,n:0}; tex[k]=o; const fin=()=>{ if(++o.n===2) o.ready=true; };
+  o.band=prep(tl.load(`env_${k}_band.jpg`,fin)); o.full=prep(tl.load(`env_${k}_full.jpg`,fin)); }
+const pmrem=new T.PMREMGenerator(W.renderer);
+function loadEnv(k){ env[k]=null; if(!T.RGBELoader) return;
+  new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(`env_${k}.hdr`,t=>{ env[k]=pmrem.fromEquirectangular(t).texture; t.dispose(); }); }
+U.uMask.value=prep(tl.load('env_mask.png'));
+['day','dawn','night'].forEach(k=>{ loadKey(k); loadEnv(k); });
+
+function sched(h){
+  const H=((h%24)+24)%24;
+  const L=[[4.5,'night','dawn'],[6.0,'dawn','dawn'],[6.6,'dawn','day'],[8.0,'day','day'],[16.5,'day','dawn'],[18.0,'dawn','dawn'],[18.6,'dawn','night'],[20.0,'night','night']];
+  let i=L.length-1; for(let k=0;k<L.length;k++) if(H>=L[k][0]) i=k;
+  const s=L[i], e=L[(i+1)%L.length][0], len=((e-s[0])+24)%24||24, t=(((H-s[0])+24)%24)/len;
+  return [s[1],s[2],s[1]===s[2]?0:t*t*(3-2*t)];
+}
+const dA=new T.Vector3(), dB=new T.Vector3(), dir=new T.Vector3();
+const sunDir=(m,o)=>{ const th=(m.u-YAW)*Math.PI*2, e=m.el*Math.PI/180; return o.set(Math.sin(th)*Math.cos(e),Math.sin(e),-Math.cos(th)*Math.cos(e)); };
+let started=false, envKey=null;
+W.setPhotoHook((h,wx)=>{
+  const [a,b,m]=sched(h), A=tex[a], B=tex[b];
+  if(!A||!A.ready||!B||!B.ready) return null;
+  if(!started){ started=true; W.setPhotoActive(); if(cb) cb(1,true,errors); }
+  U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m;
+  const k=m<.5?a:b; if(env[k]&&envKey!==k){ envKey=k; W.scene.environment=env[k]; }
+  const MA=META[a], MB=META[b], L=(x,y)=>x+(y-x)*m;
+  sunDir(MA,dA); sunDir(MB,dB); dir.copy(dA).lerp(dB,m).normalize();
+  const li=L(MA.li,MB.li)*(1-wx.cloud*.75-wx.rain*.15);
+  return {dir, lc:[L(MA.lc[0],MB.lc[0])*li,L(MA.lc[1],MB.lc[1])*li,L(MA.lc[2],MB.lc[2])*li],
+    exp:Math.exp(L(Math.log(MA.exp),Math.log(MB.exp)))*(1-wx.cloud*.15), light:L(MA.light,MB.light)*(1-wx.cloud*.3)};
+});
+
+/* ---------- 碼頭：實拍風化木板材質 ---------- */
+const rep=(t,x,y,srgb)=>{ t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(x,y); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; return t; };
+const dDiff=tl.load('dock_diff.jpg'), dNor=tl.load('dock_nor.jpg'), dRough=tl.load('dock_rough.jpg');
+if(P.dockMats){ const {plankMat,postMat,beamMat}=P.dockMats;
+  Object.assign(plankMat,{map:rep(dDiff,1.25,.1,true),normalMap:rep(dNor,1.25,.1),roughnessMap:rep(dRough,1.25,.1),roughness:1}); plankMat.needsUpdate=true;
+  for(const m of [postMat,beamMat]){ Object.assign(m,{map:rep(dDiff.clone(),.4,1.6,true),normalMap:rep(dNor.clone(),.4,1.6),roughnessMap:rep(dRough.clone(),.4,1.6),roughness:1,color:new T.Color(.75,.72,.68)});
+    m.map.needsUpdate=m.normalMap.needsUpdate=m.roughnessMap.needsUpdate=true; m.needsUpdate=true; } }
+
+/* ---------- 岸邊泥灘（實拍泥土落葉材質） ---------- */
+const mud={map:rep(tl.load('mud_diff.jpg'),5,5,true),normalMap:rep(tl.load('mud_nor.jpg'),5,5),roughnessMap:rep(tl.load('mud_rough.jpg'),5,5)};
+const mudMat=new T.MeshStandardMaterial(Object.assign({roughness:1},mud));
+function bank(cx,cz,w,d,side){ const g=new T.PlaneGeometry(w,d,60,60); g.rotateX(-Math.PI/2); const p=g.attributes.position;
+  for(let i=0;i<p.count;i++){ const x=p.getX(i), z=p.getZ(i), edge=side*x+Math.sin(z*.55)*1.1+Math.sin(z*1.7+1)*.35;
+    p.setY(i,-.45+.95*sstep(-w*.32,w*.22,-edge)+.06*Math.sin(x*2.1+z*1.3)+.04*Math.sin(x*5.3-z*3.1)); }
+  g.computeVertexNormals(); const m=new T.Mesh(g,mudMat); m.position.set(cx,0,cz); W.scene.add(m); }
+bank(-10.5,-7,11,13,1); bank(12.5,-9,10,12,-1);
+
+/* ---------- 掃描 3D 模型 ---------- */
+if(T.GLTFLoader){
+  const gl=new T.GLTFLoader(mgr);
+  const place=(file,list)=>gl.load(file,g=>{ g.scene.traverse(o=>{ if(o.isMesh&&o.material){ o.material.envMapIntensity=1; } });
+    for(const it of list){ const c=g.scene.clone(true); c.position.set(it[0],it[1],it[2]); c.rotation.set(it[4]||0,it[3]||0,it[5]||0); c.scale.setScalar(it[6]||1); W.scene.add(c); } });
+  place('dead_tree_trunk_02.glb',[[-5.8,-.2,-9.5,.6,0,.05,1.1],[7.5,-.25,-16,-1.1,0,0,1.0],[-13,-.15,-22,2.2,0,0,1.2],[2,-.3,-26,.2,0,0,1.3]]);
+  place('tree_stump_01.glb',[[3.9,-.14,-7.6,1,0,0,1.0],[-8.2,-.12,-14,2,0,0,1.3],[10,-.18,-24,0,0,0,1.4],[-3,-.2,-30,1.2,0,0,1.5]]);
+  place('tree_stump_02.glb',[[-3.4,-.12,-5.2,.4,0,0,.8],[12.5,-.12,-11,1.7,0,0,1.1],[5.5,-.15,-34,2.5,0,0,1.6]]);
+  place('dry_branches_medium_01.glb',[[-1.6,.03,-13,.4,0,0,1.6],[4.6,.03,-19,1.2,0,0,1.8],[-6.8,.03,-20,2.6,0,0,1.5],[1.2,.03,-9,2.0,0,0,1.2]]);
+  place('rock_moss_set_01.glb',[[-7.2,-.25,-6,.5,0,0,.8],[-9.8,0,-10.6,2,0,0,.7],[10.2,-.2,-7,1,0,0,.75]]);
+  place('fern_02.glb',[[-9.2,.36,-4.6,0,0,0,1.6],[-11.2,.42,-8.2,1,0,0,1.8],[-8.8,.28,-9.6,2,0,0,1.4],[12,.4,-6,1.5,0,0,1.6],[14,.45,-10,.3,0,0,1.7]]);
+  place('shrub_02.glb',[[-12.8,.46,-5.6,.5,0,0,1.2],[-13.4,.46,-11,2,0,0,1.0],[15,.46,-8,1,0,0,1.1]]);
+}
+return {sched};
+}
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
 'use strict';
@@ -2232,7 +2366,10 @@ requestAnimationFrame(frame);
 
 (function boot(){
   if(!window.THREE){ boot.n=(boot.n||0)+1; if(boot.n>240){ showErr('3D 引擎載入失敗。請確認網路連線後重新整理頁面。'); return; } setTimeout(boot,50); return; }
-  try{ const W=createWorld({canvas:document.getElementById('c')}); const P=createProps(W); startGame(W,P); }
+  try{ const W=createWorld({canvas:document.getElementById('c')}); const P=createProps(W);
+    const ln=document.getElementById('loadNote');
+    try{ createReal(W,P,(p,done,err)=>{ if(!ln) return; if(done) ln.textContent='真實場景已載入'; else if(err&&p===0) ln.textContent='部分場景檔案載入失敗，暫用簡化畫面（'+err+'）'; else ln.textContent='正在載入真實場景… '+Math.round(p*100)+'%'; }); }catch(e){ console.warn(e); }
+    startGame(W,P); }
   catch(e){ console.error(e); showErr('這個瀏覽器無法啟動 WebGL 3D 畫面。<br><small>'+String(e&&e.message||e)+'</small>'); }
 })();
 </script>

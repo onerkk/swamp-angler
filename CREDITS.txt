@@ -1,0 +1,5 @@
+濕地垂釣 使用的外部素材（皆為 CC0 公眾領域授權，可自由使用與商用）
+- 360° 實拍湖景與 HDR 光照：lakeside_dawn / lakeside_sunrise / lakeside_night — Poly Haven (polyhaven.com)
+- 3D 掃描模型：dead_tree_trunk_02, tree_stump_01, tree_stump_02, rock_moss_set_01, fern_02, shrub_02, dry_branches_medium_01 — Poly Haven
+- 材質：weathered_planks（碼頭）, brown_mud_leaves_01（泥灘）— Poly Haven
+- 掃描魚模型：Barramundi Fish © Microsoft 2017 — Khronos glTF Sample Assets
