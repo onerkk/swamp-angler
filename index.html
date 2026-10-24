@@ -318,6 +318,9 @@ uniform float uYaw;
 uniform float uExpo;
 uniform float uNight;
 uniform float uNightDeep;
+uniform sampler2D uRefl;
+uniform mat4 uReflMat;
+uniform float uReflOn;
 uniform float uSea;
 uniform vec3 uSeaCol;
 uniform float uReef;
@@ -634,6 +637,12 @@ void main(){
   float F = 0.02 + 0.98*pow(1.0 - NdV, 5.0);
   vec3 R = reflect(-V, N); R.y = max(R.y, 0.003); R = normalize(R);
   vec3 refl = envRay(vW, R, false, true);
+  if(uReflOn > 0.5){
+    vec4 rp = uReflMat*vec4(vW.x, 0.0, vW.z, 1.0);
+    vec2 ruv = rp.xy/rp.w + N.xz*(0.03 + 0.05*uSea)*(1.0 - smoothstep(30.0, 160.0, dist)*0.6);
+    vec4 rc = texture2D(uRefl, clamp(ruv, 0.002, 0.998));
+    refl = mix(refl, TM(rc.rgb)*0.92, clamp(rc.a, 0.0, 1.0)*(1.0 - 0.35*uRain));
+  }
   float sd = max(dot(R, uSunDir), 0.0);
   vec3 glint = uLightCol*(pow(sd, 1600.0)*28.0 + pow(sd, 160.0)*0.5)*uSunVis*csh;
   vec3 amb = mix(uHorizon, uZenith, 0.5);
@@ -848,14 +857,43 @@ function update(dt, t){
 let pr = Math.min(window.devicePixelRatio || 1, 2), lw = 1, lh = 1;
 function resize(w, h){ lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ? 70 : 52; camera.updateProjectionMatrix(); renderer.setPixelRatio(pr); renderer.setSize(w, h); }
 function setPR(v){ pr = v; renderer.setPixelRatio(pr); renderer.setSize(lw, lh); }
-function render(){ renderer.render(scene, camera); }
+/* 水面倒影：鏡像相機只拍物體（不含天空、水面），水面依波紋扭曲取樣 */
+const reflRT=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true});
+const reflCam=new T.PerspectiveCamera(), reflTM=new T.Matrix4();
+WU.uRefl={value:reflRT.texture}; WU.uReflMat={value:reflTM}; WU.uReflOn={value:0};
+const _rp=new T.Vector3(), _cp=new T.Vector3(), _rm=new T.Matrix4(), _la=new T.Vector3(), _tg=new T.Vector3(), _n=new T.Vector3(0,1,0), _vw=new T.Vector3();
+const _pl=new T.Plane(), _cpl=new T.Vector4(), _q=new T.Vector4(), _sz=new T.Vector2(); let reflScale=.35, reflEnabled=true, reflHide=[];
+function setRefl(on,scale){ reflEnabled=on; if(scale) reflScale=scale; WU.uReflOn.value=0; }
+function renderRefl(){
+  camera.updateMatrixWorld(); _cp.setFromMatrixPosition(camera.matrixWorld);
+  if(_cp.y<.05){ WU.uReflOn.value=0; return; }
+  renderer.getDrawingBufferSize(_sz); const w=Math.max(64,Math.round(_sz.x*reflScale)), h=Math.max(64,Math.round(_sz.y*reflScale));
+  if(reflRT.width!==w||reflRT.height!==h) reflRT.setSize(w,h);
+  _rp.set(_cp.x,0,_cp.z); _vw.subVectors(_rp,_cp).reflect(_n).negate().add(_rp);
+  _rm.extractRotation(camera.matrixWorld); _la.set(0,0,-1).applyMatrix4(_rm).add(_cp);
+  _tg.subVectors(_rp,_la).reflect(_n).negate().add(_rp);
+  reflCam.position.copy(_vw); reflCam.up.set(0,1,0).applyMatrix4(_rm).reflect(_n); reflCam.lookAt(_tg);
+  reflCam.far=camera.far; reflCam.near=camera.near; reflCam.updateMatrixWorld(); reflCam.projectionMatrix.copy(camera.projectionMatrix);
+  reflTM.set(.5,0,0,.5, 0,.5,0,.5, 0,0,.5,.5, 0,0,0,1).multiply(reflCam.projectionMatrix).multiply(reflCam.matrixWorldInverse);
+  _pl.setFromNormalAndCoplanarPoint(_n,_rp).applyMatrix4(reflCam.matrixWorldInverse);
+  _cpl.set(_pl.normal.x,_pl.normal.y,_pl.normal.z,_pl.constant);
+  const pm=reflCam.projectionMatrix;
+  _q.x=(Math.sign(_cpl.x)+pm.elements[8])/pm.elements[0]; _q.y=(Math.sign(_cpl.y)+pm.elements[9])/pm.elements[5]; _q.z=-1; _q.w=(1+pm.elements[10])/pm.elements[14];
+  _cpl.multiplyScalar(2/_cpl.dot(_q)); pm.elements[2]=_cpl.x; pm.elements[6]=_cpl.y; pm.elements[10]=_cpl.z+1-.003; pm.elements[14]=_cpl.w;
+  const hid=[water,seaGrid,sky,...reflHide].filter(o=>o&&o.visible); hid.forEach(o=>o.visible=false);
+  const oc=renderer.getClearColor(new T.Color()), oa=renderer.getClearAlpha(), ort=renderer.getRenderTarget(), bg=scene.background, sh=renderer.shadowMap.autoUpdate;
+  scene.background=null; renderer.shadowMap.autoUpdate=false;
+  renderer.setRenderTarget(reflRT); renderer.setClearColor(0x000000,0); renderer.clear(); renderer.render(scene,reflCam);
+  renderer.setRenderTarget(ort); renderer.setClearColor(oc,oa); scene.background=bg; renderer.shadowMap.autoUpdate=sh;
+  hid.forEach(o=>o.visible=true); WU.uReflOn.value=1; }
+function render(){ if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } renderer.render(scene, camera); }
 
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=on; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
 let photoHook=null;
 function setPhotoHook(f){ photoHook=f; }
 function setPhotoActive(){ U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; seaMat.toneMapped=false; seaMat.needsUpdate=true; }
 function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
-return { setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
 const SCAN_TINT=`#include <map_fragment>
 { vec3 al_ = diffuseColor.rgb; float L_ = dot(al_, vec3(0.3, 0.59, 0.11));
@@ -2632,7 +2670,7 @@ for(let i=0;i<ND;i++){ dr[i*3]=Math.random(); dr[i*3+1]=Math.random()*.8; dr[i*3
 dg.setAttribute('position',new T.BufferAttribute(dp,3)); dg.setAttribute('aR',new T.BufferAttribute(dr,3));
 const dU={uTime:W.U.uTime,uC:rU.uC,uRad:{value:14},uScale:{value:800},uRain:rU.uRain,uCol:rU.uCol};
 const drops=new T.Points(dg,new T.ShaderMaterial({uniforms:dU,vertexShader:SH4.dropVS,fragmentShader:SH4.dropFS,transparent:true,depthWrite:false}));
-drops.frustumCulled=false; S.add(drops);
+drops.frustumCulled=false; S.add(drops); if(W.reflHide){ W.reflHide(rings); W.reflHide(drops); }
 
 /* ---------- 大白鯊 ---------- */
 function sharkTex(){ const w=64,h=128,d=new Uint8Array(w*h*4);
