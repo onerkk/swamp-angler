@@ -100,7 +100,7 @@ button.chip{color:var(--fg);font-family:inherit;cursor:pointer}
 .xpb i{display:block;height:100%;width:0;background:var(--accent)}
 #baitC{color:var(--fg-dim);font-weight:600}
 .ib.dotn::after{content:"";position:absolute;top:3px;right:3px;width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2px rgba(0,0,0,.4)}
-#uwTag{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 200px);transform:translateX(-50%) skewX(-12deg);display:flex;z-index:5;pointer-events:none;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))}
+#uwTag{position:fixed;left:50%;top:calc(var(--hudY,150px) + 30px);transform:translateX(-50%) skewX(-12deg);display:flex;z-index:5;pointer-events:none;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))}
 #fade{position:fixed;top:0;right:0;bottom:0;left:0;background:#000;opacity:0;pointer-events:none;z-index:6;transition:opacity .16s}
 #fade.on{opacity:1}
 .xpg{margin-left:auto;white-space:nowrap;color:var(--accent);font-weight:800}
@@ -112,6 +112,13 @@ button.chip{color:var(--fg);font-family:inherit;cursor:pointer}
 .sbtn.pri{background:var(--accent);color:#1d1606;border-color:transparent}
 .sbtn.danger{background:rgba(239,84,70,.18);color:var(--bad);border-color:rgba(239,84,70,.4)}
 .eqd{font-size:13px;font-weight:800;color:var(--good)}
+#fxBar{position:fixed;right:12px;top:calc(var(--hudY,150px) + 52px);z-index:4;display:flex;flex-direction:column;gap:4px;align-items:flex-end;pointer-events:none}
+#fxBar span{background:rgba(20,26,30,.72);border:1px solid var(--stroke);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800;color:#ffe9a8}
+.merch{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:6px 0 2px;padding:10px 12px;border-radius:12px;background:linear-gradient(90deg,rgba(232,184,74,.22),rgba(232,184,74,.05))}
+.merch b{font-size:15px}.merch small{font-size:11px;color:var(--fg-dim)}
+.bb{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.cnt{display:inline;color:var(--accent);font-weight:800}
+.row .nm b{white-space:normal}
+.sw{display:inline-block;width:16px;height:16px;border-radius:50%;margin-right:6px;vertical-align:-2px;border:1px solid rgba(255,255,255,.4)}
 .lk{font-size:12px;color:var(--fg-dim)}
 .bb{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .cnt{color:var(--fg-dim);font-weight:600}
@@ -147,14 +154,14 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #pop{position:fixed;left:50%;top:34%;transform:translate(-50%,-50%) rotate(-12deg) scale(.6);font-size:46px;font-weight:900;letter-spacing:.06em;opacity:0;pointer-events:none;z-index:7;transition:transform .18s cubic-bezier(.2,1.6,.4,1),opacity .18s;-webkit-text-stroke:2px rgba(255,255,255,.85);text-shadow:0 4px 0 rgba(0,0,0,.35)}
 #pop.show{opacity:1;transform:translate(-50%,-50%) rotate(-12deg) scale(1)}
 #pop.miss{color:#6b2fb3}#pop.good{color:#2b8a3e}#pop.perfect{color:#e09a00}
-#castTag{position:fixed;right:12px;top:calc(env(safe-area-inset-top,0px) + 178px);z-index:4;text-align:right;font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000}
+#castTag{position:fixed;right:12px;top:calc(var(--hudY,150px) + 10px);z-index:4;text-align:right;font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000}
 #castTag b{display:block;margin-top:3px;background:#f2c230;color:#1d1606;font-size:22px;font-weight:900;padding:2px 10px;transform:skewX(-10deg)}
 #combo{position:fixed;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 140px);z-index:4;text-align:right;color:#ffd75e;font-weight:900;font-size:15px;text-shadow:0 2px 4px #000}
 #combo b{font-size:28px}#combo small{display:block;font-size:11px;color:#fff;opacity:.85}
 #combo.bump{animation:bump .4s ease}
 @keyframes bump{40%{transform:scale(1.35)}}
-#hotChip{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 232px);z-index:4;color:#7ff0a8;pointer-events:none}
-#tour{position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 178px);z-index:4;background:var(--glass);border:1px solid var(--stroke);border-radius:12px;padding:6px 10px;font-size:12px;min-width:132px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#hotChip{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--hudY,150px) + 58px);z-index:4;color:#7ff0a8;pointer-events:none}
+#tour{position:fixed;left:12px;top:calc(var(--hudY,150px) + 10px);z-index:4;background:var(--glass);border:1px solid var(--stroke);border-radius:12px;padding:6px 10px;font-size:12px;min-width:132px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 #tour .th{font-weight:900;color:#ffd75e;margin-bottom:2px}#tour .tr{display:flex;justify-content:space-between;gap:10px;color:var(--fg-dim)}#tour .tr.me{color:#fff;font-weight:800}
 #tourDlg{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px}
 #tourDlg .card{animation:none}
@@ -179,7 +186,7 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #story{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px}
 #story .card{animation:none}#stT{color:#bfe8ff;font-size:18px}#stB{font-size:15px;color:var(--fg);line-height:1.8}#stR{color:#ffd75e;font-weight:800}
 .chip.dotn{position:relative}.chip.dotn::after{content:"";position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:var(--bad)}
-#scene{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 290px);z-index:4;padding:8px 16px;border-radius:999px;background:linear-gradient(90deg,rgba(255,200,90,.85),rgba(255,140,170,.85));color:#2a1406;font-weight:900;font-size:15px;text-align:center;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.35);animation:sceneIn .5s ease both;pointer-events:none}
+#scene{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--hudY,150px) + 110px);z-index:4;padding:8px 16px;border-radius:999px;background:linear-gradient(90deg,rgba(255,200,90,.85),rgba(255,140,170,.85));color:#2a1406;font-weight:900;font-size:15px;text-align:center;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.35);animation:sceneIn .5s ease both;pointer-events:none}
 #scene small{display:block;font-size:11px;font-weight:700;opacity:.85}
 @keyframes sceneIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
 #qte{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:7;width:190px;padding:18px 12px;border-radius:24px;background:radial-gradient(circle at 40% 30%,#ff7a6a,#c4241c);color:#fff;text-align:center;box-shadow:0 0 0 4px rgba(255,255,255,.7),0 0 30px rgba(255,60,40,.7);touch-action:none;cursor:pointer;animation:qp .35s ease-in-out infinite alternate}
@@ -233,6 +240,7 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 <div id="scene" class="hidden"></div>
 <div id="qte" class="hidden" role="button" aria-label="猛拉閃避"><b>🦈 猛拉閃避！</b><small>連點 7 下</small><span class="qb"><i id="qteBar"></i></span></div>
 <div id="castTag" class="hidden"></div>
+<div id="fxBar"></div>
 <div id="combo" class="hidden"></div>
 <div id="hotChip" class="chip sm hidden"></div>
 <div id="tour" class="hidden"></div>
@@ -1510,6 +1518,7 @@ save.gear=save.gear||{rod:[0],line:[0],reel:[0]}; save.eq=save.eq||{rod:0,line:0
 save.bait=save.bait||'worm'; save.xp=save.xp||0; save.lv=save.lv||1; save.quests=save.quests||[];
 if(save.uw===undefined) save.uw=true; if(save.vibe===undefined) save.vibe=true;
 const sheet=$('sheet'), shT=$('shT'), shB=$('shB');
+const ECO=createEco({save,persist,toast,Snd,P,SPECIES,RAR,setCoins:()=>setCoins(),applyRod:()=>applyRod()}); window.__ECO=ECO;
 let cur=null, shopTab='rod', resetArm=false;
 const fmtW=w=>w<1?Math.round(w*1000)+' g':w.toFixed(2)+' kg';
 const PERN={dawn:'清晨',dusk:'黃昏',night:'夜晚'};
@@ -1531,8 +1540,8 @@ function newQuest(ex){
 function fillQuests(){ while(save.quests.length<3) save.quests.push(newQuest(save.quests.map(q=>q.k))); persist(); }
 function addXP(x){ save.xp+=x; while(save.xp>=xpNext(save.lv)){ save.xp-=xpNext(save.lv); save.lv++; const lv=save.lv;
   setTimeout(()=>{ toast('升級！Lv '+lv+'，釣具店可能有新東西解鎖','good',2600); Snd.fanfare(2); vib([40,40,80]); },1600); } }
-function gear(){ return {rod:GEAR.rod[save.eq.rod]||GEAR.rod[0], line:GEAR.line[save.eq.line]||GEAR.line[0], reel:GEAR.reel[save.eq.reel]||GEAR.reel[0]}; }
-function applyRod(){ const r=gear().rod; P.setRodLook(r.col,!!r.gold); }
+function gear(){ return ECO.enhance({rod:GEAR.rod[save.eq.rod]||GEAR.rod[0], line:GEAR.line[save.eq.line]||GEAR.line[0], reel:GEAR.reel[save.eq.reel]||GEAR.reel[0]}); }
+function applyRod(){ const r=GEAR.rod[save.eq.rod]||GEAR.rod[0]; P.setRodLook(r.col,!!r.gold); ECO.applySkins(); }
 function curBait(){ return BAITS.find(b=>b.id===save.bait)||BAITS[0]; }
 function useBait(){ const b=curBait(); if(b.id==='worm') return b; const n=save.baits[b.id]||0;
   if(n<=0){ save.bait='worm'; persist(); syncHUD(); toast(b.name+'用完了，改用蚯蚓','warn'); return BAITS[0]; }
@@ -1548,7 +1557,7 @@ function onCatch(fd,o){
     if(q.k==='count') d=1; else if(q.k==='rare') d=fd.sp.rar>=q.min?1:0; else if(q.k==='weight') d=fd.w;
     else if(q.k==='sp') d=fd.sp.id===q.id?1:0; else if(q.k==='per') d=o.per===q.per?1:0; else if(q.k==='perfect') d=o.perfect?1:0;
     if(d>0){ q.prog=Math.min(q.n,q.prog+d); if(q.prog>=q.n){ const t=q.txt; setTimeout(()=>toast('任務完成：'+t,'good',2200),2600); } } }
-  persist(); syncHUD(); return xp;
+  ECO.drop(fd); persist(); syncHUD(); return xp;
 }
 function onRelease(){ for(const q of save.quests) if(q.k==='release'&&q.prog<q.n){ q.prog++; if(q.prog>=q.n) toast('任務完成：'+q.txt,'good',2200); } persist(); syncHUD(); }
 function claim(i){ const q=save.quests[i]; if(!q||q.prog<q.n) return; save.coins+=q.reward; addXP(q.xp); save.quests.splice(i,1); fillQuests(); setCoins(); Snd.coin(); toast(`領取 🪙 ${q.reward} 與 ${q.xp} 經驗`,'good'); }
@@ -1558,9 +1567,10 @@ function render(){
   let h='';
   if(cur==='shop'){
     shT.textContent='釣具店';
-    h+='<div class="tabs">'+[['rod','釣竿'],['line','釣線'],['reel','捲線器'],['bait','魚餌']].map(t=>`<button class="tab${shopTab===t[0]?' on':''}" data-a="tab" data-v="${t[0]}">${t[1]}</button>`).join('')+'</div>';
-    h+=`<div class="note">🪙 ${save.coins.toLocaleString()}，Lv ${save.lv}</div>`;
-    if(shopTab!=='bait'){
+    h+='<div class="tabs">'+[['rod','釣竿'],['line','釣線'],['reel','捲線器'],['bait','魚餌'],['enh','🔨 強化'],['item','🧳 道具'],['skin','🎨 外觀'],['market','📈 魚市']].map(t=>`<button class="tab${shopTab===t[0]?' on':''}" data-a="tab" data-v="${t[0]}">${t[1]}</button>`).join('')+'</div>';
+    h+=`<div class="note">🪙 ${save.coins.toLocaleString()}，Lv ${save.lv}</div>`+ECO.matLine();
+    if(['enh','item','skin','market'].includes(shopTab)) h+=ECO.render(shopTab,GEAR);
+    else if(shopTab!=='bait'){
       h+=GEAR[shopTab].map((it,i)=>{ const own=save.gear[shopTab].includes(i), eq=save.eq[shopTab]===i, lock=save.lv<it.lv||(it.req==='mer3'&&!(save.mer&&save.mer.n>=3));
         const sub=shopTab==='rod'?`拋投 ${it.cast} m，拉扯張力 −${Math.round((1-it.tens)*100)}%`:shopTab==='line'?`強度 ${it.s.toFixed(1)}，越高越不容易斷`:`收線 ${it.spd} m/s，爆線累積 −${Math.round((1-it.drag)*100)}%`;
         const btn=eq?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="eq" data-v="${i}">裝備</button>`:lock?`<span class="lk">${it.req?'美人魚第 3 次相遇':'Lv '+it.lv+' 解鎖'}</span>`:`<button class="sbtn pri" data-a="buy" data-v="${i}">🪙 ${it.price.toLocaleString()}</button>`;
@@ -1618,7 +1628,7 @@ $('baitChip').addEventListener('click',()=>{ shopTab='bait'; open('shop'); });
 $('shX').addEventListener('click',close);
 sheet.addEventListener('click',e=>{ if(e.target===sheet) close(); });
 shB.addEventListener('click',e=>{
-  const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init();
+  const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
   if(a==='tab') shopTab=v;
   else if(a==='buy'){ const it=GEAR[shopTab][+v]; if(save.coins<it.price){ toast('金幣不夠','bad'); return; }
     save.coins-=it.price; save.gear[shopTab].push(+v); save.eq[shopTab]=+v; persist(); setCoins(); Snd.coin(); toast('已購買並裝備：'+it.name,'good'); applyRod(); }
@@ -1825,7 +1835,7 @@ return {
   waitK:()=>1-.2*cur.r,
   wind:()=>({x:Math.cos(windAng),z:Math.sin(windAng),s:clamp(windNow/12,0,1),speed:windNow}),
   wx:()=>({c:cur.c,r:cur.r,f:cur.f,type:wxType}),
-  onHook(fd,get){ chaseGet=get; stolenF=false; chaseDelay=(fd.sp.rar>=1&&Math.random()<.22&&!(W.isSea&&W.isSea()))?rand(3,7):-1; },
+  onHook(fd,get){ chaseGet=get; stolenF=false; chaseDelay=(fd.sp.rar>=1&&Math.random()<.22&&!(W.isSea&&W.isSea())&&!(window.__ECO&&window.__ECO.fxOn('repel')))?rand(3,7):-1; },
   endChase(){ chaseDelay=-1; if(gs.mode==='chase'){ const s=sp(); gs={mode:'leave',t:0,dir:new T.Vector3(gP.x-s.pos[0],0,gP.z-s.pos[1]).normalize()}; } },
   stolen(){ const v=stolenF; stolenF=false; return v; },
   chaseTxt:()=>gs.mode==='chase'?`，鱷魚距離 ${Math.max(0,gs.d-1.1).toFixed(1)} m`:''
@@ -2318,7 +2328,7 @@ function update(dt){
   if(hk.on){ hk.t+=dt; hgM.style.bottom=(hpos()*100)+'%'; htF.style.height=(clamp(1-hk.t/hk.win,0,1)*100)+'%'; }
   updHot(dt); updTour(dt);
 }
-return {goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,hookExpired,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
+return {spawnHot,goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,hookExpired,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
 }
 /* ===== 出海與美景：遊艇、海豚、鯨魚、鯊魚、飛魚、彩虹、鳥群、流星雨、黃金時刻 ===== */
 const SCENES={rainbow:'彩虹',flock:'歸鳥成群',meteor:'流星雨',golden:'黃金時刻',dolphin:'海豚群',whale:'鯨魚',shark:'鯊魚巡游',flyfish:'飛魚掠海'};
@@ -2469,7 +2479,7 @@ function updEv(dt,t,wx,day){
 }
 /* ---------- 鯊魚搶魚（出海時） ---------- */
 let chase=null, stolenF=false;
-function onHook(fd,get){ chase=null; stolenF=false; if(loc==='sea'&&fd.sp.rar>=2&&Math.random()<.2) chase={delay:rand(3,7),get,p:null}; }
+function onHook(fd,get){ chase=null; stolenF=false; if(loc==='sea'&&fd.sp.rar>=2&&Math.random()<.2&&!(window.__ECO&&window.__ECO.fxOn('repel'))) chase={delay:rand(3,7),get,p:null}; }
 function updChase(dt){ if(!chase) return; if(chase.delay>0){ chase.delay-=dt; if(chase.delay<=0){ const f=chase.get(); chase.p=new T.Vector3(f.x+rand(-14,14),0,f.z+rand(-14,14)); sfin.visible=true; c.toast('⚠️ 鯊魚衝過來了！快收線！','bad',2400); c.vib([60,60,60]); } return; }
   const f=chase.get(); tv.subVectors(f,chase.p); tv.y=0; const d=tv.length(); tv.normalize(); chase.p.addScaledVector(tv,Math.min(d,1.6*dt));
   sfin.position.copy(chase.p); sfin.rotation.y=Math.atan2(tv.x,tv.z)-Math.PI/2; if(Math.random()<dt*4) AT.ring(chase.p.x,chase.p.z,.4);
@@ -2628,6 +2638,129 @@ function update(dt,t){
 }
 return {update,snatch,offerDodge,busy:()=>!!snatchJob};
 }
+/* ===== 商店循環：素材掉落、裝備強化、道具、流浪商人、魚市行情、外觀 ===== */
+const MATS={scale:{n:'魚鱗',i:'🐟'},bone:{n:'魚骨',i:'🦴'},pearl:{n:'珍珠',i:'⚪'},crystal:{n:'海晶',i:'💎'}};
+const CONS=[
+ {id:'lure',n:'魚群誘餌',i:'🧆',p:400,d:'立刻在附近引來一群魚'},
+ {id:'repel',n:'鯊魚驅逐劑',i:'🧪',p:600,d:'10 分鐘內鯊魚和鱷魚不會來搶魚',min:10},
+ {id:'luck',n:'幸運香',i:'🪔',p:800,d:'10 分鐘內稀有魚機率大幅提升',min:10},
+ {id:'coin2',n:'金幣加倍券',i:'💰',p:1000,d:'10 分鐘內賣魚金幣 ×2',min:10},
+ {id:'glow',n:'夜光浮標',i:'🔆',p:450,d:'15 分鐘內魚咬餌更快',min:15},
+ {id:'leader',n:'鋼絲前導線',i:'⛓️',p:500,d:'下一次快斷線時自動撐住（自動使用）'}];
+const SKINS={
+ rod:[{id:'def',n:'原廠配色',c:null,p:0},{id:'black',n:'霧黑',c:'#1a1c20',p:2000},{id:'coral',n:'珊瑚紅',c:'#d8504a',p:3000},{id:'mint',n:'薄荷綠',c:'#3fbf9f',p:3000},{id:'galaxy',n:'星空紫',c:'#4a2a8a',p:6000,gold:true},{id:'gold',n:'鍍金',c:'#c9a227',p:15000,gold:true}],
+ bob:[{id:'classic',n:'經典紅白',t:0xd8301a,b:0xf2efe8,p:0},{id:'lime',n:'螢光綠',t:0x7cff3a,b:0x1a1a1a,p:1500},{id:'panda',n:'熊貓黑白',t:0x111111,b:0xffffff,p:2500},{id:'sakura',n:'櫻花粉',t:0xff8fb8,b:0xfff0f5,p:2500},{id:'gold',n:'黃金浮標',t:0xd9b25a,b:0xf6e6b0,p:5000}]};
+
+function createEco(c){
+'use strict';
+const S=c.save, now=()=>Date.now();
+S.mat=S.mat||{scale:0,bone:0,pearl:0,crystal:0}; S.enh=S.enh||{rod:{},line:{},reel:{}}; S.inv=S.inv||{}; S.fx=S.fx||{};
+S.skin=S.skin||{rod:'def',bob:'classic'}; S.skinOwn=S.skinOwn||{rod:['def'],bob:['classic']}; S.merch=S.merch||{};
+const fxOn=id=>(S.fx[id]||0)>now();
+/* 強化 */
+const lvOf=(k,i)=>(S.enh[k]&&S.enh[k][i])||0;
+function enhance(g){ const r=lvOf('rod',S.eq.rod), l=lvOf('line',S.eq.line), e=lvOf('reel',S.eq.reel);
+  return {rod:Object.assign({},g.rod,{cast:g.rod.cast*(1+.02*r),tens:g.rod.tens*(1-.015*r)}),line:Object.assign({},g.line,{s:g.line.s*(1+.04*l)}),reel:Object.assign({},g.reel,{spd:g.reel.spd*(1+.03*e),drag:g.reel.drag*(1-.02*e)})}; }
+function enhCost(lv,tier){ const coins=Math.round(300*Math.pow(1.5,lv)*(1+tier*.5)/10)*10, m={};
+  if(lv<3) m.scale=4*(lv+1); else if(lv<6) m.bone=lv-1; else if(lv<9) m.pearl=lv-4; else m.crystal=lv-7; return {coins,m}; }
+const has=m=>Object.keys(m).every(k=>(S.mat[k]||0)>=m[k]);
+const mtxt=m=>Object.keys(m).map(k=>MATS[k].i+m[k]).join(' ');
+/* 掉落 */
+let lastD='';
+function drop(fd){ const r=fd.sp.rar||0, g={}; const add=(k,n)=>{ if(n>0){ g[k]=(g[k]||0)+n; S.mat[k]=(S.mat[k]||0)+n; } };
+  if(r===0) add('scale',1+(Math.random()<.5?1:0)); else if(r===1){ add('scale',2); if(Math.random()<.5) add('bone',1); }
+  else if(r===2) add('bone',1+(Math.random()<.5?1:0)); else if(r===3){ add('bone',2); add('pearl',1); }
+  else if(r===4){ add('pearl',1+(Math.random()<.4?1:0)); if(Math.random()<.3) add('crystal',1); } else add('crystal',1+(Math.random()<.5?1:0));
+  c.persist(); lastD=Object.keys(g).map(k=>MATS[k].i+'×'+g[k]).join(' '); return lastD; }
+function dropItem(it){ if(it.id==='chest'){ S.mat.pearl=(S.mat.pearl||0)+3; S.mat.crystal=(S.mat.crystal||0)+1; c.persist(); setTimeout(()=>c.toast('寶箱裡還有 ⚪×3 💎×1','good',2200),1500); } }
+/* 每日魚市 */
+function rng(seed){ seed=Math.abs(seed)%2147483646+1; return ()=>{ seed=(seed*16807)%2147483647; return (seed-1)/2147483646; }; }
+const day=()=>Math.floor(now()/86400000);
+let mk=null, mkDay=-1;
+function market(){ if(mkDay===day()) return mk; mkDay=day(); const r=rng(mkDay*7919+13), pool=c.SPECIES.filter(s=>!s.special), pick=[];
+  while(pick.length<4&&pool.length) pick.push(pool.splice(Math.floor(r()*pool.length),1)[0]);
+  mk=[{sp:pick[0],m:3},{sp:pick[1],m:2},{sp:pick[2],m:1.5},{sp:pick[3],m:.6}]; return mk; }
+function priceMul(id){ const e=market().find(x=>x.sp.id===id); return e?e.m:1; }
+/* 流浪商人（每 4 小時換貨） */
+const ROT=4*3600000, rot=()=>Math.floor(now()/ROT);
+function offers(){ const r=rng(rot()*104729+7), pool=[
+  {id:'b_lure',n:'魚群誘餌 ×3',i:'🧆',p:840,give:{inv:{lure:3}}},{id:'b_luck',n:'幸運香 ×2',i:'🪔',p:1100,give:{inv:{luck:2}}},
+  {id:'b_coin',n:'金幣加倍券 ×2',i:'💰',p:1400,give:{inv:{coin2:2}}},{id:'b_repel',n:'鯊魚驅逐劑 ×3',i:'🧪',p:1260,give:{inv:{repel:3}}},
+  {id:'b_moon',n:'月光餌 ×3',i:'🌙',p:1200,give:{bait:{moon:3}}},{id:'b_live',n:'活魚餌 ×10',i:'🐟',p:900,give:{bait:{live:10}}},
+  {id:'m_bone',n:'魚骨 ×4',i:'🦴',p:1600,give:{mat:{bone:4}}},{id:'m_pearl',n:'珍珠 ×2',i:'⚪',p:3500,give:{mat:{pearl:2}}},
+  {id:'m_crys',n:'海晶 ×1',i:'💎',p:6000,give:{mat:{crystal:1}}},{id:'s_glow',n:'夜光浮標 ×3',i:'🔆',p:950,give:{inv:{glow:3}}},
+  {id:'s_lead',n:'鋼絲前導線 ×3',i:'⛓️',p:1050,give:{inv:{leader:3}}}], out=[];
+  while(out.length<4) out.push(pool.splice(Math.floor(r()*pool.length),1)[0]); return out; }
+const bought=()=>S.merch[rot()]||[];
+/* 道具 */
+function useCon(id){ const it=CONS.find(x=>x.id===id); if(!it||(S.inv[id]||0)<=0) return;
+  if(id==='lure'){ if(!(window.__FUN&&window.__FUN.spawnHot())){ c.toast('這裡引不來魚群，換個方向試試','warn'); return; } }
+  else if(id==='leader'){ c.toast('鋼絲前導線會在快斷線時自動使用','',1800); return; }
+  else S.fx[id]=Math.max(now(),S.fx[id]||0)+it.min*60000;
+  S.inv[id]--; c.persist(); c.Snd.coin(); if(id!=='lure') c.toast(it.i+' '+it.n+' 生效 '+it.min+' 分鐘','good'); }
+function useLeader(){ if((S.inv.leader||0)>0){ S.inv.leader--; c.persist(); return true; } return false; }
+/* 外觀 */
+function applySkins(){ const rs=SKINS.rod.find(s=>s.id===S.skin.rod); if(rs&&rs.c) c.P.setRodLook(rs.c,!!rs.gold);
+  const bs=SKINS.bob.find(s=>s.id===S.skin.bob)||SKINS.bob[0], ch=c.P.bobber.children; ch[0].material.color.setHex(bs.t); ch[1].material.color.setHex(bs.b); }
+/* 介面 */
+const row=(name,sub,right)=>`<div class="row"><div class="nm"><b>${name}</b><small>${sub}</small></div><div class="rt">${right}</div></div>`;
+const matLine=()=>`<div class="note">${Object.keys(MATS).map(k=>MATS[k].i+' '+MATS[k].n+' '+(S.mat[k]||0)).join('　')}</div>`;
+const fmtT=ms=>{ const s=Math.max(0,Math.floor(ms/1000)); return Math.floor(s/3600)+':'+String(Math.floor(s%3600/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); };
+function render(tab,GEAR){
+  let h='';
+  if(tab==='enh'){
+    h+='<div class="note">釣魚會掉落素材。越稀有的魚掉越好的素材，強化越後面越需要稀有素材。</div>';
+    [['rod','釣竿'],['line','釣線'],['reel','捲線器']].forEach(([k,label])=>{ const idx=S.eq[k], it=GEAR[k][idx], lv=lvOf(k,idx);
+      const st='★'.repeat(Math.min(lv,10))+'☆'.repeat(Math.max(0,10-lv));
+      const eff=k==='rod'?`拋投 +${lv*2}%、張力 −${(lv*1.5).toFixed(1)}%`:k==='line'?`強度 +${lv*4}%`:`收線 +${lv*3}%、爆線累積 −${lv*2}%`;
+      if(lv>=10){ h+=row(`${label}：${it.name} +10`,`${st}<br>${eff}`,'<span class="eqd">已滿級</span>'); return; }
+      const cs=enhCost(lv,idx), ok=S.coins>=cs.coins&&has(cs.m);
+      h+=row(`${label}：${it.name} +${lv}`,`${st}<br>${eff}<br>下一級：🪙${cs.coins.toLocaleString()} ${mtxt(cs.m)}`,`<button class="sbtn${ok?' pri':''}" data-a="enh" data-v="${k}">強化</button>`); });
+    h+='<div class="note">換裝其他裝備時，各自的強化等級會保留。</div>';
+  } else if(tab==='item'){
+    const left=ROT-(now()%ROT), bs=bought();
+    h+=`<div class="merch"><b>🧳 流浪商人</b><small>${fmtT(left)} 後換貨，每樣限購一次</small></div>`;
+    h+=offers().map(o=>row(`${o.i} ${o.n}`,'限時商品',bs.includes(o.id)?'<span class="eqd">已購買</span>':`<button class="sbtn pri" data-a="merch" data-v="${o.id}">🪙 ${o.p.toLocaleString()}</button>`)).join('');
+    h+='<div class="note" style="margin-top:12px">道具</div>';
+    h+=CONS.map(it=>{ const n=S.inv[it.id]||0, act=fxOn(it.id)?`（剩 ${Math.ceil((S.fx[it.id]-now())/60000)} 分）`:'';
+      return row(`${it.i} ${it.n} <small class="cnt">×${n}</small>`,it.d+act,`<div class="bb"><button class="sbtn" data-a="buyc" data-v="${it.id}">+1 🪙${it.p}</button>${n>0&&it.id!=='leader'?`<button class="sbtn pri" data-a="usec" data-v="${it.id}">使用</button>`:''}</div>`); }).join('');
+  } else if(tab==='skin'){
+    h+='<div class="note">釣竿配色（不影響數值）</div>';
+    h+=SKINS.rod.map(s=>{ const own=S.skinOwn.rod.includes(s.id), on=S.skin.rod===s.id;
+      return row(`<span class="sw" style="background:${s.c||'#1d4fb8'}"></span>${s.n}`,s.gold?'附金色導環':'',on?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="skine" data-v="rod:${s.id}">換上</button>`:`<button class="sbtn pri" data-a="skinb" data-v="rod:${s.id}">🪙 ${s.p.toLocaleString()}</button>`); }).join('');
+    h+='<div class="note" style="margin-top:12px">浮標造型</div>';
+    h+=SKINS.bob.map(s=>{ const own=S.skinOwn.bob.includes(s.id), on=S.skin.bob===s.id, hx=n=>'#'+n.toString(16).padStart(6,'0');
+      return row(`<span class="sw" style="background:linear-gradient(${hx(s.t)} 50%,${hx(s.b)} 50%)"></span>${s.n}`,'',on?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="skine" data-v="bob:${s.id}">換上</button>`:`<button class="sbtn pri" data-a="skinb" data-v="bob:${s.id}">🪙 ${s.p.toLocaleString()}</button>`); }).join('');
+  } else if(tab==='market'){
+    const left=86400000-(now()%86400000);
+    h+=`<div class="note">今日魚市行情（${fmtT(left)} 後更新）。賣出時自動套用。</div>`;
+    h+=market().map(e=>row(`${e.m>1?'🔥':'🧊'} ${e.sp.name}`,`${e.sp.loc==='sea'?'海釣':'湖釣'}・${c.RAR[e.sp.rar].name}`,`<b style="color:${e.m>1?'#ffb347':'#8ab4d8'}">收購價 ×${e.m}</b>`)).join('');
+  }
+  return h;
+}
+function click(a,v,GEAR){
+  if(a==='enh'){ const idx=S.eq[v], lv=lvOf(v,idx); if(lv>=10) return true; const cs=enhCost(lv,idx);
+    if(S.coins<cs.coins){ c.toast('金幣不夠','bad'); return true; } if(!has(cs.m)){ c.toast('素材不夠：'+mtxt(cs.m),'bad'); return true; }
+    S.coins-=cs.coins; for(const k in cs.m) S.mat[k]-=cs.m[k]; S.enh[v]=S.enh[v]||{}; S.enh[v][idx]=lv+1; c.persist(); c.setCoins(); c.Snd.fanfare(1); c.toast('強化成功！+'+(lv+1),'good'); return true; }
+  if(a==='buyc'){ const it=CONS.find(x=>x.id===v); if(S.coins<it.p){ c.toast('金幣不夠','bad'); return true; } S.coins-=it.p; S.inv[v]=(S.inv[v]||0)+1; c.persist(); c.setCoins(); c.Snd.coin(); return true; }
+  if(a==='usec'){ useCon(v); return true; }
+  if(a==='merch'){ const o=offers().find(x=>x.id===v); if(!o||bought().includes(v)) return true; if(S.coins<o.p){ c.toast('金幣不夠','bad'); return true; }
+    S.coins-=o.p; const g=o.give; for(const k in g.inv||{}) S.inv[k]=(S.inv[k]||0)+g.inv[k]; for(const k in g.bait||{}) S.baits[k]=(S.baits[k]||0)+g.bait[k]; for(const k in g.mat||{}) S.mat[k]=(S.mat[k]||0)+g.mat[k];
+    S.merch={[rot()]:[...bought(),v]}; c.persist(); c.setCoins(); c.Snd.coin(); c.toast('買到了：'+o.n,'good'); return true; }
+  if(a==='skinb'||a==='skine'){ const [k,id]=v.split(':'), s=SKINS[k].find(x=>x.id===id);
+    if(a==='skinb'){ if(S.coins<s.p){ c.toast('金幣不夠','bad'); return true; } S.coins-=s.p; S.skinOwn[k].push(id); c.Snd.coin(); }
+    S.skin[k]=id; c.persist(); c.setCoins(); c.applyRod(); return true; }
+  return false;
+}
+/* 生效中的道具、自動調整提示位置 */
+const fxBar=document.getElementById('fxBar');
+function tick(){ const t1=document.getElementById('top'), t2=document.getElementById('top2');
+  const y=Math.max(t1?t1.getBoundingClientRect().bottom:0, t2&&t2.offsetParent!==null?t2.getBoundingClientRect().bottom:0);
+  document.documentElement.style.setProperty('--hudY',Math.round(y)+'px');
+  if(fxBar) fxBar.innerHTML=CONS.filter(it=>it.min&&fxOn(it.id)).map(it=>`<span>${it.i} ${Math.ceil((S.fx[it.id]-now())/60000)}分</span>`).join(''); }
+setInterval(tick,1000); window.addEventListener('resize',tick); setTimeout(tick,300);
+return {fxOn,enhance,drop,dropItem,lastDrop:()=>lastD,priceMul,useLeader,applySkins,render,click,matLine};
+}
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
 'use strict';
@@ -2724,7 +2857,7 @@ function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.
 function specialK(sp){ if(!sp.special) return 1; const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone>=3||G.spot>=3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; return 1; }
 function pickSpecies(){
   const per=period(G.hour), pw=clamp((G.castDist-6)/30,0,1); let tot=0;
-  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*WL.spotAff(sp.id)*WL.wxAff(sp.id)*(((sp.loc||'lake')===(G.loc||'lake'))?1:0)*(bt.aff[sp.id]||1)*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
+  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(window.__ECO&&window.__ECO.fxOn('luck')?.4:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*WL.spotAff(sp.id)*WL.wxAff(sp.id)*(((sp.loc||'lake')===(G.loc||'lake'))?1:0)*(bt.aff[sp.id]||1)*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
   let x=Math.random()*tot; for(let i=0;i<ws.length;i++){ x-=ws[i]; if(x<=0) return SPECIES[i]; } return SPECIES[0];
 }
 
@@ -2741,7 +2874,7 @@ function cast(){
 }
 function landBobber(){
   G.state='wait'; P.splash(G.to.x,0,G.to.z,16,.7); W.addRipple(G.to.x,G.to.z,.55); Snd.plop();
-  G.timer=rand(2.5,7)*PER_WAIT[period(G.hour)]*(1-G.luck*.6)*(G.baitUsed?G.baitUsed.wait:1)*WL.waitK(); G.nib=Math.floor(rand(0,3.99)); G.approach=0; G.sp=null; G.fd=null;
+  G.timer=rand(2.5,7)*PER_WAIT[period(G.hour)]*(1-G.luck*.6)*(G.baitUsed?G.baitUsed.wait:1)*WL.waitK()*(window.__ECO&&window.__ECO.fxOn('glow')?.6:1); G.nib=Math.floor(rand(0,3.99)); G.approach=0; G.sp=null; G.fd=null;
   FUN.castTag(G.castDist); G.hot=FUN.inHot(G.to); if(G.hot){ G.timer*=.3; toast('正中魚群！','good',1200); }
 }
 function startRetrieve(msg,cls){ exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
@@ -2749,7 +2882,7 @@ function nibble(){ G.dip=.28; W.addRipple(G.to.x,G.to.z,.18); Snd.nibble(); vib(
 function prepFish(){ if(Math.random()<.085){ const it=FUN.rollItem(); G.sp=FUN.ITEM_SP; G.fd={sp:FUN.ITEM_SP,item:it,L:it.size,w:it.w*rand(.85,1.15),lvl:1,value:Math.round(it.val*rand(.8,1.25)),u:.5,xpMul:0}; return; }
   const sp=pickSpecies(), pw=clamp((G.castDist-6)/30,0,1), u=Math.pow(Math.random(),(1.6-.5*pw)/WL.sizeB());
   const L=lerp(sp.len[0],sp.len[1],u)/100, w=sp.k*L*L*L*rand(.9,1.12);
-  G.sp=sp; G.fd={sp,L,w,u,lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew),xpMul:D().rew}; }
+  G.sp=sp; G.fd={sp,L,w,u,lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; }
 function bite(){ if(!G.fd) prepFish(); UW.bite(); G.state='bite'; G.biteT=0; FUN.hookStart(G.fd); W.addRipple(G.to.x,G.to.z,.75); P.splash(G.to.x,0,G.to.z,8,.5); Snd.bite(); vib([60,40,60]); }
 function missBite(){ FUN.hookEnd(); G.combo=0; FUN.combo(0); G.state='wait'; G.timer=rand(2,5); G.nib=Math.floor(rand(0,2.99)); G.sp=null; G.fd=null; exitUW(); vib(40); }
 function hook(q){
@@ -2775,20 +2908,20 @@ function startJump(){ const f=G.f; f.jumpT=f.jumpDur=.85+.25*Math.sqrt(G.fd.L); 
   toast('魚躍出水面！先放手！','warn',1100); vib(30); G.fish.group.visible=true; }
 function dispDist(){ return Math.max(.38,G.fd.L*(G.fd.sp.sh.snout?2.5:2.1))*(W.camera.aspect<1?1:.8); }
 function land(){
-  if(G.loc==='sea'&&!G.fd.item&&!G.fd.sp.special&&G.fd.sp.id!=='shark'&&G.fd.sp.id!=='gwhite'&&Math.random()<.12&&!KK.busy()){ G.state='snatch'; fishPos(tv,-.05); toast('就在魚出水的瞬間……','warn',1200); KK.snatch(tv.clone(),()=>{ G.state='fight'; lose('shark'); }); return; }
+  if(G.loc==='sea'&&!G.fd.item&&!G.fd.sp.special&&G.fd.sp.id!=='shark'&&G.fd.sp.id!=='gwhite'&&Math.random()<.12&&!KK.busy()&&!(window.__ECO&&window.__ECO.fxOn('repel'))){ G.state='snatch'; fishPos(tv,-.05); toast('就在魚出水的瞬間……','warn',1200); KK.snatch(tv.clone(),()=>{ G.state='fight'; lose('shark'); }); return; }
   G.state='land'; G.stT=0; endFightUI(); WL.endChase(); SEA.endChase(); G.combo=(G.combo||0)+1; FUN.combo(G.combo); save.maxCombo=Math.max(save.maxCombo||0,G.combo); fishPos(G.landFrom,-.05); P.splash(G.landFrom.x,0,G.landFrom.z,40,1.3); W.addRipple(G.landFrom.x,G.landFrom.z,1);
   Snd.splash(1.2); vib([30,40,30]); const g=G.fish.group; g.visible=G.fd.sp.special!=='mermaid'; if(g.parent!==W.scene) W.scene.attach(g);
   g.position.copy(G.landFrom); te.set(0,G.f.az0+G.f.theta+Math.PI/2,0); g.quaternion.setFromEuler(te); G.landQ.copy(g.quaternion); P.shadow.material.opacity=0;
 }
 function showCard(){
-  if(G.fd.item){ save.items=(save.items||0)+1; if(G.fd.item.id==='chest') save.chests=(save.chests||0)+1; persist(); FUN.goalsDot();
+  if(G.fd.item){ save.items=(save.items||0)+1; if(G.fd.item.id==='chest') save.chests=(save.chests||0)+1; if(window.__ECO) window.__ECO.dropItem(G.fd.item); persist(); FUN.goalsDot();
     return FUN.itemCard(G.fd,()=>{ ui.catch.classList.remove('hidden'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden'); document.body.classList.add('catching'); }); }
-  { const cb=1+.1*Math.min(G.combo||0,10); G.fd.value=Math.round(G.fd.value*cb); G.fd.xpMul=(G.fd.xpMul||1)*cb; }
+  { const cb=1+.1*Math.min(G.combo||0,10); G.fd.value=Math.round(G.fd.value*cb*(window.__ECO&&window.__ECO.fxOn('coin2')?2:1)); G.fd.xpMul=(G.fd.xpMul||1)*cb; }
   FUN.tourCatch(G.fd); if(G.hot) save.hotC=(save.hotC||0)+1; $('bSell').textContent='賣出'; $('bRel').classList.remove('hidden');
   const fd=G.fd, sp=fd.sp, r=RAR[sp.rar], rec=save.dex[sp.id];
   const isNew=!rec, isRec=!!rec&&fd.w>rec.bw;
   save.dex[sp.id]={n:(rec?rec.n:0)+1,bw:Math.max(rec?rec.bw:0,fd.w),bl:Math.max(rec?rec.bl:0,fd.L),md:Math.max(rec&&rec.md||0,FUN.medalLv(fd))}; save.total++; persist();
-  $('cXp').textContent='+'+META.onCatch(fd,{perfect:!!(G.f&&G.f.perfect),per:period(G.hour)})+' 經驗';
+  { const xp=META.onCatch(fd,{perfect:!!(G.f&&G.f.perfect),per:period(G.hour)}), pm=window.__ECO?window.__ECO.priceMul(sp.id):1; $('cXp').textContent='+'+xp+' 經驗　'+(window.__ECO?window.__ECO.lastDrop():'')+(pm>1?'　🔥行情 ×'+pm:''); }
   ui.catch.style.setProperty('--rc',r.col);
   $('cLv').textContent=fd.lvl; $('cName').textContent=sp.name; $('cRar').textContent=r.name+' '+r.en; $('cSci').textContent=sp.sci;
   $('cLen').textContent=(fd.L*100).toFixed(1)+' cm'; $('cW').textContent=fd.w<1?Math.round(fd.w*1000)+' g':fd.w.toFixed(2)+' kg';
@@ -2847,7 +2980,7 @@ const META=createMeta({save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS
 const UW=createUnderwater(W,P);
 const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head});
 const AT=createAtmos(W,P,Snd,WL,{underwater:()=>UW.active(),period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,spot:()=>G.spot,toast});
-const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPECIES.length,period:()=>period(G.hour)});
+const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPECIES.length,period:()=>period(G.hour)}); window.__FUN=FUN;
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active()}); window.__KK=KK;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
@@ -2958,7 +3091,7 @@ function updateFight(dt){
   setAct(G.held?'收線中':'按住<br>收線', f.run&&G.held&&f.T>.8?'魚在衝刺，先放手！':!f.run&&!G.held?'魚停了，快按住收線':'魚往哪游，就往反方向滑動拉竿', false);
   if(WL.stolen()) return lose('gator');
   if(SEA.stolen()) return lose('shark');
-  if(f.brk>=1) return lose('snap');
+  if(f.brk>=1){ if(window.__ECO&&window.__ECO.useLeader()){ f.brk=.35; toast('⛓️ 鋼絲前導線撐住了！','good',1600); vib(60); } else return lose('snap'); }
   if(f.slk>=1) return lose('slack');
   if(f.d>MAX_LINE) return lose('spool');
   if(f.d<(G.spot===0?4.0:2.6)) return land();
