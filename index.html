@@ -318,6 +318,8 @@ uniform float uYaw;
 uniform float uExpo;
 uniform float uNight;
 uniform float uNightDeep;
+uniform float uMoonK;
+uniform float uBio;
 uniform sampler2D uRefl;
 uniform mat4 uReflMat;
 uniform float uReflOn;
@@ -680,6 +682,11 @@ void main(){
     bodyD *= mix(1.0, 0.1, uNight);
   }
   vec3 col = mix(bodyD, refl, F) + TM(glint*(0.25 + 0.75*F));
+  if(uMoonK > 0.01){ float md = max(dot(R, uMoonDir), 0.0);
+    col += vec3(0.78, 0.84, 1.0)*(pow(md, 700.0)*3.5 + pow(md, 40.0)*0.05)*uMoonK*(0.3 + 0.7*F); }
+  if(uBio > 0.01){ float bn = noise2(p*4.2 + vec2(uTime*0.23, -uTime*0.19))*noise2(p*1.1 - uTime*0.05);
+    float bs = smoothstep(0.55, 0.8, bn)*(0.5 + 0.5*sin(uTime*3.1 + p.x*5.7 + p.y*3.3));
+    col += vec3(0.05, 0.42, 0.8)*bs*uBio*(1.0 - smoothstep(4.0, 50.0, dist))*0.7; }
   vec3 dwc = vec3(0.09, 0.19, 0.024)*(0.65 + 0.55*mix(0.5, leaf, fadeD))*(amb*0.75 + uLightCol*ndl*uSunVis*0.42*csh + 0.02);
   col = mix(col, TM(dwc), dw);
   float foamS = (1.0 - smoothstep(0.3, 2.5, Rs - rp))*(0.5 + 0.5*noise2(p*1.3 + uTime*0.05))*(1.0 - uSea);
@@ -737,7 +744,7 @@ const head = new T.Group(); head.rotation.x = -0.16; player.add(head); head.add(
 const V = () => new T.Vector3();
 const U = { uTime:{value:0}, uSunDir:{value:new T.Vector3(0,1,0)}, uLightCol:{value:V()}, uSunDisk:{value:new T.Vector3(0,1,0)},
   uSunCol:{value:V()}, uMoonDir:{value:new T.Vector3(0,1,0)}, uMoonCol:{value:V()}, uZenith:{value:V()}, uHorizon:{value:V()},
-  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.035,.25,.40)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uLightK:{value:1} };
+  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.035,.25,.40)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
 
 // 天空球（含樹林遠景）
 const skyMat = new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:SH.common+SH.skyFS, side:T.BackSide, depthWrite:false, depthTest:false});
@@ -1161,6 +1168,10 @@ const SPECIES=[
   sh:{H:.15,W:.075,prof:1.4,eyeT:.88,eye:.03,tail:.24,fork:.5,dorsal:[[-.25,0],[-.2,.1],[.1,.09],[.2,0]],anal:[[-.32,0],[-.27,.06],[-.2,0]]},
   col:{back:'#1c3c5c',flank:'#2f6f9a',belly:'#b8c8d0',fin:'#4a8ab0',eye:'#7fe8ff'},pat:{t:'plain'},scale:1.4,metal:.6,
   f:{pow:3.6,spd:2.0,agi:1.2,jump:.2,stam:3.4,win:1.0},time:{dawn:0,day:0,dusk:.5,night:1.5},desc:'統御深海的古老王者，手持三叉戟、頭戴珊瑚王冠。傳說只在無月的深夜，從遠洋深處浮上來。'},
+ {id:'moonkoi',name:'月神鯉',sci:'Cyprinus selene（傳說）',rar:5,lvl:[90,99],len:[90,130],k:14,price:110,special:'moonkoi',
+  sh:{H:.15,W:.075,prof:1.4,eyeT:.88,eye:.03,tail:.24,fork:.5,dorsal:[[-.25,0],[-.2,.1],[.1,.09],[.2,0]],anal:[[-.32,0],[-.27,.06],[-.2,0]]},
+  col:{back:'#9fc4ea',flank:'#dcecff',belly:'#ffffff',fin:'#b8d8ff',eye:'#203050'},pat:{t:'plain'},scale:1.4,metal:1,
+  f:{pow:3.0,spd:1.8,agi:1.4,jump:.5,stam:2.6,win:1.2},time:{dawn:0,day:0,dusk:0,night:1},desc:'月光灣的守護者，銀藍色的鱗片會映出月光。只在月夜的月光灣現身，是汐月故事的關鍵。'},
  {id:'ghost',name:'月光幽靈魚',sci:'Lumina spectra（傳說）',rar:5,lvl:[62,72],len:[30,60],k:9,price:60,special:'ghost',
   sh:{H:.12,W:.05,prof:1.3,eyeT:.87,eye:.034,tail:.26,fork:.7,dorsal:[[-.3,0],[-.2,.14],[.05,.12],[.15,0]],anal:[[-.32,0],[-.25,.1],[-.1,.08],[-.05,0]]},
   col:{back:'#5a8ab8',flank:'#a8d8f0',belly:'#e8f8ff',fin:'#8ad0ff',eye:'#9ff4ff'},pat:{t:'plain'},scale:.6,metal:.3,
@@ -1571,7 +1582,7 @@ return { start, end, update, resize, active:()=>on, setProgress:a=>{ prog=clamp(
 /* ---------- 釣具與魚餌資料 ---------- */
 const GEAR={
  rod:[{name:'入門碳竿',price:0,lv:1,cast:30,tens:1,col:'#1d4fb8'},{name:'中調碳竿',price:1500,lv:3,cast:36,tens:.92,col:'#1f6e48'},
-      {name:'高模數競技竿',price:6000,lv:6,cast:42,tens:.85,col:'#141418',gold:true},{name:'傳奇手工竿',price:20000,lv:10,cast:50,tens:.78,col:'#8e1a20',gold:true},{name:'人魚之竿',price:0,lv:1,cast:54,tens:.72,col:'#dfeef4',gold:true,req:'mer3'}],
+      {name:'高模數競技竿',price:6000,lv:6,cast:42,tens:.85,col:'#141418',gold:true},{name:'傳奇手工竿',price:20000,lv:10,cast:50,tens:.78,col:'#8e1a20',gold:true},{name:'人魚之竿',price:0,lv:1,cast:54,tens:.72,col:'#dfeef4',gold:true,req:'mer3'},{name:'月神之竿',price:0,lv:1,cast:60,tens:.64,col:'#bcd8ff',gold:true,req:'moon'}],
  line:[{name:'尼龍線 6 lb',price:0,lv:1,s:4.2},{name:'尼龍線 10 lb',price:800,lv:2,s:5.0},{name:'碳纖線 14 lb',price:3000,lv:4,s:6.0},
        {name:'PE 編織線 20 lb',price:9000,lv:7,s:7.2},{name:'PE 編織線 30 lb',price:25000,lv:11,s:8.6}],
  reel:[{name:'2000 型紡車輪',price:0,lv:1,spd:1.9,drag:1},{name:'3000 型紡車輪',price:1200,lv:3,spd:2.2,drag:.85},
@@ -1646,9 +1657,9 @@ function render(){
     h+=`<div class="note">🪙 ${save.coins.toLocaleString()}，Lv ${save.lv}</div>`+ECO.matLine();
     if(['enh','item','skin','market'].includes(shopTab)) h+=ECO.render(shopTab,GEAR);
     else if(shopTab!=='bait'){
-      h+=GEAR[shopTab].map((it,i)=>{ const own=save.gear[shopTab].includes(i), eq=save.eq[shopTab]===i, lock=save.lv<it.lv||(it.req==='mer3'&&!(save.mer&&save.mer.n>=3));
+      h+=GEAR[shopTab].map((it,i)=>{ const own=save.gear[shopTab].includes(i), eq=save.eq[shopTab]===i, lock=save.lv<it.lv||(it.req==='mer3'&&!(save.mer&&save.mer.n>=3))||(it.req==='moon'&&!(save.moon&&save.moon.done));
         const sub=shopTab==='rod'?`拋投 ${it.cast} m，拉扯張力 −${Math.round((1-it.tens)*100)}%`:shopTab==='line'?`強度 ${it.s.toFixed(1)}，越高越不容易斷`:`收線 ${it.spd} m/s，爆線累積 −${Math.round((1-it.drag)*100)}%`;
-        const btn=eq?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="eq" data-v="${i}">裝備</button>`:lock?`<span class="lk">${it.req?'美人魚第 3 次相遇':'Lv '+it.lv+' 解鎖'}</span>`:`<button class="sbtn pri" data-a="buy" data-v="${i}">🪙 ${it.price.toLocaleString()}</button>`;
+        const btn=eq?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="eq" data-v="${i}">裝備</button>`:lock?`<span class="lk">${it.req==='moon'?'完成月光灣的故事':it.req?'美人魚第 3 次相遇':'Lv '+it.lv+' 解鎖'}</span>`:`<button class="sbtn pri" data-a="buy" data-v="${i}">🪙 ${it.price.toLocaleString()}</button>`;
         return row(it.name,sub,btn); }).join('');
     } else {
       h+=BAITS.map((b,i)=>{ const n=b.id==='worm'?'∞':(save.baits[b.id]||0), lock=save.lv<b.lv, using=save.bait===b.id;
@@ -2900,7 +2911,7 @@ const REAL_DIR='models/';
 // 魚：[檔名, 模型裡頭朝哪個軸, 選項]
 const RFISH={bluegill:['bluegill','+x'],crappie:['crappie','+z'],lmbass:['lmbass','+z'],smbass:['smbass','+z'],channel:['channel','+z'],flathead:['flathead','+z'],
   gar:['gar','+z'],barra:['barra','+x'],golden:['koi','-x',{gold:1}],ghost:['koi','-x',{ghost:1}],grouper:['grouper','-x'],tuna:['tuna','+z'],marlin:['marlin','-z'],
-  ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z']};
+  ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z']};
 const RHEAD={gwhite:'+z',tigershark:'+z',dolphin:'+z',whale:'+z',gator:'+x',eagle:'+z',gull:'-x',yacht:'-z',flyfish:'-x'};
 const RSETS={lake:['bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
   sea:['yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','seaking']};
@@ -2943,6 +2954,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
     const conv=mm=>{ const n=new T.MeshStandardMaterial({color:mm.color?mm.color.clone():new T.Color(1,1,1),map:mm.map||null,normalMap:mm.normalMap||null,
         roughnessMap:mm.roughnessMap||null,metalnessMap:mm.metalnessMap||null,roughness:mm.roughness!==undefined?mm.roughness:.5,metalness:mm.metalness!==undefined?mm.metalness:0,
         transparent:!!mm.transparent,alphaTest:mm.alphaTest||0,opacity:mm.opacity!==undefined?mm.opacity:1,side:mm.side,envMapIntensity:1.25,vertexColors:!!geo.attributes.color});
+      if(opt.moon){ n.color=new T.Color(0xd8ecff); n.emissive=new T.Color(0x4aa8ff); n.emissiveIntensity=.55; n.metalness=.6; n.roughness=.2; }
       if(opt.king){ n.roughness=.42; n.metalness=.35; n.emissive=new T.Color(0x0a3a5a); n.emissiveIntensity=.35; }
       if(mm.normalScale) n.normalScale.copy(mm.normalScale);
       [n.map,n.normalMap,n.roughnessMap,n.metalnessMap].forEach(t=>{ if(t&&t.channel) t.channel=0; });
@@ -3180,6 +3192,82 @@ box.addEventListener('click',e=>{ if(e.target===box){ box.classList.add('hidden'
 setInterval(dot,3000); dot();
 return {rank,apply,applyBoss,bossWin};
 }
+/* ===== 月光灣：汐月的故事 ===== */
+const MOON_STORY=[
+ {t:'序章・月下的人魚',b:'「你終於來了。我叫汐月，是守護月潮的人魚。很久以前，這片濕地還是連著大海的河口……可是現在，我的七片月鱗散落在湖裡，沒有它們，我回不了海。」<br><br>「月鱗會吸引在月光下覓食的魚。請你在月夜的月光灣釣魚，幫我把它們找回來。」'},
+ {t:'第一片・潮汐的記憶',b:'「每逢滿月，潮水會從海上漲進河口，我就順著月光回家。那時候的水是鹹的，夜裡會發光……就像你現在看到的這樣，只是比現在亮上一百倍。」'},
+ {t:'第二片・提燈的漁人',b:'「有個老漁人，每晚都在碼頭掛一盞燈給我。我們從沒說過話，但我知道那盞燈是為我點的。你常站的那座碼頭，就是他當年一塊一塊釘起來的。」'},
+ {t:'第三片・堤防',b:'「後來人們築起了堤防。潮水再也進不來，河口慢慢淤成沼澤。最後一次滿月那晚，水面的月光被堤防切斷，我就被困在這裡了。」'},
+ {t:'第四片・月鱗的由來',b:'「每一片月鱗，都收著一小段月光。被困住的那一夜我哭了很久，眼淚落下的地方，鱗片也跟著剝落、沉進湖底。」'},
+ {t:'第五片・幽靈魚',b:'「你釣過那種會發光的幽靈魚吧？牠們是我的眼淚變成的。牠們一直在湖裡游，替我記得回家的路。」'},
+ {t:'第六片・月神鯉',b:'「最後一片月鱗被月神鯉吞下了。牠是月光灣的守護者，不肯把鱗片交給任何人，因為牠怕我一離開，這裡就再也沒有月光。」<br><br>「請你在月夜釣起月神鯉。牠很強，比你見過的任何魚都強。」'},
+ {t:'終章・月光之路',b:'「七片月鱗都回來了……你看，水面上的月光連成一條路了。」<br><br>「謝謝你。從今以後，我可以順著月光往返大海與這片濕地。如果你在海上看見我，別驚訝。」<br><br>「這支月神之竿送給你。月神鯉會繼續守護這裡，月夜時牠還會出現——下次，別讓牠失望。」'}];
+
+function createMoonBay(W,c){
+'use strict';
+const T=THREE, S=W.scene, G=c.G, SV=c.save; SV.moon=SV.moon||{met:false,sc:0,read:-1,done:false}; const MS=SV.moon;
+const ss=(a,b,x)=>{ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); };
+/* 月亮：NASA 月球影像（公有領域），掛在月光灣的方向，仰角 17° */
+const MD=new T.Vector3(-Math.sin(.35)*Math.cos(.3),Math.sin(.3),-Math.cos(.35)*Math.cos(.3)).normalize();
+const moonTex=new T.TextureLoader().load('moon.jpg'); moonTex.encoding=T.sRGBEncoding;
+const moon=new T.Mesh(new T.SphereGeometry(1,32,24),new T.MeshBasicMaterial({map:moonTex,color:new T.Color(1.7,1.7,1.75),fog:false,transparent:true,depthWrite:false,toneMapped:false}));
+moon.rotation.y=-1.2; moon.renderOrder=-2; moon.frustumCulled=false; S.add(moon);
+const hc=document.createElement('canvas'); hc.width=hc.height=128; { const x=hc.getContext('2d'), g=x.createRadialGradient(64,64,0,64,64,64); g.addColorStop(0,'rgba(200,220,255,.55)'); g.addColorStop(.35,'rgba(150,180,255,.18)'); g.addColorStop(1,'rgba(120,150,255,0)'); x.fillStyle=g; x.fillRect(0,0,128,128); }
+const halo=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(hc),blending:T.AdditiveBlending,depthWrite:false,fog:false,transparent:true}));
+halo.renderOrder=-2; S.add(halo);
+/* 汐月：坐在岩石上的美人魚（岩石用 Poly Haven 掃描模型） */
+const spot=(typeof SPOTS!=='undefined'&&SPOTS.find(s=>s.id==='moon'))||{pos:[-10,-40],head:.35};
+const fw=new T.Vector3(-Math.sin(spot.head),0,-Math.cos(spot.head)), rt=new T.Vector3(Math.cos(spot.head),0,-Math.sin(spot.head));
+const NP=new T.Vector3(spot.pos[0],0,spot.pos[1]).addScaledVector(fw,11).addScaledVector(rt,3.5);
+const npc=new T.Group(); npc.position.copy(NP); npc.visible=false; S.add(npc);
+if(T.GLTFLoader) new T.GLTFLoader().load('rock_moss_set_01.glb',g=>{ const r=g.scene; r.scale.setScalar(1.3); r.position.y=-.35; npc.add(r); });
+else { const r=new T.Mesh(new T.DodecahedronGeometry(.9,1),new T.MeshStandardMaterial({color:0x3a4238,roughness:.9})); r.scale.set(1.2,.6,1); npc.add(r); }
+const merT=new T.TextureLoader().load('mermaid_front.png',t=>{ const a=t.image.width/t.image.height; mer.scale.set(1.9*a,1.9,1); }); merT.encoding=T.sRGBEncoding;
+const mer=new T.Mesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial({map:merT,transparent:true,alphaTest:.05,depthWrite:true,side:T.DoubleSide,fog:false}));
+mer.position.y=1.25; npc.add(mer);
+const glow=new T.Sprite(new T.SpriteMaterial({map:halo.material.map,color:0x66ccff,blending:T.AdditiveBlending,depthWrite:false,transparent:true})); glow.scale.set(4,4,1); glow.position.y=1.2; npc.add(glow);
+/* 對話介面 */
+const st=document.createElement('style'); st.textContent=`
+#moonTalk{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 250px);white-space:nowrap;width:auto;height:auto;min-width:0;display:inline-block;line-height:1.2;z-index:6;padding:10px 18px;border-radius:999px;border:1px solid rgba(160,210,255,.6);
+ background:linear-gradient(90deg,rgba(40,80,140,.9),rgba(70,50,140,.9));color:#eaf4ff;font-weight:800;font-size:15px;box-shadow:0 0 18px rgba(110,180,255,.55);font-family:inherit}
+#moonTalk.hidden,#moonBox.hidden{display:none}#moonTalk.dot::after{content:' ●';color:#ffd56a}
+#moonBox{position:fixed;inset:0;z-index:9;background:rgba(4,10,24,.72);display:flex;align-items:flex-end;justify-content:center}
+#moonBox .mb{width:min(560px,100%);max-height:84vh;overflow:auto;background:linear-gradient(180deg,rgba(18,30,58,.98),rgba(12,18,34,.98));border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));color:#e6f0ff;border-top:1px solid rgba(150,200,255,.35)}
+#moonBox h3{margin:0 0 6px;font-size:19px;display:flex;justify-content:space-between;align-items:center;color:#cfe6ff}
+#moonBox .ch{margin:14px 0;padding:12px 14px;border-radius:14px;background:rgba(120,170,255,.08);line-height:1.75;font-size:15px}
+#moonBox .ch b{display:block;color:#ffd56a;margin-bottom:4px;font-size:14px}#moonBox .pg{font-size:13px;color:#9fb8d8}`;
+document.head.appendChild(st);
+const tb=document.createElement('button'); tb.id='moonTalk'; tb.className='hidden'; tb.textContent='🧜‍♀️ 與汐月說話'; document.body.appendChild(tb);
+const box=document.createElement('div'); box.id='moonBox'; box.className='hidden'; box.innerHTML='<div class="mb"></div>'; document.body.appendChild(box);
+const unlocked=()=>MS.done?7:MS.met?Math.min(6,MS.sc):0;
+function render(){ const n=unlocked();
+  let h=`<h3>汐月<button class="sbtn" data-m="x">✕</button></h3><div class="pg">月鱗 ${Math.min(7,MS.sc)}/7${MS.done?'・故事完結':MS.sc>=6?'・最後一片在月神鯉身上':''}</div>`;
+  for(let i=n;i>=0;i--) h+=`<div class="ch"><b>${MOON_STORY[i].t}</b>${MOON_STORY[i].b}</div>`;
+  box.firstChild.innerHTML=h; }
+tb.addEventListener('click',()=>{ if(!MS.met){ MS.met=true; c.toast('🌙 任務：在月夜的月光灣釣魚，找回 7 片月鱗','good',3200); }
+  MS.read=unlocked(); c.persist(); render(); box.classList.remove('hidden'); tb.classList.remove('dot'); });
+box.addEventListener('click',e=>{ if(e.target===box||e.target.closest('[data-m=x]')) box.classList.add('hidden'); });
+
+let act=0;
+const active=()=>c.zoneId()==='moon'&&c.period()==='night'&&(G.loc||'lake')!=='sea';
+function koiK(){ if(!active()) return 0; return MS.done?1.5:MS.sc>=6?40:0; }
+function onCatch(fd){ if(!fd||fd.item||!active()||!MS.met) return;
+  if(MS.sc<6&&fd.sp.id!=='moonkoi'&&Math.random()<.45){ MS.sc++; c.persist(); tb.classList.add('dot');
+    setTimeout(()=>c.toast(`🌙 在魚肚裡找到一片月鱗（${MS.sc}/7）！去聽汐月的故事`,'good',3200),1500); }
+  else if(fd.sp.id==='moonkoi'&&!MS.done&&MS.sc>=6){ MS.sc=7; MS.done=true; c.persist(); c.giveRod(); tb.classList.add('dot');
+    setTimeout(()=>c.toast('🌙 第七片月鱗！月光連成了一條路……去找汐月吧','good',4000),1500); } }
+const cam=new T.Vector3();
+function update(dt){ W.camera.getWorldPosition(cam);
+  const nk=W.U.uNight?W.U.uNight.value:0, cl=W.U.uCloud?W.U.uCloud.value:0, vis=nk*(1-.8*Math.min(1,cl));
+  W.U.uMoonDir.value.copy(MD); W.U.uMoonK.value=vis;
+  moon.visible=halo.visible=vis>.02; if(moon.visible){ moon.position.copy(cam).addScaledVector(MD,780); moon.scale.setScalar(26); moon.material.opacity=Math.min(1,vis*1.3);
+    halo.position.copy(cam).addScaledVector(MD,770); halo.scale.set(150,150,1); halo.material.opacity=vis; }
+  act+=((active()?1:0)-act)*Math.min(1,dt*.8); W.U.uBio.value=act;
+  npc.visible=act>.05; if(npc.visible){ mer.material.opacity=act; mer.rotation.y=Math.atan2(cam.x-NP.x,cam.z-NP.z); glow.material.opacity=.5*act*(0.8+0.2*Math.sin(performance.now()*.002)); }
+  const near=npc.visible&&Math.hypot(cam.x-NP.x,cam.z-NP.z)<35; tb.classList.toggle('hidden',!near||act<.5);
+  if(near&&MS.read<unlocked()) tb.classList.add('dot'); }
+return {update,onCatch,koiK,active};
+}
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
 'use strict';
@@ -3273,7 +3361,7 @@ const PER_WAIT={dawn:.75,day:1.1,dusk:.75,night:1.0};
 function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.02,-.5,Math.cos(G.t*1.1)*.015)); }
 
 /* ---------- 選魚 ---------- */
-function specialK(sp){ if(!sp.special) return 1; const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone>=3||G.spot>=3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; if(sp.special==='king') return 0; return 1; }
+function specialK(sp){ if(!sp.special) return 1; const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone>=3||G.spot>=3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; if(sp.special==='king') return 0; if(sp.special==='moonkoi') return window.__MOON?window.__MOON.koiK():0; return 1; }
 /* 魚群警覺：同一個方向一直釣，魚會變少、變小、變慢咬；換方向或換釣點就恢復（每分鐘消退 1） */
 const DEPL={}; const TR=b=>window.__TAL?window.__TAL.rank(b):0;
 function depKey(){ const A=((G.head+G.yaw)%(2*Math.PI)+2*Math.PI)%(2*Math.PI); return (WL.zoneId?WL.zoneId():'')+':'+Math.floor(A/(Math.PI/3)); }
@@ -3341,6 +3429,7 @@ function land(){
 function showCard(){
   if(G.fd&&!G.fd.item) depAdd(G.depK||depKey(),1+.5*G.fd.sp.rar);
   if(G.fd&&G.fd.boss&&window.__TAL) window.__TAL.bossWin(G.fd);
+  if(window.__MOON) window.__MOON.onCatch(G.fd);
   if(G.fd.item){ save.items=(save.items||0)+1; if(G.fd.item.id==='chest') save.chests=(save.chests||0)+1; if(window.__ECO) window.__ECO.dropItem(G.fd.item); persist(); FUN.goalsDot();
     return FUN.itemCard(G.fd,()=>{ ui.catch.classList.remove('hidden'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden'); document.body.classList.add('catching'); }); }
   { const cb=1+.1*Math.min(G.combo||0,10); G.fd.value=Math.round(G.fd.value*cb*(window.__ECO&&window.__ECO.fxOn('coin2')?2:1)); G.fd.xpMul=(G.fd.xpMul||1)*cb; }
@@ -3413,6 +3502,7 @@ const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPEC
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 const SKY=createNightSky(W,G); window.__SKY=SKY; window.__W=W;
+window.__MOON=createMoonBay(W,{G,save,persist,toast,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
 window.__TAL=createTalents({save,persist,toast,Snd,vib,setCoins,loc:()=>G.loc||'lake',zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour)}); window.__SEA=SEA;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
 { const s=SPOTS[save.spot]; G.spot=save.spot; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; WL.setSpot(save.spot); SEA.setLoc(s.loc||'lake'); }
@@ -3605,7 +3695,7 @@ function update(dt){
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light);
   if(st!=='fight'&&st!=='wait') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
-  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); SKY.update(dt,((G.hour%24)+24)%24);
+  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); window.__MOON.update(dt); SKY.update(dt,((G.hour%24)+24)%24);
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
     const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
   G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
