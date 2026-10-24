@@ -5,3 +5,4 @@
 - 掃描魚模型：Barramundi Fish © Microsoft 2017 — Khronos glTF Sample Assets
 - 寶物與雜物模型：treasure_chest, rubber_boots, old_tyre, pocket_watch, seadogs_compass, metal_jug — Poly Haven（CC0）
 - 美人魚插畫：使用者提供
+- 海上天空：kloofendal_48d_partly_cloudy_puresky, kloppenheim_06_puresky, kloppenheim_02_puresky — Poly Haven（CC0）
