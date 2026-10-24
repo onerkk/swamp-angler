@@ -17,7 +17,7 @@
 *,*::before,*::after{box-sizing:border-box}
 html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none;overscroll-behavior:none}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+#c{position:fixed;top:0;right:0;bottom:0;left:0;width:100%;height:100%;display:block}
 .hidden{display:none!important}
 #top{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 0;display:flex;gap:8px;align-items:center;pointer-events:none;z-index:5}
 .chip{pointer-events:auto;display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--stroke);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
@@ -41,7 +41,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 #steer{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 272px);font-size:15px;font-weight:800;padding:7px 16px;border-radius:999px;background:var(--glass-strong);border:1px solid var(--stroke);z-index:4;white-space:nowrap;color:var(--warn)}
 #steer.ok{color:var(--good);border-color:rgba(95,211,141,.5)}
 #act{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);width:104px;height:104px;z-index:5}
-#act svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);pointer-events:none}
+#act svg{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;transform:rotate(-90deg);pointer-events:none}
 #act .trk{fill:none;stroke:rgba(255,255,255,.14);stroke-width:5}
 #act .pw{fill:none;stroke:var(--accent);stroke-width:5;stroke-linecap:round}
 #actBtn{position:absolute;inset:9px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.26),rgba(255,255,255,.04) 58%),rgba(14,24,19,.72);color:var(--fg);font-family:inherit;font-size:15px;font-weight:800;line-height:1.25;display:grid;place-items:center;text-align:center;padding:4px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);touch-action:none;cursor:pointer;transition:transform .08s}
@@ -49,7 +49,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 #actBtn.hot{background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.6),rgba(255,255,255,.08) 60%),#f2c230;color:#2a1d00;font-size:20px;border:4px solid #e8e8e8;box-shadow:0 0 0 3px rgba(0,0,0,.35),0 0 24px rgba(242,194,48,.6);animation:pulse .4s ease-in-out infinite alternate}
 @keyframes pulse{from{transform:scale(1)}to{transform:scale(1.09)}}
 #actSub{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 4px);font-size:12px;color:var(--fg-dim);white-space:nowrap;z-index:5;text-shadow:0 1px 3px rgba(0,0,0,.8)}
-#catch{position:fixed;inset:0;z-index:7;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;padding:calc(env(safe-area-inset-top,0px) + 66px) 14px calc(env(safe-area-inset-bottom,0px) + 16px)}
+#catch{position:fixed;top:0;right:0;bottom:0;left:0;z-index:7;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;padding:calc(env(safe-area-inset-top,0px) + 66px) 14px calc(env(safe-area-inset-bottom,0px) + 16px)}
 #tag{align-self:center;display:flex;transform:skewX(-12deg);filter:drop-shadow(0 6px 14px rgba(0,0,0,.5));animation:tagIn .5s cubic-bezier(.2,1.4,.4,1) both}
 .tg .lv{background:#f4f1ea;color:#16191b;padding:6px 13px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .tg .lv>*{transform:skewX(12deg)}
@@ -73,7 +73,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 .btn{flex:1;height:48px;border-radius:14px;border:1px solid var(--stroke);background:rgba(255,255,255,.08);color:var(--fg);font-family:inherit;font-size:16px;font-weight:800;cursor:pointer}
 .btn.pri{background:var(--accent);color:#1d1606;border-color:transparent}
 .btn:active{transform:scale(.97)}
-#sheet{position:fixed;inset:0;z-index:8;background:rgba(4,8,7,.6);display:flex;align-items:flex-end;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 50px) 10px calc(env(safe-area-inset-bottom,0px) + 10px)}
+#sheet{position:fixed;top:0;right:0;bottom:0;left:0;z-index:8;background:rgba(4,8,7,.6);display:flex;align-items:flex-end;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 50px) 10px calc(env(safe-area-inset-bottom,0px) + 10px)}
 #sheet .sheet{width:min(100%,480px);max-height:100%;overflow:auto;background:var(--glass-strong);border:1px solid var(--stroke);border-radius:20px;padding:14px 16px;touch-action:pan-y;-webkit-overflow-scrolling:touch}
 .sh-hd{display:flex;justify-content:space-between;align-items:center;font-size:18px}
 #sheetStats{font-size:13px;color:var(--fg-dim);margin:4px 0 6px}
@@ -83,14 +83,14 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 .row .nm{flex:1;display:flex;flex-direction:column}
 .row .nm small,.row .rt small{color:var(--fg-dim);font-size:12px}
 .row .rt{text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
-#intro{position:fixed;inset:0;z-index:9;display:flex;flex-direction:column;justify-content:flex-end;padding:24px 22px calc(env(safe-area-inset-bottom,0px) + 26px);background:linear-gradient(180deg,rgba(5,9,8,0) 28%,rgba(5,9,8,.8) 60%,rgba(5,9,8,.96))}
+#intro{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;display:flex;flex-direction:column;justify-content:flex-end;padding:24px 22px calc(env(safe-area-inset-bottom,0px) + 26px);background:linear-gradient(180deg,rgba(5,9,8,0) 28%,rgba(5,9,8,.8) 60%,rgba(5,9,8,.96))}
 #intro h1{font-size:42px;margin:0;letter-spacing:.14em;font-weight:900}
 #intro .en{letter-spacing:.32em;font-size:12px;color:var(--accent);font-weight:800;margin-top:2px}
 #intro p{color:var(--fg-dim);font-size:14px;line-height:1.75;margin:14px 0 18px;max-width:34em}
 #intro p b{color:var(--fg)}
 #startBtn{height:56px;border-radius:16px;border:0;background:var(--accent);color:#1d1606;font-family:inherit;font-size:18px;font-weight:900;letter-spacing:.1em;cursor:pointer;max-width:480px}
 #loadNote{margin-top:10px;font-size:13px;color:var(--fg-dim);text-align:center;max-width:480px}
-#err{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:30px;text-align:center;background:var(--bg);font-size:16px;line-height:1.7}
+#err{position:fixed;top:0;right:0;bottom:0;left:0;z-index:20;display:grid;place-items:center;padding:30px;text-align:center;background:var(--bg);font-size:16px;line-height:1.7}
 .fly{position:fixed;z-index:9;font-weight:900;color:var(--accent);font-size:20px;pointer-events:none;text-shadow:0 2px 6px rgba(0,0,0,.7);animation:fly .9s ease-in forwards}
 @keyframes fly{to{transform:translate(var(--dx),var(--dy)) scale(.6);opacity:0}}
 #top2{position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 58px);display:flex;gap:6px;z-index:5;pointer-events:none}
@@ -101,7 +101,7 @@ button.chip{color:var(--fg);font-family:inherit;cursor:pointer}
 #baitC{color:var(--fg-dim);font-weight:600}
 .ib.dotn::after{content:"";position:absolute;top:3px;right:3px;width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2px rgba(0,0,0,.4)}
 #uwTag{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 132px);transform:translateX(-50%) skewX(-12deg);display:flex;z-index:5;pointer-events:none;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))}
-#fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:6;transition:opacity .16s}
+#fade{position:fixed;top:0;right:0;bottom:0;left:0;background:#000;opacity:0;pointer-events:none;z-index:6;transition:opacity .16s}
 #fade.on{opacity:1}
 .xpg{margin-left:auto;white-space:nowrap;color:var(--accent);font-weight:800}
 .tabs{display:flex;gap:6px;margin:10px 0 6px}
@@ -119,9 +119,9 @@ button.chip{color:var(--fg);font-family:inherit;cursor:pointer}
 .pbar i{display:block;height:100%;background:var(--good)}
 body.catching #top,body.catching #top2{opacity:0;pointer-events:none}
 #top,#top2{transition:opacity .25s}
-#vig{position:fixed;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse 85% 75% at 50% 42%,rgba(0,0,0,0) 55%,rgba(0,0,0,.38) 100%)}
-#drops{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;opacity:0;transition:opacity .6s}
-#flare{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;mix-blend-mode:screen}
+#vig{position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse 85% 75% at 50% 42%,rgba(0,0,0,0) 55%,rgba(0,0,0,.38) 100%)}
+#drops{position:fixed;top:0;right:0;bottom:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2;opacity:0;transition:opacity .6s}
+#flare{position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:2;opacity:0;mix-blend-mode:screen}
 #flare i{position:absolute;left:0;top:0;border-radius:50%;will-change:transform}
 #flare .fg{width:360px;height:360px;margin:-180px 0 0 -180px;background:radial-gradient(circle,rgba(255,240,210,.55),rgba(255,200,140,.18) 30%,rgba(255,180,120,0) 65%)}
 #flare .gh{width:90px;height:90px;margin:-45px 0 0 -45px;background:radial-gradient(circle,rgba(160,220,255,0) 40%,rgba(160,220,255,.16) 62%,rgba(160,220,255,0) 72%)}
@@ -156,22 +156,29 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #hotChip{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 98px);z-index:4;color:#7ff0a8;pointer-events:none}
 #tour{position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 98px);z-index:4;background:var(--glass);border:1px solid var(--stroke);border-radius:12px;padding:6px 10px;font-size:12px;min-width:132px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 #tour .th{font-weight:900;color:#ffd75e;margin-bottom:2px}#tour .tr{display:flex;justify-content:space-between;gap:10px;color:var(--fg-dim)}#tour .tr.me{color:#fff;font-weight:800}
-#tourDlg{position:fixed;inset:0;z-index:9;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+#tourDlg{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px}
 #tourDlg .card{animation:none}
 .badge.md1{background:#c98b4a;color:#1d1606}.badge.md2{background:#cfd6dc;color:#1d1606}.badge.md3{background:#ffd23f;color:#1d1606}
 .btn.ph{flex:0 0 52px}
-#mer{position:fixed;inset:0;z-index:8;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;background:#000;opacity:1;transition:opacity .6s}
+#mer{position:fixed;top:0;right:0;bottom:0;left:0;z-index:8;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;background:#000;opacity:1;transition:opacity .6s}
 #mer.hidden{display:none}
-#mer img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:kb 9s ease-out both}
-#mer #merTx{position:relative;margin:0 18px 14px;padding:14px 16px;border-radius:16px;background:rgba(6,14,24,.6);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-size:15px;line-height:1.7;text-align:center;max-width:460px}
-#merTx b{display:block;font-size:26px;letter-spacing:.2em;color:#bfe8ff}
-#mer #merX{position:relative;margin-bottom:calc(env(safe-area-inset-bottom,0px) + 22px);width:min(70vw,320px)}
+#mer img{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;object-fit:cover;object-position:50% 8%;animation:kb 9s ease-out both}
+#mer #merTx{position:relative;flex:0 0 auto;margin:0 18px 12px;padding:10px 14px;border-radius:16px;background:rgba(6,14,24,.6);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-size:15px;line-height:1.7;text-align:center;max-width:460px}
+#merTx b{display:block;font-size:22px;letter-spacing:.2em;color:#bfe8ff}
+#mer #merX{position:relative;flex:0 0 auto;height:48px;margin-bottom:calc(env(safe-area-inset-bottom,0px) + 22px);width:min(70vw,320px)}
 #mer.vision{pointer-events:none;background:transparent}
 #mer.vision img{opacity:.55;animation:vis 2.6s ease both}
 #mer.vision #merX{display:none}
 @keyframes kb{from{transform:scale(1.15)}to{transform:scale(1)}}
 @keyframes vis{0%{opacity:0;filter:blur(8px)}30%{opacity:.6;filter:blur(2px)}100%{opacity:0;filter:blur(6px)}}
 #top2{flex-wrap:wrap;right:12px}
+#goal{position:fixed;top:0;right:0;bottom:0;left:0;z-index:8;background:rgba(4,8,7,.6);display:flex;align-items:flex-end;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 50px) 10px calc(env(safe-area-inset-bottom,0px) + 10px)}
+#goal .sheet{width:min(100%,480px);max-height:100%;overflow:auto;background:var(--glass-strong);border:1px solid var(--stroke);border-radius:20px;padding:14px 16px;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.merbox{margin:8px 0 6px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,rgba(94,242,255,.16),rgba(176,108,255,.14));border:1px solid rgba(160,220,255,.3);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.merbox b{font-size:15px;color:#bfe8ff}.merbox small{flex-basis:100%;font-size:12px;color:var(--fg-dim)}
+#story{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px}
+#story .card{animation:none}#stT{color:#bfe8ff;font-size:18px}#stB{font-size:15px;color:var(--fg);line-height:1.8}#stR{color:#ffd75e;font-weight:800}
+.chip.dotn{position:relative}.chip.dotn::after{content:"";position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:var(--bad)}
 @media (prefers-reduced-motion:reduce){#actBtn.hot{animation:none}#tag,.card{animation:none}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
@@ -197,6 +204,7 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
   <div class="chip sm">🕖 <span id="clock">07:00</span><span id="wxI">☀️</span></div>
   <button class="chip sm" id="baitChip" aria-label="更換魚餌"><span id="baitI">🪱</span><span id="baitN">蚯蚓</span><small id="baitC">∞</small></button>
   <button class="chip sm" id="bTour" aria-label="釣魚大賽">🏆</button>
+  <button class="chip sm" id="bGoal" aria-label="目標與成就">🎯</button>
 </div>
 <div id="toast"></div>
 <div id="fight" class="hidden">
@@ -219,6 +227,8 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 <div id="hotChip" class="chip sm hidden"></div>
 <div id="tour" class="hidden"></div>
 <div id="tourDlg" class="hidden"><div class="card"><div class="sh-hd"><b>🏆 釣魚大賽</b><button class="ib" id="tourX" aria-label="關閉">✕</button></div><p class="desc" id="tourBody"></p><button class="btn pri" id="tourGo" style="width:100%">報名開賽</button></div></div>
+<div id="goal" class="hidden"><div class="sheet"><div class="sh-hd"><b>🎯 目標與傳說</b><button class="ib" id="goalX" aria-label="關閉">✕</button></div><div id="goalB"></div></div></div>
+<div id="story" class="hidden"><div class="card"><div class="sh-hd"><b id="stT"></b></div><p class="desc" id="stB"></p><div class="note" id="stR"></div><button class="btn pri" id="stX" style="width:100%;margin-top:10px">收下</button></div></div>
 <div id="mer" class="hidden"><img id="merImg" alt="美人魚"><div id="merTx"></div><button class="btn" id="merX">繼續</button></div>
 <div id="joy" class="hidden" aria-label="划船搖桿"><div id="joyK"></div><span>划船</span></div>
 <div id="catch" class="hidden">
@@ -1301,14 +1311,22 @@ const worm=new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([V3(0,-1.27,0),V
   new T.MeshStandardMaterial({color:0xa8574d,roughness:.35}));
 rig.add(worm);
 const BAIT=new T.Vector3(0,-1.32,0);
+// 美人魚：用角色設定圖的正面／背面去背圖，在水中永遠面向鏡頭，尾巴與頭髮有擺動
+const merTL=new T.TextureLoader(), merUni={uSwim:{value:0},uAmp:{value:0}}; let merG=null;
+function merSprite(){ if(merG) return merG; const g=new T.Group();
+  const mk=(file,ry)=>{ const t=merTL.load(file); t.encoding=T.sRGBEncoding; t.anisotropy=4;
+    const m=new T.MeshStandardMaterial({map:t,alphaTest:.4,roughness:.55,metalness:.1,emissive:new T.Color(0x0a2a3a),emissiveIntensity:.35});
+    m.onBeforeCompile=s=>{ s.uniforms.uSwim=merUni.uSwim; s.vertexShader='uniform float uSwim;\n'+s.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nfloat ty_ = clamp(0.48 - uv.y, 0.0, 1.0);\ntransformed.x += sin(uSwim*2.2 - uv.y*7.0)*ty_*ty_*0.16;\nfloat hy_ = smoothstep(0.55, 0.95, uv.y)*abs(position.x)*4.0;\ntransformed.x += sin(uSwim*1.3 + uv.y*5.0)*hy_*0.012;'); };
+    const me=new T.Mesh(new T.PlaneGeometry(480/1620,1,10,48),m); me.rotation.y=ry; me.frustumCulled=false; g.add(me); };
+  mk('mermaid_front.png',0); mk('mermaid_back.png',Math.PI); g.userData.mer=true; merG=g; return g; }
 
 // 魚
 let on=false, fish=null, uni=null, fd=null, prog=0, biteT=-1, camA=0, yaw=0, tt=0;
 const S=new T.Vector3(), C=new T.Vector3(), dirv=new T.Vector3(), perp=new T.Vector3(), pos=new T.Vector3(), prev=new T.Vector3(), focus=new T.Vector3();
 const cDark=lin('#07110d'), cMid=lin('#2a5240'), cTint=lin('#3c4a1c'), tmpC=new T.Color();
 function start(fdIn){
-  end(); fd=fdIn; const src=P.getFish(fd.sp); uni=src.uni;
-  fish=src.group.clone(); fish.visible=true; fish.scale.setScalar(fd.L); fish.traverse(o=>{ o.frustumCulled=false; }); scene.add(fish);
+  end(); fd=fdIn; if(fd.sp.special==='mermaid'){ fish=merSprite(); uni=merUni; } else { const src=P.getFish(fd.sp); uni=src.uni; fish=src.group.clone(); fish.traverse(o=>{ o.frustumCulled=false; }); }
+  fish.visible=true; fish.scale.setScalar(fd.L); scene.add(fish);
   const a0=Math.random()*Math.PI*2, R0=3.2+fd.L*2;
   S.set(Math.cos(a0)*R0,BAIT.y+rand(-.5,.3),Math.sin(a0)*R0);
   dirv.subVectors(BAIT,S); dirv.y=0; dirv.normalize(); perp.set(-dirv.z,0,dirv.x);
@@ -1340,6 +1358,9 @@ function update(dt){
   const vx=pos.x-prev.x, vz=pos.z-prev.z, sp=Math.hypot(vx,vz)/Math.max(dt,1e-4);
   if(sp>.02){ let ty=Math.atan2(-vz,vx), d=ty-yaw; while(d>Math.PI) d-=6.283; while(d<-Math.PI) d+=6.283; yaw+=d*Math.min(1,dt*4); }
   fish.position.copy(pos); fish.rotation.set(0,yaw,clamp((pos.y-prev.y)/Math.max(dt,1e-4)*.4,-.3,.3)); prev.copy(pos);
+  if(fish.userData.mer){ const cx=cam.position.x-pos.x, cz=cam.position.z-pos.z, cl=Math.hypot(cx,cz)||1, vl=Math.hypot(vx,vz)||1e-5;
+    const away=sp>.05&&(vx*cx+vz*cz)/(cl*vl)<-.4;
+    fish.rotation.set(0,Math.atan2(cx,cz)+(away?Math.PI:0),clamp(-(vx*cz-vz*cx)/cl*8,-.25,.25)); fish.position.y+=Math.sin(tt*1.4)*.04; }
   uni.uSwim.value+=dt*(5+sp*14); uni.uAmp.value=.035+clamp(sp*.05,0,.08)+(biteT>=0&&biteT<.6?.06:0);
   worm.rotation.y=Math.sin(tt*3)*.25; rig.rotation.z=Math.sin(tt*.8)*.02;
   // 鏡頭
@@ -1355,7 +1376,7 @@ return { start, end, update, resize, active:()=>on, setProgress:a=>{ prog=clamp(
 /* ---------- 釣具與魚餌資料 ---------- */
 const GEAR={
  rod:[{name:'入門碳竿',price:0,lv:1,cast:30,tens:1,col:'#1d4fb8'},{name:'中調碳竿',price:1500,lv:3,cast:36,tens:.92,col:'#1f6e48'},
-      {name:'高模數競技竿',price:6000,lv:6,cast:42,tens:.85,col:'#141418',gold:true},{name:'傳奇手工竿',price:20000,lv:10,cast:50,tens:.78,col:'#8e1a20',gold:true}],
+      {name:'高模數競技竿',price:6000,lv:6,cast:42,tens:.85,col:'#141418',gold:true},{name:'傳奇手工竿',price:20000,lv:10,cast:50,tens:.78,col:'#8e1a20',gold:true},{name:'人魚之竿',price:0,lv:1,cast:54,tens:.72,col:'#dfeef4',gold:true,req:'mer3'}],
  line:[{name:'尼龍線 6 lb',price:0,lv:1,s:4.2},{name:'尼龍線 10 lb',price:800,lv:2,s:5.0},{name:'碳纖線 14 lb',price:3000,lv:4,s:6.0},
        {name:'PE 編織線 20 lb',price:9000,lv:7,s:7.2},{name:'PE 編織線 30 lb',price:25000,lv:11,s:8.6}],
  reel:[{name:'2000 型紡車輪',price:0,lv:1,spd:1.9,drag:1},{name:'3000 型紡車輪',price:1200,lv:3,spd:2.2,drag:.85},
@@ -1428,9 +1449,9 @@ function render(){
     h+='<div class="tabs">'+[['rod','釣竿'],['line','釣線'],['reel','捲線器'],['bait','魚餌']].map(t=>`<button class="tab${shopTab===t[0]?' on':''}" data-a="tab" data-v="${t[0]}">${t[1]}</button>`).join('')+'</div>';
     h+=`<div class="note">🪙 ${save.coins.toLocaleString()}，Lv ${save.lv}</div>`;
     if(shopTab!=='bait'){
-      h+=GEAR[shopTab].map((it,i)=>{ const own=save.gear[shopTab].includes(i), eq=save.eq[shopTab]===i, lock=save.lv<it.lv;
+      h+=GEAR[shopTab].map((it,i)=>{ const own=save.gear[shopTab].includes(i), eq=save.eq[shopTab]===i, lock=save.lv<it.lv||(it.req==='mer3'&&!(save.mer&&save.mer.n>=3));
         const sub=shopTab==='rod'?`拋投 ${it.cast} m，拉扯張力 −${Math.round((1-it.tens)*100)}%`:shopTab==='line'?`強度 ${it.s.toFixed(1)}，越高越不容易斷`:`收線 ${it.spd} m/s，爆線累積 −${Math.round((1-it.drag)*100)}%`;
-        const btn=eq?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="eq" data-v="${i}">裝備</button>`:lock?`<span class="lk">Lv ${it.lv} 解鎖</span>`:`<button class="sbtn pri" data-a="buy" data-v="${i}">🪙 ${it.price.toLocaleString()}</button>`;
+        const btn=eq?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="eq" data-v="${i}">裝備</button>`:lock?`<span class="lk">${it.req?'美人魚第 3 次相遇':'Lv '+it.lv+' 解鎖'}</span>`:`<button class="sbtn pri" data-a="buy" data-v="${i}">🪙 ${it.price.toLocaleString()}</button>`;
         return row(it.name,sub,btn); }).join('');
     } else {
       h+=BAITS.map((b,i)=>{ const n=b.id==='worm'?'∞':(save.baits[b.id]||0), lock=save.lv<b.lv, using=save.bait===b.id;
@@ -1467,9 +1488,9 @@ function render(){
   else if(cur==='spot'){
     shT.textContent='釣點';
     if(!save.kayak) h+=row('🛶 獨木舟','買了才能划到湖裡的其他釣點','<button class="sbtn pri" data-a="kayak">🪙 800</button>');
-    h+=SPOTS.map((s,i)=>{ const lock=save.lv<s.lv, need=s.kayak&&!save.kayak, here=c.curSpot()===i;
-      const btn=here?'<span class="eqd">目前位置</span>':lock?`<span class="lk">Lv ${s.lv} 解鎖</span>`:need?'<span class="lk">需要獨木舟</span>':`<button class="sbtn pri" data-a="go" data-v="${i}">${s.kayak?'划過去':'回碼頭'}</button>`;
-      return row((s.kayak?'🛶 ':'🪵 ')+s.name,s.sub,btn); }).join('');
+    h+=SPOTS.map((s,i)=>{ const lock=save.lv<s.lv||(s.req==='mer1'&&!(save.mer&&save.mer.n>=1)), need=s.kayak&&!save.kayak, here=c.curSpot()===i;
+      const btn=here?'<span class="eqd">目前位置</span>':lock?`<span class="lk">${s.req?'需要美人魚的認可':'Lv '+s.lv+' 解鎖'}</span>`:need?'<span class="lk">需要獨木舟</span>':`<button class="sbtn pri" data-a="go" data-v="${i}">${s.kayak?'划過去':'回碼頭'}</button>`;
+      return row(s.req&&lock?'🔒 ？？？':(s.kayak?'🛶 ':'🪵 ')+s.name,s.req&&lock?'只有被美人魚認可的人才知道的地方':s.sub,btn); }).join('');
   }
   shB.innerHTML=h;
 }
@@ -1510,7 +1531,8 @@ const SPOTS=[
  {id:'dock',name:'木碼頭',sub:'岸邊碼頭，各種魚都有一點',pos:[0,0],head:0,eye:2.4,kayak:false,lv:1,aff:{},size:1,rare:0},
  {id:'lily',name:'浮萍灣',sub:'睡蓮和水草多，黑鱸、太陽魚聚集',pos:[-7,-17],head:.25,eye:1.0,kayak:true,lv:2,aff:{bluegill:1.5,crappie:1.3,lmbass:1.7,smbass:1.4},size:1,rare:.1},
  {id:'wood',name:'倒木區',sub:'枯樹和沉木，鯰魚、弓鰭魚的地盤',pos:[-27,-22],head:-.45,eye:1.0,kayak:true,lv:4,aff:{channel:1.8,bowfin:2,flathead:1.8,perch:1.5},size:1.05,rare:.2},
- {id:'deep',name:'深水中央',sub:'最深的水域，大型魚出沒',pos:[6,-58],head:.1,eye:1.0,kayak:true,lv:6,aff:{gar:2.5,flathead:1.5,reba:1.3,channel:1.3},size:1.15,rare:.35}];
+ {id:'deep',name:'深水中央',sub:'最深的水域，大型魚出沒',pos:[6,-58],head:.1,eye:1.0,kayak:true,lv:6,aff:{gar:2.5,flathead:1.5,reba:1.3,channel:1.3},size:1.15,rare:.35},
+ {id:'moon',name:'月光灣',sub:'美人魚透露的秘境，夜裡傳說生物頻繁出沒',pos:[-10,-40],head:.35,eye:1.0,kayak:true,lv:1,req:'mer1',aff:{mermaid:4,ghost:3,golden:2},size:1.2,rare:.6}];
 const WXT={clear:{c:0,r:0,f:0,w:1.5,g:.3,n:'晴',i:'☀️'},breezy:{c:.25,r:0,f:0,w:5.5,g:.8,n:'晴有風',i:'🍃'},cloudy:{c:.75,r:0,f:.15,w:3,g:.5,n:'陰',i:'☁️'},drizzle:{c:.85,r:.4,f:.35,w:2,g:.3,n:'毛毛雨',i:'🌦️'},rain:{c:1,r:.8,f:.3,w:4,g:.6,n:'雨',i:'🌧️'},storm:{c:1,r:1,f:.45,w:9,g:1,n:'雷雨',i:'⛈️'},fog:{c:.45,r:0,f:1,w:.5,g:.1,n:'霧',i:'🌫️'}};
 
 function createWild(W,P,Snd,save,toast,vib,ctx){
@@ -2113,11 +2135,67 @@ function mermaidScene(){ merImg.src='mermaid_a.jpg'; merTx.innerHTML='<b>美人�
 $('merX').addEventListener('click',()=>{ mer.className='hidden'; });
 merImg.addEventListener('error',()=>{ if(mer.className!=='hidden') mer.className='hidden'; });
 
+/* ---------- 目標、成就與人魚之約 ---------- */
+const S=c.save;
+const dexV=()=>Object.values(S.dex||{});
+const maxW=()=>dexV().reduce((m,d)=>Math.max(m,d.bw||0),0);
+const golds=()=>dexV().filter(d=>(d.md||0)>=3).length;
+const merN=()=>(S.mer&&S.mer.n)||0;
+const ACH=[
+ ['first','第一條魚','釣到第一條魚',()=>[S.total||0,1],100],
+ ['c50','釣魚老手','累計釣到 50 尾',()=>[S.total||0,50],1000],
+ ['c200','濕地傳奇','累計釣到 200 尾',()=>[S.total||0,200],5000],
+ ['sp6','小小圖鑑家','發現 6 種魚',()=>[dexV().length,6],800],
+ ['spAll','圖鑑全收集','發現所有魚種',()=>[dexV().length,c.SPN],10000],
+ ['gold1','第一頂金冠','釣到金冠尺寸的魚',()=>[golds(),1],500],
+ ['gold8','金冠收藏家','8 種魚拿到金冠',()=>[golds(),8],4000],
+ ['big10','十公斤巨物','釣到 10 公斤以上的魚',()=>[maxW(),10],1500],
+ ['big30','濕地巨獸','釣到 30 公斤以上的魚',()=>[maxW(),30],6000],
+ ['combo5','五連擊','連續釣到 5 尾',()=>[S.maxCombo||0,5],800],
+ ['combo10','十連擊大師','連續釣到 10 尾',()=>[S.maxCombo||0,10],3000],
+ ['perf20','起鉤神手','完美起鉤 20 次',()=>[S.perf||0,20],1500],
+ ['hot10','追魚群的人','在魚群熱點釣到 10 尾',()=>[S.hotC||0,10],1200],
+ ['tour1','大賽冠軍','贏得 1 次釣魚大賽',()=>[S.trophies||0,1],1500],
+ ['tour5','常勝軍','贏得 5 次釣魚大賽',()=>[S.trophies||0,5],6000],
+ ['item10','拾荒者','撈起 10 件物品',()=>[S.items||0,10],600],
+ ['chest','尋寶人','撈到沉沒的寶箱',()=>[S.chests||0,1],1000],
+ ['lv10','十級釣手','等級達到 10',()=>[S.lv||1,10],3000],
+ ['mer1','傳說之約','第一次遇見美人魚',()=>[merN(),1],3000],
+ ['mer5','人魚的知己','和美人魚相遇 5 次',()=>[merN(),5],15000]];
+const MER_NEXT=['第 1 次相遇：她會告訴你一個秘密地點','第 2 次相遇：她會送你月光餌','第 3 次相遇：人魚之竿','第 4 次相遇：人魚的祝福','第 5 次相遇：月下之歌'];
+const STORY=[
+ ['她把一片發光的鱗片放在你掌心，用指尖在水面畫出一個位置。「月光灣……只告訴你。」','解鎖秘境：月光灣（獨木舟可前往，夜裡傳說生物最多）'],
+ ['她記得你了。這次她從水底撈起一串散發微光的餌，輕輕掛在你的釣竿上。','月光餌 ×3'],
+ ['她送你一根像月光般潔白的釣竿，竿身刻著看不懂的古老文字。','人魚之竿（到釣具店免費裝備）'],
+ ['她握住你的手，低聲唱了一段旋律。從今以後，濕地的魚似乎都對你特別友善。','人魚的祝福：稀有魚機率永久提升'],
+ ['滿月的夜裡，她在月光灣為你唱完整首歌。整片濕地的螢火蟲同時亮了起來。','成就「人魚的知己」可以領取 🪙15000']];
+const fmt=v=>v%1?v.toFixed(1):v;
+function goalsRender(){ const m=merN();
+  let h=`<div class="merbox"><b>🧜 人魚之約</b><span>${'💗'.repeat(Math.min(m,5))}${'🤍'.repeat(Math.max(0,5-m))}</span><small>${m<5?'下一步：'+MER_NEXT[m]:'你已是她最信任的人，她仍會在夜裡來看你'}</small>${m===0?'<small>提示：夜晚、起霧或深水中央，用月光餌最容易遇見她。</small>':''}</div>`;
+  h+=ACH.map(a=>{ const [cur,g]=a[3](), done=cur>=g, cl=S.ach&&S.ach[a[0]];
+    return `<div class="row"><div class="nm"><b>${a[1]}</b><small>${a[2]}（${fmt(Math.min(cur,g))}/${g}）</small><span class="pbar"><i style="width:${Math.min(100,cur/g*100)}%"></i></span></div><div class="rt">${cl?'<span class="eqd">已領取</span>':done?`<button class="sbtn pri" data-ach="${a[0]}">領 🪙${a[4]}</button>`:`<small>🪙${a[4]}</small>`}</div></div>`; }).join('');
+  $('goalB').innerHTML=h; }
+function goalsDot(){ $('bGoal').classList.toggle('dotn',ACH.some(a=>{ const [cur,g]=a[3](); return cur>=g&&!(S.ach&&S.ach[a[0]]); })); }
+$('bGoal').addEventListener('click',()=>{ goalsRender(); $('goal').classList.remove('hidden'); });
+$('goalX').addEventListener('click',()=>$('goal').classList.add('hidden'));
+$('goal').addEventListener('click',e=>{ if(e.target.id==='goal') $('goal').classList.add('hidden'); const b=e.target.closest('[data-ach]'); if(!b) return;
+  const a=ACH.find(x=>x[0]===b.dataset.ach); if(!a) return; S.ach=S.ach||{}; if(S.ach[a[0]]) return;
+  S.ach[a[0]]=1; S.coins+=a[4]; c.persist(); c.setCoins(); c.Snd.coin(); c.toast('成就達成：'+a[1]+'　🪙'+a[4],'good',2200); goalsRender(); goalsDot(); });
+function merMeet(){ S.mer=S.mer||{n:0}; S.mer.n++; const n=S.mer.n;
+  if(n===2){ S.baits=S.baits||{}; S.baits.moon=(S.baits.moon||0)+3; }
+  G.luck=.25; c.persist(); goalsDot();
+  const st=STORY[n-1]||['她又來看你了，在你的浮標旁繞了一圈才離開。','好運加滿'];
+  $('stT').textContent='人魚之約　'+'💗'.repeat(Math.min(n,5)); $('stB').textContent=st[0]; $('stR').textContent='獲得：'+st[1];
+  $('story').classList.remove('hidden'); c.Snd.fanfare(4); }
+$('stX').addEventListener('click',()=>$('story').classList.add('hidden'));
+setTimeout(goalsDot,500);
+let dotT=0;
 function update(dt){
+  dotT-=dt; if(dotT<=0){ dotT=3; goalsDot(); }
   if(hk.on){ hk.t+=dt; hgM.style.bottom=(hpos()*100)+'%'; htF.style.height=(clamp(1-hk.t/hk.win,0,1)*100)+'%'; }
   updHot(dt); updTour(dt);
 }
-return {ITEM_SP,hookStart,hookPress,hookEnd,hookExpired,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
+return {goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,hookExpired,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
@@ -2212,10 +2290,10 @@ const PER_WAIT={dawn:.75,day:1.1,dusk:.75,night:1.0};
 function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.02,-.5,Math.cos(G.t*1.1)*.015)); }
 
 /* ---------- 選魚 ---------- */
-function specialK(sp){ if(!sp.special) return 1; const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone===3||G.spot===3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; return 1; }
+function specialK(sp){ if(!sp.special) return 1; const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone>=3||G.spot>=3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; return 1; }
 function pickSpecies(){
   const per=period(G.hour), pw=clamp((G.castDist-6)/30,0,1); let tot=0;
-  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)))*(1+sp.rar*G.luck*2)*WL.spotAff(sp.id)*WL.wxAff(sp.id)*(bt.aff[sp.id]||1)*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
+  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*WL.spotAff(sp.id)*WL.wxAff(sp.id)*(bt.aff[sp.id]||1)*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
   let x=Math.random()*tot; for(let i=0;i<ws.length;i++){ x-=ws[i]; if(x<=0) return SPECIES[i]; } return SPECIES[0];
 }
 
@@ -2245,7 +2323,7 @@ function bite(){ if(!G.fd) prepFish(); UW.bite(); G.state='bite'; G.biteT=0; FUN
 function missBite(){ FUN.hookEnd(); G.combo=0; FUN.combo(0); G.state='wait'; G.timer=rand(2,5); G.nib=Math.floor(rand(0,2.99)); G.sp=null; G.fd=null; exitUW(); vib(40); }
 function hook(q){
   const sp=G.sp, L=G.fd.L; exitUW();
-  const perfect=!!q;
+  const perfect=!!q; if(perfect) save.perf=(save.perf||0)+1;
   G.f={perfect,d:G.castDist,az0:Math.atan2(-(G.to.x-G.base.x),-(G.to.z-G.base.z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
   G.state='fight'; P.splash(G.to.x,0,G.to.z,22,1); W.addRipple(G.to.x,G.to.z,.7); Snd.splash(.7); vib(40);
   toast(perfect?'完美揚竿！':'上鉤了！',perfect?'good':'',1200);
@@ -2266,14 +2344,15 @@ function startJump(){ const f=G.f; f.jumpT=f.jumpDur=.85+.25*Math.sqrt(G.fd.L); 
   toast('魚躍出水面！先放手！','warn',1100); vib(30); G.fish.group.visible=true; }
 function dispDist(){ return Math.max(.38,G.fd.L*(G.fd.sp.sh.snout?2.5:2.1))*(W.camera.aspect<1?1:.8); }
 function land(){
-  G.state='land'; G.stT=0; endFightUI(); WL.endChase(); G.combo=(G.combo||0)+1; FUN.combo(G.combo); fishPos(G.landFrom,-.05); P.splash(G.landFrom.x,0,G.landFrom.z,40,1.3); W.addRipple(G.landFrom.x,G.landFrom.z,1);
+  G.state='land'; G.stT=0; endFightUI(); WL.endChase(); G.combo=(G.combo||0)+1; FUN.combo(G.combo); save.maxCombo=Math.max(save.maxCombo||0,G.combo); fishPos(G.landFrom,-.05); P.splash(G.landFrom.x,0,G.landFrom.z,40,1.3); W.addRipple(G.landFrom.x,G.landFrom.z,1);
   Snd.splash(1.2); vib([30,40,30]); const g=G.fish.group; g.visible=G.fd.sp.special!=='mermaid'; if(g.parent!==W.scene) W.scene.attach(g);
   g.position.copy(G.landFrom); te.set(0,G.f.az0+G.f.theta+Math.PI/2,0); g.quaternion.setFromEuler(te); G.landQ.copy(g.quaternion); P.shadow.material.opacity=0;
 }
 function showCard(){
-  if(G.fd.item) return FUN.itemCard(G.fd,()=>{ ui.catch.classList.remove('hidden'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden'); document.body.classList.add('catching'); });
+  if(G.fd.item){ save.items=(save.items||0)+1; if(G.fd.item.id==='chest') save.chests=(save.chests||0)+1; persist(); FUN.goalsDot();
+    return FUN.itemCard(G.fd,()=>{ ui.catch.classList.remove('hidden'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden'); document.body.classList.add('catching'); }); }
   { const cb=1+.1*Math.min(G.combo||0,10); G.fd.value=Math.round(G.fd.value*cb); G.fd.xpMul=(G.fd.xpMul||1)*cb; }
-  FUN.tourCatch(G.fd); $('bSell').textContent='賣出'; $('bRel').classList.remove('hidden');
+  FUN.tourCatch(G.fd); if(G.hot) save.hotC=(save.hotC||0)+1; $('bSell').textContent='賣出'; $('bRel').classList.remove('hidden');
   const fd=G.fd, sp=fd.sp, r=RAR[sp.rar], rec=save.dex[sp.id];
   const isNew=!rec, isRec=!!rec&&fd.w>rec.bw;
   save.dex[sp.id]={n:(rec?rec.n:0)+1,bw:Math.max(rec?rec.bw:0,fd.w),bl:Math.max(rec?rec.bl:0,fd.L),md:Math.max(rec&&rec.md||0,FUN.medalLv(fd))}; save.total++; persist();
@@ -2283,7 +2362,7 @@ function showCard(){
   $('cLen').textContent=(fd.L*100).toFixed(1)+' cm'; $('cW').textContent=fd.w<1?Math.round(fd.w*1000)+' g':fd.w.toFixed(2)+' kg';
   $('cVal').textContent='🪙 '+fd.value.toLocaleString(); $('cDesc').textContent=sp.desc+' 拉扯型態：'+STY[SP_STY[sp.id]].n+'，難度 '+stars(fd)+'。';
   { const mm=sp.special==='mermaid'; $('bSell').classList.toggle('hidden',mm); $('bRel').textContent=mm?'送她回家（收下謝禮）':'放生'; if(mm) $('cW').textContent='？？？'; }
-  FUN.medalBadge(fd); if(sp.special==='mermaid'){ G.fish.group.visible=false; FUN.mermaidScene(); }
+  FUN.medalBadge(fd); FUN.goalsDot(); if(sp.special==='mermaid'){ G.fish.group.visible=false; FUN.mermaidScene(); }
   const nb=$('cNew'); nb.textContent=isNew?'新魚種':'新紀錄'; nb.classList.toggle('hidden',!(isNew||isRec));
   const tag=$('tag'); tag.style.animation='none'; void tag.offsetWidth; tag.style.animation='';
   ui.catch.classList.remove('hidden'); document.body.classList.add('catching'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden');
@@ -2294,7 +2373,7 @@ function finishCatch(sell){
   const g=G.fish.group;
   if(G.fd.item) FUN.itemEffect(G.fd.item);
   if(sell){ const v=G.fd.value; save.coins+=v; persist(); Snd.coin(); coinFly(v); }
-  else { META.onRelease(); if(G.fd.sp.special==='mermaid'){ const v=G.fd.value; save.coins+=v; persist(); Snd.coin(); coinFly(v); G.luck=.25; toast('美人魚唱著歌游回深處，留下了謝禮','good',2600); } else { G.luck=Math.min(.25,G.luck+.08); toast('放生了，下一竿稀有魚機率提高','good',1800); } }
+  else { META.onRelease(); if(G.fd.sp.special==='mermaid'){ const v=G.fd.value; save.coins+=v; persist(); Snd.coin(); coinFly(v); G.luck=.25; FUN.merMeet(); } else { G.luck=Math.min(.25,G.luck+.08); toast('放生了，下一竿稀有魚機率提高','good',1800); } }
   W.scene.attach(g); G.state='post'; G.stT=0; G.postSell=sell; G.from.copy(g.position);
 }
 function coinFly(v){ const el=document.createElement('div'); el.className='fly'; el.textContent='+'+v.toLocaleString()+' 🪙';
@@ -2336,7 +2415,7 @@ const META=createMeta({save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS
 const UW=createUnderwater(W,P);
 const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head});
 const AT=createAtmos(W,P,Snd,WL,{underwater:()=>UW.active(),period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,spot:()=>G.spot,toast});
-const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,period:()=>period(G.hour)});
+const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPECIES.length,period:()=>period(G.hour)});
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)) save.spot=0;
 { const s=SPOTS[save.spot]; G.spot=save.spot; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; WL.setSpot(save.spot); }
 function goSpot(i){ if(G.state!=='idle'){ toast('先收線再移動','warn'); return; } const s=SPOTS[i]; G.state='travel'; fadeEl.classList.add('on'); Snd.paddle(); setTimeout(()=>Snd.paddle(),380);
@@ -2349,7 +2428,7 @@ joy.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation();
 joy.addEventListener('pointermove',joyMove);
 const joyEnd=e=>{ if(e.pointerId!==KY.ptr) return; KY.ptr=null; KY.thr=0; KY.turn=0; joyK.style.transform=''; };
 joy.addEventListener('pointerup',joyEnd); joy.addEventListener('pointercancel',joyEnd);
-function zoneOf(x,z){ let best=G.spot, bd=22; for(let i=1;i<SPOTS.length;i++){ const s=SPOTS[i], d=Math.hypot(x-s.pos[0],z-s.pos[1]); if(d<bd){ bd=d; best=i; } } return best; }
+function zoneOf(x,z){ let best=G.spot, bd=22; for(let i=1;i<SPOTS.length;i++){ const s=SPOTS[i]; if(s.req==='mer1'&&!(save.mer&&save.mer.n>=1)) continue; const d=Math.hypot(x-s.pos[0],z-s.pos[1]); if(d<bd){ bd=d; best=i; } } return best; }
 function updateKayak(dt){
   const s=SPOTS[G.spot], can=s.kayak&&G.state==='idle'&&!document.body.classList.contains('catching');
   joy.classList.toggle('hidden',!can);
@@ -2478,7 +2557,7 @@ function update(dt){
     if(st==='wait'){
       G.timer-=dt; if(G.dip>0) G.dip-=dt;
       if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bite(); }
-      if(G.state==='wait'&&G.nib===0&&G.timer<3&&!G.fd){ prepFish(); if(save.uw!==false&&!G.fd.item&&G.fd.sp.special!=='mermaid') enterUW(); else if(G.fd.sp.special==='mermaid') FUN.vision(); }
+      if(G.state==='wait'&&G.nib===0&&G.timer<3&&!G.fd){ prepFish(); if(!G.fd.item&&(save.uw!==false||G.fd.sp.special==='mermaid')) enterUW(); }
       if(UW.active()&&G.state==='wait') UW.setProgress(1-G.timer/3);
       if(G.fd&&G.state==='wait'){ G.bubT=(G.bubT||0)-dt; if(G.bubT<=0){ G.bubT=rand(.25,.7); W.addRipple(G.to.x+rand(-.3,.3),G.to.z+rand(-.3,.3),.05); P.splash(G.to.x+rand(-.25,.25),0,G.to.z+rand(-.25,.25),1,.15); } }
       { const wv=WL.wind(); G.to.x+=wv.x*wv.s*.05*dt; G.to.z+=wv.z*wv.s*.05*dt; }
