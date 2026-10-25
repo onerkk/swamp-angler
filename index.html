@@ -1711,7 +1711,7 @@ function render(){
     const found=SPECIES.filter(s=>save.dex[s.id]).length;
     h+=`<div class="note">已發現 ${found}/${SPECIES.length} 種，總漁獲 ${save.total} 尾</div>`;
     h+=SPECIES.map(sp=>{ const d=save.dex[sp.id], r=RAR[sp.rar];
-      return row(d?sp.name:'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${STY[SP_STY[sp.id]].n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col); }).join('');
+      return row(d?sp.name:'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${styOf(sp.id).n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col); }).join('');
   } else if(cur==='set'){
     shT.textContent='設定';
     h+='<div class="note">切換時段</div><div class="tabs">'+PRESETS.map((p,i)=>`<button class="tab" data-a="time" data-v="${i}">${p[1]}</button>`).join('')+'</div>';
@@ -2016,7 +2016,9 @@ const STY={
  jumper:{n:'甩頭跳水',run:[.8,1.8],rest:[.8,1.8],mul:1.7,lat:1.1,spd:1,ev:'shake',evP:.35,d:.8},
  digger:{n:'往深處鑽',run:[1.5,3],rest:[1,2.5],mul:1.5,lat:.7,spd:.8,ev:'dive',evP:.4,d:1},
  brawler:{n:'短促爆衝',run:[.6,1.2],rest:[.6,1.4],mul:2.0,lat:1.2,spd:1.1,ev:'shake',evP:.2,d:.6}};
-const SP_STY={bluegill:'nibbler',crappie:'nibbler',reba:'runner',perch:'brawler',lmbass:'jumper',channel:'digger',bowfin:'brawler',smbass:'jumper',flathead:'digger',gar:'runner',golden:'brawler',ghost:'jumper',mermaid:'runner',barra:'jumper',amber:'runner',grouper:'digger',ribbon:'nibbler',mahi:'jumper',tuna:'runner',marlin:'jumper',shark:'brawler',gwhite:'brawler',sail:'jumper'};
+const SP_STY={bluegill:'nibbler',crappie:'nibbler',reba:'runner',perch:'brawler',lmbass:'jumper',channel:'digger',bowfin:'brawler',smbass:'jumper',flathead:'digger',gar:'runner',golden:'brawler',ghost:'jumper',mermaid:'runner',barra:'jumper',amber:'runner',grouper:'digger',ribbon:'nibbler',mahi:'jumper',tuna:'runner',marlin:'jumper',shark:'brawler',gwhite:'brawler',sail:'jumper',trout:'jumper',pike:'brawler',moonkoi:'digger',seaking:'digger'};
+// 依魚種取拉扯型態；新魚種忘了填也不會讓畫面報錯（預設小幅亂竄）
+const styOf=id=>STY[SP_STY[id]]||STY.nibbler;
 
 const SH3={};
 SH3.airVS=`
@@ -4024,7 +4026,7 @@ const Snd=(()=>{
 })();
 function vib(p){ if(save.vibe===false) return; try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 const D=()=>DIFF[save.diff]||DIFF.normal;
-const stars=fd=>{ const n=Math.max(1,Math.min(5,Math.round(1+fd.sp.rar*.6+Math.log2(fd.w+1)*.7+(STY[SP_STY[fd.sp.id]]||{d:0}).d))); return '★'.repeat(n)+'☆'.repeat(5-n); };
+const stars=fd=>{ const n=Math.max(1,Math.min(5,Math.round(1+fd.sp.rar*.6+Math.log2(fd.w+1)*.7+styOf(fd.sp.id).d))); return '★'.repeat(n)+'☆'.repeat(5-n); };
 
 /* ---------- 介面 ---------- */
 const ui={coin:$('coin'),clock:$('clock'),toast:$('toast'),fight:$('fight'),fName:$('fName'),fDist:$('fDist'),tBar:$('tBar'),tFill:$('tFill'),sFill:$('sFill'),
@@ -4142,7 +4144,7 @@ function showCard(){
   ui.catch.style.setProperty('--rc',r.col);
   $('cLv').textContent=fd.lvl; $('cName').textContent=sp.name; $('cRar').textContent=r.name+' '+r.en; $('cSci').textContent=sp.sci;
   $('cLen').textContent=(fd.L*100).toFixed(1)+' cm'; $('cW').textContent=fd.w<1?Math.round(fd.w*1000)+' g':fd.w.toFixed(2)+' kg';
-  $('cVal').textContent='🪙 '+fd.value.toLocaleString(); $('cDesc').textContent=sp.desc+' 拉扯型態：'+STY[SP_STY[sp.id]].n+'，難度 '+stars(fd)+'。';
+  $('cVal').textContent='🪙 '+fd.value.toLocaleString(); $('cDesc').textContent=sp.desc+' 拉扯型態：'+styOf(sp.id).n+'，難度 '+stars(fd)+'。';
   { const mm=sp.special==='mermaid'; $('bSell').classList.toggle('hidden',mm); $('bRel').textContent=mm?'送她回家（收下謝禮）':'放生'; if(mm) $('cW').textContent='？？？'; }
   FUN.medalBadge(fd); FUN.goalsDot(); if(sp.special==='mermaid'){ G.fish.group.visible=false; FUN.mermaidScene(); }
   const nb=$('cNew'); nb.textContent=isNew?'新魚種':'新紀錄'; nb.classList.toggle('hidden',!(isNew||isRec));
@@ -4273,7 +4275,7 @@ function exitUW(){ uwTag.classList.add('hidden'); if(!UW.active()) return; fadeE
 /* ---------- 每幀更新 ---------- */
 function updateFight(dt){
   const f=G.f, sp=G.fd.sp, fs=sp.f, fd=G.fd;
-  const ST=STY[SP_STY[fd.sp.id]]||STY.nibbler, DF=D();
+  const ST=styOf(fd.sp.id), DF=D();
   f.phaseT-=dt;
   if(f.phaseT<=0){
     if(f.run){ f.run=false; f.ev=null; f.phaseT=rand(ST.rest[0],ST.rest[1])*(1.3-fs.agi*.3); f.latDir=0; }
