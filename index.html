@@ -1648,6 +1648,8 @@ function newQuest(ex){
   const q=Object.assign({k,prog:0},pool[k]()); const diff={count:1,rare:1.6,weight:1.2,sp:1.5,per:1.2,perfect:1.3,release:.8,ice:1.4}[k];
   q.reward=Math.round((120+lv*90)*diff/10)*10; q.xp=Math.round(xpNext(lv)*.06*diff); return q;   // 任務經驗依這一級所需經驗按比例給
 }
+const QDIFF={count:1,rare:1.6,weight:1.2,sp:1.5,per:1.2,perfect:1.3,release:.8,ice:1.4};
+(save.quests||[]).forEach(q=>{ const want=Math.round(xpNext(save.lv)*.06*(QDIFF[q.k]||1)); if(!q.xp||q.xp<want*.5) q.xp=want; });   // 舊任務的經驗用新公式重算
 function fillQuests(){ while(save.quests.length<3) save.quests.push(newQuest(save.quests.map(q=>q.k))); persist(); }
 function addXP(x){ save.xp+=x; while(save.xp>=xpNext(save.lv)){ save.xp-=xpNext(save.lv); save.lv++; const lv=save.lv;
   if(LV_TITLES[lv]){ save.titles=save.titles||[]; if(save.titles.indexOf(LV_TITLES[lv])<0) save.titles.push(LV_TITLES[lv]); }
@@ -2154,7 +2156,7 @@ function update(dt,t){
     jf.J.uni.uAmp.value=.12; jf.J.uni.uSwim.value+=dt*20;
     if(s>=1){ g.visible=false; P.splash(g.position.x,0,g.position.z,14,.6); W.addRipple(g.position.x,g.position.z,.3); Snd.plip(); jf=null; } }
   // 美人魚尾巴
-  if(!tease){ teaseT-=dt; if(teaseT<=0){ teaseT=rand(60,140); if(day<.3&&!uw&&Math.random()<.45){ fwd(head()+rand(-.6,.6),tv).multiplyScalar(rand(18,40)).add(b);
+  if(!tease){ teaseT-=dt; if(teaseT<=0){ const ended=window.__STORY&&window.__STORY.done('c7'); teaseT=ended?rand(30,70):rand(60,140); if(day<.3&&!uw&&Math.random()<(ended?.7:.45)){   // 月潮回來後美人魚更常出現 fwd(head()+rand(-.6,.6),tv).multiplyScalar(rand(18,40)).add(b);
       if(Math.hypot(tv.x,tv.z)<W.shoreR(Math.atan2(tv.x,-tv.z))-5){ tease={t:0,x:tv.x,z:tv.z,ry:rand(0,6.28),hit:false}; fluke.visible=true; } } } }
   else { tease.t+=dt; const tt=tease.t; let y,rx;
     if(tt<1.2){ const e=sstep(0,1,tt/1.2); y=-.9+1.2*e; rx=.5-.7*e; } else if(tt<1.8){ y=.3+Math.sin((tt-1.2)*8)*.03; rx=-.2+Math.sin((tt-1.2)*6)*.08; } else { const e=sstep(0,1,(tt-1.8)/.4); y=.3-1.3*e; rx=-.2+1.5*e; }
@@ -3396,6 +3398,7 @@ document.head.appendChild(st2);
 function scaleFx(n){ fx.querySelector('b').textContent=`🌙 月鱗 ${Math.min(7,n)}/7`; fx.classList.remove('go'); void fx.offsetWidth; fx.classList.add('go');
   if(c.Snd&&c.Snd.fanfare) c.Snd.fanfare(1); if(c.vib) c.vib([30,40,30,40,90]); setTimeout(()=>fx.classList.remove('go'),2700);
   if(n<7) setTimeout(()=>c.toast('找到新的月鱗！去聽汐月的故事','good',2600),2300); }
+let endGlow=0;
 const cam=new T.Vector3();
 function update(dt){ W.camera.getWorldPosition(cam);
   const nk=W.U.uNight?W.U.uNight.value:0, cl=W.U.uCloud?W.U.uCloud.value:0, vis=nk*(1-.8*Math.min(1,cl));
@@ -3405,7 +3408,9 @@ function update(dt){ W.camera.getWorldPosition(cam);
   W.U.uMoonDir.value.copy(MD); W.U.uMoonK.value=vis*Math.max(0,il)*(above?Math.min(1,MD.y*8+.2):0); if(W.U.uMoonCol) W.U.uMoonCol.value.set(0,0,0);   // 關掉天空著色器裡的程序化滿月，避免從暗面透出
   moon.visible=halo.visible=vis>.02&&il>.03&&above; if(moon.visible){ moon.position.copy(cam).addScaledVector(MD,780); moon.scale.setScalar(26); { const k=Math.min(1,vis*1.3); moon.material.color.setRGB(1.7*k,1.7*k,1.75*k); }
     halo.position.copy(cam).addScaledVector(MD,770); halo.scale.set(150,150,1); halo.material.opacity=vis*(.25+.75*il); }
-  act+=((active()?1:0)-act)*Math.min(1,dt*.8); W.U.uBio.value=act;
+  act+=((active()?1:0)-act)*Math.min(1,dt*.8);
+  { const ended=c.save&&c.save.story&&c.save.story.ending, nightK=Math.max(0,Math.min(1,(.25-W.info.day)*5)), want=ended&&c.G&&c.G.loc==='lake'?.35*nightK:0;   // 月潮回來後：湖上夜晚永遠帶著淡淡的生物螢光
+    endGlow+=(want-endGlow)*Math.min(1,dt*.5); W.U.uBio.value=Math.max(act,endGlow); }
   npc.visible=act>.05; if(npc.visible){ mer.material.opacity=act; mer.rotation.y=Math.atan2(cam.x-NP.x,cam.z-NP.z); if(mer3) mer3.rotation.y=mer.rotation.y; glow.material.opacity=.5*act*(0.8+0.2*Math.sin(performance.now()*.002)); }
   const near=npc.visible&&Math.hypot(cam.x-NP.x,cam.z-NP.z)<35; tb.classList.toggle('hidden',!near||act<.5);
   if(near&&MS.read<unlocked()) tb.classList.add('dot'); }
@@ -3744,7 +3749,7 @@ const CH=[
   xp:1500,coins:1200,unlock:'倒木區（Lv 5）'},
  {id:'c3',spot:'wood',name:'第三章　暴風雨之後',open:{after:'c2',lv:5},
   intro:'倒木區是那場暴風雨留下的傷口。枯樹橫躺在水裡，成了大魚躲藏的地方。',
-  tasks:[{t:'catch',zone:'wood',sp:'channel',n:1,txt:'在倒木區釣到一尾斑點叉尾鮰'},{t:'catch',rain:1,n:3,txt:'下雨天釣到 3 尾魚'},{t:'catch',rar:1,n:3,txt:'釣到稀有以上的魚 3 尾'}],
+  tasks:[{t:'catch',zone:'wood',sp:'channel',n:1,txt:'在倒木區釣到一尾斑點叉尾鮰'},{t:'catch',rain:1,n:3,txt:'下雨天釣到 3 尾魚（可在設定切換天氣）'},{t:'catch',rar:1,n:3,txt:'釣到稀有以上的魚 3 尾'}],
   page:'手記第三頁\n「堤防築好以後，海水不再進來，湖心那條大鱷雀鱔變得越來越兇。\n我在牠肚子裡找到過一張畫在魚皮上的圖——湖的西邊，有個只在月光下才看得見的灣。\n冬天我要去上游看看，河水是從哪裡來的。」',
   xp:3000,coins:2500,unlock:'深水中央（Lv 8）、冰湖支線（Lv 10）'},
  {id:'ice',spot:'ice',side:1,name:'支線　上游的源頭',open:{after:'c3',lv:10},
