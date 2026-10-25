@@ -1616,7 +1616,7 @@ const BAITS=[
 const xpNext=lv=>Math.round(120*Math.pow(lv,1.75));   // 升級曲線：Lv 10 約 6,700、Lv 20 約 22,600
 /* 等級里程碑：每級解鎖什麼（升級提示與 ⭐ 面板共用） */
 const LV_TITLES={10:'見習漁人',20:'湖畔好手',30:'老練漁夫',40:'傳說釣手',50:'守湖宗師'};
-const LV_EVENTS={5:'主線第三章「暴風雨之後」',8:'主線第四章「湖心的秘密」、可購買遊艇',10:'冰湖支線「上游的源頭」',15:'大師挑戰：巨型鱷雀鱔',18:'主線終章「深淵之王」、大師挑戰：鯰魚之王',20:'大師挑戰：旗魚王',25:'大師挑戰：大白鯊女王',28:'大師挑戰：深淵海王'};
+const LV_EVENTS={5:'主線第三章「暴風雨之後」',8:'主線第四章「湖心的秘密」、可購買遊艇',10:'冰湖支線「上游的源頭」',15:'大師挑戰：巨型鱷雀鱔',18:'主線終章「深淵之王」、大師挑戰：鯰魚之王',20:'大師挑戰：旗魚王',24:'大師挑戰：深淵海王',25:'大師挑戰：大白鯊女王'};
 function lvGains(lv){ const g=[]; if(lv>=5) g.push('天賦點 +1'); if(lv%3===0&&lv<=30) g.push('強化上限提高到 +'+Math.min(10,lv/3)); if(LV_TITLES[lv]) g.push('稱號「'+LV_TITLES[lv]+'」'); if(LV_EVENTS[lv]) g.push(LV_EVENTS[lv]); return g; }
 window.__LVINFO={gains:lvGains,titles:LV_TITLES,xpNext:lv=>xpNext(lv)};
 
@@ -3208,7 +3208,7 @@ const BOSS=[
   {id:'flat',lv:18,name:'鯰魚之王',sp:'flathead',loc:'lake',zone:'wood',per:['night'],size:1.45,pow:1.45,title:'鯰魚王者',hint:'倒木區・夜晚',coins:20000,cry:3},
   {id:'marlin',lv:20,name:'旗魚王',sp:'marlin',loc:'sea',zone:'blue',per:['dawn','day'],size:1.35,pow:1.5,title:'怒海旗手',hint:'遠洋深藍・清晨或白天',coins:30000,cry:4},
   {id:'gw',lv:25,name:'大白鯊女王',sp:'gwhite',loc:'sea',zone:'blue',per:['dusk','night'],size:1.3,pow:1.6,title:'深海霸主',hint:'遠洋深藍・黃昏或夜晚',coins:50000,cry:6},
-  {id:'king',lv:28,name:'深淵海王',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'海王征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10}];
+  {id:'king',lv:24,name:'深淵海王',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'海王征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10}];
 const PER_NAME={dawn:'清晨',day:'白天',dusk:'黃昏',night:'夜晚'};
 
 function createTalents(c){
@@ -3744,7 +3744,7 @@ const CH=[
   xp:600,coins:500,unlock:'浮萍灣（需要獨木舟）'},
  {id:'c2',spot:'lily',name:'第二章　浮萍下的影子',open:{after:'c1',kayak:1},
   intro:'划進浮萍灣，水面鋪滿圓圓的葉子。手記說，老漁人第一次看見「她」，就是在這裡。',
-  tasks:[{t:'catch',zone:'lily',sp:'crappie',n:2,txt:'在浮萍灣釣到 2 尾黑斑刺蓋太陽魚'},{t:'catch',loc:'lake',per:'dawn',n:3,txt:'在湖上清晨釣到 3 尾魚'},{t:'item',n:1,txt:'從水裡釣起任何一件寶物'}],
+  tasks:[{t:'catch',zone:'lily',sp:'crappie',n:2,txt:'在浮萍灣釣到 2 尾黑斑刺蓋太陽魚'},{t:'catch',loc:'lake',per:'dawn',n:3,txt:'在湖上清晨釣到 3 尾魚'},{t:'item',n:1,txt:'從水裡釣起任何一件寶物（任務進行中機率加倍）'}],
   page:'手記第二頁\n「那天清晨，浮萍下有條銀色的尾巴，比我見過的任何魚都大。我以為眼花了。\n後來那場暴風雨，把東岸的林子整片吹倒在水裡。人們說湖病了，開始在河口築堤。」',
   xp:1500,coins:1200,unlock:'倒木區（Lv 5）'},
  {id:'c3',spot:'wood',name:'第三章　暴風雨之後',open:{after:'c2',lv:5},
@@ -3769,12 +3769,12 @@ const CH=[
   xp:8000,coins:6000,unlock:'近海礁岩（需要遊艇）'},
  {id:'c6',spot:'reef',name:'第六章　河口之外',open:{after:'c5',yacht:1},
   intro:'第一次把船開出河口。汐月回到了大海，海卻變得不安：魚群躁動，鯊魚出現得比以前頻繁。',
-  tasks:[{t:'catch',zone:'reef',sp:'amber',n:1,txt:'在近海礁岩釣到一尾紅甘'},{t:'catch',sp:'grouper',n:1,txt:'釣到一尾石斑'},{t:'scene',id:'dolphin',n:1,txt:'拍下一次海豚群'}],
+  tasks:[{t:'catch',zone:'reef',sp:'amber',n:1,txt:'在近海礁岩釣到一尾紅甘'},{t:'catch',sp:'grouper',n:1,txt:'釣到一尾石斑'},{t:'scene',id:'dolphin',n:1,txt:'拍下一次海豚群（白天出海，海豚出現時按 📷）'}],
   page:'手記最後幾頁（字跡很淡）\n「海王守著深藍的海溝。他以為是人類偷走了月潮。\n只有親手證明人與海可以共處，月潮才會回來。這件事，我沒能做到。」',
   xp:12000,coins:9000,unlock:'遠洋深藍（Lv 18）'},
  {id:'c7',spot:'blue',name:'終章　深淵之王',open:{after:'c6',lv:18},
   intro:'遠洋深藍，海水深得發黑。這裡是海王的領域，也是老漁人一輩子沒能抵達的地方。',
-  tasks:[{t:'catch',sp:'marlin',n:1,txt:'釣到一尾旗魚'},{t:'catch',sp:'sail',n:1,txt:'釣到一尾雨傘旗魚'},{t:'boss',id:'seaking',n:1,txt:'接受大師挑戰，擊敗深淵海王（Lv 28）'}],
+  tasks:[{t:'catch',sp:'marlin',n:1,txt:'釣到一尾旗魚'},{t:'catch',sp:'sail',n:1,txt:'釣到一尾雨傘旗魚'},{t:'boss',id:'king',n:1,txt:'接受大師挑戰，擊敗深淵海王（Lv 24，⭐ 面板）'}],
   page:'終章\n海王沉回深淵前，看了你很久。那天晚上，河口的堤防在大潮中自己裂開了一道縫，月光順著水流進湖裡。\n你回到碼頭，在手記最後一頁寫下：「月潮回來了。換我守著這片湖。」',
   xp:30000,coins:30000,unlock:'全部完成：獲得稱號「守湖人」'}
 ];
@@ -3806,6 +3806,7 @@ function onCatch(fd,ctx){ if(!fd||!fd.sp) return; bump(t=>{ if(t.t!=='catch') re
 const onPerfect=()=>bump(t=>t.t==='perfect'?1:0), onItem=()=>bump(t=>t.t==='item'?1:0);
 const onScene=id=>bump(t=>t.t==='scene'&&t.id===id?1:0), onBoss=id=>bump(t=>t.t==='boss'&&t.id===id?1:0);
 /* 主線正在追的魚：在指定地點（沒指定就任何地方）出現率 ×3；任務完成後恢復 */
+function needs(type){ return active().some(ch=>{ const p=prog(ch); return ch.tasks.some((t,i)=>t.t===type&&p[i]<t.n); }); }
 function boost(spId,zone){ for(const ch of active()){ const p=prog(ch); for(let i=0;i<ch.tasks.length;i++){ const t=ch.tasks[i]; if(t.t==='catch'&&t.sp===spId&&p[i]<t.n&&(!t.zone||t.zone===zone)) return 3; } } return 1; }
 let moonClock=0; function tick(dt){ moonClock-=dt; if(moonClock>0) return; moonClock=2; if(S.moon&&S.moon.done) bump(t=>t.t==='moon'?1:0); }
 /* 手記面板 */
@@ -3850,7 +3851,7 @@ btn.addEventListener('click',()=>{ render(); box.classList.remove('hidden'); });
 function dot(){ btn.classList.toggle('dot',st.done.some(id=>st.read.indexOf(id)<0)||active().some(ch=>!st.prog[ch.id])); }
 dot();
 if(!st.prog.c1&&!st.done.length) setTimeout(()=>c.toast('📜 你在碼頭找到一本舊手記，點上方的 📜 看看','good',3500),6000);
-return {boost,showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
+return {needs,boost,showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
@@ -3987,7 +3988,7 @@ function landBobber(){
 }
 function startRetrieve(msg,cls){ exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
 function nibble(){ G.dip=.28; W.addRipple(G.to.x,G.to.z,.18); Snd.nibble(); vib(12); G.approach=Math.max(G.approach,.01); }
-function prepFish(){ if(Math.random()<.085){ const it=FUN.rollItem(); G.sp=FUN.ITEM_SP; G.fd={sp:FUN.ITEM_SP,item:it,L:it.size,w:it.w*rand(.85,1.15),lvl:1,value:Math.round(it.val*rand(.8,1.25)),u:.5,xpMul:0}; return; }
+function prepFish(){ if(Math.random()<.085*(window.__STORY&&window.__STORY.needs('item')?2:1)){ const it=FUN.rollItem(); G.sp=FUN.ITEM_SP; G.fd={sp:FUN.ITEM_SP,item:it,L:it.size,w:it.w*rand(.85,1.15),lvl:1,value:Math.round(it.val*rand(.8,1.25)),u:.5,xpMul:0}; return; }
   G.depK=depKey(); const sp=pickSpecies(), pw=clamp((G.castDist-6)/30,0,1), u=Math.pow(Math.random(),(1.6-.5*pw)/WL.sizeB()*(1+(1-reachK())*1.2+.15*depNow(G.depK)));
   const L=lerp(sp.len[0],sp.len[1],u)/100, w=sp.k*L*L*L*rand(.9,1.12);
   G.sp=sp; G.fd={sp,L,w,u,lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*.5*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; if(window.__TAL) window.__TAL.applyBoss(G,SPECIES,RAR); }
