@@ -1615,10 +1615,11 @@ const BAITS=[
  {id:'crank',lure:'crank',name:'曲柄硬餌',icon:'🐠',price:1400,pack:15,lv:6,desc:'快速收線會下潛，黑鱸、金目鱸最愛（需要好捲線器）',aff:{lmbass:2.5,smbass:2.2,barra:2,gar:1.5,grouper:1.5,mahi:1.4},rare:.5,wait:1},
  {id:'minnow',lure:'minnow',name:'米諾',icon:'🐟',price:1800,pack:15,lv:8,desc:'抽一下、停一下，模仿受傷小魚，大型掠食魚無法抗拒',aff:{smbass:2.2,barra:2.2,lmbass:1.6,tuna:1.6,mahi:1.8,marlin:1.4},rare:.6,wait:1},
  {id:'moon',name:'月光餌',icon:'🌙',price:1500,pack:3,lv:3,desc:'散發微光的神秘餌，傳說中的生物會被吸引',aff:{mermaid:25,ghost:12,golden:12},rare:.6,wait:1.3}];
+const BOAT_COST={coins:25000,scale:30,bone:10,pearl:2};   // 修復老漁人的漁船
 const xpNext=lv=>Math.round(120*Math.pow(lv,1.75));   // 升級曲線：Lv 10 約 6,700、Lv 20 約 22,600
 /* 等級里程碑：每級解鎖什麼（升級提示與 ⭐ 面板共用） */
 const LV_TITLES={10:'見習漁人',20:'湖畔好手',30:'老練漁夫',40:'傳說釣手',50:'守湖宗師'};
-const LV_EVENTS={5:'主線第三章「暴風雨之後」',8:'主線第四章「湖心的秘密」、可購買遊艇',10:'冰湖支線「上游的源頭」',15:'大師挑戰：巨型鱷雀鱔',18:'主線終章「深淵之王」、大師挑戰：鯰魚之王',20:'大師挑戰：旗魚王',24:'大師挑戰：深淵海王',25:'大師挑戰：大白鯊女王'};
+const LV_EVENTS={5:'主線第三章「暴風雨之後」',8:'主線第四章「湖心的秘密」',10:'冰湖支線「上游的源頭」',15:'大師挑戰：巨型鱷雀鱔',18:'主線終章「深淵之王」、大師挑戰：鯰魚之王',20:'大師挑戰：旗魚王',24:'大師挑戰：深淵海王',25:'大師挑戰：大白鯊女王'};
 function lvGains(lv){ const g=[]; if(lv>=5) g.push('天賦點 +1'); if(lv%3===0&&lv<=30) g.push('強化上限提高到 +'+Math.min(10,lv/3)); if(LV_TITLES[lv]) g.push('稱號「'+LV_TITLES[lv]+'」'); if(LV_EVENTS[lv]) g.push(LV_EVENTS[lv]); return g; }
 window.__LVINFO={gains:lvGains,titles:LV_TITLES,xpNext:lv=>xpNext(lv)};
 
@@ -1731,7 +1732,9 @@ function render(){
   else if(cur==='spot'){
     shT.textContent='釣點';
     if(!save.kayak) h+=row('🛶 獨木舟','買了才能划到湖裡的其他釣點','<button class="sbtn pri" data-a="kayak">🪙 800</button>');
-    if(!save.yacht) h+=row('🛥️ 遊艇','Lv 8 解鎖，可以出海到外海釣點，看海豚和鯨魚',save.lv<8?'<span class="lk">Lv 8 解鎖</span>':'<button class="sbtn pri" data-a="yacht">🪙 30000</button>');
+    if(!save.yacht){ const ok=window.__STORY&&window.__STORY.done('c5'), m=save.mat||{}, need=BOAT_COST, have=k=>(m[k]||0)>=need[k];
+      h+=ok?row('🛥️ 修復老漁人的漁船',`停在河口船塢的舊漁船，修好就能出海。需要 🪙 ${need.coins.toLocaleString()}、魚鱗 ${need.scale}（有 ${m.scale||0}）、魚骨 ${need.bone}（有 ${m.bone||0}）、珍珠 ${need.pearl}（有 ${m.pearl||0}）`,`<button class="sbtn pri" data-a="yacht"${save.coins>=need.coins&&have('scale')&&have('bone')&&have('pearl')?'':' disabled'}>修復</button>`)
+          :row('🔒 ？？？的漁船','完成主線第五章「月潮」後，汐月會告訴你它在哪裡','<span class="lk">第五章後</span>'); }
     h+=SPOTS.map((s,i)=>{ const why=window.__STORY?window.__STORY.lock(i):null, lock=window.__STORY?!!why:(save.lv<s.lv||(s.req==='mer1'&&!(save.mer&&save.mer.n>=1))), need=(s.kayak&&!save.kayak)||(s.yacht&&!save.yacht), here=c.curSpot()===i;
       const btn=here?'<span class="eqd">目前位置</span>':lock?`<span class="lk">${why||(s.req?'需要美人魚的認可':'Lv '+s.lv+' 解鎖')}</span>`:need?`<span class="lk">${s.yacht?'需要遊艇':'需要獨木舟'}</span>`:`<button class="sbtn pri" data-a="go" data-v="${i}">${s.yacht?'出海':s.kayak?'划過去':'回碼頭'}</button>`;
       return row(lock?'🔒 '+(s.req?'？？？':s.name):(s.yacht?'🛥️ ':s.kayak?'🛶 ':s.loc==='ice'?'❄️ ':'🪵 ')+s.name,lock?(s.req?'只在月光下才看得見的地方':'跟著老漁人的手記前進，就會找到這裡'):s.sub,btn); }).join('');
@@ -1761,7 +1764,10 @@ shB.addEventListener('click',e=>{
   else if(a==='claim') claim(+v);
   else if(a==='wx'){ save.wxMode=v; persist(); }
   else if(a==='kayak'){ if(save.coins<800){ toast('金幣不夠','bad'); return; } save.coins-=800; save.kayak=true; persist(); setCoins(); Snd.coin(); toast('買了獨木舟！可以划到其他釣點了','good'); }
-  else if(a==='yacht'){ if(save.coins<30000){ toast('金幣不夠','bad'); return; } save.coins-=30000; save.yacht=true; persist(); setCoins(); Snd.coin(); toast('買了遊艇！可以出海了','good'); }
+  else if(a==='yacht'){ const need=BOAT_COST, m=save.mat=save.mat||{};   // 修復條件寫在動作本身
+    if(!(window.__STORY&&window.__STORY.done('c5'))){ toast('還不知道漁船在哪裡（完成第五章後）','warn',2200); return; }
+    if(save.coins<need.coins){ toast('金幣不夠','bad'); return; } if((m.scale||0)<need.scale||(m.bone||0)<need.bone||(m.pearl||0)<need.pearl){ toast('修船素材不夠','bad'); return; }
+    save.coins-=need.coins; m.scale-=need.scale; m.bone-=need.bone; m.pearl-=need.pearl; save.yacht=true; persist(); setCoins(); Snd.coin(); toast('🛥️ 老漁人的漁船修好了！可以出海了','good',3000); }
   else if(a==='go'){ close(); c.goSpot(+v); return; }
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
   else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else save[v]=!(save[v]!==false); persist(); }
@@ -3776,8 +3782,8 @@ const CH=[
  {id:'c5',spot:'moon',name:'第五章　月潮',open:{after:'c4'},
   intro:'月光灣只在夜裡發光。汐月還在這裡，等著那個提燈的人。\n提示：晚上（約 19:48～04:48）划獨木舟到月光灣釣魚，有機會在魚肚裡找到月鱗；月亮越圓，找到的機會越高。',
   tasks:[{t:'moon',n:1,txt:'集滿 7 片月鱗，聽完汐月的故事'}],
-  page:'手記第五頁\n「我老了，提不動燈了。汐月說，等堤防打開、月潮回來，她就能回家。\n可是河口外的海不平靜——深海裡有什麼東西，從堤防築起那年就一直在發怒。」',
-  xp:8000,coins:6000,unlock:'近海礁岩（需要遊艇）'},
+  page:'手記第五頁\n「我老了，提不動燈了。汐月說，等堤防打開、月潮回來，她就能回家。\n可是河口外的海不平靜——深海裡有什麼東西，從堤防築起那年就一直在發怒。\n我的舊漁船還停在河口的船塢裡。修好它，替我出海看看吧。」',
+  xp:8000,coins:6000,unlock:'近海礁岩（需修復老漁人的漁船，在 🗺️ 釣點清單）'},
  {id:'c6',spot:'reef',name:'第六章　河口之外',open:{after:'c5',yacht:1},
   intro:'第一次把船開出河口。汐月回到了大海，海卻變得不安：魚群躁動，鯊魚出現得比以前頻繁。',
   tasks:[{t:'catch',zone:'reef',sp:'amber',n:1,txt:'在近海礁岩釣到一尾紅甘'},{t:'catch',sp:'grouper',n:1,txt:'釣到一尾石斑'},{t:'scene',id:'dolphin',n:1,txt:'拍下一次海豚群（白天出海，海豚出現時按 📷）'}],
@@ -3798,10 +3804,10 @@ if(!S.story){ // 第一次載入：已經打開的地圖維持開放（沿用舊
 const st=S.story; st.prog=st.prog||{}; st.done=st.done||[]; st.read=st.read||[]; st.grand=st.grand||[]; st.seen=st.seen||[];
 const byId=id=>CH.find(x=>x.id===id), isDone=id=>st.done.indexOf(id)>=0;
 function avail(ch){ const o=ch.open; return (!o.after||isDone(o.after))&&(!o.lv||S.lv>=o.lv); }
-function why(ch){ const o=ch.open, r=[]; if(o.after&&!isDone(o.after)) r.push('完成「'+byId(o.after).name.replace(/^.*　/,'')+'」'); if(o.lv&&S.lv<o.lv) r.push('Lv '+o.lv); if(o.kayak&&!S.kayak) r.push('獨木舟'); if(o.yacht&&!S.yacht) r.push('遊艇'); return r; }
+function why(ch){ const o=ch.open, r=[]; if(o.after&&!isDone(o.after)) r.push('完成「'+byId(o.after).name.replace(/^.*　/,'')+'」'); if(o.lv&&S.lv<o.lv) r.push('Lv '+o.lv); if(o.kayak&&!S.kayak) r.push('獨木舟'); if(o.yacht&&!S.yacht) r.push('漁船'); return r; }
 /* 地圖開放：以章節為準；舊存檔已開放的維持開放 */
 function lock(i){ const id=SPOT_IDS[i]; if(id==='dock'||st.grand.indexOf(id)>=0) return null; const ch=CH.find(x=>x.spot===id); if(!ch) return null;
-  const r=why(ch).filter(x=>x!=='獨木舟'&&x!=='遊艇'); return r.length?'需要：'+r.join('、'):null; }
+  const r=why(ch).filter(x=>x!=='獨木舟'&&x!=='漁船'); return r.length?'需要：'+r.join('、'):null; }
 function active(){ return CH.filter(ch=>!isDone(ch.id)&&avail(ch)); }
 function prog(ch){ return st.prog[ch.id]=st.prog[ch.id]||ch.tasks.map(()=>0); }
 function bump(match){ let changed=false;
@@ -3840,8 +3846,8 @@ function showIntro(){ const step=2.6; cinOn=true;
 function endIntro(){ cin.classList.add('hidden'); document.body.classList.remove('cine'); cinOn=false; if(c.pan) c.pan(false); if(!st.intro){ st.intro=1; c.persist(); } cardAt=performance.now()+1200; }
 /* ===== 章節開場卡：新章節開放且玩家空閒時出現一次 ===== */
 const SPOTN={dock:'木碼頭',lily:'浮萍灣',wood:'倒木區',deep:'深水中央',moon:'月光灣',reef:'近海礁岩',blue:'遠洋深藍',ice:'冰湖'};
-function showCard(ch){ cinOn=true; const i=SPOT_IDS.indexOf(ch.spot), here=c.curSpot&&c.curSpot()===i, lk=lock(i), boat=(ch.open.kayak&&!S.kayak)?'獨木舟':(ch.open.yacht&&!S.yacht)?'遊艇':null;
-  const act=here?'<button class="go" data-c="close" style="animation-delay:2.2s">開始</button>':(!lk&&!boat)?`<button class="go" data-c="go" data-v="${i}" style="animation-delay:2.2s">前往${SPOTN[ch.spot]}</button><br><button class="sk" style="position:static;margin-top:12px;opacity:.8" data-c="close">稍後再去</button>`:`<p class="tn" style="animation-delay:2s">${boat?'需要先到釣具店購買'+boat:'尚未開放'}</p><button class="go" data-c="close" style="animation-delay:2.4s">知道了</button>`;
+function showCard(ch){ cinOn=true; const i=SPOT_IDS.indexOf(ch.spot), here=c.curSpot&&c.curSpot()===i, lk=lock(i), boat=(ch.open.kayak&&!S.kayak)?'獨木舟':(ch.open.yacht&&!S.yacht)?'漁船':null;
+  const act=here?'<button class="go" data-c="close" style="animation-delay:2.2s">開始</button>':(!lk&&!boat)?`<button class="go" data-c="go" data-v="${i}" style="animation-delay:2.2s">前往${SPOTN[ch.spot]}</button><br><button class="sk" style="position:static;margin-top:12px;opacity:.8" data-c="close">稍後再去</button>`:`<p class="tn" style="animation-delay:2s">${boat==='漁船'?'先到 🗺️ 釣點清單修復老漁人的漁船':boat?'先到 🗺️ 釣點清單購買'+boat:'尚未開放'}</p><button class="go" data-c="close" style="animation-delay:2.4s">知道了</button>`;
   cin.innerHTML=`<div class="ct" style="animation-delay:.6s">${ch.side?'支線':'新章節'}</div><h2 style="animation-delay:1s">${ch.name.replace(/^.*　/,'')}</h2><div class="ct" style="animation-delay:1.2s;letter-spacing:1px">${ch.name.split('　')[0]}・${SPOTN[ch.spot]}</div><p style="animation-delay:1.6s;font-size:15px">${ch.intro.split('\n')[0]}</p><div class="tn" style="animation-delay:2s">${ch.tasks.length} 個任務，詳情在 📜 手記</div>`+act;
   cin.classList.remove('hidden'); document.body.classList.add('cine'); if(st.seen.indexOf(ch.id)<0){ st.seen.push(ch.id); c.persist(); } }
 cin.addEventListener('click',e=>{ const b=e.target.closest('[data-c]'); if(!b) return; const a=b.dataset.c;
