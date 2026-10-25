@@ -187,8 +187,11 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #story{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px}
 #story .card{animation:none}#stT{color:#bfe8ff;font-size:18px}#stB{font-size:15px;color:var(--fg);line-height:1.8}#stR{color:#ffd75e;font-weight:800}
 .chip.dotn{position:relative}.chip.dotn::after{content:"";position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:var(--bad)}
-#scene{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--hudY,150px) + 110px);z-index:4;padding:8px 16px;border-radius:999px;background:linear-gradient(90deg,rgba(255,200,90,.85),rgba(255,140,170,.85));color:#2a1406;font-weight:900;font-size:15px;text-align:center;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.35);animation:sceneIn .5s ease both;pointer-events:none}
-#scene small{display:block;font-size:11px;font-weight:700;opacity:.85}
+#scene{position:fixed;left:12px;top:calc(var(--hudY,150px) + 8px);z-index:4;padding:5px 12px;border-radius:999px;background:linear-gradient(90deg,rgba(255,200,90,.82),rgba(255,140,170,.82));color:#2a1406;font-weight:900;font-size:13px;max-width:62vw;box-shadow:0 2px 10px rgba(0,0,0,.25);transition:padding .3s,font-size .3s;pointer-events:none}
+#scene small{display:block;font-size:10px;font-weight:700;opacity:.85}
+#scene.mini{padding:4px 9px;font-size:12px}#scene.mini small{display:none}
+#bCam.pulse{animation:camp .8s ease-in-out infinite alternate;box-shadow:0 0 0 2px #ffd56a,0 0 14px rgba(255,213,106,.8)}@keyframes camp{from{transform:scale(1)}to{transform:scale(1.12)}}
+#actSub.fade{animation:subfade 6s forwards}@keyframes subfade{0%,65%{opacity:1}100%{opacity:0}}
 @keyframes sceneIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
 #qte{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:7;width:190px;padding:18px 12px;border-radius:24px;background:radial-gradient(circle at 40% 30%,#ff7a6a,#c4241c);color:#fff;text-align:center;box-shadow:0 0 0 4px rgba(255,255,255,.7),0 0 30px rgba(255,60,40,.7);touch-action:none;cursor:pointer;animation:qp .35s ease-in-out infinite alternate}
 #qte b{display:block;font-size:22px;font-weight:900}#qte small{display:block;font-size:12px;opacity:.9;margin:2px 0 8px}
@@ -1593,6 +1596,9 @@ const BAITS=[
  {id:'shrimp',name:'活蝦',icon:'🦐',price:180,pack:10,lv:2,desc:'鱖魚、鯰魚的最愛',aff:{perch:2.2,channel:2,flathead:1.4},rare:.35,wait:1},
  {id:'soft',name:'軟蟲路亞',icon:'🐛',price:240,pack:10,lv:3,desc:'專攻黑鱸和弓鰭魚',aff:{lmbass:2.6,smbass:2.6,bowfin:1.5},rare:.4,wait:1.05},
  {id:'live',name:'活魚餌',icon:'🐟',price:600,pack:5,lv:5,desc:'小魚幾乎不碰，大型掠食魚才會咬',aff:{flathead:3,gar:3,bowfin:2,channel:1.6,bluegill:.2,crappie:.2,reba:.2},rare:1.0,wait:1.4},
+ {id:'spoon',lure:'spoon',name:'金屬亮片',icon:'🥄',price:900,pack:15,lv:4,desc:'中速穩定收線，閃光吸引掠食魚（路亞：自己收線操作）',aff:{perch:2,lmbass:1.8,smbass:1.8,amber:1.6,ribbon:2},rare:.4,wait:1},
+ {id:'crank',lure:'crank',name:'曲柄硬餌',icon:'🐠',price:1400,pack:15,lv:6,desc:'快速收線會下潛，黑鱸、金目鱸最愛（需要好捲線器）',aff:{lmbass:2.5,smbass:2.2,barra:2,gar:1.5,grouper:1.5,mahi:1.4},rare:.5,wait:1},
+ {id:'minnow',lure:'minnow',name:'米諾',icon:'🐟',price:1800,pack:15,lv:8,desc:'抽一下、停一下，模仿受傷小魚，大型掠食魚無法抗拒',aff:{smbass:2.2,barra:2.2,lmbass:1.6,tuna:1.6,mahi:1.8,marlin:1.4},rare:.6,wait:1},
  {id:'moon',name:'月光餌',icon:'🌙',price:1500,pack:3,lv:3,desc:'散發微光的神秘餌，傳說中的生物會被吸引',aff:{mermaid:25,ghost:12,golden:12},rare:.6,wait:1.3}];
 const xpNext=lv=>Math.round(80*Math.pow(lv,1.45));
 
@@ -2551,8 +2557,8 @@ function startEv(id){ Object.assign(ev,{id,t:0,shot:false,data:{}}); const b=bas
   else if(id==='whale'){ ev.dur=30; ev.data={p:fwd(hd+rand(-.5,.5),new T.Vector3()).multiplyScalar(rand(90,160)).add(b),breach:Math.random()<.4,stage:0}; }
   else if(id==='shark'){ ev.dur=22; ev.data={a:rand(0,6.28),r:rand(9,15)}; sfin.visible=true; }
   else if(id==='flyfish'){ ev.dur=8; flyers.forEach(f=>{ f.on=true; f.t=-rand(0,4); f.p=fwd(G.head+rand(-.6,.6),new T.Vector3()).multiplyScalar(rand(8,20)).add(b); f.a=G.head+rand(-1.5,1.5); }); }
-  banner.innerHTML='✨ 美景：'+SCENES[id]+'<small>按上方 📷 拍下來，收進美景相簿</small>'; banner.classList.remove('hidden'); }
-function endAll(){ ev.id=null; banner.classList.add('hidden'); rainbow.visible=false; flock.forEach(m=>m.visible=false); dolphins.forEach(o=>{ o.on=false; o.g.visible=false; });
+  banner.innerHTML='✨ '+SCENES[id]+'<small>按 📷 拍下來</small>'; banner.classList.remove('hidden','mini'); clearTimeout(banner._t); banner._t=setTimeout(()=>banner.classList.add('mini'),3500); $('bCam').classList.add('pulse'); }
+function endAll(){ ev.id=null; banner.classList.add('hidden'); $('bCam').classList.remove('pulse'); rainbow.visible=false; flock.forEach(m=>m.visible=false); dolphins.forEach(o=>{ o.on=false; o.g.visible=false; });
   whale.visible=false; fluke.visible=false; if(!chase) sfin.visible=false; flyers.forEach(f=>{ f.on=false; f.g.visible=false; }); mets.forEach(m=>m.m.visible=false); }
 function updEv(dt,t,wx,day){
   W.camera.getWorldPosition(cw);
@@ -2920,7 +2926,7 @@ const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger 
   ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
   ['斑點叉尾鮰','Channel catfish','faerbogdan99'],['扁頭鯰','Flathead Catfish','faerbogdan99'],['鱷雀鱔','Alligator Gar','Jay_Tano'],['錦鯉','Koi Fish','7plus'],
   ['石斑','lowpoly freshwater grouper','Arrangemonk9'],['黑鮪魚','Bluefin Tuna','voltairevill'],['旗魚','Blue Marlin','Gotta_go_evi'],['飛魚','Exocoetidae','victorberdug'],
-  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
+  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
 
 function createModels(W){
 'use strict';
@@ -3228,16 +3234,15 @@ mer.position.y=1.25; npc.add(mer);
 const glow=new T.Sprite(new T.SpriteMaterial({map:halo.material.map,color:0x66ccff,blending:T.AdditiveBlending,depthWrite:false,transparent:true})); glow.scale.set(4,4,1); glow.position.y=1.2; npc.add(glow);
 /* 對話介面 */
 const st=document.createElement('style'); st.textContent=`
-#moonTalk{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 250px);white-space:nowrap;width:auto;height:auto;min-width:0;display:inline-block;line-height:1.2;z-index:6;padding:10px 18px;border-radius:999px;border:1px solid rgba(160,210,255,.6);
- background:linear-gradient(90deg,rgba(40,80,140,.9),rgba(70,50,140,.9));color:#eaf4ff;font-weight:800;font-size:15px;box-shadow:0 0 18px rgba(110,180,255,.55);font-family:inherit}
-#moonTalk.hidden,#moonBox.hidden{display:none}#moonTalk.dot::after{content:' ●';color:#ffd56a}
+#moonTalk{position:fixed;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 36px);z-index:6;width:62px;height:62px;padding:0;border-radius:50%;border:1px solid rgba(160,210,255,.6);background:radial-gradient(circle at 40% 35%,rgba(90,130,210,.95),rgba(50,40,120,.95));color:#eaf4ff;font-weight:800;font-size:11px;line-height:1.1;box-shadow:0 0 16px rgba(110,180,255,.55);font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;white-space:nowrap}
+#moonTalk.hidden,#moonBox.hidden{display:none}#moonTalk.dot::after{content:'';position:absolute;top:4px;right:6px;width:10px;height:10px;border-radius:50%;background:#ffd56a}#moonTalk .ic{font-size:24px}
 #moonBox{position:fixed;inset:0;z-index:9;background:rgba(4,10,24,.72);display:flex;align-items:flex-end;justify-content:center}
 #moonBox .mb{width:min(560px,100%);max-height:84vh;overflow:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:linear-gradient(180deg,rgba(18,30,58,.98),rgba(12,18,34,.98));border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));color:#e6f0ff;border-top:1px solid rgba(150,200,255,.35)}
 #moonBox h3{margin:0 0 6px;font-size:19px;display:flex;justify-content:space-between;align-items:center;color:#cfe6ff}
 #moonBox .ch{margin:14px 0;padding:12px 14px;border-radius:14px;background:rgba(120,170,255,.08);line-height:1.75;font-size:15px}
 #moonBox .ch b{display:block;color:#ffd56a;margin-bottom:4px;font-size:14px}#moonBox .ch.lock{opacity:.55;padding:10px 14px}#moonBox .ch.lock b{color:#9fb8d8}#moonBox .ch small{color:#9fb8d8;font-size:12px}#moonBox .ch.tip{background:rgba(255,213,106,.1);border:1px solid rgba(255,213,106,.35)}#moonBox .ch.tip b{color:#ffd56a}#moonBox .ch em{font-style:normal;font-weight:800;color:#ffe9a8}#moonBox .pg{font-size:13px;color:#9fb8d8}`;
 document.head.appendChild(st);
-const tb=document.createElement('button'); tb.id='moonTalk'; tb.className='hidden'; tb.textContent='🧜‍♀️ 與汐月說話'; document.body.appendChild(tb);
+const tb=document.createElement('button'); tb.id='moonTalk'; tb.className='hidden'; tb.innerHTML='<span class="ic">🧜‍♀️</span>汐月'; tb.setAttribute('aria-label','與汐月說話'); document.body.appendChild(tb);
 const box=document.createElement('div'); box.id='moonBox'; box.className='hidden'; box.innerHTML='<div class="mb"></div>'; document.body.appendChild(box);
 const unlocked=()=>MS.done?7:MS.met?Math.min(6,MS.sc):0;
 function render(){ const n=unlocked(), sc=Math.min(7,MS.sc);
@@ -3334,6 +3339,76 @@ function update(show,st,power,dt){
     for(const f of a.fing) f.b.rotation.x=f.x0-tight*f.k; } }
 return {update};
 }
+/* ===== 路亞：收線速度、抽竿、魚的興趣（假餌模型：Zverev、xeofox，CC-BY） ===== */
+const LURE_CFG={
+ crank:{file:'lure_crank',head:'+x',len:.11,band:[1.0,2.0],twitch:.03,pause:0,dive:1.4,float:true,tip:'曲柄：快速穩定收線，會往下潛'},
+ spoon:{file:'lure_spoon',head:'+y',len:.09,pick:1,band:[.6,1.7],twitch:.04,pause:0,dive:.5,sink:true,tip:'亮片：中速穩定收線，閃光吸引魚'},
+ minnow:{file:'lure_minnow',head:'-z',len:.12,pick:1,band:[.25,1.0],twitch:.18,pause:.1,dive:.6,float:true,tip:'米諾：抽一下、停一下，模仿受傷的小魚'}};
+function createLure(W,P,c){
+'use strict';
+const T=THREE, S=W.scene, G=c.G, ang=a=>({'+x':0,'-z':Math.PI/2,'-x':Math.PI,'+z':-Math.PI/2})[a];
+const models={}, holder=new T.Group(); holder.visible=false; S.add(holder);
+const loader=T.GLTFLoader?new T.GLTFLoader():null;
+function getModel(k){ if(models[k]!==undefined) return models[k]; models[k]=null; const cf=LURE_CFG[k]; if(!loader) return null;
+  loader.load('models/'+cf.file+'.glb',g=>{ g.scene.updateMatrixWorld(true); let ms=[]; g.scene.traverse(o=>{ if(o.isMesh) ms.push(o); });
+    if(cf.pick!==undefined&&ms.length>=3){ const ctr=m=>new T.Box3().setFromObject(m).getCenter(new T.Vector3()); ms.sort((a,b)=>ctr(a).length()-ctr(b).length()); ms=[ms[0]]; }
+    const grp=new T.Group(); ms.forEach(m=>{ const k2=m.clone(); k2.matrixAutoUpdate=false; k2.matrix.copy(m.matrixWorld); grp.add(k2); });
+    const inner=new T.Group(); inner.add(grp);
+    if(cf.head==='+y') inner.rotation.x=Math.PI/2; else inner.rotation.y=ang('+z')-ang(cf.head);   // 頭朝 +Z
+    const w=new T.Group(); w.add(inner); w.updateMatrixWorld(true);
+    const b=new T.Box3().setFromObject(w), sz=b.getSize(new T.Vector3()), s=cf.len/Math.max(sz.z,1e-6); inner.scale.setScalar(s); w.updateMatrixWorld(true);
+    const c2=new T.Box3().setFromObject(w).getCenter(new T.Vector3()); inner.position.sub(c2);
+    w.traverse(o=>{ o.frustumCulled=false; }); models[k]=w; if(cur&&cur.k===k) show(k); });
+  return null; }
+let cur=null; const pos=new T.Vector3(), dir=new T.Vector3(), tmp=new T.Vector3();
+function show(k){ holder.clear(); const m=models[k]; if(m) holder.add(m); }
+/* 介面 */
+const st=document.createElement('style'); st.textContent=`#lureHud{position:fixed;left:12px;top:calc(var(--hudY,150px) + 54px);z-index:5;width:min(190px,48vw);padding:6px 10px;border-radius:12px;background:rgba(16,22,28,.7);border:1px solid rgba(255,255,255,.16);color:#eaf2f8;font-size:11px;pointer-events:none}
+#lureHud.hidden{display:none}#lureHud .bar{position:relative;height:8px;border-radius:4px;background:rgba(255,255,255,.12);margin:6px 0 4px;overflow:hidden}
+#lureHud .bar i{position:absolute;top:0;bottom:0;background:rgba(127,240,168,.35)}#lureHud .bar b{position:absolute;top:-2px;width:4px;height:12px;border-radius:2px;background:#ffd56a}
+#lureHud .st{display:flex;justify-content:space-between}#lureHud .chase{color:#7ff0a8;font-weight:800}`;
+document.head.appendChild(st);
+const hud=document.createElement('div'); hud.id='lureHud'; hud.className='hidden'; hud.innerHTML='<div class="st"><span class="t"></span><span class="chase"></span></div><div class="bar"><i></i><b></b></div><div class="h">按住收線・短按抽竿</div>'; document.body.appendChild(hud);
+const hT=hud.querySelector('.t'), hC=hud.querySelector('.chase'), hBand=hud.querySelector('.bar i'), hDot=hud.querySelector('.bar b');
+function bobberVis(v){ P.bobber.children.forEach(o=>{ o.visible=v; }); }
+function start(at,bait,base){ const k=bait.lure, cf=LURE_CFG[k]; getModel(k); show(k);
+  cur={k,cf,base:base.clone(),depth:0,heldT:0,pause:0,speed:0,twitchV:0,chase:null,delay:2+Math.random()*3,interest:0,maxSp:c.reelSpd()*.55,pressT:0};
+  pos.copy(at); pos.y=0; holder.visible=true; bobberVis(false); hud.classList.remove('hidden');
+  hT.textContent=bait.icon+' '+bait.name; hC.textContent='';
+  const mx=2.4; hBand.style.left=(cf.band[0]/mx*100)+'%'; hBand.style.width=((cf.band[1]-cf.band[0])/mx*100)+'%';
+  c.toast(cf.tip,'',2600); }
+function press(){ if(cur) cur.pressT=performance.now(); }
+function release(){ if(!cur) return; if(performance.now()-cur.pressT<220){ cur.twitchV=1.4; cur.twitched=true; c.Snd.plop&&c.Snd.plop(); W.addRipple(pos.x,pos.z,.12); } }
+function end(){ cur=null; holder.visible=false; hud.classList.add('hidden'); P.shadow.material.opacity=0; }
+function update(dt,held){ if(!cur) return null; const cf=cur.cf;
+  if(held){ cur.heldT+=dt; cur.pause=0; } else { cur.heldT=0; cur.pause+=dt; }
+  const target=held?cur.maxSp*Math.min(1,.4+.6*cur.heldT/1.5):0;
+  cur.speed+=(target-cur.speed)*Math.min(1,dt*5); cur.twitchV=Math.max(0,cur.twitchV-dt*4);
+  dir.set(cur.base.x-pos.x,0,cur.base.z-pos.z); const dist=dir.length(); dir.normalize();
+  const v=cur.speed+cur.twitchV; pos.addScaledVector(dir,v*dt);
+  const want=cur.speed>.2?cf.dive*Math.min(1,cur.speed/cf.band[1]):(cf.sink?Math.min(2.5,cur.depth+dt*.4):(cf.float?0:cur.depth));
+  cur.depth+=(want-cur.depth)*Math.min(1,dt*1.5);
+  holder.position.set(pos.x,-cur.depth-.05,pos.z); holder.lookAt(tmp.set(cur.base.x,holder.position.y,cur.base.z));
+  holder.rotateZ(Math.sin(performance.now()*.02)*(.15+.6*cur.twitchV)); holder.rotateY(Math.sin(performance.now()*.013)*.25*Math.min(1,v));
+  hDot.style.left=Math.min(98,v/2.4*100)+'%';
+  /* 魚：先等一段時間才有魚注意到；之後依收線方式調整興趣 */
+  let ev=null;
+  if(!cur.chase){ cur.delay-=dt; if(cur.delay<=0) cur.chase={d:3.2}; }
+  else { const inBand=cur.speed>=cf.band[0]&&cur.speed<=cf.band[1];
+    let di=0; if(inBand) di+=.3*dt; else if(cur.speed>cf.band[1]) di-=.35*dt;
+    if(cur.pause>0){ if(cf.pause&&cur.pause<1.2) di+=cf.pause*dt; else if(cur.pause>1.6) di-=.22*dt; }
+    if(cur.twitched){ di+=cf.twitch; cur.twitched=false; }
+    cur.interest=Math.max(0,Math.min(1.1,cur.interest+di));
+    cur.chase.d+=((3.2-2.8*cur.interest)-cur.chase.d)*Math.min(1,dt*2);
+    tmp.copy(pos).addScaledVector(dir,-cur.chase.d); P.shadow.position.set(tmp.x,.02,tmp.z); P.shadow.material.opacity=.15+.35*cur.interest;
+    hC.textContent=cur.interest>.7?'🐟 快咬了！':cur.interest>.25?'🐟 有魚在追':'🐟 魚在觀察';
+    if(cur.interest>=1&&Math.random()<dt*3) ev='strike';
+    else if(cur.interest<=0&&cur.wasHigh){ cur.chase=null; cur.delay=2+Math.random()*3; cur.wasHigh=false; hC.textContent=''; P.shadow.material.opacity=0; ev='lost'; }
+    if(cur.interest>.3) cur.wasHigh=true; }
+  if(!ev&&dist<3.2) ev='done';
+  return ev; }
+return {start,update,press,release,end,bobberVis,pos:()=>pos,interest:()=>cur?cur.interest:0,active:()=>!!cur};
+}
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
 'use strict';
@@ -3412,7 +3487,7 @@ function toast(msg,cls,ms){ ui.toast.innerHTML=msg; ui.toast.className='show '+(
 function setCoins(){ ui.coin.textContent=save.coins.toLocaleString(); }
 setCoins();
 let lastLbl='', lastSub='', lastHot=null;
-function setAct(lbl,sub,hot){ if(lbl!==lastLbl){ ui.actLbl.innerHTML=lbl; lastLbl=lbl; } if(sub!==lastSub){ ui.sub.textContent=sub; lastSub=sub; }
+function setAct(lbl,sub,hot){ if(lbl!==lastLbl){ ui.actLbl.innerHTML=lbl; lastLbl=lbl; } if(sub!==lastSub){ ui.sub.textContent=sub; lastSub=sub; ui.sub.classList.remove('fade'); void ui.sub.offsetWidth; if(['idle','wait','cast','lure'].indexOf(G.state)>=0) ui.sub.classList.add('fade'); }
   if(hot!==lastHot){ ui.act.classList.toggle('hot',!!hot); lastHot=hot; } }
 function setPower(p){ ui.pw.setAttribute('stroke-dashoffset',(301.6*(1-p)).toFixed(1)); }
 
@@ -3443,7 +3518,7 @@ function pickSpecies(){
 /* ---------- 動作 ---------- */
 function startCharge(){ G.state='charge'; G.chargeT=0; }
 function cast(){
-  G.baitUsed=META.useBait();
+  G.baitUsed=META.useBait(); LURE.bobberVis(!(G.baitUsed&&G.baitUsed.lure));
   const p=G.power, dist=6+p*META.gear().rod.cast, A=G.head+G.yaw, fw=tv.set(-Math.sin(A),0,-Math.cos(A)), bx=G.base.x, bz=G.base.z;
   let x=bx+fw.x*dist+rand(-.6,.6), z=bz+fw.z*dist+rand(-.6,.6);
   for(let k=0;k<14;k++){ const r=Math.hypot(x,z), maxR=W.shoreR(Math.atan2(x,-z))-6; if(r<=maxR) break; x=bx+(x-bx)*.9; z=bz+(z-bz)*.9; }
@@ -3452,6 +3527,7 @@ function cast(){
   G.castT=0; G.delay=.12; G.state='cast'; rod.pitchT=-.32; Snd.whoosh(); setPower(0);
 }
 function landBobber(){
+  if(G.baitUsed&&G.baitUsed.lure){ G.state='lure'; P.splash(G.to.x,0,G.to.z,10,.4); W.addRipple(G.to.x,G.to.z,.4); Snd.plop(); G.sp=null; G.fd=null; FUN.castTag(G.castDist); LURE.start(G.to,G.baitUsed,G.base); return; }
   G.state='wait'; P.splash(G.to.x,0,G.to.z,16,.7); W.addRipple(G.to.x,G.to.z,.55); Snd.plop();
   G.timer=rand(2.5,7)*PER_WAIT[period(G.hour)]*(1-G.luck*.6)*(G.baitUsed?G.baitUsed.wait:1)*WL.waitK()*(window.__ECO&&window.__ECO.fxOn('glow')?.6:1)*(1+.2*depNow(depKey())); G.nib=Math.floor(rand(0,3.99)); G.approach=0; G.sp=null; G.fd=null;
   FUN.castTag(G.castDist); G.hot=FUN.inHot(G.to); if(G.hot){ G.timer*=.3; toast('正中魚群！','good',1200); }
@@ -3534,11 +3610,12 @@ function actDown(){
   Snd.init(); G.held=true; ui.act.classList.add('held');
   switch(G.state){
     case 'idle': startCharge(); break;
+    case 'lure': LURE.press(); break;
     case 'wait': startRetrieve(G.dip>0?'太早了，魚被嚇跑了':'收線','warn'); break;
     case 'bite': { const r=FUN.hookPress(); if(r==='miss') missBite(); else hook(r==='perfect'); } break;
   }
 }
-function actUp(){ G.held=false; ui.act.classList.remove('held'); if(G.state==='charge') cast(); }
+function actUp(){ G.held=false; ui.act.classList.remove('held'); if(G.state==='lure') LURE.release(); if(G.state==='charge') cast(); }
 ui.act.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ ui.act.setPointerCapture(e.pointerId); }catch(_){} actPtr=e.pointerId; actX0=e.clientX; actDown(); });
 ui.act.addEventListener('pointermove',e=>{ if(e.pointerId!==actPtr) return; if(G.state==='fight') G.rodSideT=clamp((e.clientX-actX0)/70,-1,1); });
 const actRel=e=>{ if(e.pointerId!==actPtr) return; actPtr=null; actUp(); if(dragPtr===null) G.rodSideT=0; };
@@ -3569,6 +3646,7 @@ const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>per
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 const SKY=createNightSky(W,G); window.__SKY=SKY; window.__W=W;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
+const LURE=createLure(W,P,{G,toast,Snd,reelSpd:()=>META.gear().reel.spd}); window.__LURE=LURE; window.__G=G;
 window.__MOON=createMoonBay(W,{G,save,persist,toast,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
 window.__TAL=createTalents({save,persist,toast,Snd,vib,setCoins,loc:()=>G.loc||'lake',zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour)}); window.__SEA=SEA;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
@@ -3708,6 +3786,15 @@ function update(dt){
       if(G.castT>.25) rod.pitchT=.05; if(s>=1) landBobber(); }
     lineEnd=bob.position; slack=.1; setAct('・・・','',false);
   }
+  else if(st==='lure'){
+      const ev=LURE.update(dt,G.held); bob.position.copy(LURE.pos()); lineEnd=bob.position; slack=.08; if(G.held){ rod.spin-=dt*14; if(Math.random()<dt*10) Snd.click(); }
+      setAct(G.held?'收線中':'按住收線<br>點擊抽竿',LURE.interest()>.25?'魚在追！照這個節奏繼續':'按住收線、短按抽竿，找出魚喜歡的節奏',false);
+      if(ev==='strike'){ G.to.set(bob.position.x,0,bob.position.z); G.castDist=Math.hypot(G.to.x-G.base.x,G.to.z-G.base.z); LURE.end(); exitUW(); G.fd=null; prepFish(); bite(); toast('咬了！','good',900); }
+      else if(ev==='lost'){ exitUW(); G.fd=null; toast('魚失去興趣游走了','warn',1400); }
+      else if(ev==='done'){ LURE.end(); exitUW(); startRetrieve('路亞收回來了，這次沒有魚咬','warn'); LURE.bobberVis(true); }
+      else if(LURE.interest()>.45&&!UW.active()&&save.uw!==false){ if(!G.fd) prepFish(); if(G.fd&&!G.fd.item){ G.to.set(bob.position.x,0,bob.position.z); enterUW(); } }
+      if(UW.active()) UW.setProgress(Math.min(1,LURE.interest()));
+    }
   else if(st==='wait'||st==='bite'){
     rod.pitchT=.05;
     const y=W.swell(G.to.x,G.to.z,G.t)-.005;
@@ -3760,7 +3847,7 @@ function update(dt){
     if(lineOn){ W.head.localToWorld(tv.set(0,.14*D+.03,-D+.02)); lineEnd=tv; slack=.05; }
   }
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light);
-  if(st!=='fight'&&st!=='wait') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
+  if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
   P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); window.__MOON.update(dt); ARMS.update(!UW.active(),G.state,G.power,dt); SKY.update(dt,((G.hour%24)+24)%24);
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
