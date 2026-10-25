@@ -201,7 +201,9 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 /* 圖鑑詳細頁 */
 .dexrow{cursor:pointer}.dexrow:active{opacity:.7}
 .dexhd{display:flex;gap:12px;align-items:center;margin:12px 0 8px}.dexhd b{display:block;font-size:20px;color:var(--rc)}.dexhd small{opacity:.75}
-.dexsil{width:96px;height:56px;flex:none;border-radius:10px;background:rgba(255,255,255,.06) center/contain no-repeat;border:1px solid rgba(255,255,255,.12)}
+.dexview{position:relative;margin:10px 0 0;border-radius:12px;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,rgba(120,170,200,.28),rgba(10,24,32,.55) 75%),#0e1b22;border:1px solid rgba(255,255,255,.1)}
+.dexview.sil{background:radial-gradient(ellipse at 50% 45%,rgba(170,205,225,.55),rgba(40,64,78,.6) 80%),#2a3e48}
+.dexview canvas{display:block;width:100%;height:190px;touch-action:none}.dexview small{position:absolute;right:10px;bottom:6px;opacity:.55;font-size:11px}
 .dexsec{margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px;line-height:1.6}.dexsec.dim{opacity:.6}
 .dexgrid{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px}.dexgrid span{opacity:.65}
 .dexbar{display:flex;align-items:center;gap:10px;margin:3px 0}.dexbar span{width:3em;opacity:.7}.dexbar i{flex:1;height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}.dexbar em{display:block;height:100%;background:var(--rc,#e9b949);border-radius:4px}
@@ -1750,6 +1752,7 @@ function render(){
       return row(lock?'🔒 '+(s.req?'？？？':s.name):(s.yacht?'🛥️ ':s.kayak?'🛶 ':s.loc==='ice'?'❄️ ':'🪵 ')+s.name,lock?(s.req?'只在月光下才看得見的地方':'跟著老漁人的手記前進，就會找到這裡'):s.sub,btn); }).join('');
   }
   shB.innerHTML=h;
+  { const dsp=cur==='log'&&dexSel&&SPECIES.find(s=>s.id===dexSel); if(dsp) DEXV.show(dsp,$('dexCv'),!!save.dex[dsp.id]); else DEXV.stop(); }
 }
 // 圖鑑詳細頁：未釣獲只給出沒線索，釣獲後顯示完整資料
 const TIME_N={dawn:'清晨',day:'白天',dusk:'傍晚',night:'夜晚'}, STAT_N=[['pow','力量'],['spd','速度'],['agi','靈活'],['stam','耐力'],['jump','跳躍']];
@@ -1762,7 +1765,8 @@ function dexWhere(sp){ const L=sp.loc||'lake';
 function dexPage(sp){ const d=save.dex[sp.id], r=RAR[sp.rar], wh=dexWhere(sp), tm=sp.time||{};
   const tmax=Math.max(...Object.values(tm),0), bestT=Object.keys(TIME_N).filter(k=>tm[k]&&tm[k]>=tmax*.9).map(k=>TIME_N[k]).join('、')||'不限';
   let h=`<button class="sbtn" data-a="dexback">← 返回列表</button>`;
-  h+=`<div class="dexhd" style="--rc:${r.col}"><span class="dexsil${d?' on':''}" id="dexPic"></span><div><b>${d?sp.name:'？？？'}</b><small>${r.name}${d?'｜'+sp.sci:''}</small></div></div>`;
+  h+=`<div class="dexview${d?'':' sil'}"><canvas id="dexCv"></canvas><small>${d?'拖曳旋轉':'剪影'}</small></div>`;
+  h+=`<div class="dexhd" style="--rc:${r.col}"><div><b>${d?sp.name:'？？？'}</b><small>${r.name}${d?'｜'+sp.sci:''}</small></div></div>`;
   h+=`<div class="dexsec">出沒地點：${wh.area}${wh.best.length?'<br>最佳釣點：'+wh.best.join('、'):''}<br>活躍時段：${bestT}${sp.special&&SPECIAL_N[sp.special]?'<br>'+SPECIAL_N[sp.special]:''}</div>`;
   if(!d){ h+='<div class="dexsec dim">還沒釣到這種魚，釣到後會解鎖外觀、介紹與完整資料。</div>'; return `<div style="--rc:${r.col}">${h}</div>`; }
   const W=x=>sp.k*Math.pow(x/100,3), wl=W(sp.len[0])*.9, wu=W(sp.len[1])*1.12, val=w=>Math.round(sp.price*Math.pow(w+.3,.85)*r.mult*.4);
@@ -1772,8 +1776,44 @@ function dexPage(sp){ const d=save.dex[sp.id], r=RAR[sp.rar], wh=dexWhere(sp), t
     return `<div class="dexbar"><span>${n}</span><i><em style="width:${(v*100).toFixed(0)}%"></em></i></div>`; }).join('')+'</div>'; }
   h+=`<div class="dexgrid"><span>累計釣獲</span><b>${d.n} 尾</b><span>最重紀錄</span><b>${fmtW(d.bw)}</b>${d.bl?`<span>最長紀錄</span><b>${Math.round(d.bl*100)} 公分</b>`:''}${d.f?`<span>首次釣獲</span><b>${new Date(d.f).toLocaleDateString('zh-TW')}</b>`:''}</div>`;
   return `<div style="--rc:${r.col}">${h}</div>`; }
+// 圖鑑 3D 預覽：用遊戲裡同一個魚模型（真實模型優先），以主渲染器畫到離屏目標再複製到頁面畫布；
+// 只在詳細頁開著時運作，關閉即停止。未釣獲顯示黑色剪影。
+const DEXV=(()=>{ const T=THREE, R=c.W.renderer; let scene,cam,rt,cv,ctx,img,buf,holder,obj,sp0,caught,raf=0,last=0,yaw=.55,pitch=.12,drag=null,idle=0,real=false,chk=0;
+  const sil=new T.MeshBasicMaterial({color:0x000000});
+  function ensure(){ if(scene) return; scene=new T.Scene();
+    scene.add(new T.HemisphereLight(0xe8f2ff,0x40382c,1.15));
+    const k=new T.DirectionalLight(0xffffff,1.7); k.position.set(2,3,4); scene.add(k);
+    const f=new T.DirectionalLight(0xa8ccff,.7); f.position.set(-3,1,-3); scene.add(f);
+    cam=new T.PerspectiveCamera(28,1,.01,50); holder=new T.Group(); holder.position.y=5; scene.add(holder); }
+  function build(){ if(obj){ holder.remove(obj); obj=null; }
+    const fsh=c.P.getFish(sp0); real=!!(window.__MDL&&window.__MDL.fishReady&&window.__MDL.fishReady(sp0.id));
+    obj=fsh.group.clone(true); obj.visible=true; obj.position.set(0,0,0); obj.rotation.set(0,0,0); obj.scale.set(1,1,1);
+    obj.traverse(o=>{ o.visible=true; o.frustumCulled=false; });
+    const bx=new T.Box3().setFromObject(obj), sz=bx.getSize(new T.Vector3()), ct=bx.getCenter(new T.Vector3()), s=1/Math.max(sz.x,sz.y,sz.z,1e-3);
+    obj.scale.setScalar(s); obj.position.copy(ct).multiplyScalar(-s); const w=new T.Group(); w.add(obj); obj=w; holder.add(obj); }
+  function size(){ const dpr=Math.min(2,window.devicePixelRatio||1), W=Math.max(2,Math.round(cv.clientWidth*dpr)), H=Math.max(2,Math.round(cv.clientHeight*dpr));
+    if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; img=ctx.createImageData(W,H); buf=new Uint8Array(W*H*4);
+      if(rt) rt.dispose(); rt=new T.WebGLRenderTarget(W,H,{depthBuffer:true}); rt.texture.encoding=T.sRGBEncoding; cam.aspect=W/H; cam.updateProjectionMatrix(); } }
+  function frame(t){ raf=requestAnimationFrame(frame); if(!cv||!cv.isConnected){ stop(); return; } if(t-last<33) return; const dt=Math.min(.1,(t-last)/1000); last=t;
+    if((chk+=dt)>1&&!real&&window.__MDL&&window.__MDL.fishReady&&window.__MDL.fishReady(sp0.id)){ chk=0; build(); }   // 真實模型晚一步載好就換上
+    if(!drag&&(idle+=dt)>1.5) yaw+=dt*.5;
+    size(); obj.rotation.set(pitch,yaw,0); const W=cv.width,H=cv.height, dist=1.25/Math.tan(cam.fov*Math.PI/360)/Math.max(.8,Math.min(1.6,cam.aspect))*.5;
+    cam.position.set(0,5,dist); cam.lookAt(0,5,0); scene.overrideMaterial=caught?null:sil;
+    const pRT=R.getRenderTarget(), pSc=R.getScissorTest(), cc=R.getClearColor(new T.Color()), ca=R.getClearAlpha();
+    R.setScissorTest(false); R.setRenderTarget(rt); R.setClearColor(0x000000,0); R.clear(); R.render(scene,cam);
+    R.readRenderTargetPixels(rt,0,0,W,H,buf); R.setRenderTarget(pRT); R.setScissorTest(pSc); R.setClearColor(cc,ca);
+    const row=W*4; for(let y=0;y<H;y++) img.data.set(buf.subarray((H-1-y)*row,(H-y)*row),y*row);   // 讀出來是上下顛倒的
+    ctx.putImageData(img,0,0); }
+  function bind(){ const P=e=>e.touches?e.touches[0]:e;
+    cv.onpointerdown=e=>{ drag={x:e.clientX,y:e.clientY,yaw,pitch}; idle=0; cv.setPointerCapture&&cv.setPointerCapture(e.pointerId); };
+    cv.onpointermove=e=>{ if(!drag) return; yaw=drag.yaw+(e.clientX-drag.x)*.012; pitch=Math.max(-.9,Math.min(.9,drag.pitch+(e.clientY-drag.y)*.008)); };
+    cv.onpointerup=cv.onpointercancel=()=>{ drag=null; idle=0; }; }
+  function show(sp,el,isCaught){ if(!el) return; ensure(); const same=sp0===sp&&caught===isCaught; sp0=sp; caught=isCaught; cv=el; ctx=cv.getContext('2d'); img=null; cv.width=cv.height=0;
+    if(!same||!obj){ build(); yaw=.55; pitch=.12; } chk=0; idle=0; bind(); if(!raf){ last=0; raf=requestAnimationFrame(frame); } }
+  function stop(){ if(raf) cancelAnimationFrame(raf); raf=0; cv=null; }
+  return {show,stop}; })();
 function open(k){ cur=k; if(k==='log') dexSel=null; resetArm=false; render(); sheet.classList.remove('hidden'); }
-function close(){ sheet.classList.add('hidden'); cur=null; }
+function close(){ sheet.classList.add('hidden'); cur=null; DEXV.stop(); }
 $('bShop').addEventListener('click',()=>open('shop'));
 $('bQuest').addEventListener('click',()=>open('quest'));
 $('bLog').addEventListener('click',()=>open('log'));
@@ -4232,7 +4272,7 @@ $('startBtn').addEventListener('click',()=>{ Snd.init(); $('intro').classList.ad
 $('bSell').addEventListener('click',()=>{ if(G.state==='catch') finishCatch(true); });
 $('bRel').addEventListener('click',()=>{ if(G.state==='catch') finishCatch(false); });
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
-const META=createMeta({save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS,goSpot,curSpot:()=>G.spot,setHour:h=>{ G.hour=h; W.setTime(h,true); }});
+const META=createMeta({W,save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS,goSpot,curSpot:()=>G.spot,setHour:h=>{ G.hour=h; W.setTime(h,true); }});
 const UW=createUnderwater(W,P);
 const tvSea=new THREE.Vector3();
 window.__MDL=createModels(W); const MDL=window.__MDL; MDL.preload('lake');
