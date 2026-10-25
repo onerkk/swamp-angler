@@ -1649,7 +1649,7 @@ function newQuest(ex){
     ice:()=>{ const n=2+Math.floor(lv/8); return {n,txt:`在冰湖釣到魚 ${n} 尾`}; }};
   const keys=Object.keys(pool).filter(k=>!ex.includes(k)&&(k!=='ice'||lv>=10)), k=keys[Math.floor(Math.random()*keys.length)];
   const q=Object.assign({k,prog:0},pool[k]()); const diff={count:1,rare:1.6,weight:1.2,sp:1.5,per:1.2,perfect:1.3,release:.8,ice:1.4}[k];
-  q.reward=Math.round((120+lv*90)*diff/10)*10; q.xp=Math.round(xpNext(lv)*.06*diff); return q;   // 任務經驗依這一級所需經驗按比例給
+  q.reward=Math.round((60+lv*45)*diff/10)*10; q.xp=Math.round(xpNext(lv)*.06*diff); return q;   // 任務經驗依這一級所需經驗按比例給
 }
 const QDIFF={count:1,rare:1.6,weight:1.2,sp:1.5,per:1.2,perfect:1.3,release:.8,ice:1.4};
 (save.quests||[]).forEach(q=>{ const want=Math.round(xpNext(save.lv)*.06*(QDIFF[q.k]||1)); if(!q.xp||q.xp<want*.5) q.xp=want; });   // 舊任務的經驗用新公式重算
@@ -1982,10 +1982,10 @@ return {
 }
 /* ===== 沉浸感更新 · 難度、拉扯型態、空氣與水面生態、鏡頭效果 ===== */
 const DIFF={
- easy:{n:'休閒',line:1.35,win:1.5,stam:.75,slack:1.6,jit:.6,rew:.8},
- normal:{n:'標準',line:1,win:1,stam:1,slack:1,jit:1,rew:1},
- hard:{n:'硬派',line:.85,win:.8,stam:1.25,slack:.8,jit:1.3,rew:1.3},
- expert:{n:'專家',line:.72,win:.65,stam:1.5,slack:.65,jit:1.6,rew:1.6}};
+ easy:{n:'休閒',line:1.25,win:1.25,stam:.95,slack:1.4,jit:.8,rew:.8},
+ normal:{n:'標準',line:.92,win:.8,stam:1.3,slack:.85,jit:1.15,rew:1},
+ hard:{n:'硬派',line:.8,win:.65,stam:1.6,slack:.7,jit:1.4,rew:1.3},
+ expert:{n:'專家',line:.68,win:.52,stam:1.9,slack:.55,jit:1.75,rew:1.6}};
 const STY={
  nibbler:{n:'小幅亂竄',run:[.4,.9],rest:[.4,1],mul:1.4,lat:1.6,spd:1,ev:null,evP:0,d:0},
  runner:{n:'長距離狂奔',run:[2.2,4.5],rest:[1.2,2.4],mul:1.5,lat:.6,spd:1.5,ev:'long',evP:.5,d:.8},
@@ -2346,7 +2346,7 @@ const ctEl=$('castTag'); let ctT=0;
 function castTag(d){ ctEl.innerHTML='拋竿距離<b>'+d.toFixed(2)+' 米</b>'; ctEl.classList.remove('hidden'); clearTimeout(ctT); ctT=setTimeout(()=>ctEl.classList.add('hidden'),3200); }
 /* ---------- 連擊 ---------- */
 const cbEl=$('combo');
-function combo(n){ if(n>=2){ cbEl.innerHTML='連擊 <b>×'+n+'</b><small>獎勵 +'+Math.min(n,10)*10+'%</small>'; cbEl.classList.remove('hidden'); cbEl.classList.remove('bump'); void cbEl.offsetWidth; cbEl.classList.add('bump'); } else cbEl.classList.add('hidden'); }
+function combo(n){ if(n>=2){ cbEl.innerHTML='連擊 <b>×'+n+'</b><small>獎勵 +'+Math.min(n,6)*5+'%</small>'; cbEl.classList.remove('hidden'); cbEl.classList.remove('bump'); void cbEl.offsetWidth; cbEl.classList.add('bump'); } else cbEl.classList.add('hidden'); }
 /* ---------- 尺寸獎牌 ---------- */
 const medalLv=fd=>fd.u>=.9?3:fd.u>=.7?2:fd.u>=.4?1:0;
 const MEDAL=['','🥉 銅牌尺寸','🥈 銀牌尺寸','👑 金冠尺寸'];
@@ -2479,14 +2479,14 @@ const fmt=v=>v%1?v.toFixed(1):v;
 function goalsRender(){ const m=merN();
   let h=`<div class="merbox"><b>🧜 人魚之約</b><span>${'💗'.repeat(Math.min(m,5))}${'🤍'.repeat(Math.max(0,5-m))}</span><small>${m<5?'下一步：'+MER_NEXT[m]:'你已是她最信任的人，她仍會在夜裡來看你'}</small>${m===0?'<small>提示：夜晚、起霧或深水中央，用月光餌最容易遇見她。</small>':''}</div>`;
   h+=ACH.map(a=>{ const [cur,g]=a[3](), done=cur>=g, cl=S.ach&&S.ach[a[0]];
-    return `<div class="row"><div class="nm"><b>${a[1]}</b><small>${a[2]}（${fmt(Math.min(cur,g))}/${g}）</small><span class="pbar"><i style="width:${Math.min(100,cur/g*100)}%"></i></span></div><div class="rt">${cl?'<span class="eqd">已領取</span>':done?`<button class="sbtn pri" data-ach="${a[0]}">領 🪙${a[4]}</button>`:`<small>🪙${a[4]}</small>`}</div></div>`; }).join('');
+    return `<div class="row"><div class="nm"><b>${a[1]}</b><small>${a[2]}（${fmt(Math.min(cur,g))}/${g}）</small><span class="pbar"><i style="width:${Math.min(100,cur/g*100)}%"></i></span></div><div class="rt">${cl?'<span class="eqd">已領取</span>':done?`<button class="sbtn pri" data-ach="${a[0]}">領 🪙${Math.round(a[4]*.5)}</button>`:`<small>🪙${Math.round(a[4]*.5)}</small>`}</div></div>`; }).join('');
   $('goalB').innerHTML=h; }
 function goalsDot(){ $('bGoal').classList.toggle('dotn',ACH.some(a=>{ const [cur,g]=a[3](); return cur>=g&&!(S.ach&&S.ach[a[0]]); })); }
 $('bGoal').addEventListener('click',()=>{ goalsRender(); $('goal').classList.remove('hidden'); });
 $('goalX').addEventListener('click',()=>$('goal').classList.add('hidden'));
 $('goal').addEventListener('click',e=>{ if(e.target.id==='goal') $('goal').classList.add('hidden'); const b=e.target.closest('[data-ach]'); if(!b) return;
   const a=ACH.find(x=>x[0]===b.dataset.ach); if(!a) return; S.ach=S.ach||{}; if(S.ach[a[0]]) return;
-  S.ach[a[0]]=1; S.coins+=a[4]; c.persist(); c.setCoins(); c.Snd.coin(); c.toast('成就達成：'+a[1]+'　🪙'+a[4],'good',2200); goalsRender(); goalsDot(); });
+  const ac=Math.round(a[4]*.5); S.ach[a[0]]=1; S.coins+=ac; c.persist(); c.setCoins(); c.Snd.coin(); c.toast('成就達成：'+a[1]+'　🪙'+ac,'good',2200); goalsRender(); goalsDot(); });
 function merMeet(){ S.mer=S.mer||{n:0}; S.mer.n++; const n=S.mer.n;
   if(n===2){ S.baits=S.baits||{}; S.baits.moon=(S.baits.moon||0)+3; }
   G.luck=.25; c.persist(); goalsDot();
@@ -3758,42 +3758,42 @@ const CH=[
   intro:'這是老漁人一根一根釘起來的碼頭。先在這裡找回釣魚的手感——他說過，湖會告訴你很多事，只要你願意等。',
   tasks:[{t:'catch',zone:'dock',n:5,txt:'在木碼頭釣到 5 尾魚'},{t:'catch',sp:'bluegill',n:1,txt:'釣到一尾藍鰓太陽魚'},{t:'perfect',n:2,txt:'完美揚竿 2 次'}],
   page:'手記第一頁\n「這座碼頭是我年輕時一根一根釘起來的。湖會告訴你很多事，只要你願意等。\n浮萍灣那邊，傍晚常有東西在葉子底下發光——我花了好幾年才看清楚那是什麼。」',
-  xp:600,coins:500,unlock:'浮萍灣（需要獨木舟）'},
+  xp:600,coins:250,unlock:'浮萍灣（需要獨木舟）'},
  {id:'c2',spot:'lily',name:'第二章　浮萍下的影子',open:{after:'c1',kayak:1},
   intro:'划進浮萍灣，水面鋪滿圓圓的葉子。手記說，老漁人第一次看見「她」，就是在這裡。',
   tasks:[{t:'catch',zone:'lily',sp:'crappie',n:2,txt:'在浮萍灣釣到 2 尾黑斑刺蓋太陽魚'},{t:'catch',loc:'lake',per:'dawn',n:3,txt:'在湖上清晨釣到 3 尾魚'},{t:'item',n:1,txt:'從水裡釣起任何一件寶物（任務進行中機率加倍）'}],
   page:'手記第二頁\n「那天清晨，浮萍下有條銀色的尾巴，比我見過的任何魚都大。我以為眼花了。\n後來那場暴風雨，把東岸的林子整片吹倒在水裡。人們說湖病了，開始在河口築堤。」',
-  xp:1500,coins:1200,unlock:'倒木區（Lv 5）'},
+  xp:1500,coins:600,unlock:'倒木區（Lv 5）'},
  {id:'c3',spot:'wood',name:'第三章　暴風雨之後',open:{after:'c2',lv:5},
   intro:'倒木區是那場暴風雨留下的傷口。枯樹橫躺在水裡，成了大魚躲藏的地方。',
   tasks:[{t:'catch',zone:'wood',sp:'channel',n:1,txt:'在倒木區釣到一尾斑點叉尾鮰'},{t:'catch',rain:1,n:3,txt:'下雨天釣到 3 尾魚（可在設定切換天氣）'},{t:'catch',rar:1,n:3,txt:'釣到稀有以上的魚 3 尾'}],
   page:'手記第三頁\n「堤防築好以後，海水不再進來，湖心那條大鱷雀鱔變得越來越兇。\n我在牠肚子裡找到過一張畫在魚皮上的圖——湖的西邊，有個只在月光下才看得見的灣。\n冬天我要去上游看看，河水是從哪裡來的。」',
-  xp:3000,coins:2500,unlock:'深水中央（Lv 8）、冰湖支線（Lv 10）'},
+  xp:3000,coins:1250,unlock:'深水中央（Lv 8）、冰湖支線（Lv 10）'},
  {id:'ice',spot:'ice',side:1,name:'支線　上游的源頭',open:{after:'c3',lv:10},
   intro:'順著河往上走，湖面結了厚厚的冰。老漁人最後一個冬天，就是在這裡度過的。',
   tasks:[{t:'catch',loc:'ice',n:3,txt:'在冰湖釣到 3 尾魚'},{t:'catch',sp:'trout',n:1,txt:'釣到一尾虹鱒'},{t:'catch',sp:'pike',n:1,txt:'釣到一尾白斑狗魚'}],
   page:'手記・冰湖\n「冰底下的水是活的，一路流向湖，再流向海。堤防擋住的不只是海水，也擋住了回家的路。\n如果你讀到這裡，替我去河口看看吧。」',
-  xp:3500,coins:3000,unlock:'冰湖支線完成（金幣與經驗）'},
+  xp:3500,coins:1500,unlock:'冰湖支線完成（金幣與經驗）'},
  {id:'c4',spot:'deep',name:'第四章　湖心的秘密',open:{after:'c3',lv:8},
   intro:'深水中央沒有遮蔽，風浪最大，也最安靜。老漁人說，這裡住著湖的主人。',
   tasks:[{t:'catch',zone:'deep',rar:1,n:3,txt:'在深水中央釣到稀有以上的魚 3 尾'},{t:'catch',loc:'lake',per:'night',n:3,txt:'在湖上夜晚釣到 3 尾魚'},{t:'catch',sp:'gar',n:1,txt:'釣到一尾鱷雀鱔'}],
   page:'手記第四頁\n「月亮很圓的晚上，我照著魚皮上的圖划過去。灣裡的水是銀色的，岩石上坐著一個人——\n不，是一條人魚。她說她叫汐月，在等一條回海的路。我答應她，每個滿月都提燈來陪她。」',
-  xp:5000,coins:4000,unlock:'月光灣'},
+  xp:5000,coins:2000,unlock:'月光灣'},
  {id:'c5',spot:'moon',name:'第五章　月潮',open:{after:'c4'},
   intro:'月光灣只在夜裡發光。汐月還在這裡，等著那個提燈的人。\n提示：晚上（約 19:48～04:48）划獨木舟到月光灣釣魚，有機會在魚肚裡找到月鱗；月亮越圓，找到的機會越高。',
   tasks:[{t:'moon',n:1,txt:'集滿 7 片月鱗，聽完汐月的故事'}],
   page:'手記第五頁\n「我老了，提不動燈了。汐月說，等堤防打開、月潮回來，她就能回家。\n可是河口外的海不平靜——深海裡有什麼東西，從堤防築起那年就一直在發怒。\n我的舊漁船還停在河口的船塢裡。修好它，替我出海看看吧。」',
-  xp:8000,coins:6000,unlock:'近海礁岩（需修復老漁人的漁船，在 🗺️ 釣點清單）'},
+  xp:8000,coins:3000,unlock:'近海礁岩（需修復老漁人的漁船，在 🗺️ 釣點清單）'},
  {id:'c6',spot:'reef',name:'第六章　河口之外',open:{after:'c5',yacht:1},
   intro:'第一次把船開出河口。汐月回到了大海，海卻變得不安：魚群躁動，鯊魚出現得比以前頻繁。',
   tasks:[{t:'catch',zone:'reef',sp:'amber',n:1,txt:'在近海礁岩釣到一尾紅甘'},{t:'catch',sp:'grouper',n:1,txt:'釣到一尾石斑'},{t:'scene',id:'dolphin',n:1,txt:'拍下一次海豚群（白天出海，海豚出現時按 📷）'}],
   page:'手記最後幾頁（字跡很淡）\n「海王守著深藍的海溝。他以為是人類偷走了月潮。\n只有親手證明人與海可以共處，月潮才會回來。這件事，我沒能做到。」',
-  xp:12000,coins:9000,unlock:'遠洋深藍（Lv 18）'},
+  xp:12000,coins:4500,unlock:'遠洋深藍（Lv 18）'},
  {id:'c7',spot:'blue',name:'終章　深淵之王',open:{after:'c6',lv:18},
   intro:'遠洋深藍，海水深得發黑。這裡是海王的領域，也是老漁人一輩子沒能抵達的地方。',
   tasks:[{t:'catch',sp:'marlin',n:1,txt:'釣到一尾旗魚'},{t:'catch',sp:'sail',n:1,txt:'釣到一尾雨傘旗魚'},{t:'boss',id:'king',n:1,txt:'接受大師挑戰，擊敗深淵海王（Lv 24，⭐ 面板）'}],
   page:'終章\n海王沉回深淵前，看了你很久。那天晚上，河口的堤防在大潮中自己裂開了一道縫，月光順著水流進湖裡。\n你回到碼頭，在手記最後一頁寫下：「月潮回來了。換我守著這片湖。」',
-  xp:30000,coins:30000,unlock:'全部完成：獲得稱號「守湖人」'}
+  xp:30000,coins:15000,unlock:'全部完成：獲得稱號「守湖人」'}
 ];
 const SPOT_IDS=['dock','lily','wood','deep','moon','reef','blue','ice'];
 S.story=S.story||null;
@@ -4031,7 +4031,7 @@ function cast(){
 function landBobber(){
   if(G.baitUsed&&G.baitUsed.lure){ G.state='lure'; P.splash(G.to.x,0,G.to.z,10,.4); W.addRipple(G.to.x,G.to.z,.4); Snd.plop(); G.sp=null; G.fd=null; FUN.castTag(G.castDist); LURE.start(G.to,G.baitUsed,G.base); return; }
   G.state='wait'; P.splash(G.to.x,0,G.to.z,16,.7); W.addRipple(G.to.x,G.to.z,.55); Snd.plop();
-  G.timer=rand(2.5,7)*PER_WAIT[period(G.hour)]*(1-G.luck*.6)*(G.baitUsed?G.baitUsed.wait:1)*WL.waitK()*(window.__ECO&&window.__ECO.fxOn('glow')?.6:1)*(1+.2*depNow(depKey())); G.nib=Math.floor(rand(0,3.99)); G.approach=0; G.sp=null; G.fd=null;
+  G.timer=rand(6,15)*PER_WAIT[period(G.hour)]*(1-G.luck*.6)*(G.baitUsed?G.baitUsed.wait:1)*WL.waitK()*(window.__ECO&&window.__ECO.fxOn('glow')?.6:1)*(1+.2*depNow(depKey())); G.nib=Math.floor(rand(0,3.99)); G.approach=0; G.sp=null; G.fd=null;
   FUN.castTag(G.castDist); G.hot=FUN.inHot(G.to); if(G.hot){ G.timer*=.3; toast('正中魚群！','good',1200); }
 }
 function startRetrieve(msg,cls){ exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
@@ -4039,9 +4039,9 @@ function nibble(){ G.dip=.28; W.addRipple(G.to.x,G.to.z,.18); Snd.nibble(); vib(
 function prepFish(){ if(Math.random()<.085*(window.__STORY&&window.__STORY.needs('item')?2:1)){ const it=FUN.rollItem(); G.sp=FUN.ITEM_SP; G.fd={sp:FUN.ITEM_SP,item:it,L:it.size,w:it.w*rand(.85,1.15),lvl:1,value:Math.round(it.val*rand(.8,1.25)),u:.5,xpMul:0}; return; }
   G.depK=depKey(); const sp=pickSpecies(), pw=clamp((G.castDist-6)/30,0,1), u=Math.pow(Math.random(),(1.6-.5*pw)/WL.sizeB()*(1+(1-reachK())*1.2+.15*depNow(G.depK)));
   const L=lerp(sp.len[0],sp.len[1],u)/100, w=sp.k*L*L*L*rand(.9,1.12);
-  G.sp=sp; G.fd={sp,L,w,u,lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*.5*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; if(window.__TAL) window.__TAL.applyBoss(G,SPECIES,RAR); }
+  G.sp=sp; G.fd={sp,L,w,u,lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*.4*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; if(window.__TAL) window.__TAL.applyBoss(G,SPECIES,RAR); }
 function bite(){ if(!G.fd) prepFish(); UW.bite(); G.state='bite'; G.biteT=0; FUN.hookStart(G.fd); W.addRipple(G.to.x,G.to.z,.75); P.splash(G.to.x,0,G.to.z,8,.5); Snd.bite(); vib([60,40,60]); }
-function missBite(){ FUN.hookEnd(); G.combo=0; FUN.combo(0); G.state='wait'; G.timer=rand(2,5); G.nib=Math.floor(rand(0,2.99)); G.sp=null; G.fd=null; exitUW(); vib(40); }
+function missBite(){ FUN.hookEnd(); G.combo=0; FUN.combo(0); G.state='wait'; G.timer=rand(4,9); G.nib=Math.floor(rand(0,2.99)); G.sp=null; G.fd=null; exitUW(); vib(40); }
 function hook(q){
   const sp=G.sp, L=G.fd.L; exitUW();
   const perfect=!!q; if(perfect){ save.perf=(save.perf||0)+1; if(window.__STORY) window.__STORY.onPerfect(); }
@@ -4077,7 +4077,7 @@ function showCard(){
   if(window.__MOON) window.__MOON.onCatch(G.fd);
   if(G.fd.item){ if(window.__STORY) window.__STORY.onItem(); save.items=(save.items||0)+1; if(G.fd.item.id==='chest') save.chests=(save.chests||0)+1; if(window.__ECO) window.__ECO.dropItem(G.fd.item); persist(); FUN.goalsDot();
     return FUN.itemCard(G.fd,()=>{ ui.catch.classList.remove('hidden'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden'); document.body.classList.add('catching'); }); }
-  { const cb=1+.1*Math.min(G.combo||0,10); G.fd.value=Math.round(G.fd.value*cb*(window.__ECO&&window.__ECO.fxOn('coin2')?2:1)); G.fd.xpMul=(G.fd.xpMul||1)*cb; }
+  { const cb=1+.05*Math.min(G.combo||0,6); G.fd.value=Math.round(G.fd.value*cb*(window.__ECO&&window.__ECO.fxOn('coin2')?2:1)); G.fd.xpMul=(G.fd.xpMul||1)*cb; }
   FUN.tourCatch(G.fd); if(G.hot) save.hotC=(save.hotC||0)+1; $('bSell').textContent='賣出'; $('bRel').classList.remove('hidden');
   const fd=G.fd, sp=fd.sp, r=RAR[sp.rar], rec=save.dex[sp.id];
   const isNew=!rec, isRec=!!rec&&fd.w>rec.bw;
