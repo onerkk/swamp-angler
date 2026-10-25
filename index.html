@@ -3643,7 +3643,7 @@ function makePipEnv(renderer){ const es=new T.Scene(), g=new T.Mesh(new T.Sphere
     fragmentShader:'varying vec3 vP; void main(){ float h=normalize(vP).y; vec3 c=mix(vec3(0.03,0.09,0.11),vec3(0.32,0.5,0.55),smoothstep(-0.3,0.9,h)); c+=vec3(0.55,0.65,0.6)*pow(max(h,0.0),10.0); gl_FragColor=vec4(c,1.0); }'}));
   es.add(g); const pm=new T.PMREMGenerator(renderer), rt=pm.fromScene(es,0,.1,50); pm.dispose(); return rt.texture; }   // 子畫面專屬的水下環境反射，金屬假餌才會發亮
 function renderPiP(renderer,dt){ const on=(cur||pip.strikeT>0)&&(!c.uwOn||c.uwOn());
-  if(!on){ frame.style.display='none'; return; } dt=dt||.016; if(!pipEnv){ pipEnv=makePipEnv(renderer); pip.scene.environment=pipEnv; } pipSync();
+  if(!on){ frame.style.display='none'; return; } dt=dt||.016;  pipSync();
   const sp=cur?(cur.speed+cur.twitchV):0, I=cur?cur.interest:1, t=performance.now()*.001;
   const p=motes.geometry.attributes.position.array; for(let i=0;i<PN;i++){ p[i*3]+=dt*(.15+sp*.9); if(p[i*3]>4) p[i*3]-=8; } motes.geometry.attributes.position.needsUpdate=true;
   if(pip.lure){ pip.lure.position.set(0,.35+Math.sin(t*2.2)*.02,0); pip.lure.rotation.z=Math.sin(t*14)*(.12+(cur?.5*cur.twitchV:0)); }
