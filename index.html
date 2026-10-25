@@ -3416,7 +3416,7 @@ function setup(g){
     arms.push({side,grp,wl,rl,pl,ld,L0,fing,grip:.85});
     if(W.reflHide) W.reflHide(grp);
   }
-  ready=arms.length===2; window.__ARMSDBG=arms; }
+  ready=arms.length===2; }
 if(T.GLTFLoader) new T.GLTFLoader().load('models/arms.glb',setup);
 /* 雙手補光：掛在鏡頭上、只照 2 米內，亮度跟著日照，夜裡不會像戴頭燈 */
 const fill=new T.PointLight(0xfff2e0,0,2.2,1.6); W.camera.add(fill); fill.position.set(.15,.1,.1); if(!W.camera.parent) S.add(W.camera);
@@ -3546,7 +3546,6 @@ const rays=[]; for(let i=0;i<5;i++){ const m=new T.Mesh(new T.PlaneGeometry(.35,
 const bub=[]; for(let i=0;i<14;i++){ const b=new T.Mesh(new T.SphereGeometry(.012,8,6),new T.MeshBasicMaterial({color:0xe8f8ff,transparent:true,opacity:.7})); b.visible=false; pip.scene.add(b); bub.push({b,v:0}); }
 const frame=document.createElement('div'); frame.id='pipFrame'; frame.innerHTML='<span>🎥 水下鏡頭</span>'; document.body.appendChild(frame);
 const pst=document.createElement('style'); pst.textContent=`#pipFrame{position:fixed;z-index:5;border:2px solid rgba(160,220,255,.7);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.4);pointer-events:none;display:none}#pipFrame span{position:absolute;left:6px;top:4px;font-size:11px;font-weight:800;color:#dff4ff;text-shadow:0 1px 3px #000}`; document.head.appendChild(pst);
-window.__PIP=pip; window.__LMODELS=models;
 function pipSync(){ if(!cur) return;
   if(pip.lureK!==cur.k&&models[cur.k]){ if(pip.lure) pip.scene.remove(pip.lure); pip.lure=models[cur.k].clone(true); pip.lure.scale.multiplyScalar(2.2); pip.lure.rotation.set(0,-Math.PI/2,0); pip.scene.add(pip.lure); pip.lureK=cur.k; }
   if(chaser&&pip.fishSrc!==chaser.group){ if(pip.fish) pip.scene.remove(pip.fish); pip.fish=chaser.group.clone(true); pip.fish.visible=true; pip.fishSrc=chaser.group; pip.scene.add(pip.fish); }
@@ -3765,7 +3764,7 @@ function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.
 function specialK(sp){ if(!sp.special) return 1; const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone>=3||G.spot>=3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; if(sp.special==='king') return 0; if(sp.special==='moonkoi') return window.__MOON?window.__MOON.koiK():0; return 1; }
 /* 魚群警覺：同一個方向一直釣，魚會變少、變小、變慢咬；換方向或換釣點就恢復（每分鐘消退 1） */
 /* 透水：水下物體在水面之後繪製，越深越透明、越帶水色（湖底沒有地形，所以讓物體透出來，而不是讓水變透明） */
-const SEE_U={value:new THREE.Vector3(.04,.13,.15)}, SEE_K={value:1}; window.__SEE_K=SEE_K; window.__SEE_U=SEE_U;
+const SEE_U={value:new THREE.Vector3(.04,.13,.15)}, SEE_K={value:1}; window.__SEE_K=SEE_K;
 function seeThrough(obj){ if(!obj) return; obj.traverse(m=>{ if(!m.isMesh&&!m.isSkinnedMesh) return; m.renderOrder=10;
   (Array.isArray(m.material)?m.material:[m.material]).forEach(mat=>{ if(!mat||mat.userData.see) return; mat.userData.see=true; mat.transparent=true;
     const prev=mat.onBeforeCompile, prevKey=mat.customProgramCacheKey?mat.customProgramCacheKey.bind(mat):null;
@@ -3781,7 +3780,7 @@ function depAdd(k,n){ const v=depNow(k)+n, w=v>=2&&DEPL[k]&&DEPL[k].warned; DEPL
 const reachK=()=>G.loc==='ice'?.78:clamp((G.castDist-4)/(24*(1-.05*TR('cast'))),0,1);
 function pickSpecies(){
   const per=period(G.hour), pw=clamp((G.castDist-6)/30,0,1); let tot=0;
-  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(window.__ECO&&window.__ECO.fxOn('luck')?.4:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*WL.spotAff(sp.id)*WL.wxAff(sp.id)*(((sp.loc==='both'&&G.loc!=='ice')||(sp.loc||'lake')===(G.loc||'lake')||(G.loc==='ice'&&sp.ice))?1:0)*(G.loc==='sea'?1+sp.rar*.08*TR('sea'):1)*Math.pow(.12+.88*reachK(),sp.rar)/(1+.3*depNow(G.depK||'')*sp.rar)*(bt.aff[sp.id]||(bt.lure?.15:1))*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
+  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(window.__ECO&&window.__ECO.fxOn('luck')?.4:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*WL.spotAff(sp.id)*WL.wxAff(sp.id)*(((sp.loc==='both'&&G.loc!=='ice')||(sp.loc||'lake')===(G.loc||'lake')||(G.loc==='ice'&&sp.ice))?1:0)*(G.loc==='sea'?1+sp.rar*.08*TR('sea'):1)*Math.pow(.12+.88*reachK(),sp.rar)/(1+.3*depNow(G.depK||'')*sp.rar)*(bt.aff[sp.id]||(bt.lure&&G.loc!=='ice'?0:1))*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
   let x=Math.random()*tot; for(let i=0;i<ws.length;i++){ x-=ws[i]; if(x<=0) return SPECIES[i]; } return SPECIES[0];
 }
 
@@ -3922,7 +3921,7 @@ window.__applyGfx=q=>{ window.__GFX=q; const cap={high:2,mid:1.5,low:1}[q]||2;
 window.__applyGfx(save.gfx||'high');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
 function iceDrop(){ const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=5; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
-const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST; window.__W=W;
+const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
 const LURE=createLure(W,P,{G,toast,Snd,uwOn:()=>save.uw!==false,reelSpd:()=>META.gear().reel.spd,onChase:()=>{ if(!G.fd) prepFish(); if(!G.fd||G.fd.item) return null; const f=P.getFish(G.fd.sp); if(f) seeThrough(f.group); return f?{group:f.group,uni:f.uni,L:G.fd.L}:null; }}); window.__LURE=LURE; window.__G=G;
 window.__MOON=createMoonBay(W,{G,save,persist,toast,Snd,vib,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
