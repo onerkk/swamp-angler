@@ -3624,8 +3624,13 @@ const bub=[]; for(let i=0;i<14;i++){ const b=new T.Mesh(new T.SphereGeometry(.01
 const frame=document.createElement('div'); frame.id='pipFrame'; frame.innerHTML='<span>🎥 水下鏡頭</span>'; document.body.appendChild(frame);
 const pst=document.createElement('style'); pst.textContent=`#pipFrame{position:fixed;z-index:5;border:2px solid rgba(160,220,255,.7);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.4);pointer-events:none;display:none}#pipFrame span{position:absolute;left:6px;top:4px;font-size:11px;font-weight:800;color:#dff4ff;text-shadow:0 1px 3px #000}`; document.head.appendChild(pst);
 function pipSync(){ if(!cur) return;
+  if(!pip.glint){ pip.glint=new T.PointLight(0xfff4e0,1.6,5,1.5); pip.glint.position.set(.6,1,1.4); pip.scene.add(pip.glint); }   // 亮片轉動時的高光來源
   if(pip.lureK!==cur.k&&models[cur.k]){ if(pip.lure) pip.scene.remove(pip.lure);
     const m=models[cur.k].clone(true); m.position.set(0,0,0); m.rotation.set(0,0,0); m.scale.multiplyScalar(2.2); m.updateMatrixWorld(true);
+    // 子畫面專用材質複本：調低金屬度、表面光滑，靠點光源產生高光；只改複本，主畫面與魚不受影響
+    m.traverse(o=>{ if(!o.isMesh) return; const mt=o.material.clone(); mt.transparent=false; mt.opacity=1; mt.depthWrite=true;
+      if(mt.metalness!==undefined){ mt.metalness=Math.min(mt.metalness,.35); mt.roughness=Math.min(mt.roughness==null?1:mt.roughness,.28); }
+      if(mt.emissive){ mt.emissive=new T.Color(0x223338); mt.emissiveIntensity=1; } o.material=mt; o.renderOrder=0; });
     // 自動量測：最薄的方向轉向鏡頭（正面朝你），最長的方向轉成水平（身體橫向）
     const sz=new T.Box3().setFromObject(m).getSize(new T.Vector3()), d=[sz.x,sz.y,sz.z], A=[new T.Vector3(1,0,0),new T.Vector3(0,1,0),new T.Vector3(0,0,1)];
     const thin=d.indexOf(Math.min(...d)), lng=[0,1,2].filter(i=>i!==thin).sort((a,b)=>d[b]-d[a])[0];
