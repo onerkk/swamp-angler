@@ -3484,7 +3484,7 @@ function start(at,bait,base){ const k=bait.lure, cf=LURE_CFG[k]; getModel(k); sh
   c.toast(cf.tip,'',2600); }
 function press(){ if(cur) cur.pressT=performance.now(); }
 function release(){ if(!cur) return; if(performance.now()-cur.pressT<220){ cur.twitchV=1.4; cur.twitched=true; c.Snd.plop&&c.Snd.plop(); W.addRipple(pos.x,pos.z,.12); } }
-function end(keep){ if(!keep) hideChaser(); else chaser=null; cur=null; holder.visible=false; hud.classList.add('hidden'); P.shadow.material.opacity=0; }
+function end(keep){ P.shadow.scale.setScalar(1); if(!keep) hideChaser(); else chaser=null; cur=null; holder.visible=false; hud.classList.add('hidden'); P.shadow.material.opacity=0; }
 function update(dt,held){ if(!cur) return null; const cf=cur.cf;
   if(held){ cur.heldT+=dt; cur.pause=0; } else { cur.heldT=0; cur.pause+=dt; }
   const target=held?cur.maxSp*Math.min(1,.4+.6*cur.heldT/1.5):0;
@@ -3510,7 +3510,8 @@ function update(dt,held){ if(!cur) return null; const cf=cur.cf;
     if(chaser){ /* 真實魚模型跟在假餌後面：越有興趣越靠近水面、跟得越緊、尾巴擺得越快 */
       const g=chaser.group, I=cur.interest, wob=Math.sin(performance.now()*.004)*.35*(1-I);
       g.position.set(tmp.x+dir.z*wob,-(.25-.3*I)+Math.sin(performance.now()*.006)*.01,tmp.z-dir.x*wob); g.rotation.set(0,Math.atan2(-dir.z,dir.x),0);
-      chaser.uni.uSwim.value+=dt*(5+9*(cur.speed+I)); chaser.uni.uAmp.value=.05+.04*I; P.shadow.material.opacity*=.5;
+      chaser.uni.uSwim.value+=dt*(5+9*(cur.speed+I)); chaser.uni.uAmp.value=.05+.04*I;
+      { const far=Math.min(1,Math.max(0,(dist-6)/14)); P.shadow.scale.setScalar(1+1.6*far); P.shadow.material.opacity=Math.min(.75,(.15+.35*I)*(.5+.9*far)); }   // 遠處時加強魚下方的暗影，讓人看得出有魚在跟
       if(I>.75&&Math.random()<dt*6) P.splash(g.position.x-dir.x*chaser.L*.3,0,g.position.z-dir.z*chaser.L*.3,2,.18); }   // 背鰭劃開水面
     cur.fx=(cur.fx||0)-dt; if(cur.interest>.45&&cur.fx<=0){ cur.fx=.9-.6*cur.interest; W.addRipple(tmp.x,tmp.z,.12+.25*cur.interest); if(cur.interest>.75) P.splash(tmp.x,0,tmp.z,4,.25); }   // 魚背攪水
     hC.textContent=cur.interest>.7?'🐟 快咬了！':cur.interest>.25?'🐟 有魚在追':'🐟 魚在觀察';
@@ -3713,12 +3714,13 @@ function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.
 function specialK(sp){ if(!sp.special) return 1; const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone>=3||G.spot>=3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; if(sp.special==='king') return 0; if(sp.special==='moonkoi') return window.__MOON?window.__MOON.koiK():0; return 1; }
 /* 魚群警覺：同一個方向一直釣，魚會變少、變小、變慢咬；換方向或換釣點就恢復（每分鐘消退 1） */
 /* 透水：水下物體在水面之後繪製，越深越透明、越帶水色（湖底沒有地形，所以讓物體透出來，而不是讓水變透明） */
+const SEE_U={value:new THREE.Vector3(.04,.13,.15)}; window.__SEE_U=SEE_U;
 function seeThrough(obj){ if(!obj) return; obj.traverse(m=>{ if(!m.isMesh&&!m.isSkinnedMesh) return; m.renderOrder=10;
   (Array.isArray(m.material)?m.material:[m.material]).forEach(mat=>{ if(!mat||mat.userData.see) return; mat.userData.see=true; mat.transparent=true;
     const prev=mat.onBeforeCompile, prevKey=mat.customProgramCacheKey?mat.customProgramCacheKey.bind(mat):null;
-    mat.onBeforeCompile=(s,r)=>{ if(prev) prev(s,r);
+    mat.onBeforeCompile=(s,r)=>{ if(prev) prev(s,r); s.uniforms.uSeeCol=SEE_U;
       s.vertexShader='varying float vWy_;\n'+s.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\nvWy_=(modelMatrix*vec4(transformed,1.0)).y;');
-      s.fragmentShader='varying float vWy_;\n'+s.fragmentShader.replace(/}\s*$/,'  { float d_=max(0.0,-vWy_); gl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(0.04,0.13,0.15),1.0-exp(-d_*1.3)); gl_FragColor.a*=exp(-d_*1.1); }\n}'); };
+      s.fragmentShader='uniform vec3 uSeeCol;\nvarying float vWy_;\n'+s.fragmentShader.replace(/}\s*$/,'  { float d_=max(0.0,-vWy_); gl_FragColor.rgb=mix(gl_FragColor.rgb,uSeeCol,1.0-exp(-d_*1.3)); gl_FragColor.a*=exp(-d_*1.1); }\n}'); };
     mat.customProgramCacheKey=()=>(prevKey?prevKey():'')+'|see'; mat.needsUpdate=true; }); }); }
 window.__seeThrough=seeThrough;
 const DEPL={}; const TR=b=>window.__TAL?window.__TAL.rank(b):0;
@@ -4073,6 +4075,8 @@ function update(dt){
   if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
   P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); window.__MOON.update(dt); if(window.__TAL) window.__TAL.tick(G); ARMS.update(!UW.active(),G.state,G.power,dt); SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt); ICE.update(dt);
+  { const z=WL.zoneId?WL.zoneId():'', tgt=G.loc==='ice'?[.03,.08,.12]:G.loc==='sea'?(z==='reef'?[.02,.2,.25]:[.01,.08,.2]):[.04,.13,.15], v=SEE_U.value, k=Math.min(1,dt*1.5);   // 水下物體混入的水色依地點
+    v.set(v.x+(tgt[0]-v.x)*k,v.y+(tgt[1]-v.y)*k,v.z+(tgt[2]-v.z)*k); }
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
     const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
   G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
