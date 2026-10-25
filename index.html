@@ -25,7 +25,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 .ib{position:relative;pointer-events:auto;width:38px;height:38px;border-radius:50%;border:1px solid var(--stroke);background:var(--glass);color:var(--fg);font-size:18px;display:grid;place-items:center;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);cursor:pointer;padding:0}
 .ib:active{transform:scale(.93)}
 .ib:focus-visible,.btn:focus-visible,#actBtn:focus-visible,#startBtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-#toast{position:fixed;left:50%;top:21%;transform:translate(-50%,-8px);padding:10px 18px;border-radius:14px;background:var(--glass-strong);border:1px solid var(--stroke);font-size:16px;font-weight:800;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:6;text-align:center;max-width:86vw}
+#toast{position:fixed;left:50%;top:21%;transform:translate(-50%,-8px);padding:10px 18px;border-radius:14px;background:var(--glass-strong);border:1px solid var(--stroke);font-size:16px;font-weight:800;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:30;text-align:center;max-width:86vw}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #toast.good{color:var(--good)}#toast.bad{color:var(--bad)}#toast.warn{color:var(--warn)}
 #fight{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 134px);width:min(88vw,420px);padding:10px 14px 6px;border-radius:16px;background:var(--glass);border:1px solid var(--stroke);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);z-index:4}
@@ -1699,6 +1699,7 @@ function render(){
   } else if(cur==='set'){
     shT.textContent='設定';
     h+='<div class="note">切換時段</div><div class="tabs">'+PRESETS.map((p,i)=>`<button class="tab" data-a="time" data-v="${i}">${p[1]}</button>`).join('')+'</div>';
+    { const gq=save.gfx||'high'; h+='<div class="note">畫質（手機卡頓時調低）</div><div class="tabs">'+[['high','高'],['mid','中'],['low','低']].map(([k,n])=>`<button class="tab${gq===k?' on':''}" data-a="gfx" data-v="${k}">${n}</button>`).join('')+'</div><div class="note" style="font-size:12px">高：全部特效｜中：關光束、倒影降解析｜低：關倒影、霧層、雨圈、草叢，解析度 1 倍</div>'; }
     h+='<div class="note">天氣</div><div class="tabs">'+[['auto','自動'],['clear','晴'],['breezy','有風'],['cloudy','陰'],['drizzle','毛毛雨'],['rain','雨'],['storm','雷雨'],['fog','霧']].map(w=>`<button class="tab${(save.wxMode||'auto')===w[0]?' on':''}" data-a="wx" data-v="${w[0]}">${w[1]}</button>`).join('')+'</div>';
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
     const tg=(k,name,sub,onv)=>row(name,sub,`<button class="sbtn${onv?' pri':''}" data-a="tg" data-v="${k}">${onv?'開':'關'}</button>`);
@@ -1732,7 +1733,7 @@ $('baitChip').addEventListener('click',()=>{ shopTab='bait'; open('shop'); });
 $('shX').addEventListener('click',close);
 sheet.addEventListener('click',e=>{ if(e.target===sheet) close(); });
 shB.addEventListener('click',e=>{
-  const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
+  const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(a==='gfx'){ save.gfx=v; persist(); if(window.__applyGfx) window.__applyGfx(v); toast('畫質：'+({high:'高',mid:'中',low:'低'})[v],'good',1200); render(); return; } if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
   if(a==='tab') shopTab=v;
   else if(a==='buy'){ const it=GEAR[shopTab][+v]; if(save.coins<it.price){ toast('金幣不夠','bad'); return; }
     save.coins-=it.price; save.gear[shopTab].push(+v); save.eq[shopTab]=+v; persist(); setCoins(); Snd.coin(); toast('已購買並裝備：'+it.name,'good'); applyRod(); }
@@ -2264,7 +2265,7 @@ if(T.GLTFLoader){
       if(y===null||y<minY) continue; const k=kinds[Math.floor(rnd()*kinds.length)], inst=k.w.clone(true);
       inst.scale.setScalar((hMin+rnd()*(hMax-hMin))/Math.max(k.h,1e-3)); inst.position.set(x,y-.02,zz); inst.rotation.y=rnd()*Math.PI*2;
       inst.traverse(o=>{ if(o.isMesh){ o.castShadow=false; if(o.material){ o.material.envMapIntensity=.9; } } });
-      inst.userData.lake=true; inst.visible=!(W.isSea&&W.isSea()); W.scene.add(inst); } });
+      inst.userData.lake=true; inst.userData.veg=true; inst.visible=!(W.isSea&&W.isSea()); W.scene.add(inst); } });
   scatter('grass_medium_01.glb',34,.3,.6,ZONES,.12);
   scatter('grass_medium_02.glb',14,.35,.7,ZONES,.12);
   scatter('shrub_03.glb',10,.6,1.1,ZONES,.2);
@@ -2653,7 +2654,7 @@ function update(dt,t){
   const wx=c.wx(), day=W.info.day;
   if(wx.r>.4) lastRain=60; else lastRain=Math.max(0,lastRain-dt);
   updEv(dt,t,wx,day); updChase(dt);
-  lakeT-=dt; if(lakeT<=0){ lakeT=.25; const sea=(G.loc||loc)!=='lake'; S.children.forEach(o=>{ if(o.userData&&o.userData.lake&&o.visible===sea) o.visible=!sea; }); }
+  lakeT-=dt; if(lakeT<=0){ lakeT=.25; const sea=(G.loc||loc)!=='lake'; S.children.forEach(o=>{ if(o.userData&&o.userData.lake){ const want=!sea&&!(o.userData.veg&&window.__GFX==='low'); if(o.visible!==want) o.visible=want; } }); }
   if(yacht.visible){ const b=base(); const h0=W.swell(b.x,b.z,t), fx=-Math.sin(G.head), fz=-Math.cos(G.head);
     const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);
     yacht.position.set(b.x,h0*.9-.05,b.z); yacht.rotation.set((hf-h0)/3*.7,G.head,(hs-h0)/1.5*-.5,'YXZ'); }
@@ -2808,7 +2809,7 @@ function updQte(dt){ if(!qte) return; qte.t-=dt; if(qte.t<=0){ qte=null; qEl.cla
 
 function update(dt,t){
   const rain=W.U.uRain.value, cw=rU.uC.value; W.camera.getWorldPosition(cw);
-  rU.uRain.value=rain>.03?Math.min(1,rain*1.2):0; rings.visible=drops.visible=rain>.03&&!c.underwater()&&G.loc!=='ice';
+  rU.uRain.value=rain>.03?Math.min(1,rain*1.2):0; rings.visible=drops.visible=rain>.03&&!c.underwater()&&G.loc!=='ice'&&window.__GFX!=='low';
   const L=clamp(W.info.light,.15,1); rU.uCol.value.setRGB(.85*L,.9*L,.95*L);
   dU.uScale.value=window.innerHeight*W.getPR()/(2*Math.tan(W.camera.fov*Math.PI/360));
   updSnatch(dt); updOver(dt); updQte(dt);
@@ -3502,8 +3503,9 @@ function update(dt){ W.camera.getWorldPosition(cam); const wx=c.wx?c.wx():{r:0};
   const target=mistK()*(.75+.5*wet)*(c.sea()?.5:1)*(c.underwater()?0:1);
   k+=(target-k)*Math.min(1,dt*.5); U.uK.value=k;
   const wd=c.wind?c.wind():null; if(wd) U.uWind.value.set(wd.x||1,wd.z||0);
-  for(const m of layers){ m.visible=k>.01; m.position.x=cam.x; m.position.z=cam.z; }
-  updShafts(dt); }
+  const q=window.__GFX||'high';
+  for(const m of layers){ m.visible=k>.01&&q!=='low'; m.position.x=cam.x; m.position.z=cam.z; }
+  if(q==='high') updShafts(dt); else shafts.forEach(s2=>s2.m.visible=false); }
 return {update,level:()=>k};
 }
 /* ===== 冰湖：覆雪冰面與冰洞（雪地材質：Poly Haven snow_02，CC0） ===== */
@@ -3786,6 +3788,10 @@ const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPEC
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 const SKY=createNightSky(W,G); window.__SKY=SKY;
+/* 畫質：高／中／低，影響倒影、霧層光束、雨圈、草叢與解析度上限 */
+window.__applyGfx=q=>{ window.__GFX=q; const cap={high:2,mid:1.5,low:1}[q]||2;
+  if(W.setRefl) W.setRefl(q!=='low',q==='mid'?.22:.35); W.setPR(Math.min(window.devicePixelRatio||1,cap)); };
+window.__applyGfx(save.gfx||'high');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
 function iceDrop(){ const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=5; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
 const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST; window.__W=W;
@@ -4013,7 +4019,7 @@ function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
   try{ update(dt); if(UW.active()) UW.render(); else W.render(); }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
-  if(prAcc>2){ const avg=prAcc/prN; if(prChecks<10&&avg>1/40&&W.getPR()>1.01) W.setPR(Math.max(1,W.getPR()-.25)); prChecks++; prAcc=0; prN=0; }
+  if(prAcc>2){ const avg=prAcc/prN; if(prChecks<10&&avg>1/40&&W.getPR()>1.01) W.setPR(Math.max(1,W.getPR()-.25)); if(prChecks===9&&avg>1/30&&(save.gfx||'high')==='high'&&!G.gfxHint){ G.gfxHint=true; toast('畫面有點卡，可以到設定把畫質調成「中」或「低」','warn',3500); } prChecks++; prAcc=0; prN=0; }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
