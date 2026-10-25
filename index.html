@@ -3629,8 +3629,8 @@ function pipSync(){ if(!cur) return;
     const m=models[cur.k].clone(true); m.position.set(0,0,0); m.rotation.set(0,0,0); m.scale.multiplyScalar(2.2); m.updateMatrixWorld(true);
     // 子畫面專用材質複本：調低金屬度、表面光滑，靠點光源產生高光；只改複本，主畫面與魚不受影響
     m.traverse(o=>{ if(!o.isMesh) return; const mt=o.material.clone(); mt.transparent=false; mt.opacity=1; mt.depthWrite=true;
-      if(mt.metalness!==undefined){ mt.metalness=Math.min(mt.metalness,.35); mt.roughness=Math.min(mt.roughness==null?1:mt.roughness,.28); }
-      if(mt.emissive){ mt.emissive=new T.Color(0x223338); mt.emissiveIntensity=1; } o.material=mt; o.renderOrder=0; });
+      if(cur.k==='spoon'&&mt.metalness!==undefined){ mt.metalness=Math.min(mt.metalness,.35); mt.roughness=Math.min(mt.roughness==null?1:mt.roughness,.28); if(mt.emissive){ mt.emissive=new T.Color(0x223338); mt.emissiveIntensity=1; } }   // 只有金屬亮片做光滑高光；米諾、曲柄保留原本花色
+      o.material=mt; o.renderOrder=0; });
     // 自動量測：最薄的方向轉向鏡頭（正面朝你），最長的方向轉成水平（身體橫向）
     const sz=new T.Box3().setFromObject(m).getSize(new T.Vector3()), d=[sz.x,sz.y,sz.z], A=[new T.Vector3(1,0,0),new T.Vector3(0,1,0),new T.Vector3(0,0,1)];
     const thin=d.indexOf(Math.min(...d)), lng=[0,1,2].filter(i=>i!==thin).sort((a,b)=>d[b]-d[a])[0];
@@ -3651,7 +3651,11 @@ function renderPiP(renderer,dt){ const on=(cur||pip.strikeT>0)&&(!c.uwOn||c.uwOn
   if(!on){ frame.style.display='none'; return; } dt=dt||.016;  pipSync();
   const sp=cur?(cur.speed+cur.twitchV):0, I=cur?cur.interest:1, t=performance.now()*.001;
   const p=motes.geometry.attributes.position.array; for(let i=0;i<PN;i++){ p[i*3]+=dt*(.15+sp*.9); if(p[i*3]>4) p[i*3]-=8; } motes.geometry.attributes.position.needsUpdate=true;
-  if(pip.lure){ pip.lure.position.set(0,.35+Math.sin(t*2.2)*.02,0); pip.lure.rotation.z=Math.sin(t*14)*(.12+(cur?.5*cur.twitchV:0)); }
+  if(pip.lure){ const k=pip.lureK, tw=cur?cur.twitchV:0, ws=.6+(cur?cur.speed:0); pip.lure.position.set(0,.35+Math.sin(t*2.2)*.02,0);
+    // 依假餌種類做真實泳姿（身體軸＝X、正面＝Z）：亮片沿長軸翻轉閃光；曲柄快速擺尾；米諾細微搖擺、抽竿時大擺。收線越快擺得越快
+    if(k==='spoon') pip.lure.rotation.set(Math.sin(t*9*ws)*1.15,Math.sin(t*4.5)*.12,Math.sin(t*9*ws+1)*.06);
+    else if(k==='crank') pip.lure.rotation.set(Math.sin(t*16*ws+1)*.16,Math.sin(t*16*ws)*.24,Math.sin(t*3)*.04);
+    else pip.lure.rotation.set(Math.sin(t*7)*(.1+.5*tw),Math.sin(t*7)*(.07+.6*tw),Math.sin(t*2.6)*.04); }
   let span=.5;
   if(pip.fish){ const L=pip.fishSrc?pip.fishSrc.scale.x:.4; let dx;
     if(pip.strikeT>0){ pip.strikeT-=dt; const k=Math.min(1,(.9-pip.strikeT)/.25); dx=pip.x*(1-k); if(k>=1&&!pip.burst){ pip.burst=true; bub.forEach(o=>{ o.b.visible=true; o.b.position.set((Math.random()-.5)*.2,.35+(Math.random()-.5)*.15,(Math.random()-.5)*.2); o.v=.3+Math.random()*.5; }); } }
