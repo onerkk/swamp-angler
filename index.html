@@ -1802,6 +1802,11 @@ snag(-33,-30,5); snag(-22,-35,3.6); snag(-36,-17,6.5); snag(-18,-29,2.4); snag(-
 /* ---------- 黃色獨木舟與槳 ---------- */
 let padG=null; const paddleTilt={x:0,z:0};
 const boat=new T.Group(); boat.visible=false; S.add(boat);
+/* 原木獨木舟（依玩家設定圖生成）：載入後取代程式做的塑膠艇；船頭朝 −Z，長 4.2 米 */
+if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ x.material=new T.MeshStandardMaterial({vertexColors:true,roughness:.85,metalness:0}); x.castShadow=false; } });
+  const w=new T.Group(); w.add(o); w.rotation.y=Math.PI; w.updateMatrixWorld(true); let b=new T.Box3().setFromObject(w); const sz=b.getSize(new T.Vector3()); w.scale.set(.78/Math.max(sz.x,1e-6),.42/Math.max(sz.y,1e-6),4.2/Math.max(sz.z,1e-6));   // 長寬高分開縮放成真實獨木舟比例
+  w.updateMatrixWorld(true); b=new T.Box3().setFromObject(w); const c=b.getCenter(new T.Vector3()); w.position.set(-c.x,-.2-b.min.y,-.35-c.z);
+  boat.children.forEach(ch=>{ ch.visible=false; }); boat.add(w); });
 { const yel=new T.MeshStandardMaterial({color:0xf2b705,roughness:.32}), blk=new T.MeshStandardMaterial({color:0x151515,roughness:.6}), gry=new T.MeshStandardMaterial({color:0x33363b,metalness:.5,roughness:.4});
   const hull=new T.Mesh(new T.SphereGeometry(1,48,20),yel); hull.scale.set(.36,.22,1.95); hull.position.set(0,.02,-.15); boat.add(hull);
   const ridge=new T.Mesh(new T.SphereGeometry(1,24,10),yel); ridge.scale.set(.06,.05,1.2); ridge.position.set(0,.215,-.9); boat.add(ridge);
@@ -2966,9 +2971,9 @@ const REAL_DIR='models/';
 // 魚：[檔名, 模型裡頭朝哪個軸, 選項]
 const RFISH={bluegill:['bluegill','+x'],crappie:['crappie','+z'],lmbass:['lmbass','+z'],smbass:['smbass','+z'],channel:['channel','+z'],flathead:['flathead','+z'],
   gar:['gar','+z'],barra:['barra','+x'],golden:['koi','-x',{gold:1}],ghost:['koi','-x',{ghost:1}],grouper:['grouper','-x'],tuna:['tuna','+z'],marlin:['marlin','-z'],
-  ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],mermaid:['mermaid3d','up',{mer:1}],trout:['trout','+z'],pike:['pike','+z'],reba:['fish_reba','+z'],perch:['fish_mandarin','+z'],amber:['fish_amber','+z'],mahi:['fish_mahi','+z'],sail:['fish_sail','+z'],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z']};
+  ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],mermaid:['mermaid3d','up',{mer:1}],trout:['trout','+z'],pike:['pike','+z'],reba:['fish_reba','+z'],bowfin:['fish_bowfin','+z'],perch:['fish_mandarin','+z'],amber:['fish_amber','+z'],mahi:['fish_mahi','+z'],sail:['fish_sail','+z'],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z']};
 const RHEAD={gwhite:'+z',tigershark:'+z',dolphin:'+z',whale:'+z',gator:'+x',eagle:'+z',gull:'-x',yacht:'-z',flyfish:'-x'};
-const RSETS={lake:['mermaid3d','fish_reba','fish_mandarin','bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
+const RSETS={lake:['mermaid3d','fish_bowfin','fish_reba','fish_mandarin','bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
   ice:['trout','pike','bluegill','crappie'],
   sea:['mermaid3d','fish_amber','fish_mahi','fish_sail','yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','seaking']};
 const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger Shark','ra_in_coat'],['海豚','Bottlenose Dolphin','popcornbag'],['座頭鯨','Humpback Whale','ostapblendercg'],
@@ -2976,7 +2981,7 @@ const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger 
   ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
   ['斑點叉尾鮰','Channel catfish','faerbogdan99'],['扁頭鯰','Flathead Catfish','faerbogdan99'],['鱷雀鱔','Alligator Gar','Jay_Tano'],['錦鯉','Koi Fish','7plus'],
   ['石斑','lowpoly freshwater grouper','Arrangemonk9'],['黑鮪魚','Bluefin Tuna','voltairevill'],['旗魚','Blue Marlin','Gotta_go_evi'],['飛魚','Exocoetidae','victorberdug'],
-  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['汐月（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
+  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚・弓鰭魚・原木獨木舟','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['汐月（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
 
 function createModels(W){
 'use strict';
