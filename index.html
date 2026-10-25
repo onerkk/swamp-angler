@@ -3533,12 +3533,18 @@ function createLure(W,P,c){
 const T=THREE, S=W.scene, G=c.G, ang=a=>({'+x':0,'-z':Math.PI/2,'-x':Math.PI,'+z':-Math.PI/2})[a];
 const models={}, holder=new T.Group(); holder.visible=false; S.add(holder);
 const loader=T.GLTFLoader?new T.GLTFLoader():null;
+/* 頂點資料若是交錯排列（模型工具常用），先轉成分開排列，切割與複製才不會讀錯位 */
+function plainGeo(g){ const out=new T.BufferGeometry(); if(g.index) out.setIndex(g.index.clone());
+  for(const name in g.attributes){ const a=g.attributes[name], n=a.count, it=a.itemSize, arr=new Float32Array(n*it);
+    for(let i=0;i<n;i++){ arr[i*it]=a.getX(i); if(it>1) arr[i*it+1]=a.getY(i); if(it>2) arr[i*it+2]=a.getZ(i); if(it>3) arr[i*it+3]=a.getW(i); }
+    out.setAttribute(name,new T.BufferAttribute(arr,it)); }
+  out.groups=g.groups.slice(); return out; }
 function getModel(k){ if(models[k]!==undefined) return models[k]; models[k]=null; const cf=LURE_CFG[k]; if(!loader) return null;
   loader.load('models/'+cf.file+'.glb',g=>{ try{ g.scene.updateMatrixWorld(true); let ms=[]; g.scene.traverse(o=>{ if(o.isMesh) ms.push(o); });
     if(cf.pick!==undefined&&ms.length>=3){ const ctr=m=>new T.Box3().setFromObject(m).getCenter(new T.Vector3()); ms.sort((a,b)=>ctr(a).length()-ctr(b).length()); ms=[ms[0]]; }
     /* 3 個假餌合併在同一個網格裡（米諾上下疊、亮片左右排）：只保留位在中間三分之一的三角面 */
     if(cf.split){ const ax=cf.split, B=new T.Box3(); ms.forEach(m=>B.expandByObject(m)); const lo=B.min[ax]+(B.max[ax]-B.min[ax])/3, hi=B.min[ax]+(B.max[ax]-B.min[ax])*2/3;
-      ms=ms.map(m=>{ const g0=m.geometry.index?m.geometry.toNonIndexed():m.geometry.clone(); g0.applyMatrix4(m.matrixWorld); const P=g0.attributes.position, keep=[];
+      ms=ms.map(m=>{ const gp=plainGeo(m.geometry), g0=gp.index?gp.toNonIndexed():gp; g0.applyMatrix4(m.matrixWorld); const P=g0.attributes.position, keep=[];
         for(let i=0;i<P.count;i+=3){ const gf=ax==='x'?'getX':ax==='y'?'getY':'getZ', cc=(P[gf](i)+P[gf](i+1)+P[gf](i+2))/3; if(cc>=lo&&cc<=hi) keep.push(i); }
         const ng=new T.BufferGeometry(); for(const name in g0.attributes){ const a=g0.attributes[name], it=a.itemSize, arr=new a.array.constructor(keep.length*3*it); keep.forEach((v,j)=>{ for(let q=0;q<3*it;q++) arr[j*3*it+q]=a.array[v*it+q]; }); ng.setAttribute(name,new T.BufferAttribute(arr,it,a.normalized)); }
         const nm=new T.Mesh(ng,m.material); nm.updateMatrixWorld(true); return nm; }).filter(m=>m.geometry.attributes.position.count>0); }
@@ -3622,8 +3628,13 @@ function pipSync(){ if(!cur) return;
   if(chaser&&pip.fishSrc!==chaser.group){ if(pip.fish) pip.scene.remove(pip.fish); pip.fish=chaser.group.clone(true); pip.fish.visible=true; pip.fishSrc=chaser.group; pip.scene.add(pip.fish); }
   if(!chaser&&pip.fish&&pip.strikeT<=0){ pip.scene.remove(pip.fish); pip.fish=null; pip.fishSrc=null; } }
 const vs=new T.Vector2();
+let pipEnv=null;
+function makePipEnv(renderer){ const es=new T.Scene(), g=new T.Mesh(new T.SphereGeometry(10,32,16),new T.ShaderMaterial({side:T.BackSide,
+    vertexShader:'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader:'varying vec3 vP; void main(){ float h=normalize(vP).y; vec3 c=mix(vec3(0.03,0.09,0.11),vec3(0.32,0.5,0.55),smoothstep(-0.3,0.9,h)); c+=vec3(0.55,0.65,0.6)*pow(max(h,0.0),10.0); gl_FragColor=vec4(c,1.0); }'}));
+  es.add(g); const pm=new T.PMREMGenerator(renderer), rt=pm.fromScene(es,0,.1,50); pm.dispose(); return rt.texture; }   // 子畫面專屬的水下環境反射，金屬假餌才會發亮
 function renderPiP(renderer,dt){ const on=(cur||pip.strikeT>0)&&(!c.uwOn||c.uwOn());
-  if(!on){ frame.style.display='none'; return; } dt=dt||.016; pipSync();
+  if(!on){ frame.style.display='none'; return; } dt=dt||.016; if(!pipEnv){ pipEnv=makePipEnv(renderer); pip.scene.environment=pipEnv; } pipSync();
   const sp=cur?(cur.speed+cur.twitchV):0, I=cur?cur.interest:1, t=performance.now()*.001;
   const p=motes.geometry.attributes.position.array; for(let i=0;i<PN;i++){ p[i*3]+=dt*(.15+sp*.9); if(p[i*3]>4) p[i*3]-=8; } motes.geometry.attributes.position.needsUpdate=true;
   if(pip.lure){ pip.lure.position.set(0,.35+Math.sin(t*2.2)*.02,0); pip.lure.rotation.z=Math.sin(t*14)*(.12+(cur?.5*cur.twitchV:0)); }
