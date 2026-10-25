@@ -198,6 +198,13 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #qte .qb{display:block;height:8px;border-radius:4px;background:rgba(0,0,0,.3);overflow:hidden}#qte .qb i{display:block;height:100%;width:0;background:#ffe14a}
 @keyframes qp{from{transform:translate(-50%,-50%) scale(1)}to{transform:translate(-50%,-50%) scale(1.07)}}
 @media (prefers-reduced-motion:reduce){#actBtn.hot{animation:none}#tag,.card{animation:none}}
+/* 圖鑑詳細頁 */
+.dexrow{cursor:pointer}.dexrow:active{opacity:.7}
+.dexhd{display:flex;gap:12px;align-items:center;margin:12px 0 8px}.dexhd b{display:block;font-size:20px;color:var(--rc)}.dexhd small{opacity:.75}
+.dexsil{width:96px;height:56px;flex:none;border-radius:10px;background:rgba(255,255,255,.06) center/contain no-repeat;border:1px solid rgba(255,255,255,.12)}
+.dexsec{margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px;line-height:1.6}.dexsec.dim{opacity:.6}
+.dexgrid{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px}.dexgrid span{opacity:.65}
+.dexbar{display:flex;align-items:center;gap:10px;margin:3px 0}.dexbar span{width:3em;opacity:.7}.dexbar i{flex:1;height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}.dexbar em{display:block;height:100%;background:var(--rc,#e9b949);border-radius:4px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -1632,7 +1639,7 @@ save.bait=save.bait||'worm'; save.xp=save.xp||0; save.lv=save.lv||1; save.quests
 if(save.uw===undefined) save.uw=true; if(save.vibe===undefined) save.vibe=true;
 const sheet=$('sheet'), shT=$('shT'), shB=$('shB');
 const ECO=createEco({save,persist,toast,Snd,P,SPECIES,RAR,setCoins:()=>setCoins(),applyRod:()=>applyRod()}); window.__ECO=ECO;
-let cur=null, shopTab='rod', resetArm=false;
+let cur=null, shopTab='rod', resetArm=false, dexSel=null;
 const fmtW=w=>w<1?Math.round(w*1000)+' g':w.toFixed(2)+' kg';
 const PERN={dawn:'清晨',dusk:'黃昏',night:'夜晚'};
 
@@ -1710,8 +1717,11 @@ function render(){
     shT.textContent='漁獲圖鑑';
     const found=SPECIES.filter(s=>save.dex[s.id]).length;
     h+=`<div class="note">已發現 ${found}/${SPECIES.length} 種，總漁獲 ${save.total} 尾</div>`;
+    const dsp=dexSel&&SPECIES.find(s=>s.id===dexSel);
+    if(dsp){ h=dexPage(dsp); }
+    else { h+='<div class="note" style="font-size:12px">點任一種魚查看詳細資料</div>';
     h+=SPECIES.map(sp=>{ const d=save.dex[sp.id], r=RAR[sp.rar];
-      return row(d?sp.name:'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${styOf(sp.id).n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col); }).join('');
+      return `<div class="dexrow" data-a="dex" data-v="${sp.id}">`+row(d?sp.name:'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${styOf(sp.id).n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col)+'</div>'; }).join(''); }
   } else if(cur==='set'){
     shT.textContent='設定';
     h+='<div class="note">切換時段</div><div class="tabs">'+PRESETS.map((p,i)=>`<button class="tab" data-a="time" data-v="${i}">${p[1]}</button>`).join('')+'</div>';
@@ -1741,7 +1751,28 @@ function render(){
   }
   shB.innerHTML=h;
 }
-function open(k){ cur=k; resetArm=false; render(); sheet.classList.remove('hidden'); }
+// 圖鑑詳細頁：未釣獲只給出沒線索，釣獲後顯示完整資料
+const TIME_N={dawn:'清晨',day:'白天',dusk:'傍晚',night:'夜晚'}, STAT_N=[['pow','力量'],['spd','速度'],['agi','靈活'],['stam','耐力'],['jump','跳躍']];
+const SPECIAL_N={golden:'傳說魚：極少出現，月光灣機率較高',moonkoi:'傳說魚：只在月光灣的特殊夜晚現身',king:'終章 Boss：深淵之王'};
+function dexWhere(sp){ const L=sp.loc||'lake';
+  const ok=SPOTS.filter(s=>(s.loc||'lake')===L||(s.loc==='ice'&&sp.ice));
+  const best=ok.filter(s=>(s.aff[sp.id]||0)>=1.3).sort((a,b)=>b.aff[sp.id]-a.aff[sp.id]).map(s=>s.name);
+  const area=L==='sea'?'海上（需要漁船）':L==='ice'?'冰湖':'濕地湖區'+(sp.ice?'、冰湖':'');
+  return {area,best}; }
+function dexPage(sp){ const d=save.dex[sp.id], r=RAR[sp.rar], wh=dexWhere(sp), tm=sp.time||{};
+  const tmax=Math.max(...Object.values(tm),0), bestT=Object.keys(TIME_N).filter(k=>tm[k]&&tm[k]>=tmax*.9).map(k=>TIME_N[k]).join('、')||'不限';
+  let h=`<button class="sbtn" data-a="dexback">← 返回列表</button>`;
+  h+=`<div class="dexhd" style="--rc:${r.col}"><span class="dexsil${d?' on':''}" id="dexPic"></span><div><b>${d?sp.name:'？？？'}</b><small>${r.name}${d?'｜'+sp.sci:''}</small></div></div>`;
+  h+=`<div class="dexsec">出沒地點：${wh.area}${wh.best.length?'<br>最佳釣點：'+wh.best.join('、'):''}<br>活躍時段：${bestT}${sp.special&&SPECIAL_N[sp.special]?'<br>'+SPECIAL_N[sp.special]:''}</div>`;
+  if(!d){ h+='<div class="dexsec dim">還沒釣到這種魚，釣到後會解鎖外觀、介紹與完整資料。</div>'; return `<div style="--rc:${r.col}">${h}</div>`; }
+  const W=x=>sp.k*Math.pow(x/100,3), wl=W(sp.len[0])*.9, wu=W(sp.len[1])*1.12, val=w=>Math.round(sp.price*Math.pow(w+.3,.85)*r.mult*.4);
+  h+=`<div class="dexsec">${sp.desc||''}</div>`;
+  h+=`<div class="dexgrid"><span>體長</span><b>${sp.len[0]}–${sp.len[1]} 公分</b><span>體重</span><b>${fmtW(wl)}–${fmtW(wu)}</b><span>等級</span><b>LVL ${sp.lvl[0]}–${sp.lvl[1]}</b><span>參考售價</span><b>🪙 ${val(wl).toLocaleString()}–${val(wu).toLocaleString()}</b><span>拉扯型態</span><b>${styOf(sp.id).n}</b></div>`;
+  if(sp.f){ h+='<div class="dexsec">'+STAT_N.map(([k,n])=>{ const mx=Math.max(...SPECIES.map(s=>s.f?s.f[k]||0:0),.01), v=Math.min(1,(sp.f[k]||0)/mx);
+    return `<div class="dexbar"><span>${n}</span><i><em style="width:${(v*100).toFixed(0)}%"></em></i></div>`; }).join('')+'</div>'; }
+  h+=`<div class="dexgrid"><span>累計釣獲</span><b>${d.n} 尾</b><span>最重紀錄</span><b>${fmtW(d.bw)}</b>${d.bl?`<span>最長紀錄</span><b>${Math.round(d.bl*100)} 公分</b>`:''}${d.f?`<span>首次釣獲</span><b>${new Date(d.f).toLocaleDateString('zh-TW')}</b>`:''}</div>`;
+  return `<div style="--rc:${r.col}">${h}</div>`; }
+function open(k){ cur=k; if(k==='log') dexSel=null; resetArm=false; render(); sheet.classList.remove('hidden'); }
 function close(){ sheet.classList.add('hidden'); cur=null; }
 $('bShop').addEventListener('click',()=>open('shop'));
 $('bQuest').addEventListener('click',()=>open('quest'));
@@ -1762,6 +1793,8 @@ shB.addEventListener('click',e=>{
     save.coins-=bt.price; save.baits[bt.id]=(save.baits[bt.id]||0)+bt.pack; persist(); setCoins(); Snd.coin(); }
   else if(a==='ub'){ save.bait=BAITS[+v].id; persist(); toast('改用'+BAITS[+v].name); }
   else if(a==='claim') claim(+v);
+  else if(a==='dex'){ dexSel=v; render(); shB.scrollTop=0; return; }
+  else if(a==='dexback'){ dexSel=null; render(); return; }
   else if(a==='wx'){ save.wxMode=v; persist(); }
   else if(a==='kayak'){ if(save.coins<800){ toast('金幣不夠','bad'); return; } save.coins-=800; save.kayak=true; persist(); setCoins(); Snd.coin(); toast('買了獨木舟！可以划到其他釣點了','good'); }
   else if(a==='yacht'){ const need=BOAT_COST, m=save.mat=save.mat||{};   // 修復條件寫在動作本身
@@ -4138,7 +4171,7 @@ function showCard(){
   FUN.tourCatch(G.fd); if(G.hot) save.hotC=(save.hotC||0)+1; $('bSell').textContent='賣出'; $('bRel').classList.remove('hidden');
   const fd=G.fd, sp=fd.sp, r=RAR[sp.rar], rec=save.dex[sp.id];
   const isNew=!rec, isRec=!!rec&&fd.w>rec.bw;
-  save.dex[sp.id]={n:(rec?rec.n:0)+1,bw:Math.max(rec?rec.bw:0,fd.w),bl:Math.max(rec?rec.bl:0,fd.L),md:Math.max(rec&&rec.md||0,FUN.medalLv(fd))}; save.total++; persist();
+  save.dex[sp.id]={n:(rec?rec.n:0)+1,bw:Math.max(rec?rec.bw:0,fd.w),bl:Math.max(rec?rec.bl:0,fd.L),md:Math.max(rec&&rec.md||0,FUN.medalLv(fd)),f:rec&&rec.f||Date.now()}; save.total++; persist();
   if(window.__STORY&&!G.fd.item) window.__STORY.onCatch(fd,{zone:(SPOTS[G.spot]||{}).id,loc:G.loc,per:period(G.hour),rain:W.U.uRain.value>.25});
   { const xp=META.onCatch(fd,{perfect:!!(G.f&&G.f.perfect),per:period(G.hour)}), pm=window.__ECO?window.__ECO.priceMul(sp.id):1; $('cXp').textContent='+'+xp+' 經驗　'+(window.__ECO?window.__ECO.lastDrop():'')+(pm>1?'　🔥行情 ×'+pm:''); }
   ui.catch.style.setProperty('--rc',r.col);
