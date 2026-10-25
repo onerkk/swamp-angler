@@ -3738,7 +3738,7 @@ const S=c.save;
 /* 任務類型：catch（可限魚種 sp、地點 zone、地區 loc、時段 per、下雨 rain、稀有度 rar）、perfect、item、scene、boss、moon */
 const CH=[
  {id:'c1',spot:'dock',name:'第一章　老漁人的碼頭',open:{},
-  intro:'你繼承了湖邊這座舊碼頭。木板間塞著一本被水泡過的手記，大半頁都被撕走了，只剩封面一行字：「給下一個守著這片湖的人。」',
+  intro:'這是老漁人一根一根釘起來的碼頭。先在這裡找回釣魚的手感——他說過，湖會告訴你很多事，只要你願意等。',
   tasks:[{t:'catch',zone:'dock',n:5,txt:'在木碼頭釣到 5 尾魚'},{t:'catch',sp:'bluegill',n:1,txt:'釣到一尾藍鰓太陽魚'},{t:'perfect',n:2,txt:'完美揚竿 2 次'}],
   page:'手記第一頁\n「這座碼頭是我年輕時一根一根釘起來的。湖會告訴你很多事，只要你願意等。\n浮萍灣那邊，傍晚常有東西在葉子底下發光——我花了好幾年才看清楚那是什麼。」',
   xp:600,coins:500,unlock:'浮萍灣（需要獨木舟）'},
@@ -3784,7 +3784,7 @@ if(!S.story){ // 第一次載入：已經打開的地圖維持開放（沿用舊
   const OLD={dock:1,lily:2,wood:4,deep:6,moon:1,reef:8,blue:12,ice:10}, grand=[];
   SPOT_IDS.forEach(id=>{ if(id==='dock') return; const ok=S.lv>=OLD[id]&&(id!=='moon'||(S.mer&&S.mer.n>=1)); if(ok&&(S.total||0)>0) grand.push(id); });
   S.story={done:[],prog:{},read:[],grand}; }
-const st=S.story; st.prog=st.prog||{}; st.done=st.done||[]; st.read=st.read||[]; st.grand=st.grand||[];
+const st=S.story; st.prog=st.prog||{}; st.done=st.done||[]; st.read=st.read||[]; st.grand=st.grand||[]; st.seen=st.seen||[];
 const byId=id=>CH.find(x=>x.id===id), isDone=id=>st.done.indexOf(id)>=0;
 function avail(ch){ const o=ch.open; return (!o.after||isDone(o.after))&&(!o.lv||S.lv>=o.lv); }
 function why(ch){ const o=ch.open, r=[]; if(o.after&&!isDone(o.after)) r.push('完成「'+byId(o.after).name.replace(/^.*　/,'')+'」'); if(o.lv&&S.lv<o.lv) r.push('Lv '+o.lv); if(o.kayak&&!S.kayak) r.push('獨木舟'); if(o.yacht&&!S.yacht) r.push('遊艇'); return r; }
@@ -3808,7 +3808,39 @@ const onScene=id=>bump(t=>t.t==='scene'&&t.id===id?1:0), onBoss=id=>bump(t=>t.t=
 /* 主線正在追的魚：在指定地點（沒指定就任何地方）出現率 ×3；任務完成後恢復 */
 function needs(type){ return active().some(ch=>{ const p=prog(ch); return ch.tasks.some((t,i)=>t.t===type&&p[i]<t.n); }); }
 function boost(spId,zone){ for(const ch of active()){ const p=prog(ch); for(let i=0;i<ch.tasks.length;i++){ const t=ch.tasks[i]; if(t.t==='catch'&&t.sp===spId&&p[i]<t.n&&(!t.zone||t.zone===zone)) return 3; } } return 1; }
-let moonClock=0; function tick(dt){ moonClock-=dt; if(moonClock>0) return; moonClock=2; if(S.moon&&S.moon.done) bump(t=>t.t==='moon'?1:0); }
+/* ===== 開場過場：電影黑邊＋旁白逐段淡入，背後是即時的湖面 ===== */
+const OPEN=['三年前的冬天，湖邊的老漁人走了。','他把碼頭留給了你——一座歪斜的木碼頭，和一間堆滿釣具的小屋。','整理小屋時，你在漁具箱底找到一本泡過水的手記。','大半頁都被撕走了，封面上只剩一行字：','「給下一個守著這片湖的人。」','湖面起霧了。你拿起他留下的釣竿，走上碼頭。'];
+const cin=document.createElement('div'); cin.id='cinBox'; cin.className='hidden'; document.body.appendChild(cin);
+const ccss=document.createElement('style'); ccss.textContent=`#cinBox{position:fixed;inset:0;z-index:28;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 26px;text-align:center;color:#eef2f6;background:linear-gradient(180deg,rgba(0,0,0,.25),rgba(0,0,0,.55) 50%,rgba(0,0,0,.25))}#cinBox.hidden{display:none}
+#cinBox:before,#cinBox:after{content:'';position:absolute;left:0;right:0;height:11vh;background:#000;animation:barIn 1.2s ease forwards}#cinBox:before{top:0;transform:translateY(-100%)}#cinBox:after{bottom:0;transform:translateY(100%)}
+@keyframes barIn{to{transform:none}}
+body.cine>*:not(#cinBox):not(canvas):not(#toast){visibility:hidden!important}
+#cinBox p{margin:8px 0;font-size:17px;line-height:1.75;font-family:serif;text-shadow:0 2px 10px #000;opacity:0;animation:cinIn 1.8s ease forwards}#cinBox p.gold{color:#ffe3a3;font-size:19px}
+#cinBox .sk{position:absolute;top:calc(11vh + 10px);right:14px;z-index:2;background:rgba(0,0,0,.45);color:#ddd;border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:5px 14px;font-size:13px}
+#cinBox .go{opacity:0;animation:cinIn 1s ease forwards;margin-top:20px;padding:10px 30px;border-radius:999px;border:0;background:#ffd56a;color:#2a1a00;font-weight:800;font-size:15px}
+#cinBox .ct{font-size:13px;letter-spacing:4px;color:#d9c08a;opacity:0;animation:cinIn 1s ease forwards}#cinBox h2{margin:6px 0 4px;font-size:24px;color:#ffe3a3;opacity:0;animation:cinIn 1.2s ease forwards;font-family:serif}
+#cinBox .tn{font-size:13px;color:#c9d2dc;opacity:0;animation:cinIn 1s ease forwards}
+@keyframes cinIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}`; document.head.appendChild(ccss);
+let cinOn=false;
+function showIntro(){ const step=2.6; cinOn=true;
+  cin.innerHTML='<button class="sk" data-c="end">略過 ›</button>'+OPEN.map((t,i)=>`<p class="${i===4?'gold':''}" style="animation-delay:${(1+i*step).toFixed(1)}s">${t}</p>`).join('')+
+    `<button class="go" data-c="end" style="animation-delay:${(1+OPEN.length*step).toFixed(1)}s">開始</button>`;
+  cin.classList.remove('hidden'); document.body.classList.add('cine'); if(c.pan) c.pan(true); }
+function endIntro(){ cin.classList.add('hidden'); document.body.classList.remove('cine'); cinOn=false; if(c.pan) c.pan(false); if(!st.intro){ st.intro=1; c.persist(); } cardAt=performance.now()+1200; }
+/* ===== 章節開場卡：新章節開放且玩家空閒時出現一次 ===== */
+const SPOTN={dock:'木碼頭',lily:'浮萍灣',wood:'倒木區',deep:'深水中央',moon:'月光灣',reef:'近海礁岩',blue:'遠洋深藍',ice:'冰湖'};
+function showCard(ch){ cinOn=true; const i=SPOT_IDS.indexOf(ch.spot), here=c.curSpot&&c.curSpot()===i, lk=lock(i), boat=(ch.open.kayak&&!S.kayak)?'獨木舟':(ch.open.yacht&&!S.yacht)?'遊艇':null;
+  const act=here?'<button class="go" data-c="close" style="animation-delay:2.2s">開始</button>':(!lk&&!boat)?`<button class="go" data-c="go" data-v="${i}" style="animation-delay:2.2s">前往${SPOTN[ch.spot]}</button><br><button class="sk" style="position:static;margin-top:12px;opacity:.8" data-c="close">稍後再去</button>`:`<p class="tn" style="animation-delay:2s">${boat?'需要先到釣具店購買'+boat:'尚未開放'}</p><button class="go" data-c="close" style="animation-delay:2.4s">知道了</button>`;
+  cin.innerHTML=`<div class="ct" style="animation-delay:.6s">${ch.side?'支線':'新章節'}</div><h2 style="animation-delay:1s">${ch.name.replace(/^.*　/,'')}</h2><div class="ct" style="animation-delay:1.2s;letter-spacing:1px">${ch.name.split('　')[0]}・${SPOTN[ch.spot]}</div><p style="animation-delay:1.6s;font-size:15px">${ch.intro.split('\n')[0]}</p><div class="tn" style="animation-delay:2s">${ch.tasks.length} 個任務，詳情在 📜 手記</div>`+act;
+  cin.classList.remove('hidden'); document.body.classList.add('cine'); if(st.seen.indexOf(ch.id)<0){ st.seen.push(ch.id); c.persist(); } }
+cin.addEventListener('click',e=>{ const b=e.target.closest('[data-c]'); if(!b) return; const a=b.dataset.c;
+  if(a==='end') endIntro(); else { cin.classList.add('hidden'); document.body.classList.remove('cine'); cinOn=false; if(c.pan) c.pan(false); cardAt=performance.now()+1500; if(a==='go') c.goSpot(+b.dataset.v); } });
+let cardAt=performance.now()+3000;   // 用真實時間計時，不受每幀時間差上限影響
+function tryCard(){ if(cinOn||!st.intro) return; const now=performance.now(); if(now<cardAt) return; cardAt=now+2000;
+  if(!box.classList.contains('hidden')||!document.getElementById('endBox').classList.contains('hidden')) return;
+  if(c.idle&&!c.idle()) return; const ch=active().find(x=>st.seen.indexOf(x.id)<0); if(ch) showCard(ch); }
+let moonClock=0; function tick(dt){ tryCard(); moonClock-=dt; if(moonClock>0) return; moonClock=2; if(S.moon&&S.moon.done) bump(t=>t.t==='moon'?1:0); }
+const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>{ if(!st.intro) setTimeout(showIntro,700); });
 /* 手記面板 */
 const btn=document.createElement('button'); btn.className='chip sm'; btn.id='storyBtn'; btn.setAttribute('aria-label','老漁人的手記'); btn.textContent='📜';
 const t2=document.getElementById('top2'); if(t2) t2.appendChild(btn);
@@ -3850,8 +3882,7 @@ box.addEventListener('click',e=>{ const b=e.target.closest('[data-s]'); if(!b){ 
 btn.addEventListener('click',()=>{ render(); box.classList.remove('hidden'); });
 function dot(){ btn.classList.toggle('dot',st.done.some(id=>st.read.indexOf(id)<0)||active().some(ch=>!st.prog[ch.id])); }
 dot();
-if(!st.prog.c1&&!st.done.length) setTimeout(()=>c.toast('📜 你在碼頭找到一本舊手記，點上方的 📜 看看','good',3500),6000);
-return {needs,boost,showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
+return {intro:showIntro,needs,boost,showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
@@ -4101,7 +4132,7 @@ const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPEC
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 G.saveRef=save;
-window.__STORY=createStory({save,persist,toast,Snd,vib,addXP:x=>META.addXP(x),setCoins:()=>setCoins(),syncHUD:()=>META.syncHUD()});
+window.__STORY=createStory({save,persist,toast,Snd,vib,goSpot:i=>goSpot(i),curSpot:()=>G.spot,idle:()=>G.state==='idle',pan:on=>{ G.cinePan=on; if(!on) G.yawT=0; },addXP:x=>META.addXP(x),setCoins:()=>setCoins(),syncHUD:()=>META.syncHUD()});
 const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* 畫質：高／中／低，影響倒影、霧層光束、雨圈、草叢與解析度上限 */
 window.__applyGfx=q=>{ window.__GFX=q; const cap={high:2.5,mid:1.5,low:1}[q]||2.5;
@@ -4312,7 +4343,8 @@ function update(dt){
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light);
   if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
-  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); window.__MOON.update(dt); if(window.__TAL) window.__TAL.tick(G); if(window.__STORY) window.__STORY.tick(dt); ARMS.update(!UW.active(),G.state,G.power,dt); SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt); ICE.update(dt);
+  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); if(G.cinePan) G.yawT=Math.sin(performance.now()*.00011)*.55;   // 開場過場：鏡頭緩慢左右擺動
+  window.__MOON.update(dt); if(window.__TAL) window.__TAL.tick(G); if(window.__STORY) window.__STORY.tick(dt); ARMS.update(!UW.active(),G.state,G.power,dt); SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt); ICE.update(dt);
   { const z=WL.zoneId?WL.zoneId():'', tgt=G.loc==='ice'?[.03,.08,.12]:G.loc==='sea'?(z==='reef'?[.02,.2,.25]:[.01,.08,.2]):[.04,.13,.15], v=SEE_U.value, k=Math.min(1,dt*1.5);   // 水下物體混入的水色依地點
     v.set(v.x+(tgt[0]-v.x)*k,v.y+(tgt[1]-v.y)*k,v.z+(tgt[2]-v.z)*k); }
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
