@@ -898,12 +898,13 @@ function renderRefl(){
   hid.forEach(o=>o.visible=true); WU.uReflOn.value=1; }
 function render(){ if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } renderer.render(scene, camera); }
 
+function setIce(on){ water.visible=!on; if(on) seaGrid.visible=false; }
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=on; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
 let photoHook=null;
 function setPhotoHook(f){ photoHook=f; }
 function setPhotoActive(){ U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; seaMat.toneMapped=false; seaMat.needsUpdate=true; }
 function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
-return { setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
 const SCAN_TINT=`#include <map_fragment>
 { vec3 al_ = diffuseColor.rgb; float L_ = dot(al_, vec3(0.3, 0.59, 0.11));
@@ -1706,7 +1707,7 @@ function render(){
     if(!save.yacht) h+=row('🛥️ 遊艇','Lv 8 解鎖，可以出海到外海釣點，看海豚和鯨魚',save.lv<8?'<span class="lk">Lv 8 解鎖</span>':'<button class="sbtn pri" data-a="yacht">🪙 30000</button>');
     h+=SPOTS.map((s,i)=>{ const lock=save.lv<s.lv||(s.req==='mer1'&&!(save.mer&&save.mer.n>=1)), need=(s.kayak&&!save.kayak)||(s.yacht&&!save.yacht), here=c.curSpot()===i;
       const btn=here?'<span class="eqd">目前位置</span>':lock?`<span class="lk">${s.req?'需要美人魚的認可':'Lv '+s.lv+' 解鎖'}</span>`:need?`<span class="lk">${s.yacht?'需要遊艇':'需要獨木舟'}</span>`:`<button class="sbtn pri" data-a="go" data-v="${i}">${s.yacht?'出海':s.kayak?'划過去':'回碼頭'}</button>`;
-      return row(s.req&&lock?'🔒 ？？？':(s.yacht?'🛥️ ':s.kayak?'🛶 ':'🪵 ')+s.name,s.req&&lock?'只有被美人魚認可的人才知道的地方':s.sub,btn); }).join('');
+      return row(s.req&&lock?'🔒 ？？？':(s.yacht?'🛥️ ':s.kayak?'🛶 ':s.loc==='ice'?'❄️ ':'🪵 ')+s.name,s.req&&lock?'只有被美人魚認可的人才知道的地方':s.sub,btn); }).join('');
   }
   shB.innerHTML=h;
 }
@@ -1751,7 +1752,9 @@ const SPOTS=[
  {id:'deep',name:'深水中央',sub:'最深的水域，大型魚出沒',pos:[6,-58],head:.1,eye:1.0,kayak:true,lv:6,aff:{gar:2.5,flathead:1.5,reba:1.3,channel:1.3},size:1.15,rare:.35},
  {id:'moon',name:'月光灣',sub:'美人魚透露的秘境，夜裡傳說生物頻繁出沒',pos:[-10,-40],head:.35,eye:1.0,kayak:true,lv:1,req:'mer1',aff:{mermaid:4,ghost:3,golden:2},size:1.2,rare:.6},
  {id:'reef',name:'近海礁岩',loc:'sea',sub:'藍綠色海水下的礁區，石斑、紅甘出沒',pos:[0,0],head:0,eye:3.2,kayak:false,yacht:true,lv:8,aff:{grouper:2,amber:2,ribbon:1.5},size:1.05,rare:.15},
- {id:'blue',name:'遠洋深藍',loc:'sea',sub:'一望無際的深藍外海，大型洄游魚與鯊魚的領域',pos:[0,0],head:0,eye:3.2,kayak:false,yacht:true,lv:12,aff:{tuna:2,marlin:2,mahi:2,shark:1.5,gwhite:1.2},size:1.2,rare:.4}];
+ {id:'blue',name:'遠洋深藍',loc:'sea',sub:'一望無際的深藍外海，大型洄游魚與鯊魚的領域',pos:[0,0],head:0,eye:3.2,kayak:false,yacht:true,lv:12,aff:{tuna:2,marlin:2,mahi:2,shark:1.5,gwhite:1.2},size:1.2,rare:.4},
+ {id:'ice',name:'冰湖',loc:'ice',sub:'結冰的湖面，鑿開冰洞垂釣鱒魚與狗魚',pos:[0,0],head:0,eye:1.6,kayak:false,yacht:false,lv:10,aff:{trout:2,pike:1.6,bluegill:1.3,crappie:1.3},size:1,rare:.1}
+];
 const WXT={clear:{c:0,r:0,f:0,w:1.5,g:.3,n:'晴',i:'☀️'},breezy:{c:.25,r:0,f:0,w:5.5,g:.8,n:'晴有風',i:'🍃'},cloudy:{c:.75,r:0,f:.15,w:3,g:.5,n:'陰',i:'☁️'},drizzle:{c:.85,r:.4,f:.35,w:2,g:.3,n:'毛毛雨',i:'🌦️'},rain:{c:1,r:.8,f:.3,w:4,g:.6,n:'雨',i:'🌧️'},storm:{c:1,r:1,f:.45,w:9,g:1,n:'雷雨',i:'⛈️'},fog:{c:.45,r:0,f:1,w:.5,g:.1,n:'霧',i:'🌫️'}};
 
 function createWild(W,P,Snd,save,toast,vib,ctx){
@@ -2160,6 +2163,7 @@ const clamp=(x,a,b)=>x<a?a:x>b?b:x, sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,
 // 三張同一腳架拍攝的湖景：dawn=破曉/黃昏、day=日出後白天、night=入夜
 const SETS={
  lake:{pre:'env_',mask:'env_mask.png',meta:{dawn:{u:.3633,el:6.33,exp:.252,lc:[1.0,.72,.52],li:1.2,light:.7},day:{u:.3496,el:5.62,exp:1.0,lc:[1.0,.86,.7],li:2.4,light:1},night:{u:.6865,el:44.3,exp:.14,lc:[.55,.62,.85],li:.5,light:.3}}},
+ ice:{pre:'ice_',mask:'ice_mask.png',meta:{dawn:{u:.6191,el:17.05,exp:.9,lc:[.9,.93,.97],li:1.4,light:.85},day:{u:.5996,el:28.3,exp:1.0,lc:[1.0,.96,.9],li:2.5,light:1},night:{u:.6191,el:17.05,exp:.9,lc:[.55,.62,.85],li:.5,light:.3}}},
  sea:{pre:'sea_',mask:'sea_mask.png',meta:{dawn:{u:.3623,el:4.92,exp:.305,lc:[1.0,.72,.5],li:1.3,light:.7},day:{u:.3447,el:48.16,exp:.568,lc:[1.0,.95,.88],li:2.6,light:1},night:{u:.3486,el:17.23,exp:1.343,lc:[.6,.68,.9],li:.45,light:.35}}}};
 let SET='lake', META=SETS.lake.meta, started=false, envKey=null;
 const YAW=.25; U.uYaw.value=YAW;
@@ -2544,9 +2548,9 @@ const mets=[]; for(let i=0;i<6;i++){ const m=new T.Mesh(new T.PlaneGeometry(1,1)
 
 /* ---------- 地點切換 ---------- */
 let loc='lake';
-function setLoc(l){ loc=l; G.loc=l; const sea=l==='sea'; W.setSea(sea); if(window.__MDL) window.__MDL.preload(sea?'sea':'lake');
-  S.children.forEach(o=>{ if(o.userData&&o.userData.lake) o.visible=!sea; });
-  if(window.__REAL&&window.__REAL.useSet) window.__REAL.useSet(sea?'sea':'lake');
+function setLoc(l){ loc=l; G.loc=l; const sea=l==='sea', ice=l==='ice'; W.setSea(sea); if(W.setIce) W.setIce(ice); if(window.__MDL) window.__MDL.preload(l);
+  S.children.forEach(o=>{ if(o.userData&&o.userData.lake) o.visible=l==='lake'; });
+  if(window.__REAL&&window.__REAL.useSet) window.__REAL.useSet(l);
   yacht.visible=sea; endAll(); if(sea){ evT=6; forced='dolphin'; }
   if(sea){ c.save.seaTrips=(c.save.seaTrips||0)+1; c.persist(); } }
 
@@ -2635,7 +2639,7 @@ function update(dt,t){
   const wx=c.wx(), day=W.info.day;
   if(wx.r>.4) lastRain=60; else lastRain=Math.max(0,lastRain-dt);
   updEv(dt,t,wx,day); updChase(dt);
-  lakeT-=dt; if(lakeT<=0){ lakeT=.25; const sea=(G.loc||loc)==='sea'; S.children.forEach(o=>{ if(o.userData&&o.userData.lake&&o.visible===sea) o.visible=!sea; }); }
+  lakeT-=dt; if(lakeT<=0){ lakeT=.25; const sea=(G.loc||loc)!=='lake'; S.children.forEach(o=>{ if(o.userData&&o.userData.lake&&o.visible===sea) o.visible=!sea; }); }
   if(yacht.visible){ const b=base(); const h0=W.swell(b.x,b.z,t), fx=-Math.sin(G.head), fz=-Math.cos(G.head);
     const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);
     yacht.position.set(b.x,h0*.9-.05,b.z); yacht.rotation.set((hf-h0)/3*.7,G.head,(hs-h0)/1.5*-.5,'YXZ'); }
@@ -2936,9 +2940,10 @@ const REAL_DIR='models/';
 // 魚：[檔名, 模型裡頭朝哪個軸, 選項]
 const RFISH={bluegill:['bluegill','+x'],crappie:['crappie','+z'],lmbass:['lmbass','+z'],smbass:['smbass','+z'],channel:['channel','+z'],flathead:['flathead','+z'],
   gar:['gar','+z'],barra:['barra','+x'],golden:['koi','-x',{gold:1}],ghost:['koi','-x',{ghost:1}],grouper:['grouper','-x'],tuna:['tuna','+z'],marlin:['marlin','-z'],
-  ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z']};
+  ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],trout:['trout','+z'],pike:['pike','+z'],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z']};
 const RHEAD={gwhite:'+z',tigershark:'+z',dolphin:'+z',whale:'+z',gator:'+x',eagle:'+z',gull:'-x',yacht:'-z',flyfish:'-x'};
 const RSETS={lake:['bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
+  ice:['trout','pike','bluegill','crappie'],
   sea:['yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','seaking']};
 const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger Shark','ra_in_coat'],['海豚','Bottlenose Dolphin','popcornbag'],['座頭鯨','Humpback Whale','ostapblendercg'],
   ['鱷魚','American Alligator','JeremyGrayson'],['白頭海鵰','Bald Eagle','ucdavisterc'],['海鷗','Seagull','Dayvable'],['遊艇',"Frickie's yacht",'dannzjs'],
@@ -3487,6 +3492,27 @@ function update(dt){ W.camera.getWorldPosition(cam); const wx=c.wx?c.wx():{r:0};
   updShafts(dt); }
 return {update,level:()=>k};
 }
+/* ===== 冰湖：覆雪冰面與冰洞（雪地材質：Poly Haven snow_02，CC0） ===== */
+function createIce(W,c){
+'use strict';
+const T=THREE, tl=new T.TextureLoader(), rep=(t,n)=>{ t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(n,n); t.anisotropy=4; return t; };
+const col=rep(tl.load('snow_Diffuse.jpg'),90); col.encoding=T.sRGBEncoding;
+const mat=new T.MeshStandardMaterial({map:col,normalMap:rep(tl.load('snow_nor_gl.jpg'),90),roughnessMap:rep(tl.load('snow_Rough.jpg'),90),roughness:.82,metalness:0,color:0xffffff,envMapIntensity:1.6,normalScale:new T.Vector2(.45,.45)});
+const g=new T.Group(); g.visible=false; W.scene.add(g);
+const sheet=new T.Mesh(new T.CircleGeometry(600,96).rotateX(-Math.PI/2),mat); sheet.position.y=.01; g.add(sheet);
+/* 冰洞：深色水面＋碎冰邊緣 */
+const hole=new T.Group(); g.add(hole);
+const water=new T.Mesh(new T.CircleGeometry(.34,40).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x06141c,roughness:.04,metalness:.1,envMapIntensity:1.4})); water.position.y=.012; hole.add(water);
+const rimM=new T.MeshStandardMaterial({color:0xdfeefa,roughness:.25,metalness:0,transparent:true,opacity:.92});
+const rim=new T.Mesh(new T.TorusGeometry(.38,.05,8,40).rotateX(Math.PI/2),rimM); rim.position.y=.03; hole.add(rim);
+for(let i=0;i<14;i++){ const a=i/14*Math.PI*2+Math.random()*.3, r=.46+Math.random()*.22, s=.04+Math.random()*.07;
+  const ch=new T.Mesh(new T.DodecahedronGeometry(s,0),rimM); ch.position.set(Math.cos(a)*r,.02+s*.4,Math.sin(a)*r); ch.rotation.set(Math.random(),Math.random(),Math.random()); ch.scale.y=.45; hole.add(ch); }
+const holePos=new T.Vector3();
+function update(){ const on=c.loc()==='ice'; g.visible=on; if(!on) return;
+  const b=c.base(), h=c.head(); holePos.set(b.x-Math.sin(h)*1.25,0,b.z-Math.cos(h)*1.25); hole.position.copy(holePos);
+  sheet.position.x=b.x; sheet.position.z=b.z; col.offset.set(b.x/600*90/2,-b.z/600*90/2); }
+return {update,holePos:()=>holePos};
+}
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
 'use strict';
@@ -3723,6 +3749,7 @@ const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPEC
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 const SKY=createNightSky(W,G); window.__SKY=SKY;
+const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head}); window.__ICE=ICE;
 const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST; window.__W=W;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
 const LURE=createLure(W,P,{G,toast,Snd,reelSpd:()=>META.gear().reel.spd,onChase:()=>{ if(!G.fd) prepFish(); if(!G.fd||G.fd.item) return null; const f=P.getFish(G.fd.sp); return f?{group:f.group,uni:f.uni,L:G.fd.L}:null; }}); window.__LURE=LURE; window.__G=G;
@@ -3926,7 +3953,7 @@ function update(dt){
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light);
   if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
-  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); window.__MOON.update(dt); ARMS.update(!UW.active(),G.state,G.power,dt); SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt);
+  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); window.__MOON.update(dt); ARMS.update(!UW.active(),G.state,G.power,dt); SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt); ICE.update();
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
     const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
   G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
