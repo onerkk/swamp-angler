@@ -1633,9 +1633,10 @@ function newQuest(ex){
     sp:()=>{ const cs=SPECIES.filter(s=>s.rar<=Math.min(4,Math.floor(lv/3)+1)&&(s.loc||'lake')==='lake'), s=cs[Math.floor(Math.random()*cs.length)], n=s.rar>=2?1:2; return {n,id:s.id,txt:`釣到${s.name} ${n} 尾`}; },
     per:()=>{ const n=2+Math.floor(lv/4); return {n,per,txt:`在${PERN[per]}釣到魚 ${n} 尾`}; },
     perfect:()=>{ const n=2+Math.floor(lv/5); return {n,txt:`完美揚竿 ${n} 次`}; },
-    release:()=>({n:2,txt:'放生 2 尾魚'})};
-  const keys=Object.keys(pool).filter(k=>!ex.includes(k)), k=keys[Math.floor(Math.random()*keys.length)];
-  const q=Object.assign({k,prog:0},pool[k]()); const diff={count:1,rare:1.6,weight:1.2,sp:1.5,per:1.2,perfect:1.3,release:.8}[k];
+    release:()=>({n:2,txt:'放生 2 尾魚'}),
+    ice:()=>{ const n=2+Math.floor(lv/8); return {n,txt:`在冰湖釣到魚 ${n} 尾`}; }};
+  const keys=Object.keys(pool).filter(k=>!ex.includes(k)&&(k!=='ice'||lv>=10)), k=keys[Math.floor(Math.random()*keys.length)];
+  const q=Object.assign({k,prog:0},pool[k]()); const diff={count:1,rare:1.6,weight:1.2,sp:1.5,per:1.2,perfect:1.3,release:.8,ice:1.4}[k];
   q.reward=Math.round((120+lv*90)*diff/10)*10; q.xp=Math.round((20+lv*12)*diff); return q;
 }
 function fillQuests(){ while(save.quests.length<3) save.quests.push(newQuest(save.quests.map(q=>q.k))); persist(); }
@@ -1654,9 +1655,10 @@ function syncHUD(){
 }
 function onCatch(fd,o){
   const xp=Math.round((fd.lvl+3)*RAR[fd.sp.rar].mult*(fd.xpMul||1)); addXP(xp);
+  if(window.__G&&window.__G.loc==='ice') save.iceN=(save.iceN||0)+1;
   for(const q of save.quests){ if(q.prog>=q.n) continue; let d=0;
     if(q.k==='count') d=1; else if(q.k==='rare') d=fd.sp.rar>=q.min?1:0; else if(q.k==='weight') d=fd.w;
-    else if(q.k==='sp') d=fd.sp.id===q.id?1:0; else if(q.k==='per') d=o.per===q.per?1:0; else if(q.k==='perfect') d=o.perfect?1:0;
+    else if(q.k==='sp') d=fd.sp.id===q.id?1:0; else if(q.k==='per') d=o.per===q.per?1:0; else if(q.k==='perfect') d=o.perfect?1:0; else if(q.k==='ice') d=(window.__G&&window.__G.loc==='ice')?1:0;
     if(d>0){ q.prog=Math.min(q.n,q.prog+d); if(q.prog>=q.n){ const t=q.txt; setTimeout(()=>toast('任務完成：'+t,'good',2200),2600); } } }
   ECO.drop(fd); persist(); syncHUD(); return xp;
 }
@@ -1885,6 +1887,8 @@ function updateEagle(dt,t){
 
 /* ---------- 天氣 ---------- */
 let wxType=WXT[save.wxCur]?save.wxCur:'cloudy', wxT=rand(45,90);
+const onIce=()=>window.__G&&window.__G.loc==='ice', SNOWN={drizzle:['小雪','🌨️'],rain:['下雪','❄️'],storm:['暴風雪','🌨️']};
+const wxName=k=>onIce()&&SNOWN[k]?SNOWN[k][0]:WXT[k].n, wxEmo=k=>onIce()&&SNOWN[k]?SNOWN[k][1]:WXT[k].i;
 const cur={c:WXT[wxType].c,r:WXT[wxType].r,f:WXT[wxType].f,w:WXT[wxType].w};
 let windAng=Math.random()*6.283, windNow=1, wt=0;
 let thT=rand(20,40), flash=0, sT=rand(3,8), lastIcon='';
@@ -1894,7 +1898,7 @@ function pickWx0(){ let r=Math.random(); if(ctx.period()==='dawn'&&r<.3) return 
 function updateWeather(dt){
   const mode=save.wxMode||'auto';
   if(mode!=='auto'&&WXT[mode]) wxType=mode;
-  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; toast('天氣轉為'+WXT[n].n+' '+WXT[n].i); } wxT=rand(70,150); save.wxCur=wxType; } }
+  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; toast('天氣轉為'+wxName(n)+' '+wxEmo(n)); } wxT=rand(70,150); save.wxCur=wxType; } }
   const tg=WXT[wxType], k=Math.min(1,dt*.22);
   cur.c+=(tg.c-cur.c)*k; cur.r+=(tg.r-cur.r)*k; cur.f+=(tg.f-cur.f)*k;
   wt+=dt; cur.w+=(tg.w-cur.w)*k; windAng+=dt*.012*Math.sin(wt*.05);
@@ -1903,7 +1907,7 @@ function updateWeather(dt){
   W.setWeather(cur.c,cur.r,cur.f); Snd.rain(cur.r);
   if(wxType==='storm'&&cur.r>.7){ thT-=dt; if(thT<=0){ thT=rand(25,60); flash=1; setTimeout(()=>Snd.thunder(),rand(300,1600)); } }
   if(flash>0){ W.renderer.toneMappingExposure*=1+flash*(Math.random()<.5?2.2:1.2); flash=Math.max(0,flash-dt*4); }
-  const ic=((W.info.day<.2&&cur.c<.4)?'🌙':WXT[wxType].i)+' '+Math.round(windNow)+'m/s'; if(ic!==lastIcon){ lastIcon=ic; const el=wxIcon('wxI'); if(el) el.textContent=ic; }
+  const ic=((W.info.day<.2&&cur.c<.4)?'🌙':wxEmo(wxType))+' '+Math.round(windNow)+'m/s'; if(ic!==lastIcon){ lastIcon=ic; const el=wxIcon('wxI'); if(el) el.textContent=ic; }
 }
 function updateRain(dt){
   if(cur.r<.02||(window.__G&&window.__G.loc==='ice')){ rainL.visible=false; return; }
@@ -2403,6 +2407,8 @@ const golds=()=>dexV().filter(d=>(d.md||0)>=3).length;
 const merN=()=>(S.mer&&S.mer.n)||0;
 const ACH=[
  ['first','第一條魚','釣到第一條魚',()=>[S.total||0,1],100],
+ ['ice1','冰上漁人','在冰湖釣到第一條魚',()=>[S.iceN||0,1],1500],
+ ['pike','冰下霸主','釣到白斑狗魚',()=>[(S.dex&&S.dex.pike&&S.dex.pike.n)||0,1],3000],
  ['c50','釣魚老手','累計釣到 50 尾',()=>[S.total||0,50],1000],
  ['c200','濕地傳奇','累計釣到 200 尾',()=>[S.total||0,200],5000],
  ['sp6','小小圖鑑家','發現 6 種魚',()=>[dexV().length,6],800],
@@ -3506,6 +3512,8 @@ function createIce(W,c){
 const T=THREE, tl=new T.TextureLoader(), rep=(t,n)=>{ t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(n,n); t.anisotropy=4; return t; };
 const col=rep(tl.load('snow_Diffuse.jpg'),90); col.encoding=T.sRGBEncoding;
 const mat=new T.MeshStandardMaterial({map:col,normalMap:rep(tl.load('snow_nor_gl.jpg'),90),roughnessMap:rep(tl.load('snow_Rough.jpg'),90),roughness:.82,metalness:0,color:0xffffff,envMapIntensity:1.6,normalScale:new T.Vector2(.45,.45)});
+/* 打散重複紋路：同一張材質以另一個比例、偏移再疊一層，加上大範圍明暗起伏 */
+mat.onBeforeCompile=sh=>{ sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n  vec4 t2_=mapTexelToLinear(texture2D(map,vUv*0.27+vec2(0.31,0.17)));\n  diffuseColor.rgb=mix(diffuseColor.rgb,t2_.rgb*diffuse,0.45);\n  diffuseColor.rgb*=0.95+0.07*sin(vUv.x*0.21+1.3)*sin(vUv.y*0.17+0.4);'); };
 const g=new T.Group(); g.visible=false; W.scene.add(g);
 const sheet=new T.Mesh(new T.CircleGeometry(600,96).rotateX(-Math.PI/2),mat); sheet.position.y=.01; g.add(sheet);
 /* 冰洞：深色水面＋碎冰邊緣 */
@@ -3531,7 +3539,10 @@ function updSnow(dt){ const on=c.loc()==='ice', want=on?Math.min(1,Math.max(W.U.
   for(let i=0;i<NF;i++){ const j=i*3; p[j+1]-=dt*(.5+fs[i]*.7); p[j]+=Math.sin(t*.8+fs[i]*20)*dt*.25; p[j+2]+=Math.cos(t*.6+fs[i]*13)*dt*.2;
     if(p[j+1]<0){ p[j+1]+=18; p[j]=(Math.random()-.5)*40; p[j+2]=(Math.random()-.5)*40; } }
   fg.attributes.position.needsUpdate=true; flakes.position.set(fcam.x,0,fcam.z); }
-function update(dt){ updSnow(dt||.016); const on=c.loc()==='ice'; g.visible=on; if(!on){ drilled=false; prog=0; return; }
+let strT=0;
+function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visible=on;
+  if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
+      W.addRipple(holePos.x,holePos.z,.15+.2*T2); if(T2>.6){ c.chips&&0; if(c.splash) c.splash(holePos,T2); } } } if(!on){ drilled=false; prog=0; return; }
   const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; }
   holePos.set(b.x-Math.sin(h)*5,0,b.z-Math.cos(h)*5); hole.position.copy(holePos); hole.visible=drilled;
   sheet.position.x=b.x; sheet.position.z=b.z; col.offset.set(b.x/600*90/2,-b.z/600*90/2); }
@@ -3639,7 +3650,6 @@ function depKey(){ const A=((G.head+G.yaw)%(2*Math.PI)+2*Math.PI)%(2*Math.PI); r
 function depNow(k){ const e=DEPL[k]; return e?Math.max(0,e.v-(performance.now()-e.t)/60000):0; }
 function depAdd(k,n){ const v=depNow(k)+n, w=v>=2&&DEPL[k]&&DEPL[k].warned; DEPL[k]={v,t:performance.now(),warned:w}; if(v>=4&&!w){ DEPL[k].warned=true; setTimeout(()=>toast('這一帶的魚變警覺了，轉個方向或換釣點吧','warn',2600),1800); } }
 const reachK=()=>G.loc==='ice'?.78:clamp((G.castDist-4)/(24*(1-.05*TR('cast'))),0,1);
-window.__dbgPick=()=>pickSpecies().id;
 function pickSpecies(){
   const per=period(G.hour), pw=clamp((G.castDist-6)/30,0,1); let tot=0;
   const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(window.__ECO&&window.__ECO.fxOn('luck')?.4:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*WL.spotAff(sp.id)*WL.wxAff(sp.id)*(((sp.loc==='both'&&G.loc!=='ice')||(sp.loc||'lake')===(G.loc||'lake')||(G.loc==='ice'&&sp.ice))?1:0)*(G.loc==='sea'?1+sp.rar*.08*TR('sea'):1)*Math.pow(.12+.88*reachK(),sp.rar)/(1+.3*depNow(G.depK||'')*sp.rar)*(bt.aff[sp.id]||(bt.lure?.15:1))*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
@@ -3776,7 +3786,7 @@ const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPEC
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 const SKY=createNightSky(W,G); window.__SKY=SKY;
-const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
+const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
 function iceDrop(){ const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=5; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
 const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST; window.__W=W;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
