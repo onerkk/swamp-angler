@@ -1184,6 +1184,10 @@ const SPECIES=[
   sh:{H:.14,W:.08,prof:1.3,eyeT:.88,eye:.018,tail:.2,fork:.25,dorsal:[[-.3,0],[-.25,.08],[-.15,.07],[-.12,0]],anal:[[-.32,0],[-.28,.06],[-.2,0]]},
   col:{back:'#4a5a2a',flank:'#8a9a50',belly:'#e8e6c8',fin:'#9a7a40',eye:'#c8b040'},pat:{t:'plain'},scale:.5,metal:.3,
   f:{pow:1.9,spd:2.0,agi:1.3,jump:.3,stam:1.6,win:1.3},time:{dawn:1.2,day:1.1,dusk:1.2,night:.5},desc:'冰下的頂級掠食者，長吻和滿口利牙，咬上時會猛力衝刺。'},
+ {id:'sail',loc:'sea',name:'雨傘旗魚',sci:'Istiophorus platypterus',rar:3,lvl:[60,90],len:[150,280],k:.55,price:48,
+  sh:{H:.13,W:.06,prof:1.5,eyeT:.86,eye:.016,tail:.26,fork:.75,dorsal:[[-.15,0],[-.1,.35],[.25,.3],[.3,0]],anal:[[-.3,0],[-.27,.05],[-.2,0]]},
+  col:{back:'#1c2f6a',flank:'#8fa6c8',belly:'#e8eef4',fin:'#2a3f8a',eye:'#101010'},pat:{t:'plain'},scale:.4,metal:.7,
+  f:{pow:2.3,spd:2.4,agi:1.6,jump:.9,stam:2.0,win:1.3},time:{dawn:1.3,day:1.1,dusk:1.2,night:.4},desc:'海中最快的魚之一，巨大的帆狀背鰭像一把張開的雨傘。上鉤後會連續躍出水面。'},
  {id:'ghost',name:'月光幽靈魚',sci:'Lumina spectra（傳說）',rar:5,lvl:[62,72],len:[30,60],k:9,price:60,special:'ghost',
   sh:{H:.12,W:.05,prof:1.3,eyeT:.87,eye:.034,tail:.26,fork:.7,dorsal:[[-.3,0],[-.2,.14],[.05,.12],[.15,0]],anal:[[-.32,0],[-.25,.1],[-.1,.08],[-.05,0]]},
   col:{back:'#5a8ab8',flank:'#a8d8f0',belly:'#e8f8ff',fin:'#8ad0ff',eye:'#9ff4ff'},pat:{t:'plain'},scale:.6,metal:.3,
@@ -1763,7 +1767,7 @@ const SPOTS=[
  {id:'deep',name:'深水中央',sub:'最深的水域，大型魚出沒',pos:[6,-58],head:.1,eye:1.0,kayak:true,lv:6,aff:{gar:2.5,flathead:1.5,reba:1.3,channel:1.3},size:1.15,rare:.35},
  {id:'moon',name:'月光灣',sub:'美人魚透露的秘境，夜裡傳說生物頻繁出沒',pos:[-10,-40],head:.35,eye:1.0,kayak:true,lv:1,req:'mer1',aff:{mermaid:4,ghost:3,golden:2},size:1.2,rare:.6},
  {id:'reef',name:'近海礁岩',loc:'sea',sub:'藍綠色海水下的礁區，石斑、紅甘出沒',pos:[0,0],head:0,eye:3.2,kayak:false,yacht:true,lv:8,aff:{grouper:2,amber:2,ribbon:1.5},size:1.05,rare:.15},
- {id:'blue',name:'遠洋深藍',loc:'sea',sub:'一望無際的深藍外海，大型洄游魚與鯊魚的領域',pos:[0,0],head:0,eye:3.2,kayak:false,yacht:true,lv:12,aff:{tuna:2,marlin:2,mahi:2,shark:1.5,gwhite:1.2},size:1.2,rare:.4},
+ {id:'blue',name:'遠洋深藍',loc:'sea',sub:'一望無際的深藍外海，大型洄游魚與鯊魚的領域',pos:[0,0],head:0,eye:3.2,kayak:false,yacht:true,lv:12,aff:{tuna:2,marlin:2,mahi:2,shark:1.5,gwhite:1.2,sail:1.6},size:1.2,rare:.4},
  {id:'ice',name:'冰湖',loc:'ice',sub:'結冰的湖面，鑿開冰洞垂釣鱒魚與狗魚',pos:[0,0],head:0,eye:1.6,kayak:false,yacht:false,lv:10,aff:{trout:2,pike:1.6,bluegill:1.3,crappie:1.3},size:1,rare:.1}
 ];
 const WXT={clear:{c:0,r:0,f:0,w:1.5,g:.3,n:'晴',i:'☀️'},breezy:{c:.25,r:0,f:0,w:5.5,g:.8,n:'晴有風',i:'🍃'},cloudy:{c:.75,r:0,f:.15,w:3,g:.5,n:'陰',i:'☁️'},drizzle:{c:.85,r:.4,f:.35,w:2,g:.3,n:'毛毛雨',i:'🌦️'},rain:{c:1,r:.8,f:.3,w:4,g:.6,n:'雨',i:'🌧️'},storm:{c:1,r:1,f:.45,w:9,g:1,n:'雷雨',i:'⛈️'},fog:{c:.45,r:0,f:1,w:.5,g:.1,n:'霧',i:'🌫️'}};
@@ -1964,7 +1968,7 @@ const STY={
  jumper:{n:'甩頭跳水',run:[.8,1.8],rest:[.8,1.8],mul:1.7,lat:1.1,spd:1,ev:'shake',evP:.35,d:.8},
  digger:{n:'往深處鑽',run:[1.5,3],rest:[1,2.5],mul:1.5,lat:.7,spd:.8,ev:'dive',evP:.4,d:1},
  brawler:{n:'短促爆衝',run:[.6,1.2],rest:[.6,1.4],mul:2.0,lat:1.2,spd:1.1,ev:'shake',evP:.2,d:.6}};
-const SP_STY={bluegill:'nibbler',crappie:'nibbler',reba:'runner',perch:'brawler',lmbass:'jumper',channel:'digger',bowfin:'brawler',smbass:'jumper',flathead:'digger',gar:'runner',golden:'brawler',ghost:'jumper',mermaid:'runner',barra:'jumper',amber:'runner',grouper:'digger',ribbon:'nibbler',mahi:'jumper',tuna:'runner',marlin:'jumper',shark:'brawler',gwhite:'brawler'};
+const SP_STY={bluegill:'nibbler',crappie:'nibbler',reba:'runner',perch:'brawler',lmbass:'jumper',channel:'digger',bowfin:'brawler',smbass:'jumper',flathead:'digger',gar:'runner',golden:'brawler',ghost:'jumper',mermaid:'runner',barra:'jumper',amber:'runner',grouper:'digger',ribbon:'nibbler',mahi:'jumper',tuna:'runner',marlin:'jumper',shark:'brawler',gwhite:'brawler',sail:'jumper'};
 
 const SH3={};
 SH3.airVS=`
@@ -2962,17 +2966,17 @@ const REAL_DIR='models/';
 // 魚：[檔名, 模型裡頭朝哪個軸, 選項]
 const RFISH={bluegill:['bluegill','+x'],crappie:['crappie','+z'],lmbass:['lmbass','+z'],smbass:['smbass','+z'],channel:['channel','+z'],flathead:['flathead','+z'],
   gar:['gar','+z'],barra:['barra','+x'],golden:['koi','-x',{gold:1}],ghost:['koi','-x',{ghost:1}],grouper:['grouper','-x'],tuna:['tuna','+z'],marlin:['marlin','-z'],
-  ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],mermaid:['mermaid3d','up',{mer:1}],trout:['trout','+z'],pike:['pike','+z'],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z']};
+  ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],mermaid:['mermaid3d','up',{mer:1}],trout:['trout','+z'],pike:['pike','+z'],reba:['fish_reba','+z'],perch:['fish_mandarin','+z'],amber:['fish_amber','+z'],mahi:['fish_mahi','+z'],sail:['fish_sail','+z'],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z']};
 const RHEAD={gwhite:'+z',tigershark:'+z',dolphin:'+z',whale:'+z',gator:'+x',eagle:'+z',gull:'-x',yacht:'-z',flyfish:'-x'};
-const RSETS={lake:['mermaid3d','bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
+const RSETS={lake:['mermaid3d','fish_reba','fish_mandarin','bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
   ice:['trout','pike','bluegill','crappie'],
-  sea:['mermaid3d','yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','seaking']};
+  sea:['mermaid3d','fish_amber','fish_mahi','fish_sail','yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','seaking']};
 const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger Shark','ra_in_coat'],['海豚','Bottlenose Dolphin','popcornbag'],['座頭鯨','Humpback Whale','ostapblendercg'],
   ['鱷魚','American Alligator','JeremyGrayson'],['白頭海鵰','Bald Eagle','ucdavisterc'],['海鷗','Seagull','Dayvable'],['遊艇',"Frickie's yacht",'dannzjs'],
   ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
   ['斑點叉尾鮰','Channel catfish','faerbogdan99'],['扁頭鯰','Flathead Catfish','faerbogdan99'],['鱷雀鱔','Alligator Gar','Jay_Tano'],['錦鯉','Koi Fish','7plus'],
   ['石斑','lowpoly freshwater grouper','Arrangemonk9'],['黑鮪魚','Bluefin Tuna','voltairevill'],['旗魚','Blue Marlin','Gotta_go_evi'],['飛魚','Exocoetidae','victorberdug'],
-  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['汐月（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
+  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['汐月（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
 
 function createModels(W){
 'use strict';
