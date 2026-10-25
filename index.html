@@ -1035,7 +1035,7 @@ function updateRod(dt){
   else bdir.set(0,-1,0);
   bdir.addScaledVector(dir,-bdir.dot(dir)); if(bdir.lengthSq()<1e-6) bdir.set(0,-1,0); bdir.normalize();
   const b=Math.max(0.035,rod.bend);
-  for(let i=0;i<=NS;i++){ const s=i/NS; pts[i].copy(R_BASE).addScaledVector(dir,R_LEN*s*(1-.16*b*s*s)).addScaledVector(bdir,R_LEN*b*.36*s*s); }
+  for(let i=0;i<=NS;i++){ const s=i/NS; pts[i].copy(R_BASE).addScaledVector(dir,R_LEN*s*(1-.22*b*s*s)).addScaledVector(bdir,R_LEN*b*.52*s*s); }
   for(let i=0;i<NS;i++){ const a=pts[i], c=pts[i+1]; const m=segs[i]; m.position.addVectors(a,c).multiplyScalar(.5);
     tmp.subVectors(c,a); const L=tmp.length(); m.quaternion.setFromUnitVectors(AY,tmp.divideScalar(L)); m.scale.set(1,L,1); }
   GS.forEach((s,k)=>{ rodAt(s,tmp); frameAt(s); const g=guides[k]; g.position.copy(tmp).addScaledVector(dn,.008+.026*(1-s)); g.quaternion.setFromUnitVectors(AZ,tan);
@@ -1559,7 +1559,7 @@ function start(fdIn){
 function end(){ on=false; if(fish){ scene.remove(fish); fish=null; } }
 function update(dt){
   if(!on) return; tt+=dt;
-  const L=clamp(W.info.light,0,1.2), day=W.info.day;
+  const L=Math.max(clamp(W.info.light,0,1.2),.38), day=W.info.day;   // 夜裡水下鏡頭保留月光亮度，才看得清楚魚
   const sea=W.isSea&&W.isSea(); weeds.visible=!sea; const mid=tmpC.copy(cDark).lerp(sea?cSea:cMid,clamp(L,0,1));
   fog.color.copy(mid); bgU.uMid.value.copy(mid); bgU.uTop.value.copy(mid).multiplyScalar(2.4).add(cTint.clone().multiplyScalar(L*.6)); bgU.uBot.value.copy(mid).multiplyScalar(.35);
   surfU.uCol.value.copy(mid).multiplyScalar(5); surfU.uFog.value.copy(mid);
@@ -4228,9 +4228,9 @@ function updateFight(dt){
   const az=f.az0+f.theta; { fishPos(tv,0); const r=Math.hypot(tv.x,tv.z), Rm=W.shoreR(Math.atan2(tv.x,-tv.z))-3; if(r>Rm) f.d=Math.max(2,f.d-(r-Rm)); }
   if(G.held){ f.clickA+=reel*dt*9; while(f.clickA>=1){ Snd.click(); f.clickA-=1; } rod.spin-=reel*dt*14; }
   else if(f.run&&f.T>.3){ f.clickA+=dt*28; while(f.clickA>=1){ Snd.click(4500); f.clickA-=1; } }
-  if(f.T>.85){ f.vibT-=dt; if(f.vibT<=0){ vib(12); f.vibT=.25; } }
+  f.vibT-=dt; if(f.vibT<=0){ if(f.T>.85){ vib(14); f.vibT=.22; } else if(f.run){ vib(Math.round(5+8*f.T)); f.vibT=.32; } else f.vibT=.2; }
   fishPos(tv,0);
-  f.ripT-=dt; if(f.ripT<=0){ f.ripT=f.run?rand(.35,.8):rand(1,2); W.addRipple(tv.x,tv.z,f.run?.3:.12); if(f.run&&f.d<7) P.splash(tv.x,0,tv.z,4,.5); }
+  f.ripT-=dt; if(f.ripT<=0){ f.ripT=f.run?rand(.12,.3):rand(.4,.8); W.addRipple(tv.x,tv.z,.15+.35*f.T+(f.run?.12:0)); if(f.run) P.splash(tv.x,0,tv.z,Math.round(3+8*f.T),.25+.35*f.T); }
   // 跳水
   const g=G.fish.group;
   if(f.jumpT>0){
@@ -4243,8 +4243,10 @@ function updateFight(dt){
   const sh=P.shadow; sh.position.set(tv.x-Math.sin(az)*.4,.012,tv.z-Math.cos(az)*.4); sh.rotation.y=az+(f.latDir<0?-Math.PI/2:Math.PI/2); sh.scale.setScalar(fd.L*1.15);
   sh.material.opacity=f.jumpT>0?0:.4*(1-sstep(3,10,f.d));
   // 浮標與釣竿
-  bob.position.set(tv.x,-.02+Math.sin(G.t*9)*.012*(f.run?1:.4),tv.z); bob.rotation.z=Math.sin(G.t*7)*.25;
-  rod.end=G.endV.copy(tv); rod.pitchT=.3+.1*f.T; rod.bendT=clamp(f.T*1.05,0,1);
+  { const pull=clamp(f.T*1.1+(f.run?.15:0),0,1);   // 浮標被拖進水裡、朝釣竿方向傾斜
+    bob.position.set(tv.x,-.03-.28*pull+Math.sin(G.t*9)*.012*(f.run?1:.4),tv.z); bob.rotation.set(-.6*pull,0,Math.sin(G.t*7)*.25*(1-pull*.6)); }
+  { const load=clamp(.25+.35*Math.min(1,fd.w/3),.25,.6), jit=(f.run||shake)?Math.sin(G.t*38)*.05*(.5+f.T):0;   // 掛上魚就有弧度，張力再加深，衝刺甩頭時竿尖抖動
+    rod.end=G.endV.copy(tv); rod.pitchT=.18+.08*f.T; rod.bendT=clamp(load+.75*f.T+(f.run?.08:0)+jit,0,1.15); }
   G.yawT=clamp(az-G.head,-.95,.95);
   // HUD
   ui.tFill.style.width=(f.T*100).toFixed(1)+'%'; ui.tFill.style.background=f.T<.65?'var(--good)':f.T<.9?'var(--warn)':'var(--bad)';
