@@ -3501,17 +3501,21 @@ const mat=new T.MeshStandardMaterial({map:col,normalMap:rep(tl.load('snow_nor_gl
 const g=new T.Group(); g.visible=false; W.scene.add(g);
 const sheet=new T.Mesh(new T.CircleGeometry(600,96).rotateX(-Math.PI/2),mat); sheet.position.y=.01; g.add(sheet);
 /* 冰洞：深色水面＋碎冰邊緣 */
-const hole=new T.Group(); g.add(hole);
+const hole=new T.Group(); hole.visible=false; g.add(hole);
+let drilled=false, prog=0, lastKey='';
 const water=new T.Mesh(new T.CircleGeometry(.34,40).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x06141c,roughness:.04,metalness:.1,envMapIntensity:1.4})); water.position.y=.012; hole.add(water);
 const rimM=new T.MeshStandardMaterial({color:0xdfeefa,roughness:.25,metalness:0,transparent:true,opacity:.92});
 const rim=new T.Mesh(new T.TorusGeometry(.38,.05,8,40).rotateX(Math.PI/2),rimM); rim.position.y=.03; hole.add(rim);
 for(let i=0;i<14;i++){ const a=i/14*Math.PI*2+Math.random()*.3, r=.46+Math.random()*.22, s=.04+Math.random()*.07;
   const ch=new T.Mesh(new T.DodecahedronGeometry(s,0),rimM); ch.position.set(Math.cos(a)*r,.02+s*.4,Math.sin(a)*r); ch.rotation.set(Math.random(),Math.random(),Math.random()); ch.scale.y=.45; hole.add(ch); }
 const holePos=new T.Vector3();
-function update(){ const on=c.loc()==='ice'; g.visible=on; if(!on) return;
-  const b=c.base(), h=c.head(); holePos.set(b.x-Math.sin(h)*1.25,0,b.z-Math.cos(h)*1.25); hole.position.copy(holePos);
+function update(){ const on=c.loc()==='ice'; g.visible=on; if(!on){ drilled=false; prog=0; return; }
+  const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; }
+  holePos.set(b.x-Math.sin(h)*5,0,b.z-Math.cos(h)*5); hole.position.copy(holePos); hole.visible=drilled;
   sheet.position.x=b.x; sheet.position.z=b.z; col.offset.set(b.x/600*90/2,-b.z/600*90/2); }
-return {update,holePos:()=>holePos};
+/* 鑿冰洞：按住約 2 秒，冰屑四濺，完成後冰洞出現 */
+function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; if(c.done) c.done(holePos); } return prog; }
+return {update,holePos:()=>holePos,drilled:()=>drilled,drill,progress:()=>prog};
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
@@ -3713,7 +3717,7 @@ let actPtr=null, actX0=0, dragPtr=null, dragX0=0, yaw0=0;
 function actDown(){
   Snd.init(); G.held=true; ui.act.classList.add('held');
   switch(G.state){
-    case 'idle': startCharge(); break;
+    case 'idle': if(G.loc==='ice'){ if(ICE.drilled()) iceDrop(); } else startCharge(); break;
     case 'lure': LURE.press(); break;
     case 'wait': startRetrieve(G.dip>0?'太早了，魚被嚇跑了':'收線','warn'); break;
     case 'bite': { const r=FUN.hookPress(); if(r==='miss') missBite(); else hook(r==='perfect'); } break;
@@ -3749,7 +3753,8 @@ const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPEC
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 const SKY=createNightSky(W,G); window.__SKY=SKY;
-const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head}); window.__ICE=ICE;
+const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
+function iceDrop(){ const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=5; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
 const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST; window.__W=W;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
 const LURE=createLure(W,P,{G,toast,Snd,reelSpd:()=>META.gear().reel.spd,onChase:()=>{ if(!G.fd) prepFish(); if(!G.fd||G.fd.item) return null; const f=P.getFish(G.fd.sp); return f?{group:f.group,uni:f.uni,L:G.fd.L}:null; }}); window.__LURE=LURE; window.__G=G;
@@ -3881,7 +3886,7 @@ function update(dt){
   if(st==='intro'||st==='idle'||st==='charge'){
     rod.pitchT=st==='charge'?.15+.5*G.power:Math.sin(G.t*.8)*.01;
     if(st==='charge'){ G.chargeT+=dt; G.power=(1-Math.cos(G.chargeT*2.4))/2; setPower(G.power); setAct('放開<br>拋竿','力道條滿格時放開最遠',false); }
-    else if(st==='idle') setAct('按住<br>蓄力','左右拖曳畫面可以轉向瞄準',false);
+    else if(st==='idle'){ if(G.loc==='ice'){ if(!ICE.drilled()){ if(G.held) ICE.drill(dt); setAct(G.held?'鑿冰中 '+Math.round(ICE.progress()*100)+'%':'按住<br>鑿冰洞','冰釣：先在前方鑿開冰洞',false); } else setAct('點擊<br>放線','把浮標從冰洞放下去',false); } else setAct('按住<br>蓄力','左右拖曳畫面可以轉向瞄準',false); }
   }
   P.updateRod(dt);
   if(st==='intro'||st==='idle'||st==='charge'){ hangPos(bob.position); lineEnd=bob.position; slack=.05; }
