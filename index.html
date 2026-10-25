@@ -3624,7 +3624,16 @@ const bub=[]; for(let i=0;i<14;i++){ const b=new T.Mesh(new T.SphereGeometry(.01
 const frame=document.createElement('div'); frame.id='pipFrame'; frame.innerHTML='<span>🎥 水下鏡頭</span>'; document.body.appendChild(frame);
 const pst=document.createElement('style'); pst.textContent=`#pipFrame{position:fixed;z-index:5;border:2px solid rgba(160,220,255,.7);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.4);pointer-events:none;display:none}#pipFrame span{position:absolute;left:6px;top:4px;font-size:11px;font-weight:800;color:#dff4ff;text-shadow:0 1px 3px #000}`; document.head.appendChild(pst);
 function pipSync(){ if(!cur) return;
-  if(pip.lureK!==cur.k&&models[cur.k]){ if(pip.lure) pip.scene.remove(pip.lure); pip.lure=models[cur.k].clone(true); pip.lure.scale.multiplyScalar(2.2); pip.lure.rotation.set(0,-Math.PI/2,0); pip.scene.add(pip.lure); pip.lureK=cur.k; }
+  if(pip.lureK!==cur.k&&models[cur.k]){ if(pip.lure) pip.scene.remove(pip.lure);
+    const m=models[cur.k].clone(true); m.position.set(0,0,0); m.rotation.set(0,0,0); m.scale.multiplyScalar(2.2); m.updateMatrixWorld(true);
+    // 自動量測：最薄的方向轉向鏡頭（正面朝你），最長的方向轉成水平（身體橫向）
+    const sz=new T.Box3().setFromObject(m).getSize(new T.Vector3()), d=[sz.x,sz.y,sz.z], A=[new T.Vector3(1,0,0),new T.Vector3(0,1,0),new T.Vector3(0,0,1)];
+    const thin=d.indexOf(Math.min(...d)), lng=[0,1,2].filter(i=>i!==thin).sort((a,b)=>d[b]-d[a])[0];
+    const aL=A[lng], aT=A[thin], aM=new T.Vector3().crossVectors(aT,aL);
+    const src=new T.Matrix4().makeBasis(aL,aM,aT), dst=new T.Matrix4().makeBasis(new T.Vector3(1,0,0),new T.Vector3(0,1,0),new T.Vector3(0,0,1));
+    m.quaternion.setFromRotationMatrix(dst.multiply(src.transpose()));
+    const ctr=new T.Box3().setFromObject(m).getCenter(new T.Vector3()); m.position.sub(ctr);
+    pip.lure=new T.Group(); pip.lure.add(m); pip.scene.add(pip.lure); pip.lureK=cur.k; }
   if(chaser&&pip.fishSrc!==chaser.group){ if(pip.fish) pip.scene.remove(pip.fish); pip.fish=chaser.group.clone(true); pip.fish.visible=true; pip.fishSrc=chaser.group; pip.scene.add(pip.fish); }
   if(!chaser&&pip.fish&&pip.strikeT<=0){ pip.scene.remove(pip.fish); pip.fish=null; pip.fishSrc=null; } }
 const vs=new T.Vector2();
