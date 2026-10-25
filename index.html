@@ -1704,6 +1704,7 @@ function render(){
     shT.textContent='設定';
     h+='<div class="note">切換時段</div><div class="tabs">'+PRESETS.map((p,i)=>`<button class="tab" data-a="time" data-v="${i}">${p[1]}</button>`).join('')+'</div>';
     { const gq=save.gfx||'high'; h+='<div class="note">畫質（手機卡頓時調低）</div><div class="tabs">'+[['high','高'],['mid','中'],['low','低']].map(([k,n])=>`<button class="tab${gq===k?' on':''}" data-a="gfx" data-v="${k}">${n}</button>`).join('')+'</div><div class="note" style="font-size:12px">高：全部特效｜中：關光束、倒影降解析｜低：關倒影、霧層、雨圈、草叢，解析度 1 倍</div>'; }
+    { const n=window.__DIAG?window.__DIAG.count():0; h+=`<div class="note">問題回報（目前記錄 ${n} 筆錯誤）</div><div class="tabs"><button class="tab" data-a="diag" data-v="copy">📋 複製診斷資訊</button><button class="tab" data-a="diag" data-v="clear">清除記錄</button></div><div class="note" style="font-size:12px">遇到怪問題時，按「複製診斷資訊」再貼給開發者，就能看到你手機上實際發生的錯誤和幀率。</div>`; }
     h+='<div class="note">天氣</div><div class="tabs">'+[['auto','自動'],['clear','晴'],['breezy','有風'],['cloudy','陰'],['drizzle','毛毛雨'],['rain','雨'],['storm','雷雨'],['fog','霧']].map(w=>`<button class="tab${(save.wxMode||'auto')===w[0]?' on':''}" data-a="wx" data-v="${w[0]}">${w[1]}</button>`).join('')+'</div>';
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
     const tg=(k,name,sub,onv)=>row(name,sub,`<button class="sbtn${onv?' pri':''}" data-a="tg" data-v="${k}">${onv?'開':'關'}</button>`);
@@ -1737,7 +1738,8 @@ $('baitChip').addEventListener('click',()=>{ shopTab='bait'; open('shop'); });
 $('shX').addEventListener('click',close);
 sheet.addEventListener('click',e=>{ if(e.target===sheet) close(); });
 shB.addEventListener('click',e=>{
-  const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(a==='gfx'){ save.gfx=v; persist(); if(window.__applyGfx) window.__applyGfx(v); toast('畫質：'+({high:'高',mid:'中',low:'低'})[v],'good',1200); render(); return; } if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
+  const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(a==='diag'&&window.__DIAG){ if(v==='copy') window.__DIAG.copy().then(ok=>toast(ok?'已複製診斷資訊，可以直接貼上':'複製失敗，請截圖設定頁','good',2200)); else { window.__DIAG.clear(); toast('已清除錯誤記錄','good',1200); } render(); return; }
+  if(a==='gfx'){ save.gfx=v; persist(); if(window.__applyGfx) window.__applyGfx(v); toast('畫質：'+({high:'高',mid:'中',low:'低'})[v],'good',1200); render(); return; } if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
   if(a==='tab') shopTab=v;
   else if(a==='buy'){ const it=GEAR[shopTab][+v]; if(save.coins<it.price){ toast('金幣不夠','bad'); return; }
     save.coins-=it.price; save.gear[shopTab].push(+v); save.eq[shopTab]=+v; persist(); setCoins(); Snd.coin(); toast('已購買並裝備：'+it.name,'good'); applyRod(); }
@@ -3294,7 +3296,7 @@ function createMoonBay(W,c){
 'use strict';
 const T=THREE, S=W.scene, G=c.G, SV=c.save; SV.moon=SV.moon||{met:false,sc:0,read:-1,done:false}; const MS=SV.moon;
 const ss=(a,b,x)=>{ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); };
-/* 月亮：NASA 月球影像（公有領域），掛在月光灣的方向，仰角 17° */
+/* 月亮：NASA 月球影像（公有領域），位置依時間與月相即時計算 */
 const MD=new T.Vector3(-Math.sin(.35)*Math.cos(.22),Math.sin(.22),-Math.cos(.35)*Math.cos(.22)).normalize();
 const moonTex=new T.TextureLoader().load('moon.jpg'); moonTex.encoding=T.sRGBEncoding;
 const moon=new T.Mesh(new T.SphereGeometry(1,32,24),new T.MeshBasicMaterial({map:moonTex,color:new T.Color(1.7,1.7,1.75),fog:false,transparent:false,depthWrite:false,toneMapped:false}));
@@ -3309,6 +3311,13 @@ moon.material.onBeforeCompile=sh=>{ sh.uniforms.uL=uL;
   sh.vertexShader='varying vec3 vNw;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvNw=normalize(mat3(modelMatrix)*normal);');
   sh.fragmentShader='uniform vec3 uL;\nvarying vec3 vNw;\n'+sh.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n  float lit_=smoothstep(-0.06,0.12,dot(normalize(vNw),uL));\n  diffuseColor.rgb*=mix(0.035,1.0,lit_);'); };
 const toV=new T.Vector3(), rgt=new T.Vector3(), upY=new T.Vector3(0,1,0);
+/* 月亮真實軌跡：月亮比太陽晚升（月相×24 小時），依台灣緯度 23.7° 算時角→高度角、方位角。
+   世界座標與星空相同：往 −Z 是南、+Z 是北、−X 是東。 */
+const LAT=23.7*Math.PI/180, DEC=8*Math.PI/180;
+function moonDir(hour,out){ const H=((hour-12-phase()*24)/24)*2*Math.PI;            // 時角：0＝正南上中天
+  const sa=Math.sin(LAT)*Math.sin(DEC)+Math.cos(LAT)*Math.cos(DEC)*Math.cos(H), alt=Math.asin(sa);
+  const az=Math.atan2(Math.sin(H),Math.cos(H)*Math.sin(LAT)-Math.tan(DEC)*Math.cos(LAT));   // 由南起算、往西為正
+  const ch=Math.cos(alt); return out.set(-Math.sin(az)*ch*-1,Math.sin(alt),-Math.cos(az)*ch); }
 const hc=document.createElement('canvas'); hc.width=hc.height=128; { const x=hc.getContext('2d'), g=x.createRadialGradient(64,64,0,64,64,64); g.addColorStop(0,'rgba(200,220,255,.55)'); g.addColorStop(.35,'rgba(150,180,255,.18)'); g.addColorStop(1,'rgba(120,150,255,0)'); x.fillStyle=g; x.fillRect(0,0,128,128); }
 const halo=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(hc),blending:T.AdditiveBlending,depthWrite:false,fog:false,transparent:true}));
 halo.renderOrder=-2; S.add(halo);
@@ -3377,10 +3386,11 @@ function scaleFx(n){ fx.querySelector('b').textContent=`🌙 月鱗 ${Math.min(7
 const cam=new T.Vector3();
 function update(dt){ W.camera.getWorldPosition(cam);
   const nk=W.U.uNight?W.U.uNight.value:0, cl=W.U.uCloud?W.U.uCloud.value:0, vis=nk*(1-.8*Math.min(1,cl));
+  moonDir(c.hour?c.hour():22,MD); const above=MD.y>-.02;
   const th=2*Math.PI*phase(), il=illum(); toV.copy(MD).negate(); rgt.crossVectors(MD,upY).normalize();
   uL.value.copy(toV).multiplyScalar(-Math.cos(th)).addScaledVector(rgt,Math.sin(th)).normalize();
-  W.U.uMoonDir.value.copy(MD); W.U.uMoonK.value=vis*Math.max(0,il); if(W.U.uMoonCol) W.U.uMoonCol.value.set(0,0,0);   // 關掉天空著色器裡的程序化滿月，避免從暗面透出
-  moon.visible=halo.visible=vis>.02&&il>.03; if(moon.visible){ moon.position.copy(cam).addScaledVector(MD,780); moon.scale.setScalar(26); { const k=Math.min(1,vis*1.3); moon.material.color.setRGB(1.7*k,1.7*k,1.75*k); }
+  W.U.uMoonDir.value.copy(MD); W.U.uMoonK.value=vis*Math.max(0,il)*(above?Math.min(1,MD.y*8+.2):0); if(W.U.uMoonCol) W.U.uMoonCol.value.set(0,0,0);   // 關掉天空著色器裡的程序化滿月，避免從暗面透出
+  moon.visible=halo.visible=vis>.02&&il>.03&&above; if(moon.visible){ moon.position.copy(cam).addScaledVector(MD,780); moon.scale.setScalar(26); { const k=Math.min(1,vis*1.3); moon.material.color.setRGB(1.7*k,1.7*k,1.75*k); }
     halo.position.copy(cam).addScaledVector(MD,770); halo.scale.set(150,150,1); halo.material.opacity=vis*(.25+.75*il); }
   act+=((active()?1:0)-act)*Math.min(1,dt*.8); W.U.uBio.value=act;
   npc.visible=act>.05; if(npc.visible){ mer.material.opacity=act; mer.rotation.y=Math.atan2(cam.x-NP.x,cam.z-NP.z); if(mer3) mer3.rotation.y=mer.rotation.y; glow.material.opacity=.5*act*(0.8+0.2*Math.sin(performance.now()*.002)); }
@@ -3668,6 +3678,31 @@ function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visib
 function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; if(c.done) c.done(holePos); } return prog; }
 return {update,holePos:()=>holePos,drilled:()=>drilled,drill,progress:()=>prog};
 }
+/* ===== 診斷：錯誤記錄、效能取樣、一鍵複製給開發者 ===== */
+function createDiag(W,c){
+'use strict';
+const KEY='swampAngler.log'; let log=[]; try{ log=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ log=[]; }
+function add(kind,msg){ const t=new Date(); log.push(`${t.getMonth()+1}/${t.getDate()} ${t.toTimeString().slice(0,8)} [${kind}] ${String(msg).slice(0,300)}`); if(log.length>30) log=log.slice(-30); try{ localStorage.setItem(KEY,JSON.stringify(log)); }catch(e){} }
+window.addEventListener('error',e=>{ if(e.target&&e.target!==window&&(e.target.src||e.target.href)) add('load',e.target.src||e.target.href); else add('error',(e.message||'')+' @'+(e.filename||'').split('/').pop()+':'+(e.lineno||'')); },true);
+window.addEventListener('unhandledrejection',e=>add('promise',e.reason&&(e.reason.message||e.reason)));
+const ce=console.error.bind(console); console.error=function(){ try{ add('console',[...arguments].map(a=>a&&a.message?a.message:String(a)).join(' ')); }catch(e){} ce(...arguments); };
+/* 效能：最近 10 秒的平均與最低幀率 */
+const fr=[]; let last=performance.now();
+function tick(){ const n=performance.now(), dt=n-last; last=n; if(dt>0&&dt<2000){ fr.push([n,1000/dt]); } while(fr.length&&n-fr[0][0]>10000) fr.shift(); requestAnimationFrame(tick); }
+requestAnimationFrame(tick);
+function fps(){ if(!fr.length) return {avg:0,min:0}; let s=0,mn=999; for(const f of fr){ s+=f[1]; if(f[1]<mn) mn=f[1]; } return {avg:Math.round(s/fr.length),min:Math.round(mn)}; }
+function gpu(){ try{ const gl=W.renderer.getContext(), ext=gl.getExtension('WEBGL_debug_renderer_info'); return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER); }catch(e){ return '?'; } }
+function report(){ const f=fps(), G=c.G, S=c.save;
+  return ['【濕地垂釣 診斷資訊】','時間：'+new Date().toLocaleString('zh-TW'),'裝置：'+navigator.userAgent,'螢幕：'+screen.width+'×'+screen.height+' DPR '+(window.devicePixelRatio||1)+'，畫布解析度 '+(W.getPR?W.getPR():'?'),
+    '顯示晶片：'+gpu(),'畫質設定：'+(S.gfx||'high'),'幀率（近 10 秒）：平均 '+f.avg+'，最低 '+f.min,
+    '位置：'+(G.loc||'?')+'／釣點 '+(G.spot)+'／狀態 '+G.state+'／時間 '+(((G.hour%24)+24)%24).toFixed(1)+'／Lv '+S.lv,
+    '錯誤記錄（最近 '+log.length+' 筆）：',...(log.length?log:['（沒有錯誤）'])].join('\n'); }
+async function copy(){ const txt=report();
+  try{ await navigator.clipboard.writeText(txt); return true; }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); let ok=false; try{ ok=document.execCommand('copy'); }catch(e2){} ta.remove(); return ok; } }
+function clear(){ log=[]; try{ localStorage.removeItem(KEY); }catch(e){} }
+return {report,copy,clear,add,count:()=>log.length};
+}
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
 'use strict';
@@ -3914,6 +3949,7 @@ const AT=createAtmos(W,P,Snd,WL,{underwater:()=>UW.active(),period:()=>period(G.
 const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPECIES.length,period:()=>period(G.hour)}); window.__FUN=FUN;
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
+G.saveRef=save;
 const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* 畫質：高／中／低，影響倒影、霧層光束、雨圈、草叢與解析度上限 */
 window.__applyGfx=q=>{ window.__GFX=q; const cap={high:2,mid:1.5,low:1}[q]||2;
@@ -3924,7 +3960,7 @@ function iceDrop(){ const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assig
 const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
 const LURE=createLure(W,P,{G,toast,Snd,uwOn:()=>save.uw!==false,reelSpd:()=>META.gear().reel.spd,onChase:()=>{ if(!G.fd) prepFish(); if(!G.fd||G.fd.item) return null; const f=P.getFish(G.fd.sp); if(f) seeThrough(f.group); return f?{group:f.group,uni:f.uni,L:G.fd.L}:null; }}); window.__LURE=LURE; window.__G=G;
-window.__MOON=createMoonBay(W,{G,save,persist,toast,Snd,vib,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
+window.__MOON=createMoonBay(W,{G,save,persist,toast,Snd,vib,hour:()=>((G.hour%24)+24)%24,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
 window.__TAL=createTalents({save,persist,toast,Snd,vib,setCoins,loc:()=>G.loc||'lake',zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour)}); window.__SEA=SEA;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
 { const s=SPOTS[save.spot]; G.spot=save.spot; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; WL.setSpot(save.spot); SEA.setLoc(s.loc||'lake'); }
@@ -4156,7 +4192,7 @@ requestAnimationFrame(frame);
 
 (function boot(){
   if(!window.THREE){ boot.n=(boot.n||0)+1; if(boot.n>240){ showErr('3D 引擎載入失敗。請確認網路連線後重新整理頁面。'); return; } setTimeout(boot,50); return; }
-  try{ const W=createWorld({canvas:document.getElementById('c')}); const P=createProps(W);
+  try{ const W=createWorld({canvas:document.getElementById('c')}); window.__DIAG=createDiag(W,{get G(){ return window.__G||{}; },get save(){ return (window.__G&&window.__G.saveRef)||{}; }}); const P=createProps(W);
     const ln=document.getElementById('loadNote');
     try{ window.__REAL=createReal(W,P,(p,done,err)=>{ if(!ln) return; if(done) ln.textContent='真實場景已載入'; else if(err&&p===0) ln.textContent='部分場景檔案載入失敗，暫用簡化畫面（'+err+'）'; else ln.textContent='正在載入真實場景… '+Math.round(p*100)+'%'; }); }catch(e){ console.warn(e); }
     startGame(W,P); }
