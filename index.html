@@ -2077,7 +2077,7 @@ function update(dt,t){
   for(const m of wisps){ m.position.x+=wd.x*(.4+wd.s*3)*dt; m.position.z+=wd.z*(.4+wd.s*3)*dt;
     const d=Math.hypot(m.position.x-cw.x,m.position.z-cw.z); if(d>75||d<4) placeWisp(m,false);
     m.rotation.y=Math.atan2(cw.x-m.position.x,cw.z-m.position.z);
-    m.material.opacity=clamp(mist*.42,0,.5)*sstep(4,12,d)*(1-sstep(55,75,d));
+    m.material.opacity=clamp(mist*.42+(window.__MIST?window.__MIST.level()*.35:0),0,.62)*sstep(4,12,d)*(1-sstep(55,75,d));
     m.material.color.setRGB(fc.x*1.25+.02,fc.y*1.25+.02,fc.z*1.25+.02); }
   // 螢火蟲：黃昏後、無雨
   flies.p.position.copy(b); flies.p.rotation.y=head();
@@ -3361,7 +3361,7 @@ return {update};
 /* ===== 路亞：收線速度、抽竿、魚的興趣（假餌模型：Zverev、xeofox，CC-BY） ===== */
 const LURE_CFG={
  crank:{file:'lure_crank',head:'+x',len:.11,band:[1.0,2.0],twitch:.03,pause:0,dive:1.4,float:true,tip:'曲柄：快速穩定收線，會往下潛'},
- spoon:{file:'lure_spoon',head:'+y',len:.09,pick:1,band:[.6,1.7],twitch:.04,pause:0,dive:.5,sink:true,tip:'亮片：中速穩定收線，閃光吸引魚'},
+ spoon:{file:'lure_spoon',head:'+y',len:.09,pick:1,band:[.45,1.7],twitch:.04,pause:0,dive:.5,sink:true,tip:'亮片：中速穩定收線，閃光吸引魚'},
  minnow:{file:'lure_minnow',head:'-z',len:.12,pick:1,band:[.25,1.0],twitch:.18,pause:.1,dive:.6,float:true,tip:'米諾：抽一下、停一下，模仿受傷的小魚'}};
 function createLure(W,P,c){
 'use strict';
@@ -3429,6 +3429,38 @@ function update(dt,held){ if(!cur) return null; const cf=cur.cf;
   if(!ev&&dist<3.2) ev='done';
   return ev; }
 return {start,update,press,release,end,bobberVis,pos:()=>pos,interest:()=>cur?cur.interest:0,active:()=>!!cur};
+}
+/* ===== 晨霧：貼著水面的低霧層，迎光處被照亮 ===== */
+const SH6={};
+SH6.vs=`varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
+SH6.fs=`
+uniform float uTime, uK; uniform vec3 uFog, uSunDir, uSunCol; uniform vec2 uWind; varying vec3 vW;
+float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }
+void main(){
+  vec2 p=vW.xz*0.045 + uWind*uTime*0.02;
+  float n=n2(p)*0.55 + n2(p*2.3 + 7.0 - uWind*uTime*0.015)*0.3 + n2(p*5.1 + 3.0)*0.15;
+  vec3 V=vW - cameraPosition; float d=length(V); V/=d;
+  float graze=1.0 - smoothstep(0.05, 0.5, abs(V.y));            // 平視水面時最濃
+  float a=uK*smoothstep(0.32, 0.85, n)*graze*smoothstep(3.0, 14.0, d)*(1.0 - smoothstep(90.0, 120.0, d));
+  float fwd=pow(max(dot(V, normalize(uSunDir)), 0.0), 6.0);      // 迎著太陽：前向散射
+  vec3 col=mix(uFog*1.15 + 0.03, uSunCol*0.9 + uFog*0.4, fwd*0.8);
+  gl_FragColor=vec4(col, a*0.7);
+}`;
+function createMorningMist(W,c){
+'use strict';
+const T=THREE, U={uTime:W.U.uTime,uK:{value:0},uFog:W.U.uFogCol,uSunDir:W.U.uSunDir,uSunCol:W.U.uSunCol||{value:new T.Vector3(1,.85,.6)},uWind:{value:new T.Vector2(1,0)}};
+const layers=[]; for(const y of [.35,.9]){ const m=new T.Mesh(new T.PlaneGeometry(240,240).rotateX(-Math.PI/2),new T.ShaderMaterial({uniforms:U,vertexShader:SH6.vs,fragmentShader:SH6.fs,transparent:true,depthWrite:false,side:T.DoubleSide,fog:false}));
+  m.position.y=y; m.renderOrder=4; m.frustumCulled=false; W.scene.add(m); layers.push(m); if(W.reflHide) W.reflHide(m); }
+const cam=new T.Vector3(); let k=0, wet=0;
+function mistK(){ const h=((c.hour()%24)+24)%24; const dawn=Math.exp(-Math.pow((h-6.5)/1.1,2)), dusk=.35*Math.exp(-Math.pow((h-19.2)/.9,2)); return Math.max(dawn,dusk); }
+function update(dt){ W.camera.getWorldPosition(cam); const wx=c.wx?c.wx():{r:0};
+  wet=Math.max(wet-dt/240,(wx.r||0)>.3?1:0);                          // 雨後幾分鐘內的早晨更濃
+  const target=mistK()*(.75+.5*wet)*(c.sea()?.5:1)*(c.underwater()?0:1);
+  k+=(target-k)*Math.min(1,dt*.5); U.uK.value=k;
+  const wd=c.wind?c.wind():null; if(wd) U.uWind.value.set(wd.x||1,wd.z||0);
+  for(const m of layers){ m.visible=k>.01; m.position.x=cam.x; m.position.z=cam.z; } }
+return {update,level:()=>k};
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
@@ -3665,7 +3697,8 @@ const AT=createAtmos(W,P,Snd,WL,{underwater:()=>UW.active(),period:()=>period(G.
 const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPECIES.length,period:()=>period(G.hour)}); window.__FUN=FUN;
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
-const SKY=createNightSky(W,G); window.__SKY=SKY; window.__W=W;
+const SKY=createNightSky(W,G); window.__SKY=SKY;
+const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST; window.__W=W;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
 const LURE=createLure(W,P,{G,toast,Snd,reelSpd:()=>META.gear().reel.spd}); window.__LURE=LURE; window.__G=G;
 window.__MOON=createMoonBay(W,{G,save,persist,toast,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
@@ -3868,7 +3901,7 @@ function update(dt){
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light);
   if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
-  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); window.__MOON.update(dt); ARMS.update(!UW.active(),G.state,G.power,dt); SKY.update(dt,((G.hour%24)+24)%24);
+  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); window.__MOON.update(dt); ARMS.update(!UW.active(),G.state,G.power,dt); SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt);
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
     const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
   G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
