@@ -3333,7 +3333,8 @@ function setup(g){
     o.traverse(b=>{ if(!b.isBone) return; const n=b.name;
       if(n.indexOf(side+'_wrist')===0) wrist=b; if(n.indexOf(side+'_arm')===0) root=b; if(n.indexOf(side+'_palm')===0) palm=b;
       if(n.indexOf((side==='R'?'L':'R')+'_arm')===0) other=b;
-      const m=n.match(new RegExp('^'+side+'_(point|middle|ring|pink)([123])')); if(m) fing.push({b,k:CURL[+m[2]-1],x0:b.rotation.x}); });
+      const m=n.match(new RegExp('^'+side+'_(point|middle|ring|pink)([123])')); if(m) fing.push({b,k:CURL[+m[2]-1],x0:b.rotation.x});
+      const th=n.match(new RegExp('^'+side+'_thumb([123])')); if(th) fing.push({b,k:[.45,.6,.5][+th[1]-1],x0:b.rotation.x}); });   // 拇指同樣繞 −X 內收扣住竿子（實測）
     if(!wrist||!root) continue;
     if(other) other.scale.setScalar(1e-4);
     o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ m.renderOrder=2; (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.8; }); } });
