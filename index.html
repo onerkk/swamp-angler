@@ -4171,7 +4171,8 @@ function showCard(){
   FUN.tourCatch(G.fd); if(G.hot) save.hotC=(save.hotC||0)+1; $('bSell').textContent='賣出'; $('bRel').classList.remove('hidden');
   const fd=G.fd, sp=fd.sp, r=RAR[sp.rar], rec=save.dex[sp.id];
   const isNew=!rec, isRec=!!rec&&fd.w>rec.bw;
-  save.dex[sp.id]={n:(rec?rec.n:0)+1,bw:Math.max(rec?rec.bw:0,fd.w),bl:Math.max(rec?rec.bl:0,fd.L),md:Math.max(rec&&rec.md||0,FUN.medalLv(fd)),f:rec?rec.f:Date.now()};   // 只有第一次釣到才記日期；更新前的舊紀錄沒有日期就不顯示，不亂填 save.total++; persist();
+  // 首次釣獲日期只在第一次釣到時記錄；更新前的舊紀錄沒有日期就不顯示，不亂填
+  save.dex[sp.id]={n:(rec?rec.n:0)+1,bw:Math.max(rec?rec.bw:0,fd.w),bl:Math.max(rec?rec.bl:0,fd.L),md:Math.max(rec&&rec.md||0,FUN.medalLv(fd)),f:rec?rec.f:Date.now()}; save.total++; persist();
   if(window.__STORY&&!G.fd.item) window.__STORY.onCatch(fd,{zone:(SPOTS[G.spot]||{}).id,loc:G.loc,per:period(G.hour),rain:W.U.uRain.value>.25});
   { const xp=META.onCatch(fd,{perfect:!!(G.f&&G.f.perfect),per:period(G.hour)}), pm=window.__ECO?window.__ECO.priceMul(sp.id):1; $('cXp').textContent='+'+xp+' 經驗　'+(window.__ECO?window.__ECO.lastDrop():'')+(pm>1?'　🔥行情 ×'+pm:''); }
   ui.catch.style.setProperty('--rc',r.col);
