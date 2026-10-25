@@ -3379,7 +3379,8 @@ function getModel(k){ if(models[k]!==undefined) return models[k]; models[k]=null
     const c2=new T.Box3().setFromObject(w).getCenter(new T.Vector3()); inner.position.sub(c2);
     w.traverse(o=>{ o.frustumCulled=false; }); models[k]=w; if(cur&&cur.k===k) show(k); });
   return null; }
-let cur=null; const pos=new T.Vector3(), dir=new T.Vector3(), tmp=new T.Vector3();
+let cur=null, chaser=null; const pos=new T.Vector3(), dir=new T.Vector3(), tmp=new T.Vector3();
+function hideChaser(){ if(chaser){ chaser.group.visible=false; chaser=null; } }
 function show(k){ holder.clear(); const m=models[k]; if(m) holder.add(m); }
 /* 介面 */
 const st=document.createElement('style'); st.textContent=`#lureHud{position:fixed;left:12px;top:calc(var(--hudY,150px) + 54px);z-index:5;width:min(190px,48vw);padding:6px 10px;border-radius:12px;background:rgba(16,22,28,.7);border:1px solid rgba(255,255,255,.16);color:#eaf2f8;font-size:11px;pointer-events:none}
@@ -3398,7 +3399,7 @@ function start(at,bait,base){ const k=bait.lure, cf=LURE_CFG[k]; getModel(k); sh
   c.toast(cf.tip,'',2600); }
 function press(){ if(cur) cur.pressT=performance.now(); }
 function release(){ if(!cur) return; if(performance.now()-cur.pressT<220){ cur.twitchV=1.4; cur.twitched=true; c.Snd.plop&&c.Snd.plop(); W.addRipple(pos.x,pos.z,.12); } }
-function end(){ cur=null; holder.visible=false; hud.classList.add('hidden'); P.shadow.material.opacity=0; }
+function end(keep){ if(!keep) hideChaser(); else chaser=null; cur=null; holder.visible=false; hud.classList.add('hidden'); P.shadow.material.opacity=0; }
 function update(dt,held){ if(!cur) return null; const cf=cur.cf;
   if(held){ cur.heldT+=dt; cur.pause=0; } else { cur.heldT=0; cur.pause+=dt; }
   const target=held?cur.maxSp*Math.min(1,.4+.6*cur.heldT/1.5):0;
@@ -3412,7 +3413,7 @@ function update(dt,held){ if(!cur) return null; const cf=cur.cf;
   hDot.style.left=Math.min(98,v/2.4*100)+'%';
   /* 魚：先等一段時間才有魚注意到；之後依收線方式調整興趣 */
   let ev=null;
-  if(!cur.chase){ cur.delay-=dt; if(cur.delay<=0) cur.chase={d:3.2}; }
+  if(!cur.chase){ cur.delay-=dt; if(cur.delay<=0){ cur.chase={d:3.2}; const f=c.onChase?c.onChase():null; if(f){ chaser=f; f.group.visible=true; if(!f.group.parent) S.add(f.group); f.group.scale.setScalar(f.L); } } }
   else { const inBand=cur.speed>=cf.band[0]&&cur.speed<=cf.band[1];
     let di=0; if(inBand) di+=.3*dt; else if(cur.speed>cf.band[1]) di-=.35*dt;
     if(cur.pause>0){ if(cf.pause&&cur.pause<1.2) di+=cf.pause*dt; else if(cur.pause>1.6) di-=.22*dt; }
@@ -3421,14 +3422,19 @@ function update(dt,held){ if(!cur) return null; const cf=cur.cf;
     cur.chase.d+=((3.2-2.8*cur.interest)-cur.chase.d)*Math.min(1,dt*2);
     tmp.copy(pos).addScaledVector(dir,-cur.chase.d); P.shadow.position.set(tmp.x,.02,tmp.z); P.shadow.material.opacity=.15+.35*cur.interest;
     P.shadow.rotation&&(P.shadow.rotation.y=Math.atan2(dir.x,dir.z));
+    if(chaser){ /* 真實魚模型跟在假餌後面：越有興趣越靠近水面、跟得越緊、尾巴擺得越快 */
+      const g=chaser.group, I=cur.interest, wob=Math.sin(performance.now()*.004)*.35*(1-I);
+      g.position.set(tmp.x+dir.z*wob,-(.25-.3*I)+Math.sin(performance.now()*.006)*.01,tmp.z-dir.x*wob); g.rotation.set(0,Math.atan2(-dir.z,dir.x),0);
+      chaser.uni.uSwim.value+=dt*(5+9*(cur.speed+I)); chaser.uni.uAmp.value=.05+.04*I; P.shadow.material.opacity*=.5;
+      if(I>.75&&Math.random()<dt*6) P.splash(g.position.x-dir.x*chaser.L*.3,0,g.position.z-dir.z*chaser.L*.3,2,.18); }   // 背鰭劃開水面
     cur.fx=(cur.fx||0)-dt; if(cur.interest>.45&&cur.fx<=0){ cur.fx=.9-.6*cur.interest; W.addRipple(tmp.x,tmp.z,.12+.25*cur.interest); if(cur.interest>.75) P.splash(tmp.x,0,tmp.z,4,.25); }   // 魚背攪水
     hC.textContent=cur.interest>.7?'🐟 快咬了！':cur.interest>.25?'🐟 有魚在追':'🐟 魚在觀察';
     if(cur.interest>=1&&Math.random()<dt*3) ev='strike';
-    else if(cur.interest<=0&&cur.wasHigh){ cur.chase=null; cur.delay=2+Math.random()*3; cur.wasHigh=false; hC.textContent=''; P.shadow.material.opacity=0; ev='lost'; }
+    else if(cur.interest<=0&&cur.wasHigh){ hideChaser(); cur.chase=null; cur.delay=2+Math.random()*3; cur.wasHigh=false; hC.textContent=''; P.shadow.material.opacity=0; ev='lost'; }
     if(cur.interest>.3) cur.wasHigh=true; }
   if(!ev&&dist<3.2) ev='done';
   return ev; }
-return {start,update,press,release,end,bobberVis,pos:()=>pos,interest:()=>cur?cur.interest:0,active:()=>!!cur};
+return {start,update,press,release,end,chaser:()=>chaser,bobberVis,pos:()=>pos,interest:()=>cur?cur.interest:0,active:()=>!!cur};
 }
 /* ===== 晨霧：貼著水面的低霧層，迎光處被照亮 ===== */
 const SH6={};
@@ -3700,7 +3706,7 @@ const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDim
 const SKY=createNightSky(W,G); window.__SKY=SKY;
 const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST; window.__W=W;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
-const LURE=createLure(W,P,{G,toast,Snd,reelSpd:()=>META.gear().reel.spd}); window.__LURE=LURE; window.__G=G;
+const LURE=createLure(W,P,{G,toast,Snd,reelSpd:()=>META.gear().reel.spd,onChase:()=>{ if(!G.fd) prepFish(); if(!G.fd||G.fd.item) return null; const f=P.getFish(G.fd.sp); return f?{group:f.group,uni:f.uni,L:G.fd.L}:null; }}); window.__LURE=LURE; window.__G=G;
 window.__MOON=createMoonBay(W,{G,save,persist,toast,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
 window.__TAL=createTalents({save,persist,toast,Snd,vib,setCoins,loc:()=>G.loc||'lake',zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour)}); window.__SEA=SEA;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
@@ -3843,7 +3849,7 @@ function update(dt){
   else if(st==='lure'){
       const ev=LURE.update(dt,G.held); bob.position.copy(LURE.pos()); lineEnd=bob.position; slack=.08; if(G.held){ rod.spin-=dt*14; if(Math.random()<dt*10) Snd.click(); }
       setAct(G.held?'收線中':'按住收線<br>點擊抽竿',LURE.interest()>.25?'魚在追！照這個節奏繼續':'按住收線、短按抽竿，找出魚喜歡的節奏',false);
-      if(ev==='strike'){ G.to.set(bob.position.x,0,bob.position.z); G.castDist=Math.hypot(G.to.x-G.base.x,G.to.z-G.base.z); LURE.end(); G.fd=null; prepFish(); P.splash(G.to.x,0,G.to.z,40,1.3); W.addRipple(G.to.x,G.to.z,.9); Snd.splash&&Snd.splash(1.2); vib([40,30,80]); bite(); toast('咬了！','good',900); }
+      if(ev==='strike'){ G.to.set(bob.position.x,0,bob.position.z); G.castDist=Math.hypot(G.to.x-G.base.x,G.to.z-G.base.z); { const ch=LURE.chaser(); if(ch){ ch.group.position.set(G.to.x,-.05,G.to.z); } } LURE.end(); if(!G.fd) prepFish(); P.splash(G.to.x,0,G.to.z,40,1.3); W.addRipple(G.to.x,G.to.z,.9); Snd.splash&&Snd.splash(1.2); vib([40,30,80]); bite(); toast('咬了！','good',900); }
       else if(ev==='lost'){ G.fd=null; toast('魚失去興趣游走了','warn',1400); }
       else if(ev==='done'){ LURE.end(); startRetrieve('路亞收回來了，這次沒有魚咬','warn'); LURE.bobberVis(true); }
     }
