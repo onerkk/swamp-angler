@@ -1870,7 +1870,8 @@ let taps=0; tapB.addEventListener('pointerdown',e=>{ e.preventDefault(); if(gs.m
 function raidOk(){ const s=sp(); return !(ctx.loc&&ctx.loc()!=='lake')&&ctx.state&&['idle','wait'].indexOf(ctx.state())>=0&&!s.yacht; }
 function spawnRaid(dist){ const b=ctx.base(), s=sp(), side=Math.random()<.5?1:-1, a=ctx.head()+side*rand(.25,.7), D=dist||16;
   gP.set(b.x-Math.sin(a)*D,0,b.z-Math.cos(a)*D); inShore(gP,b.x,b.z,4); gs={mode:'raid',t:0,d:16}; taps=0;
-  Snd.gator(); vib([80,60,80,60,120]); W.addRipple(gP.x,gP.z,1.2);   // 不用文字宣告，只靠叫聲、震動、水紋讓玩家自己察覺
+  Snd.gator(); vib([80,60,80,60,120]); W.addRipple(gP.x,gP.z,1.2);
+  if(!save.gatorTip){ save.gatorTip=1; setTimeout(()=>toast(s.kayak?'🛶 划船撞開牠！':'🪵 快拍水嚇走牠！','warn',2600),900); }   // 只在第一次遇到時提示一次   // 不用文字宣告，只靠叫聲、震動、水紋讓玩家自己察覺
   if(!s.kayak) tapB.classList.remove('hidden'); }
 function gatorFlee(why){ const b=ctx.base(); tapB.classList.add('hidden'); gs={mode:'flee',t:0,dir:tv3.subVectors(gP,b).setY(0).normalize().clone(),why};
   P.splash(gP.x,0,gP.z,why==='ram'?40:22,why==='ram'?1.4:.9); W.addRipple(gP.x,gP.z,why==='ram'?1.4:.9); vib(why==='ram'?[150,40,200]:[60,40,90]);
@@ -4043,7 +4044,7 @@ function pickSpecies(){
 }
 
 /* ---------- 動作 ---------- */
-function startCharge(){ if(G.scareT>0){ toast('驚魂未定，等一下再拋竿…','warn',1400); return; } G.state='charge'; G.chargeT=0; }
+function startCharge(){ if(G.scareT>0){ toast('驚魂未定，等一下再拋竿…','warn',1400); return; } G.state='charge'; G.chargeT=0; G.aimYawCast=G.yawT; }
 function cast(){
   G.baitUsed=META.useBait(); LURE.bobberVis(!(G.baitUsed&&G.baitUsed.lure));
   const p=G.power, dist=6+p*META.gear().rod.cast, A=G.head+G.yaw, fw=tv.set(-Math.sin(A),0,-Math.cos(A)), bx=G.base.x, bz=G.base.z;
@@ -4153,7 +4154,7 @@ ui.act.addEventListener('contextmenu',e=>e.preventDefault());
 const cv=W.renderer.domElement;
 cv.addEventListener('pointerdown',e=>{ if(dragPtr!==null) return; dragPtr=e.pointerId; dragX0=e.clientX; yaw0=G.yawT; dragY0=e.clientY; pitch0=G.pitchT||0; try{ cv.setPointerCapture(e.pointerId); }catch(_){} });
 cv.addEventListener('pointermove',e=>{ if(e.pointerId!==dragPtr) return; const dx=e.clientX-dragX0;
-  if(G.state==='fight') G.rodSideT=clamp(dx/70,-1,1); else if(G.state==='idle'||G.state==='charge') G.yawT=clamp(yaw0-dx*.005,-.95,.95);
+  if(G.state==='fight') G.rodSideT=clamp(dx/70,-1,1); else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(yaw0-dx*.005,-.95,.95);   // 拋竿後（等魚、咬餌、路亞）也能自由轉視角
   if(G.state==='idle'||G.state==='wait') G.pitchT=clamp(pitch0+(e.clientY-dragY0)*.004,0,.62); });   // 上下拖曳：抬頭看天空
 const dragRel=e=>{ if(e.pointerId!==dragPtr) return; dragPtr=null; if(actPtr===null) G.rodSideT=0; };
 cv.addEventListener('pointerup',dragRel); cv.addEventListener('pointercancel',dragRel);
@@ -4314,10 +4315,12 @@ function updateFight(dt){
 }
 
 function update(dt){
+  // 拉魚開始時記住拋竿瞄準的方向；離開拉魚（釣到、跑掉、斷線）就轉回去。放在最前面，不受後面任何錯誤影響
+  if(G.prevSt==='fight'&&G.state!=='fight') G.yawT=G.aimYaw||0; if(G.state==='fight'&&G.prevSt!=='fight') G.aimYaw=G.aimYawCast!=null?G.aimYawCast:G.yawT; G.prevSt=G.state;
   G.t+=dt; G.hour+=dt/40;
   G.hSave=(G.hSave||0)+dt; if(G.hSave>10){ G.hSave=0; save.hour=((G.hour%24)+24)%24; persist(); }
   const info=W.setTime(G.hour); W.update(dt,G.t); updateKayak(dt);
-  if(keys.ArrowLeft||keys.ArrowRight){ const k=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0); if(G.state==='fight') G.rodSideT=k; else if(G.state==='idle'||G.state==='charge') G.yawT=clamp(G.yawT-k*dt*1.2,-.95,.95); }
+  if(keys.ArrowLeft||keys.ArrowRight){ const k=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0); if(G.state==='fight') G.rodSideT=k; else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(G.yawT-k*dt*1.2,-.95,.95); }
   G.rodSide+=(G.rodSideT-G.rodSide)*Math.min(1,dt*8); rod.side=G.rodSide;
   if(G.state!=='fight'){ rod.end=null; rod.bendT=.03; } bob.visible=!G.snapped; bob.rotation.set(0,0,0);
   let lineEnd=null, slack=.35, lineOn=!G.snapped, trem=0;
