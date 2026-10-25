@@ -2083,6 +2083,13 @@ const fluke=new T.Group(); fluke.visible=false; S.add(fluke);
 { const sh=new T.Shape(); sh.moveTo(0,.06); sh.quadraticCurveTo(-.25,.15,-.5,.42); sh.quadraticCurveTo(-.38,.12,-.32,0); sh.quadraticCurveTo(-.38,-.12,-.5,-.42); sh.quadraticCurveTo(-.25,-.15,0,-.06); sh.lineTo(0,.06);
   const f=new T.Mesh(new T.ShapeGeometry(sh,12),tailM); f.rotation.z=-Math.PI/2; f.position.y=.6; fluke.add(f);
   const shaft=new T.Mesh(new T.CylinderGeometry(.05,.09,.62,14),tailM); shaft.position.y=.3; fluke.add(shaft); fluke.scale.setScalar(1.2); }
+/* 3D 美人魚：上下顛倒，只讓魚尾那一截露出水面（模型依玩家設定圖生成） */
+if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid3d.glb',gl=>{ const o=gl.scene;
+  o.traverse(x=>{ if(x.isMesh){ x.material=new T.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.1,emissive:new T.Color(0x3a6f8a),emissiveIntensity:.35}); x.frustumCulled=false; } });
+  const w=new T.Group(); w.add(o); o.updateMatrixWorld(true); let b=new T.Box3().setFromObject(o); o.scale.setScalar(1.6/Math.max(b.getSize(new T.Vector3()).y,1e-6));
+  w.rotation.x=Math.PI; w.rotation.z=.18; w.updateMatrixWorld(true); b=new T.Box3().setFromObject(w); const c=b.getCenter(new T.Vector3());
+  w.position.set(-c.x,(.85/1.2)-b.max.y,-c.z);
+  fluke.children.forEach(ch=>{ ch.visible=false; }); fluke.add(w); });
 let tease=null, teaseT=rand(60,140), teaseN=0;
 let riseT=rand(3,8), t0=0;
 function update(dt,t){
@@ -3402,11 +3409,13 @@ function setup(g){
   }
   ready=arms.length===2; window.__ARMSDBG=arms; }
 if(T.GLTFLoader) new T.GLTFLoader().load('models/arms.glb',setup);
+/* 雙手補光：掛在鏡頭上、只照 2 米內，亮度跟著日照，夜裡不會像戴頭燈 */
+const fill=new T.PointLight(0xfff2e0,0,2.2,1.6); W.camera.add(fill); fill.position.set(.15,.1,.1); if(!W.camera.parent) S.add(W.camera);
 const tg=new T.Vector3(), sh=new T.Vector3(), wd=new T.Vector3(), q=new T.Quaternion(), q2=new T.Quaternion(), cq=new T.Quaternion(),
   upW=new T.Vector3(), upM=new T.Vector3(), sd=new T.Vector3(), tmp=new T.Vector3(), off=new T.Vector3();
 let back=0, fwd=0, lastSt='', reelK=0;
 function update(show,st,power,dt){
-  if(!ready) return; dt=dt||.016;
+  if(!ready) return; dt=dt||.016; fill.intensity=show?(W.info?W.info.light:1)*(window.__G&&window.__G.loc==='sea'?3.2:1.6):0;
   /* 揮臂：蓄力時往後上方拉，放開瞬間往前揮，再回原位 */
   if(lastSt==='charge'&&st!=='charge') fwd=1; lastSt=st;
   back+=((st==='charge'?Math.min(1,power||0):0)-back)*Math.min(1,dt*8); fwd=Math.max(0,fwd-dt*2.2);
