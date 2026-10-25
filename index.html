@@ -1908,7 +1908,7 @@ function updateWeather(dt){
   W.setWeather(cur.c,cur.r,cur.f); Snd.rain(cur.r);
   if(wxType==='storm'&&cur.r>.7){ thT-=dt; if(thT<=0){ thT=rand(25,60); flash=1; setTimeout(()=>Snd.thunder(),rand(300,1600)); } }
   if(flash>0){ W.renderer.toneMappingExposure*=1+flash*(Math.random()<.5?2.2:1.2); flash=Math.max(0,flash-dt*4); }
-  const ic=((W.info.day<.2&&cur.c<.4)?'🌙':wxEmo(wxType))+' '+Math.round(windNow)+'m/s'; if(ic!==lastIcon){ lastIcon=ic; const el=wxIcon('wxI'); if(el) el.textContent=ic; }
+  const ic=((W.info.day<.2&&cur.c<.4)?(window.__MOONPH?window.__MOONPH.emo():'🌙'):wxEmo(wxType))+' '+Math.round(windNow)+'m/s'; if(ic!==lastIcon){ lastIcon=ic; const el=wxIcon('wxI'); if(el) el.textContent=ic; }
 }
 function updateRain(dt){
   if(cur.r<.02||(window.__G&&window.__G.loc==='ice')){ rainL.visible=false; return; }
@@ -3280,8 +3280,18 @@ const ss=(a,b,x)=>{ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2
 /* 月亮：NASA 月球影像（公有領域），掛在月光灣的方向，仰角 17° */
 const MD=new T.Vector3(-Math.sin(.35)*Math.cos(.22),Math.sin(.22),-Math.cos(.35)*Math.cos(.22)).normalize();
 const moonTex=new T.TextureLoader().load('moon.jpg'); moonTex.encoding=T.sRGBEncoding;
-const moon=new T.Mesh(new T.SphereGeometry(1,32,24),new T.MeshBasicMaterial({map:moonTex,color:new T.Color(1.7,1.7,1.75),fog:false,transparent:true,depthWrite:false,toneMapped:false}));
+const moon=new T.Mesh(new T.SphereGeometry(1,32,24),new T.MeshBasicMaterial({map:moonTex,color:new T.Color(1.7,1.7,1.75),fog:false,transparent:false,depthWrite:false,toneMapped:false}));
 moon.rotation.y=-1.2; moon.renderOrder=-2; moon.frustumCulled=false; S.add(moon);
+/* 月相：依真實日期算月齡（朔望月 29.53 天），以陽光方向即時照亮球體 */
+const SYN=29.530588853, NEW0=Date.UTC(2000,0,6,18,14);
+const phase=()=>((((Date.now()-NEW0)/864e5)/SYN)%1+1)%1, illum=()=>(1-Math.cos(2*Math.PI*phase()))/2;
+const PH_EMO=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'], phEmo=()=>PH_EMO[Math.round(phase()*8)%8];
+window.__MOONPH={phase,illum,emo:phEmo};
+const uL={value:new T.Vector3(0,0,1)};
+moon.material.onBeforeCompile=sh=>{ sh.uniforms.uL=uL;
+  sh.vertexShader='varying vec3 vNw;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvNw=normalize(mat3(modelMatrix)*normal);');
+  sh.fragmentShader='uniform vec3 uL;\nvarying vec3 vNw;\n'+sh.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n  float lit_=smoothstep(-0.06,0.12,dot(normalize(vNw),uL));\n  diffuseColor.rgb*=mix(0.035,1.0,lit_);'); };
+const toV=new T.Vector3(), rgt=new T.Vector3(), upY=new T.Vector3(0,1,0);
 const hc=document.createElement('canvas'); hc.width=hc.height=128; { const x=hc.getContext('2d'), g=x.createRadialGradient(64,64,0,64,64,64); g.addColorStop(0,'rgba(200,220,255,.55)'); g.addColorStop(.35,'rgba(150,180,255,.18)'); g.addColorStop(1,'rgba(120,150,255,0)'); x.fillStyle=g; x.fillRect(0,0,128,128); }
 const halo=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(hc),blending:T.AdditiveBlending,depthWrite:false,fog:false,transparent:true}));
 halo.renderOrder=-2; S.add(halo);
@@ -3326,21 +3336,34 @@ let act=0;
 const active=()=>c.zoneId()==='moon'&&c.period()==='night'&&(G.loc||'lake')!=='sea';
 function koiK(){ if(!active()) return 0; return MS.done?1.5:MS.sc>=6?40:0; }
 function onCatch(fd){ if(!fd||fd.item||!active()||!MS.met) return;
-  if(MS.sc<6&&fd.sp.id!=='moonkoi'&&Math.random()<.45){ MS.sc++; c.persist(); tb.classList.add('dot');
-    setTimeout(()=>c.toast(`🌙 在魚肚裡找到一片月鱗（${MS.sc}/7）！去聽汐月的故事`,'good',3200),1500); }
+  if(MS.sc<6&&fd.sp.id!=='moonkoi'&&Math.random()<.25+.3*illum()){ MS.sc++; c.persist(); tb.classList.add('dot'); setTimeout(()=>scaleFx(MS.sc),1200); }
   else if(fd.sp.id==='moonkoi'&&!MS.done&&MS.sc>=6){ MS.sc=7; MS.done=true; c.persist(); c.giveRod(); tb.classList.add('dot');
-    setTimeout(()=>c.toast('🌙 第七片月鱗！月光連成了一條路……去找汐月吧','good',4000),1500); } }
+    setTimeout(()=>{ scaleFx(7); c.toast('🌙 第七片月鱗！月光連成了一條路……去找汐月吧','good',4000); },1200); } }
+/* 找到月鱗：發光的鱗片在畫面中央浮現、旋轉放大，再飛向汐月按鈕 */
+const fx=document.createElement('div'); fx.id='scaleFx'; fx.innerHTML='<i></i><b></b>'; document.body.appendChild(fx);
+const st2=document.createElement('style'); st2.textContent=`#scaleFx{position:fixed;left:50%;top:42%;z-index:26;pointer-events:none;display:none;transform:translate(-50%,-50%)}
+#scaleFx i{display:block;width:84px;height:110px;margin:0 auto;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;background:radial-gradient(ellipse at 40% 30%,#ffffff,#cfe6ff 35%,#7fb6ff 70%,rgba(80,140,255,0) 72%);box-shadow:0 0 30px 10px rgba(140,190,255,.8),0 0 70px 20px rgba(120,160,255,.4)}
+#scaleFx b{display:block;margin-top:14px;text-align:center;color:#eaf4ff;font-size:22px;font-weight:900;text-shadow:0 0 12px rgba(120,170,255,.9);white-space:nowrap}
+#scaleFx.go{display:block;animation:scF 2.6s ease-in-out forwards}#scaleFx.go i{animation:scS 2.6s ease-in-out forwards}
+@keyframes scS{0%{transform:scale(.2) rotate(-30deg);opacity:0}20%{transform:scale(1.15) rotate(10deg);opacity:1}35%{transform:scale(1) rotate(0)}100%{transform:scale(.9) rotate(360deg)}}
+@keyframes scF{0%,70%{left:50%;top:42%;opacity:1}100%{left:calc(100% - 46px);top:calc(100% - 70px);opacity:0;transform:translate(-50%,-50%) scale(.3)}}`;
+document.head.appendChild(st2);
+function scaleFx(n){ fx.querySelector('b').textContent=`🌙 月鱗 ${Math.min(7,n)}/7`; fx.classList.remove('go'); void fx.offsetWidth; fx.classList.add('go');
+  if(c.Snd&&c.Snd.fanfare) c.Snd.fanfare(1); if(c.vib) c.vib([30,40,30,40,90]); setTimeout(()=>fx.classList.remove('go'),2700);
+  if(n<7) setTimeout(()=>c.toast('找到新的月鱗！去聽汐月的故事','good',2600),2300); }
 const cam=new T.Vector3();
 function update(dt){ W.camera.getWorldPosition(cam);
   const nk=W.U.uNight?W.U.uNight.value:0, cl=W.U.uCloud?W.U.uCloud.value:0, vis=nk*(1-.8*Math.min(1,cl));
-  W.U.uMoonDir.value.copy(MD); W.U.uMoonK.value=vis;
-  moon.visible=halo.visible=vis>.02; if(moon.visible){ moon.position.copy(cam).addScaledVector(MD,780); moon.scale.setScalar(26); moon.material.opacity=Math.min(1,vis*1.3);
-    halo.position.copy(cam).addScaledVector(MD,770); halo.scale.set(150,150,1); halo.material.opacity=vis; }
+  const th=2*Math.PI*phase(), il=illum(); toV.copy(MD).negate(); rgt.crossVectors(MD,upY).normalize();
+  uL.value.copy(toV).multiplyScalar(-Math.cos(th)).addScaledVector(rgt,Math.sin(th)).normalize();
+  W.U.uMoonDir.value.copy(MD); W.U.uMoonK.value=vis*Math.max(0,il); if(W.U.uMoonCol) W.U.uMoonCol.value.set(0,0,0);   // 關掉天空著色器裡的程序化滿月，避免從暗面透出
+  moon.visible=halo.visible=vis>.02&&il>.03; if(moon.visible){ moon.position.copy(cam).addScaledVector(MD,780); moon.scale.setScalar(26); { const k=Math.min(1,vis*1.3); moon.material.color.setRGB(1.7*k,1.7*k,1.75*k); }
+    halo.position.copy(cam).addScaledVector(MD,770); halo.scale.set(150,150,1); halo.material.opacity=vis*(.25+.75*il); }
   act+=((active()?1:0)-act)*Math.min(1,dt*.8); W.U.uBio.value=act;
   npc.visible=act>.05; if(npc.visible){ mer.material.opacity=act; mer.rotation.y=Math.atan2(cam.x-NP.x,cam.z-NP.z); glow.material.opacity=.5*act*(0.8+0.2*Math.sin(performance.now()*.002)); }
   const near=npc.visible&&Math.hypot(cam.x-NP.x,cam.z-NP.z)<35; tb.classList.toggle('hidden',!near||act<.5);
   if(near&&MS.read<unlocked()) tb.classList.add('dot'); }
-return {update,onCatch,koiK,active};
+return {update,onCatch,koiK,active,scaleFx};
 }
 /* ===== 第一人稱雙手（Sketchfab「First Person arms」by bumstrum，CC-BY） ===== */
 function createArms(W,P){
@@ -3824,7 +3847,7 @@ function iceDrop(){ const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assig
 const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST; window.__W=W;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
 const LURE=createLure(W,P,{G,toast,Snd,reelSpd:()=>META.gear().reel.spd,onChase:()=>{ if(!G.fd) prepFish(); if(!G.fd||G.fd.item) return null; const f=P.getFish(G.fd.sp); return f?{group:f.group,uni:f.uni,L:G.fd.L}:null; }}); window.__LURE=LURE; window.__G=G;
-window.__MOON=createMoonBay(W,{G,save,persist,toast,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
+window.__MOON=createMoonBay(W,{G,save,persist,toast,Snd,vib,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
 window.__TAL=createTalents({save,persist,toast,Snd,vib,setCoins,loc:()=>G.loc||'lake',zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour)}); window.__SEA=SEA;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
 { const s=SPOTS[save.spot]; G.spot=save.spot; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; WL.setSpot(save.spot); SEA.setLoc(s.loc||'lake'); }
