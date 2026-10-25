@@ -476,7 +476,8 @@ vec3 photoEnv(vec3 dir){
   c = mix(c, vec3(g)*vec3(0.94, 0.97, 1.02), clamp(uCloud - 0.3, 0.0, 1.0)*0.75);
   c *= 1.0 - 0.35*clamp(uCloud - 0.4, 0.0, 1.0) - 0.25*uRain;
   c *= mix(1.0, uNightDeep, uNight);
-  c += vec3(0.0006, 0.0011, 0.0026)*uNight*smoothstep(-0.05, 0.6, d.y);
+  vec3 navy = mix(vec3(0.006, 0.009, 0.02), vec3(0.0012, 0.002, 0.0065), smoothstep(0.1, 0.9, d.y));
+  c = mix(c, navy, uNight*0.9*smoothstep(0.02, 0.35, d.y));
   if(d.y > 0.0){
     vec2 cuv = d.xz/(d.y + 0.10)*0.6 + uCloudOff;
     float n = fbm5(cuv);
@@ -1055,11 +1056,12 @@ const lineMat=new T.MeshBasicMaterial({color:0xdfe6e8, transparent:true, opacity
 const lineMesh=new T.Mesh(lgeo,lineMat); lineMesh.frustumCulled=false; scene.add(lineMesh);
 const LP=[]; for(let i=0;i<LN;i++) LP.push(new T.Vector3());
 const camW=new T.Vector3(), lt=new T.Vector3(), lc=new T.Vector3(), ls=new T.Vector3();
-function setLine(end, slack, visible, light){
+function setLine(end, slack, visible, light, trem){
   lineMesh.visible=!!visible; if(!visible) return;
   let n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(rod.tipW);
   const tip=rod.tipW, dist=tip.distanceTo(end), sag=slack*Math.min(dist,40)*0.12, NC=LN-n;
   const ctrl=tmp2.copy(tip).add(end).multiplyScalar(.5); ctrl.y-=sag*2;
+  if(trem){ const tq=performance.now()*.001; ctrl.x+=Math.sin(tq*61)*trem; ctrl.y+=Math.sin(tq*47+1.3)*trem*.7; ctrl.z+=Math.cos(tq*53)*trem; }   // 繃緊的釣線細微顫動
   for(let i=1;i<=NC;i++){ const t=i/NC, a=(1-t)*(1-t), b=2*(1-t)*t, c=t*t;
     LP[n++].set(a*tip.x+b*ctrl.x+c*end.x, a*tip.y+b*ctrl.y+c*end.y, a*tip.z+b*ctrl.z+c*end.z); }
   camera.getWorldPosition(camW);
@@ -3100,10 +3102,10 @@ void main(){
   float air = 1.0/max(alt + 0.06, 0.06);                     // 大氣質量：低空變暗
   float flux = pow(10.0, -0.4*(aMag - 1.0));
   float tw = 1.0 + (0.12 + 0.5*(1.0 - smoothstep(0.05, 0.5, alt)))*sin(uTime*(7.0 + aSeed*9.0) + aSeed*40.0);  // 閃爍：越低越明顯
-  vA = clamp(sqrt(flux)*1.25, 0.0, 1.0)*hz*uVis*tw*exp(-0.09*(air - 1.0));
+  vA = clamp(max(pow(flux, 0.32)*1.75, 0.24), 0.0, 1.0)*hz*uVis*tw*exp(-0.09*(air - 1.0));
   vCol = aCol;
   vec4 mv = viewMatrix*wp;
-  gl_PointSize = clamp(1.6 + 2.8*sqrt(flux), 1.6, 7.5)*uPR;
+  gl_PointSize = clamp(2.0 + 3.4*sqrt(flux), 2.0, 9.0)*uPR;
   gl_Position = projectionMatrix*mv;
 }`;
 SH5.starFS=`
@@ -3127,7 +3129,7 @@ void main(){
   float band = exp(-pow(b/0.17, 2.0))*(0.45 + 0.9*exp(-pow(l/0.9, 2.0)));
   float n = n3(d*9.0)*0.6 + n3(d*23.0)*0.4;
   float dust = smoothstep(0.35, 0.75, n3(d*14.0 + 3.0))*exp(-pow(b/0.05, 2.0));
-  float a = band*(0.55 + 0.6*n)*(1.0 - 0.75*dust)*0.24*uVis;
+  float a = band*(0.55 + 0.6*n)*(1.0 - 0.75*dust)*0.75*uVis;
   vec3 wd = normalize(vW - cameraPosition); a *= smoothstep(uHz0, uHz1 + 0.15, wd.y);
   gl_FragColor = vec4(vec3(0.85, 0.88, 1.0)*a, a);
 }`;
@@ -3147,7 +3149,15 @@ function bvRGB(bv){ // B-V 色指數 → 色溫 → 顏色
 for(let i=0;i<N;i++){ const ra=dv.getUint16(i*6,true)/65535*2*Math.PI, de=dv.getInt16(i*6+2,true)/32767*Math.PI/2;
   pos[i*3]=Math.cos(de)*Math.cos(ra); pos[i*3+1]=Math.cos(de)*Math.sin(ra); pos[i*3+2]=Math.sin(de);
   mag[i]=dv.getUint8(i*6+4)/25-2; const c=bvRGB(dv.getInt8(i*6+5)/60); col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2]; seed[i]=Math.random(); }
-const sg=new T.BufferGeometry(); sg.setAttribute('position',new T.BufferAttribute(pos,3)); sg.setAttribute('aMag',new T.BufferAttribute(mag,1)); sg.setAttribute('aCol',new T.BufferAttribute(col,3)); sg.setAttribute('aSeed',new T.BufferAttribute(seed,1));
+/* 無光害夜空的暗星：6.2～8.5 等、9,000 顆，靠近銀河面越密（與真實星表同一套座標與著色） */
+const NF=9000, P2=new Float32Array((N+NF)*3), M2=new Float32Array(N+NF), C2=new Float32Array((N+NF)*3), S2=new Float32Array(N+NF);
+P2.set(pos); M2.set(mag); C2.set(col); S2.set(seed);
+{ const NG=[-0.8676,-0.1981,0.4560]; let k=N;
+  while(k<N+NF){ const u=Math.random()*2-1, ph=Math.random()*2*Math.PI, r=Math.sqrt(1-u*u), x=r*Math.cos(ph), y=r*Math.sin(ph), z=u;
+    const b=Math.asin(x*NG[0]+y*NG[1]+z*NG[2]); if(Math.random()>.22+.78*Math.exp(-Math.pow(b/.28,2))) continue;
+    P2[k*3]=x; P2[k*3+1]=y; P2[k*3+2]=z; M2[k]=6.2+2.3*Math.pow(Math.random(),.6);
+    const t=Math.random(), cc=t<.3?[.8,.88,1]:t<.75?[1,1,1]:[1,.92,.78]; C2[k*3]=cc[0]; C2[k*3+1]=cc[1]; C2[k*3+2]=cc[2]; S2[k]=Math.random(); k++; } }
+const sg=new T.BufferGeometry(); sg.setAttribute('position',new T.BufferAttribute(P2,3)); sg.setAttribute('aMag',new T.BufferAttribute(M2,1)); sg.setAttribute('aCol',new T.BufferAttribute(C2,3)); sg.setAttribute('aSeed',new T.BufferAttribute(S2,1));
 const U={uTime:W.U.uTime,uPR:{value:1},uVis:{value:0},uHz0:{value:.1},uHz1:{value:.2}};
 const stars=new T.Points(sg,new T.ShaderMaterial({uniforms:U,vertexShader:SH5.starVS,fragmentShader:SH5.starFS,transparent:true,depthWrite:false,blending:T.AdditiveBlending,fog:false}));
 const mw=new T.Mesh(new T.SphereGeometry(1,64,32),new T.ShaderMaterial({uniforms:U,vertexShader:SH5.mwVS,fragmentShader:SH5.mwFS,transparent:true,depthWrite:false,blending:T.AdditiveBlending,side:T.BackSide,fog:false}));
@@ -3189,7 +3199,7 @@ function update(dt,hour){ W.camera.getWorldPosition(cam);
   const day=W.U.uDay?W.U.uDay.value:1, cloud=W.U.uCloud?W.U.uCloud.value:0;
   const vis=Math.pow(Math.max(0,1-day*1.6),2)*(1-.85*Math.min(1,cloud))*(W.U.uRain?1-.9*W.U.uRain.value:1);
   U.uVis.value+=(vis-U.uVis.value)*Math.min(1,dt*2);
-  const sea=G.loc==='sea'; U.uHz0.value=sea?.005:.1; U.uHz1.value=sea?.05:.22;
+  const sea=G.loc==='sea'; U.uHz0.value=sea?.005:.018; U.uHz1.value=sea?.05:.1;
   U.uPR.value=W.getPR?W.getPR():1;
   const on=U.uVis.value>.01; stars.visible=mw.visible=on;
   if(on){ const m=skyMatrix(hour); stars.matrix.copy(m).scale(v1.set(R,R,R)).setPosition(cam); stars.matrixWorld.copy(stars.matrix);
@@ -4271,7 +4281,7 @@ function update(dt){
   if(keys.ArrowLeft||keys.ArrowRight){ const k=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0); if(G.state==='fight') G.rodSideT=k; else if(G.state==='idle'||G.state==='charge') G.yawT=clamp(G.yawT-k*dt*1.2,-.95,.95); }
   G.rodSide+=(G.rodSideT-G.rodSide)*Math.min(1,dt*8); rod.side=G.rodSide;
   if(G.state!=='fight'){ rod.end=null; rod.bendT=.03; } bob.visible=!G.snapped; bob.rotation.set(0,0,0);
-  let lineEnd=null, slack=.35, lineOn=!G.snapped;
+  let lineEnd=null, slack=.35, lineOn=!G.snapped, trem=0;
   const st=G.state;
   if(st==='intro'||st==='idle'||st==='charge'){
     rod.pitchT=st==='charge'?.15+.5*G.power:Math.sin(G.t*.8)*.01;
@@ -4317,7 +4327,8 @@ function update(dt){
     }
     lineEnd=bob.position; slack=.35;
   }
-  else if(st==='fight'){ updateFight(dt); if(G.state==='fight'){ lineEnd=rod.end; slack=(1-G.f.T)*.5; } }
+  else if(st==='fight'){ updateFight(dt); if(G.state==='fight'){ const f=G.f; lineEnd=rod.end; slack=clamp(.1*(1-f.T*1.4),0,.1);   // 魚掛在線上：線幾乎繃直
+      trem=(.012+.05*f.T)*(f.run?1.6:1); } }
   else if(st==='retrieve'){
     G.stT+=dt; const s=Math.min(1,G.stT/.9), e=sstep(0,1,s); hangPos(tv);
     bob.position.set(lerp(G.from.x,tv.x,e),s<.7?W.swell(bob.position.x,bob.position.z,G.t):lerp(0,tv.y,(s-.7)/.3),lerp(G.from.z,tv.z,e));
@@ -4345,7 +4356,7 @@ function update(dt){
     }
     if(lineOn){ W.head.localToWorld(tv.set(0,.14*D+.03,-D+.02)); lineEnd=tv; slack=.05; }
   }
-  P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light);
+  P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light, trem);
   if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
   P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); if(G.cinePan) G.yawT=Math.sin(performance.now()*.00011)*.55;   // 開場過場：鏡頭緩慢左右擺動
@@ -4355,7 +4366,8 @@ function update(dt){
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
     const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
   G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
-  W.head.rotation.x=-.16+Math.sin(G.t*.5)*.004; W.camera.rotation.z=Math.sin(G.t*.37)*.003;
+  { const f=G.state==='fight'?G.f:null, want=f?((f.run?.45:0)+(f.ev&&f.ev.k==='shake'?.6:0)+(f.T>.85?.35:0)):0; G.shk=(G.shk||0)+(want-(G.shk||0))*Math.min(1,dt*6);
+    W.head.rotation.x=-.16+Math.sin(G.t*.5)*.004+Math.sin(G.t*29)*.005*G.shk; W.camera.rotation.z=Math.sin(G.t*.37)*.003+Math.sin(G.t*23+1.7)*.004*G.shk; }
   showLightSet(showing);
   const hh=((G.hour%24)+24)%24, cl=String(Math.floor(hh)).padStart(2,'0')+':'+String(Math.floor((hh%1)*60)).padStart(2,'0');
   if(ui.clock.textContent!==cl) ui.clock.textContent=cl;
