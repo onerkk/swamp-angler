@@ -1862,16 +1862,38 @@ function spawnPass(){ const s=sp(), bx=s.pos[0], bz=s.pos[1], sg=Math.random()<.
   gS.copy(fwd(s.head-.75*sg,tv)).multiplyScalar(rand(24,32)).add(tv2.set(bx,0,bz)); inShore(gS,bx,bz,4);
   gE.copy(fwd(s.head+.75*sg,tv)).multiplyScalar(rand(24,32)).add(tv2.set(bx,0,bz)); inShore(gE,bx,bz,4);
   gs={mode:'pass',t:0,dur:gS.distanceTo(gE)/.55}; gP.copy(gS); if(gS.distanceTo(tv2.set(bx,0,bz))<26) Snd.gator(); }
+/* ===== 鱷魚鬧場：直接衝向玩家；獨木舟可以撞開，碼頭上連拍水面嚇走 ===== */
+const tapB=document.createElement('button'); tapB.id='gatorTap'; tapB.className='hidden'; tapB.textContent='🪵 拍水嚇牠！'; document.body.appendChild(tapB);
+const tcss=document.createElement('style'); tcss.textContent='#gatorTap{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 190px);transform:translateX(-50%);z-index:7;padding:14px 26px;border-radius:999px;border:2px solid #ffb4a0;background:#c0392b;color:#fff;font-size:18px;font-weight:900;box-shadow:0 0 24px rgba(255,80,60,.7);animation:gtp .5s ease-in-out infinite alternate}#gatorTap.hidden{display:none}@keyframes gtp{to{transform:translateX(-50%) scale(1.08)}}';
+document.head.appendChild(tcss);
+let taps=0; tapB.addEventListener('pointerdown',e=>{ e.preventDefault(); if(gs.mode!=='raid') return; taps++; Snd.splash&&Snd.splash(.6); const b=ctx.base(); P.splash(b.x+Math.sin(ctx.head())*-1.2,0,b.z-Math.cos(ctx.head())*1.2,6,.4); vib(15); if(taps>=6) gatorFlee('scare'); });
+function raidOk(){ const s=sp(); return !(ctx.loc&&ctx.loc()!=='lake')&&ctx.state&&['idle','wait'].indexOf(ctx.state())>=0&&!s.yacht; }
+function spawnRaid(dist){ const b=ctx.base(), s=sp(), side=Math.random()<.5?1:-1, a=ctx.head()+side*rand(.25,.7), D=dist||16;
+  gP.set(b.x-Math.sin(a)*D,0,b.z-Math.cos(a)*D); inShore(gP,b.x,b.z,4); gs={mode:'raid',t:0,d:16}; taps=0;
+  toast(s.kayak?'🐊 鱷魚鬧場！牠朝你衝過來了，划船撞開牠！':'🐊 鱷魚鬧場！快連拍水面嚇走牠！','bad',3200); Snd.gator(); vib([80,60,80,60,120]);
+  if(!s.kayak) tapB.classList.remove('hidden'); }
+function gatorFlee(why){ const b=ctx.base(); tapB.classList.add('hidden'); gs={mode:'flee',t:0,dir:tv3.subVectors(gP,b).setY(0).normalize().clone(),why};
+  P.splash(gP.x,0,gP.z,why==='ram'?40:22,why==='ram'?1.4:.9); W.addRipple(gP.x,gP.z,why==='ram'?1.4:.9); vib(why==='ram'?[150,40,200]:[60,40,90]);
+  if(ctx.onScare) ctx.onScare(why); }
+const tv3=new T.Vector3(), bow=new T.Vector3();
 function updateGator(dt){
-  if(W.isSea&&W.isSea()){ gator.visible=false; return; }
-  if(gs.mode==='off'){ if(chaseDelay<0){ gTimer-=dt; if(gTimer<=0){ spawnPass(); gTimer=rand(55,140); } } }
+  if((W.isSea&&W.isSea())||(ctx.loc&&ctx.loc()==='ice')){ gator.visible=false; if(gs.mode==='raid') tapB.classList.add('hidden'); return; }   // 海上、冰湖沒有鱷魚
+  if(gs.mode==='off'){ if(chaseDelay<0){ gTimer-=dt; if(gTimer<=0){ if(raidOk()&&Math.random()<.35) spawnRaid(); else spawnPass(); gTimer=rand(55,140); } } }
+  else if(gs.mode==='raid'){ gs.t+=dt; const b=ctx.base(); tv.subVectors(b,gP); tv.y=0; const d=tv.length(); tv.normalize(); gs.d=d;
+    const spd=d<4?2.6:1.2+.04*gs.t; gP.addScaledVector(tv,Math.min(d,spd*dt)); placeGator(gP,Math.atan2(tv.x,tv.z)); gator.rotation.x=d<4?-.22*Math.sin(gs.t*9):0;   // 最後 4 米撲上來
+    const k=ctx.kayak?ctx.kayak():null;
+    if(k&&k.on&&k.v>.55){ bow.set(b.x-Math.sin(k.yaw)*1.6,0,b.z-Math.cos(k.yaw)*1.6); if(bow.distanceTo(tv3.set(gP.x,0,gP.z))<1.7){ gator.rotation.x=0; gatorFlee('ram'); return; } }   // 獨木舟夠快撞上 → 撞開
+    if(d<1.4){ gator.rotation.x=0; tapB.classList.add('hidden'); if(ctx.onBite) ctx.onBite(); P.splash(gP.x,0,gP.z,30,1.1); gs={mode:'leave',t:0,dir:tv.clone().negate()}; }
+    if(gs.mode==='raid'&&gs.t>40){ tapB.classList.add('hidden'); gs={mode:'sink',t:0}; } }
+  else if(gs.mode==='flee'){ gs.t+=dt; gP.addScaledVector(gs.dir,dt*3.2); placeGator(gP,Math.atan2(gs.dir.x,gs.dir.z)); gator.rotation.z=gs.why==='ram'&&gs.t<.8?Math.sin(gs.t*20)*.6:0;
+    if(gs.t>2.4){ gator.rotation.z=0; gs={mode:'sink',t:0}; } }
   else if(gs.mode==='pass'){ gs.t+=dt; const s=gs.t/gs.dur; gP.copy(gS).lerp(gE,Math.min(1,s)); placeGator(gP,Math.atan2(gE.x-gS.x,gE.z-gS.z)); if(s>=1) gs={mode:'sink',t:0}; }
   else if(gs.mode==='chase'){ const tg=chaseGet(); tv.subVectors(tg,gP); tv.y=0; const d=tv.length(); tv.normalize();
     gP.addScaledVector(tv,Math.min(d,1.15*dt)); placeGator(gP,Math.atan2(tv.x,tv.z)); gs.d=d;
     if(d<1.1){ stolenF=true; gs={mode:'sink',t:0}; vib([100,50,150]); } }
   else if(gs.mode==='leave'){ gs.t+=dt; gP.addScaledVector(gs.dir,dt); placeGator(gP,Math.atan2(gs.dir.x,gs.dir.z)); if(gs.t>3) gs={mode:'sink',t:0}; }
   else if(gs.mode==='sink'){ gs.t+=dt; gator.position.y-=dt*.12; if(gs.t>1.6){ gator.visible=false; gs={mode:'off'}; } }
-  if(gator.visible&&gs.mode!=='sink'){ gRip-=dt; if(gRip<=0){ W.addRipple(gator.position.x,gator.position.z,gs.mode==='chase'?.3:.14); gRip=gs.mode==='chase'?.9:1.7; } }
+  if(gator.visible&&gs.mode!=='sink'){ const fast=gs.mode==='chase'||gs.mode==='raid'||gs.mode==='flee'; gRip-=dt; if(gRip<=0){ W.addRipple(gator.position.x,gator.position.z,fast?.3:.14); gRip=fast?.45:1.7; } }
   if(chaseDelay>0){ chaseDelay-=dt; if(chaseDelay<=0){ chaseDelay=-1; const fp=chaseGet(), s=sp();
       tv.set(fp.x-s.pos[0],0,fp.z-s.pos[1]).normalize(); const side=Math.random()<.5?1:-1;
       gP.set(fp.x+tv.x*12+tv.z*side*5,0,fp.z+tv.z*12-tv.x*side*5); inShore(gP,fp.x,fp.z,3);
@@ -1968,7 +1990,8 @@ function update(dt,t){
   sT-=dt; if(sT<=0){ sT=rand(3,9); if(cur.r<.5){ const per=ctx.period(); if(per==='night'||per==='dusk') Snd.frog(); else Snd.bird(); } }
 }
 return {
-  update, paddle, obstacles:OBST, setZone(i){ zoneI=i; }, zoneId:()=>SPOTS[zoneI].id, setSpot(i){ spotI=i; zoneI=i; gs={mode:'off'}; gator.visible=false; },
+  update, paddle, obstacles:OBST, setZone(i){ zoneI=i; }, zoneId:()=>SPOTS[zoneI].id, setSpot(i){ spotI=i; zoneI=i; gs={mode:'off'}; gator.visible=false; tapB.classList.add('hidden'); },
+  raid:dist=>{ if(gs.mode==='off'&&raidOk()){ spawnRaid(dist); return true; } return false; }, gatorMode:()=>gs.mode,
   spotAff:id=>sp().aff[id]||1, sizeB:()=>sp().size, rareB:()=>sp().rare+.15*cur.f,
   wxAff(id){ let m=1; if(cur.r>.5&&['lmbass','smbass','channel','bowfin'].includes(id)) m*=1.3; if(cur.c>.5&&['lmbass','smbass'].includes(id)) m*=1.15; return m; },
   waitK:()=>1-.2*cur.r,
@@ -2444,6 +2467,8 @@ const golds=()=>dexV().filter(d=>(d.md||0)>=3).length;
 const merN=()=>(S.mer&&S.mer.n)||0;
 const ACH=[
  ['first','第一條魚','釣到第一條魚',()=>[S.total||0,1],100],
+ ['gram1','鱷口脫險','划獨木舟撞開鬧場的鱷魚',()=>[S.gatorRam||0,1],600],
+ ['gram10','鱷魚剋星','撞開鬧場的鱷魚 10 次',()=>[S.gatorRam||0,10],3000],
  ['ice1','冰上漁人','在冰湖釣到第一條魚',()=>[S.iceN||0,1],1500],
  ['pike','冰下霸主','釣到白斑狗魚',()=>[(S.dex&&S.dex.pike&&S.dex.pike.n)||0,1],3000],
  ['c50','釣魚老手','累計釣到 50 尾',()=>[S.total||0,50],1000],
@@ -4018,7 +4043,7 @@ function pickSpecies(){
 }
 
 /* ---------- 動作 ---------- */
-function startCharge(){ G.state='charge'; G.chargeT=0; }
+function startCharge(){ if(G.scareT>0){ toast('驚魂未定，等一下再拋竿…','warn',1400); return; } G.state='charge'; G.chargeT=0; }
 function cast(){
   G.baitUsed=META.useBait(); LURE.bobberVis(!(G.baitUsed&&G.baitUsed.lure));
   const p=G.power, dist=6+p*META.gear().rod.cast, A=G.head+G.yaw, fw=tv.set(-Math.sin(A),0,-Math.cos(A)), bx=G.base.x, bz=G.base.z;
@@ -4143,7 +4168,13 @@ const META=createMeta({save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS
 const UW=createUnderwater(W,P);
 const tvSea=new THREE.Vector3();
 window.__MDL=createModels(W); const MDL=window.__MDL; MDL.preload('lake');
-const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head});
+const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,
+  state:()=>G.state, loc:()=>G.loc||'lake', kayak:()=>({on:!!SPOTS[G.spot].kayak,v:Math.abs(KY.v),yaw:G.head}),
+  onBite:()=>{ if(G.state==='wait'||G.state==='bite'){ G.state='lost'; G.stT=0; G.snapped=true; }   // 鱷魚咬船：斷線、連擊歸零、驚魂未定
+    G.combo=0; FUN.combo(0); G.scareT=6; G.gShake=1.6; vib([200,60,260,60,200]); Snd.splash(2); toast('🐊 船被鱷魚狠狠咬了一口！嚇得手都在抖……','bad',3000); },
+  onScare:why=>{ const ram=why==='ram', xp=Math.round(window.__LVINFO.xpNext(save.lv)*(ram?.04:.02)), cn=Math.round((ram?20:10)+save.lv*(ram?10:5));
+    if(ram) save.gatorRam=(save.gatorRam||0)+1; else save.gatorScare=(save.gatorScare||0)+1; META.addXP(xp); save.coins+=cn; setCoins(); META.syncHUD(); persist(); G.gShake=ram?.9:.3;
+    toast(ram?`💥 撞開鱷魚！牠嚇得逃走了　+${xp} 經驗 🪙${cn}`:`🪵 鱷魚被拍水聲嚇跑了　+${xp} 經驗 🪙${cn}`,'good',3000); } });
 const AT=createAtmos(W,P,Snd,WL,{underwater:()=>UW.active(),period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,spot:()=>G.spot,toast});
 const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPECIES.length,period:()=>period(G.hour)}); window.__FUN=FUN;
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
@@ -4372,7 +4403,8 @@ function update(dt){
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
     const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
   G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
-  { const f=G.state==='fight'?G.f:null, want=f?((f.run?.45:0)+(f.ev&&f.ev.k==='shake'?.6:0)+(f.T>.85?.35:0)):0; G.shk=(G.shk||0)+(want-(G.shk||0))*Math.min(1,dt*6);
+  if(G.scareT>0) G.scareT-=dt; if(G.gShake>0) G.gShake=Math.max(0,G.gShake-dt*.7);
+  { const f=G.state==='fight'?G.f:null, want=(f?((f.run?.45:0)+(f.ev&&f.ev.k==='shake'?.6:0)+(f.T>.85?.35:0)):0)+(G.gShake||0); G.shk=(G.shk||0)+(want-(G.shk||0))*Math.min(1,dt*6);
     W.head.rotation.x=-.16+Math.sin(G.t*.5)*.004+Math.sin(G.t*29)*.005*G.shk; W.camera.rotation.z=Math.sin(G.t*.37)*.003+Math.sin(G.t*23+1.7)*.004*G.shk; }
   showLightSet(showing);
   const hh=((G.hour%24)+24)%24, cl=String(Math.floor(hh)).padStart(2,'0')+':'+String(Math.floor((hh%1)*60)).padStart(2,'0');
