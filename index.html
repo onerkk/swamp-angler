@@ -1561,7 +1561,7 @@ function start(fdIn){
 function end(){ on=false; if(fish){ scene.remove(fish); fish=null; } }
 function update(dt){
   if(!on) return; tt+=dt;
-  const L=Math.max(clamp(W.info.light,0,1.2),.38), day=W.info.day;   // 夜裡水下鏡頭保留月光亮度，才看得清楚魚
+  const L=Math.max(clamp(W.info.light,0,1.2),.62), day=W.info.day;   // 夜裡水下鏡頭保留月光亮度，才看得清楚魚
   const sea=W.isSea&&W.isSea(); weeds.visible=!sea; const mid=tmpC.copy(cDark).lerp(sea?cSea:cMid,clamp(L,0,1));
   fog.color.copy(mid); bgU.uMid.value.copy(mid); bgU.uTop.value.copy(mid).multiplyScalar(2.4).add(cTint.clone().multiplyScalar(L*.6)); bgU.uBot.value.copy(mid).multiplyScalar(.35);
   surfU.uCol.value.copy(mid).multiplyScalar(5); surfU.uFog.value.copy(mid);
@@ -2667,7 +2667,7 @@ function updEv(dt,t,wx,day){
   ev.t+=dt; const k=ev.t/ev.dur, d=ev.data;
   if(ev.id==='rainbow'){ const sd=W.U.uSunDisk.value; tv.copy(sd).multiplyScalar(-800).add(cw); rainbow.position.copy(tv); rainbow.lookAt(cw); rbMat.uniforms.uA.value=.32*sstep(0,.15,k)*(1-sstep(.8,1,k))*(1-wx.c); }
   else if(ev.id==='flock'){ d.o.addScaledVector(d.v,dt); flock.forEach(m=>{ m.position.copy(d.o).add(m.userData.off); m.lookAt(tv.copy(m.position).add(d.v)); if(!m.userData.real) m.scale.y=1.6*(.4+.6*Math.abs(Math.sin(t*6+m.userData.ph))); }); }
-  else if(ev.id==='meteor'){ if(window.__SKY&&Math.random()<dt*1.3) window.__SKY.spawn(Math.random()<.12); }
+  else if(ev.id==='meteor'){ if(window.__SKY&&Math.random()<dt*2.6) window.__SKY.spawn(Math.random()<.12); }
   else if(ev.id==='dolphin'){ d.p.addScaledVector(d.v,dt);
     for(const o of dolphins){ if(!o.on) continue; o.t+=dt; const cy=o.cyc, ph=(o.t%cy)/cy, jump=ph>.55; const g=o.g;
       tv.copy(d.p).add(o.off); const s=(ph-.55)/.45;
@@ -3209,7 +3209,7 @@ const mets=[]; for(let i=0;i<4;i++){ const g=new T.BufferGeometry(); g.setAttrib
 const v1=new T.Vector3(), v2=new T.Vector3(), hd=new T.Vector3(), td=new T.Vector3(), sd=new T.Vector3(), vw=new T.Vector3();
 function dirAE(az,el,o){ return o.set(-Math.sin(az)*Math.cos(el),Math.sin(el),-Math.cos(az)*Math.cos(el)); }
 function spawn(big){ const o=mets.find(x=>!x.on); if(!o||U.uVis.value<.15) return; const yaw=G.head+(G.yaw||0)+(Math.random()-.5)*1.6;
-  const el=.45+Math.random()*.6, len=(big?.45:.14+Math.random()*.22), ang=Math.random()*Math.PI*2;
+  const el=.09+Math.random()*.3+(G.pitch||0)*.85, len=(big?.45:.14+Math.random()*.22), ang=Math.random()*Math.PI*2;
   o.s=dirAE(yaw,el,new T.Vector3()); const ax=new T.Vector3(Math.cos(ang),-.35-Math.random()*.5,Math.sin(ang)).cross(o.s).normalize();
   o.e=o.s.clone().applyAxisAngle(ax,len); if(o.e.y>o.s.y){ const t=o.s; o.s=o.e; o.e=t; }
   o.dur=big?1.6:.35+Math.random()*.6; o.t=0; o.on=true; o.big=!!big; o.br=big?1:.45+Math.random()*.5; o.m.visible=true; }
@@ -4151,11 +4151,13 @@ const actRel=e=>{ if(e.pointerId!==actPtr) return; actPtr=null; actUp(); if(drag
 ui.act.addEventListener('pointerup',actRel); ui.act.addEventListener('pointercancel',actRel);
 ui.act.addEventListener('contextmenu',e=>e.preventDefault());
 const cv=W.renderer.domElement;
-cv.addEventListener('pointerdown',e=>{ if(dragPtr!==null) return; dragPtr=e.pointerId; dragX0=e.clientX; yaw0=G.yawT; try{ cv.setPointerCapture(e.pointerId); }catch(_){} });
+cv.addEventListener('pointerdown',e=>{ if(dragPtr!==null) return; dragPtr=e.pointerId; dragX0=e.clientX; yaw0=G.yawT; dragY0=e.clientY; pitch0=G.pitchT||0; try{ cv.setPointerCapture(e.pointerId); }catch(_){} });
 cv.addEventListener('pointermove',e=>{ if(e.pointerId!==dragPtr) return; const dx=e.clientX-dragX0;
-  if(G.state==='fight') G.rodSideT=clamp(dx/70,-1,1); else if(G.state==='idle'||G.state==='charge') G.yawT=clamp(yaw0-dx*.005,-.95,.95); });
+  if(G.state==='fight') G.rodSideT=clamp(dx/70,-1,1); else if(G.state==='idle'||G.state==='charge') G.yawT=clamp(yaw0-dx*.005,-.95,.95);
+  if(G.state==='idle'||G.state==='wait') G.pitchT=clamp(pitch0+(e.clientY-dragY0)*.004,0,.62); });   // 上下拖曳：抬頭看天空
 const dragRel=e=>{ if(e.pointerId!==dragPtr) return; dragPtr=null; if(actPtr===null) G.rodSideT=0; };
 cv.addEventListener('pointerup',dragRel); cv.addEventListener('pointercancel',dragRel);
+let dragY0=0, pitch0=0;
 const keys={};
 window.addEventListener('keydown',e=>{ if(e.repeat) return; keys[e.code]=true; if(e.code==='Space'&&G.state!=='intro'&&G.state!=='catch'){ e.preventDefault(); actDown(); } });
 window.addEventListener('keyup',e=>{ keys[e.code]=false; if(e.code==='Space'){ e.preventDefault(); actUp(); } });
@@ -4396,16 +4398,18 @@ function update(dt){
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light, trem);
   if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
-  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); if(G.cinePan) G.yawT=Math.sin(performance.now()*.00011)*.55;   // 開場過場：鏡頭緩慢左右擺動
+  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); if(!save.lookTip&&W.info.day<.15&&G.state==='idle'&&G.t>20){ save.lookTip=1; persist(); toast('🌌 上下拖曳畫面可以抬頭看星空','good',3500); }
+  if(G.cinePan) G.yawT=Math.sin(performance.now()*.00011)*.55;   // 開場過場：鏡頭緩慢左右擺動
   window.__MOON.update(dt); if(window.__TAL) window.__TAL.tick(G); if(window.__STORY) window.__STORY.tick(dt); ARMS.update(!UW.active(),G.state,G.power,dt); SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt); ICE.update(dt);
   { const z=WL.zoneId?WL.zoneId():'', tgt=G.loc==='ice'?[.03,.08,.12]:G.loc==='sea'?(z==='reef'?[.02,.2,.25]:[.01,.08,.2]):[.04,.13,.15], v=SEE_U.value, k=Math.min(1,dt*1.5);   // 水下物體混入的水色依地點
     v.set(v.x+(tgt[0]-v.x)*k,v.y+(tgt[1]-v.y)*k,v.z+(tgt[2]-v.z)*k); }
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
     const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
   G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
+  if(G.state!=='idle'&&G.state!=='wait') G.pitchT=0; G.pitch=(G.pitch||0)+((G.pitchT||0)-(G.pitch||0))*Math.min(1,dt*5);   // 蓄力、拉魚時視角自動回正
   if(G.scareT>0) G.scareT-=dt; if(G.gShake>0) G.gShake=Math.max(0,G.gShake-dt*.7);
   { const f=G.state==='fight'?G.f:null, want=(f?((f.run?.45:0)+(f.ev&&f.ev.k==='shake'?.6:0)+(f.T>.85?.35:0)):0)+(G.gShake||0); G.shk=(G.shk||0)+(want-(G.shk||0))*Math.min(1,dt*6);
-    W.head.rotation.x=-.16+Math.sin(G.t*.5)*.004+Math.sin(G.t*29)*.005*G.shk; W.camera.rotation.z=Math.sin(G.t*.37)*.003+Math.sin(G.t*23+1.7)*.004*G.shk; }
+    W.head.rotation.x=-.16+(G.pitch||0)+Math.sin(G.t*.5)*.004+Math.sin(G.t*29)*.005*G.shk; W.camera.rotation.z=Math.sin(G.t*.37)*.003+Math.sin(G.t*23+1.7)*.004*G.shk; }
   showLightSet(showing);
   const hh=((G.hour%24)+24)%24, cl=String(Math.floor(hh)).padStart(2,'0')+':'+String(Math.floor((hh%1)*60)).padStart(2,'0');
   if(ui.clock.textContent!==cl) ui.clock.textContent=cl;
