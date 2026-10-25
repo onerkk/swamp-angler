@@ -1863,14 +1863,14 @@ function spawnPass(){ const s=sp(), bx=s.pos[0], bz=s.pos[1], sg=Math.random()<.
   gE.copy(fwd(s.head+.75*sg,tv)).multiplyScalar(rand(24,32)).add(tv2.set(bx,0,bz)); inShore(gE,bx,bz,4);
   gs={mode:'pass',t:0,dur:gS.distanceTo(gE)/.55}; gP.copy(gS); if(gS.distanceTo(tv2.set(bx,0,bz))<26) Snd.gator(); }
 /* ===== 鱷魚鬧場：直接衝向玩家；獨木舟可以撞開，碼頭上連拍水面嚇走 ===== */
-const tapB=document.createElement('button'); tapB.id='gatorTap'; tapB.className='hidden'; tapB.textContent='🪵 拍水嚇牠！'; document.body.appendChild(tapB);
+const tapB=document.createElement('button'); tapB.id='gatorTap'; tapB.className='hidden'; tapB.textContent='🪵 拍水'; document.body.appendChild(tapB);
 const tcss=document.createElement('style'); tcss.textContent='#gatorTap{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 190px);transform:translateX(-50%);z-index:7;padding:14px 26px;border-radius:999px;border:2px solid #ffb4a0;background:#c0392b;color:#fff;font-size:18px;font-weight:900;box-shadow:0 0 24px rgba(255,80,60,.7);animation:gtp .5s ease-in-out infinite alternate}#gatorTap.hidden{display:none}@keyframes gtp{to{transform:translateX(-50%) scale(1.08)}}';
 document.head.appendChild(tcss);
 let taps=0; tapB.addEventListener('pointerdown',e=>{ e.preventDefault(); if(gs.mode!=='raid') return; taps++; Snd.splash&&Snd.splash(.6); const b=ctx.base(); P.splash(b.x+Math.sin(ctx.head())*-1.2,0,b.z-Math.cos(ctx.head())*1.2,6,.4); vib(15); if(taps>=6) gatorFlee('scare'); });
 function raidOk(){ const s=sp(); return !(ctx.loc&&ctx.loc()!=='lake')&&ctx.state&&['idle','wait'].indexOf(ctx.state())>=0&&!s.yacht; }
 function spawnRaid(dist){ const b=ctx.base(), s=sp(), side=Math.random()<.5?1:-1, a=ctx.head()+side*rand(.25,.7), D=dist||16;
   gP.set(b.x-Math.sin(a)*D,0,b.z-Math.cos(a)*D); inShore(gP,b.x,b.z,4); gs={mode:'raid',t:0,d:16}; taps=0;
-  toast(s.kayak?'🐊 鱷魚鬧場！牠朝你衝過來了，划船撞開牠！':'🐊 鱷魚鬧場！快連拍水面嚇走牠！','bad',3200); Snd.gator(); vib([80,60,80,60,120]);
+  Snd.gator(); vib([80,60,80,60,120]); W.addRipple(gP.x,gP.z,1.2);   // 不用文字宣告，只靠叫聲、震動、水紋讓玩家自己察覺
   if(!s.kayak) tapB.classList.remove('hidden'); }
 function gatorFlee(why){ const b=ctx.base(); tapB.classList.add('hidden'); gs={mode:'flee',t:0,dir:tv3.subVectors(gP,b).setY(0).normalize().clone(),why};
   P.splash(gP.x,0,gP.z,why==='ram'?40:22,why==='ram'?1.4:.9); W.addRipple(gP.x,gP.z,why==='ram'?1.4:.9); vib(why==='ram'?[150,40,200]:[60,40,90]);
@@ -4173,10 +4173,10 @@ window.__MDL=createModels(W); const MDL=window.__MDL; MDL.preload('lake');
 const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,
   state:()=>G.state, loc:()=>G.loc||'lake', kayak:()=>({on:!!SPOTS[G.spot].kayak,v:Math.abs(KY.v),yaw:G.head}),
   onBite:()=>{ if(G.state==='wait'||G.state==='bite'){ G.state='lost'; G.stT=0; G.snapped=true; }   // 鱷魚咬船：斷線、連擊歸零、驚魂未定
-    G.combo=0; FUN.combo(0); G.scareT=6; G.gShake=1.6; vib([200,60,260,60,200]); Snd.splash(2); toast('🐊 船被鱷魚狠狠咬了一口！嚇得手都在抖……','bad',3000); },
+    G.combo=0; FUN.combo(0); G.scareT=6; G.gShake=1.6; vib([200,60,260,60,200]); Snd.splash(2); toast('🐊 ……！','bad',1600); },
   onScare:why=>{ const ram=why==='ram', xp=Math.round(window.__LVINFO.xpNext(save.lv)*(ram?.04:.02)), cn=Math.round((ram?20:10)+save.lv*(ram?10:5));
     if(ram) save.gatorRam=(save.gatorRam||0)+1; else save.gatorScare=(save.gatorScare||0)+1; META.addXP(xp); save.coins+=cn; setCoins(); META.syncHUD(); persist(); G.gShake=ram?.9:.3;
-    toast(ram?`💥 撞開鱷魚！牠嚇得逃走了　+${xp} 經驗 🪙${cn}`:`🪵 鱷魚被拍水聲嚇跑了　+${xp} 經驗 🪙${cn}`,'good',3000); } });
+    toast(`+${xp} 經驗　🪙${cn}`,'good',2200); } });
 const AT=createAtmos(W,P,Snd,WL,{underwater:()=>UW.active(),period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,spot:()=>G.spot,toast});
 const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPECIES.length,period:()=>period(G.hour)}); window.__FUN=FUN;
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
