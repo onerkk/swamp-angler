@@ -1646,7 +1646,7 @@ function newQuest(ex){
     ice:()=>{ const n=2+Math.floor(lv/8); return {n,txt:`在冰湖釣到魚 ${n} 尾`}; }};
   const keys=Object.keys(pool).filter(k=>!ex.includes(k)&&(k!=='ice'||lv>=10)), k=keys[Math.floor(Math.random()*keys.length)];
   const q=Object.assign({k,prog:0},pool[k]()); const diff={count:1,rare:1.6,weight:1.2,sp:1.5,per:1.2,perfect:1.3,release:.8,ice:1.4}[k];
-  q.reward=Math.round((120+lv*90)*diff/10)*10; q.xp=Math.round((20+lv*12)*diff); return q;
+  q.reward=Math.round((120+lv*90)*diff/10)*10; q.xp=Math.round(xpNext(lv)*.06*diff); return q;   // 任務經驗依這一級所需經驗按比例給
 }
 function fillQuests(){ while(save.quests.length<3) save.quests.push(newQuest(save.quests.map(q=>q.k))); persist(); }
 function addXP(x){ save.xp+=x; while(save.xp>=xpNext(save.lv)){ save.xp-=xpNext(save.lv); save.lv++; const lv=save.lv;
@@ -3225,8 +3225,8 @@ function applyBoss(G,SPECIES,RAR){ const b=bossRoll(); if(!b) return false; cons
   G.sp=sp2; G.fd={sp:sp2,L,w,u:1,lvl:99,boss:b,value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*2.5),xpMul:3};
   c.toast('👑 有什麼巨大的東西在靠近……','warn',2400); c.vib([60,40,60]); return true; }
 function bossWin(fd){ const b=fd.boss, first=!S.boss[b.id]; S.boss[b.id]=(S.boss[b.id]||0)+1; S.bossOn=null; if(window.__STORY) window.__STORY.onBoss(b.id);
-  if(first){ S.coins+=b.coins; S.mat=S.mat||{}; S.mat.crystal=(S.mat.crystal||0)+b.cry; if(S.titles.indexOf(b.title)<0) S.titles.push(b.title); c.setCoins(); }
-  showTitle(); c.persist(); setTimeout(()=>c.toast(first?`👑 擊敗${b.name}！稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}`:`👑 再次擊敗${b.name}！`,'good',4200),1600); c.Snd.fanfare(2); dot(); }
+  let bxp=0; if(first){ S.coins+=b.coins; S.mat=S.mat||{}; S.mat.crystal=(S.mat.crystal||0)+b.cry; if(S.titles.indexOf(b.title)<0) S.titles.push(b.title); c.setCoins(); if(c.addXP&&window.__LVINFO){ bxp=Math.round(window.__LVINFO.xpNext(S.lv||1)*.3); c.addXP(bxp); } }
+  showTitle(); c.persist(); setTimeout(()=>c.toast(first?`👑 擊敗${b.name}！稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}${bxp?'・經驗 '+bxp.toLocaleString():''}`:`👑 再次擊敗${b.name}！`,'good',4200),1600); c.Snd.fanfare(2); dot(); }
 
 /* Boss 登場演出與光暈 */
 const T=THREE, bc=document.createElement('canvas'); bc.width=bc.height=128; { const x=bc.getContext('2d'), gr=x.createRadialGradient(64,64,4,64,64,64); gr.addColorStop(0,'rgba(255,230,140,.9)'); gr.addColorStop(.35,'rgba(255,150,60,.45)'); gr.addColorStop(1,'rgba(255,80,40,0)'); x.fillStyle=gr; x.fillRect(0,0,128,128); }
@@ -3758,7 +3758,7 @@ const CH=[
   page:'手記第四頁\n「月亮很圓的晚上，我照著魚皮上的圖划過去。灣裡的水是銀色的，岩石上坐著一個人——\n不，是一條人魚。她說她叫汐月，在等一條回海的路。我答應她，每個滿月都提燈來陪她。」',
   xp:5000,coins:4000,unlock:'月光灣'},
  {id:'c5',spot:'moon',name:'第五章　月潮',open:{after:'c4'},
-  intro:'月光灣只在夜裡發光。汐月還在這裡，等著那個提燈的人。',
+  intro:'月光灣只在夜裡發光。汐月還在這裡，等著那個提燈的人。\n提示：晚上（約 19:48～04:48）划獨木舟到月光灣釣魚，有機會在魚肚裡找到月鱗；月亮越圓，找到的機會越高。',
   tasks:[{t:'moon',n:1,txt:'集滿 7 片月鱗，聽完汐月的故事'}],
   page:'手記第五頁\n「我老了，提不動燈了。汐月說，等堤防打開、月潮回來，她就能回家。\n可是河口外的海不平靜——深海裡有什麼東西，從堤防築起那年就一直在發怒。」',
   xp:8000,coins:6000,unlock:'近海礁岩（需要遊艇）'},
@@ -3794,7 +3794,7 @@ function bump(match){ let changed=false;
   if(changed){ c.persist(); dot(); } }
 function finish(ch){ if(isDone(ch.id)) return; st.done.push(ch.id); c.addXP(ch.xp); S.coins+=ch.coins; c.setCoins(); if(c.syncHUD) c.syncHUD(); c.persist(); dot();
   if(ch.id==='c7'){ S.titles=S.titles||[]; if(S.titles.indexOf('守湖人')<0) S.titles.push('守湖人'); }
-  setTimeout(()=>{ showPage(ch,true); c.Snd&&c.Snd.fanfare&&c.Snd.fanfare(2); c.vib&&c.vib([40,40,120]); },1800); }
+  setTimeout(()=>{ if(ch.id==='c7') showEnding(ch); else showPage(ch,true); c.Snd&&c.Snd.fanfare&&c.Snd.fanfare(2); c.vib&&c.vib([40,40,120]); },1800); }
 /* 事件掛鉤 */
 function onCatch(fd,ctx){ if(!fd||!fd.sp) return; bump(t=>{ if(t.t!=='catch') return 0;
   if(t.sp&&fd.sp.id!==t.sp) return 0; if(t.zone&&ctx.zone!==t.zone) return 0; if(t.loc&&ctx.loc!==t.loc) return 0; if(t.per&&ctx.per!==t.per) return 0; if(t.rain&&!ctx.rain) return 0; if(t.rar&&fd.sp.rar<t.rar) return 0; return 1; }); }
@@ -3809,7 +3809,7 @@ const css=document.createElement('style'); css.textContent=`#storyBtn{position:r
 #storyBox{position:fixed;inset:0;z-index:9;background:rgba(4,8,7,.66);display:flex;align-items:flex-end;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 40px) 10px calc(env(safe-area-inset-bottom,0px) + 10px)}#storyBox.hidden{display:none}
 #storyBox .pn{width:100%;max-width:520px;max-height:100%;overflow:auto;background:linear-gradient(180deg,#2a2216,#1a150e);border:1px solid rgba(230,200,140,.35);border-radius:18px;padding:16px 16px 18px;color:#f1e6cc;box-shadow:0 10px 40px rgba(0,0,0,.5)}
 #storyBox h3{margin:0 0 4px;font-size:19px;color:#ffe3a3}#storyBox .x{float:right;background:none;border:0;color:#f1e6cc;font-size:22px}
-#storyBox .intro{font-size:14px;line-height:1.7;color:#e6d8b8;margin:6px 0 10px}#storyBox .tk{display:flex;gap:8px;align-items:center;padding:8px 10px;margin:6px 0;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px}
+#storyBox .intro{white-space:pre-line;font-size:14px;line-height:1.7;color:#e6d8b8;margin:6px 0 10px}#storyBox .tk{display:flex;gap:8px;align-items:center;padding:8px 10px;margin:6px 0;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px}
 #storyBox .tk.ok{color:#9ee6a0}#storyBox .tk b{margin-left:auto;font-variant-numeric:tabular-nums}#storyBox .sec{margin:14px 0 6px;font-size:13px;color:#d9c08a;font-weight:800}
 #storyBox .ch{padding:8px 10px;margin:5px 0;border-radius:10px;border:1px solid rgba(230,200,140,.18);font-size:14px;display:flex;justify-content:space-between;gap:8px}#storyBox .ch small{color:#bfae88}#storyBox .ch button{background:#ffd56a;color:#2a1a00;border:0;border-radius:8px;padding:3px 10px;font-weight:800}
 #storyBox .page{white-space:pre-line;font-size:15px;line-height:1.85;padding:14px;border-radius:12px;background:#efe2c4;color:#3a2b14;font-family:serif;box-shadow:inset 0 0 30px rgba(120,80,30,.25)}#storyBox .rw{margin-top:10px;font-size:13px;color:#ffe3a3}`;
@@ -3823,15 +3823,27 @@ function render(){ const act=active(); let h='<div class="pn"><button class="x" 
   if(nxt.length){ h+='<div class="sec">尚未開放</div>'+nxt.map(ch=>`<div class="ch"><span>🔒 ${ch.name}</span><small>需要：${why(ch).join('、')}</small></div>`).join(''); }
   const dn=CH.filter(ch=>isDone(ch.id)); if(dn.length) h+='<div class="sec">已收集的手記</div>'+dn.map(ch=>`<div class="ch"><span>📖 ${ch.name}</span><button data-s="read" data-v="${ch.id}">閱讀</button></div>`).join('');
   box.innerHTML=h+'</div>'; }
+/* 終章結局：全螢幕，文字逐段淡入 */
+const END=['海王沉回了深淵。','那一夜大潮，河口的堤防在浪裡裂開一道縫。','月光順著海水流進河口，流過倒木、流過浮萍，一路回到碼頭前。','汐月在浪頭上回頭看了你一眼，然後游向大海。','你翻開手記最後一頁，在老漁人的字跡下面寫——','「月潮回來了。換我守著這片湖。」'];
+const ed=document.createElement('div'); ed.id='endBox'; ed.className='hidden'; document.body.appendChild(ed);
+const ecss=document.createElement('style'); ecss.textContent=`#endBox{position:fixed;inset:0;z-index:27;background:radial-gradient(ellipse at 50% 30%,#1b2c4a,#05080f 75%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 26px;text-align:center;color:#e9f0ff}#endBox.hidden{display:none}
+#endBox p{margin:9px 0;font-size:17px;line-height:1.7;font-family:serif;opacity:0;animation:endIn 1.6s ease forwards}#endBox p.last{font-size:20px;color:#ffe3a3;margin-top:18px}
+#endBox .tt{opacity:0;animation:endIn 1.4s ease forwards;margin-top:26px;font-size:15px;color:#ffd56a}#endBox button{opacity:0;animation:endIn 1s ease forwards;margin-top:22px;padding:10px 26px;border-radius:999px;border:0;background:#ffd56a;color:#2a1a00;font-weight:800;font-size:15px}
+@keyframes endIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`; document.head.appendChild(ecss);
+function showEnding(ch){ const step=2.4;
+  ed.innerHTML=END.map((t,i)=>`<p class="${i===END.length-1?'last':''}" style="animation-delay:${(i*step).toFixed(1)}s">${t}</p>`).join('')+
+    `<div class="tt" style="animation-delay:${(END.length*step+.5).toFixed(1)}s">🏆 獲得稱號「守湖人」<br><small>經驗 ${ch.xp.toLocaleString()}・金幣 ${ch.coins.toLocaleString()}</small></div><button data-e="ok" style="animation-delay:${(END.length*step+1.5).toFixed(1)}s">回到碼頭</button>`;
+  ed.classList.remove('hidden'); st.ending=1; if(st.read.indexOf(ch.id)<0) st.read.push(ch.id); c.persist(); dot(); }
+ed.addEventListener('click',e=>{ if(e.target.closest('[data-e=ok]')) ed.classList.add('hidden'); });
 function showPage(ch,isNew){ box.innerHTML=`<div class="pn"><button class="x" data-s="back">✕</button><h3>${isNew?'📖 找回了一頁手記':'📖 '+ch.name}</h3><div class="page">${ch.page}</div>${isNew?`<div class="rw">獲得經驗 ${ch.xp.toLocaleString()}、金幣 ${ch.coins.toLocaleString()}<br>開放：${ch.unlock}</div>`:''}</div>`;
   box.classList.remove('hidden'); if(st.read.indexOf(ch.id)<0){ st.read.push(ch.id); c.persist(); } dot(); }
 box.addEventListener('click',e=>{ const b=e.target.closest('[data-s]'); if(!b){ if(e.target===box) box.classList.add('hidden'); return; }
-  const a=b.dataset.s; if(a==='close') box.classList.add('hidden'); else if(a==='back') render(); else if(a==='read') showPage(byId(b.dataset.v),false); });
+  const a=b.dataset.s; if(a==='close') box.classList.add('hidden'); else if(a==='back') render(); else if(a==='read'){ const ch=byId(b.dataset.v); if(ch.id==='c7'){ box.classList.add('hidden'); showEnding(ch); } else showPage(ch,false); } });
 btn.addEventListener('click',()=>{ render(); box.classList.remove('hidden'); });
 function dot(){ btn.classList.toggle('dot',st.done.some(id=>st.read.indexOf(id)<0)||active().some(ch=>!st.prog[ch.id])); }
 dot();
 if(!st.prog.c1&&!st.done.length) setTimeout(()=>c.toast('📜 你在碼頭找到一本舊手記，點上方的 📜 看看','good',3500),6000);
-return {lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
+return {showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
@@ -4093,7 +4105,7 @@ const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
 const LURE=createLure(W,P,{G,toast,Snd,uwOn:()=>save.uw!==false,reelSpd:()=>META.gear().reel.spd,onChase:()=>{ if(!G.fd) prepFish(); if(!G.fd||G.fd.item) return null; const f=P.getFish(G.fd.sp); if(f) seeThrough(f.group); return f?{group:f.group,uni:f.uni,L:G.fd.L}:null; }}); window.__LURE=LURE; window.__G=G;
 window.__MOON=createMoonBay(W,{G,save,persist,toast,Snd,vib,hour:()=>((G.hour%24)+24)%24,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
-window.__TAL=createTalents({save,persist,toast,Snd,vib,setCoins,loc:()=>G.loc||'lake',zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour)}); window.__SEA=SEA;
+window.__TAL=createTalents({save,persist,toast,Snd,vib,setCoins,addXP:x=>META.addXP(x),loc:()=>G.loc||'lake',zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour)}); window.__SEA=SEA;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
 { const s=SPOTS[save.spot]; G.spot=save.spot; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; WL.setSpot(save.spot); SEA.setLoc(s.loc||'lake'); }
 function goSpot(i){ if(G.state!=='idle'){ toast('先收線再移動','warn'); return; } { const lk=window.__STORY&&window.__STORY.lock(i); if(lk){ toast('🔒 '+lk,'warn',2400); return; } }   // 所有入口共用的開放檢查 const s=SPOTS[i]; G.state='travel'; fadeEl.classList.add('on'); Snd.paddle(); setTimeout(()=>Snd.paddle(),380);
