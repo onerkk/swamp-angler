@@ -3459,13 +3459,32 @@ const T=THREE, U={uTime:W.U.uTime,uK:{value:0},uFog:W.U.uFogCol,uSunDir:W.U.uSun
 const layers=[]; for(const y of [.35,.9]){ const m=new T.Mesh(new T.PlaneGeometry(240,240).rotateX(-Math.PI/2),new T.ShaderMaterial({uniforms:U,vertexShader:SH6.vs,fragmentShader:SH6.fs,transparent:true,depthWrite:false,side:T.DoubleSide,fog:false}));
   m.position.y=y; m.renderOrder=4; m.frustumCulled=false; W.scene.add(m); layers.push(m); if(W.reflHide) W.reflHide(m); }
 const cam=new T.Vector3(); let k=0, wet=0;
+/* 晨光光束：沿陽光方向斜射的細長光帶，繞光軸面向鏡頭（軸向看板） */
+const sc=document.createElement('canvas'); sc.width=64; sc.height=256; { const x=sc.getContext('2d'), im=x.createImageData(64,256);
+  for(let j=0;j<256;j++) for(let i=0;i<64;i++){ const u=(i+.5)/64-.5, v=j/255, a=Math.exp(-u*u*28)*Math.pow(Math.sin(Math.PI*v),.8)*(.35+.65*(1-v)); const o=(j*64+i)*4; im.data[o]=255; im.data[o+1]=240; im.data[o+2]=210; im.data[o+3]=Math.round(255*a); }
+  x.putImageData(im,0,0); }
+const sTex=new T.CanvasTexture(sc), shafts=[];
+for(let i=0;i<10;i++){ const m=new T.Mesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial({map:sTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,fog:false,opacity:0,color:0xffe2b8}));
+  m.matrixAutoUpdate=false; m.frustumCulled=false; m.renderOrder=5; m.visible=false; W.scene.add(m); if(W.reflHide) W.reflHide(m);
+  shafts.push({m,off:(i/9-.5)*0.9+(Math.random()-.5)*.12,dist:16+Math.random()*30,w:2.2+Math.random()*3.6,len:24+Math.random()*14,ph:Math.random()*6.28}); }
+const sd=new T.Vector3(), hs=new T.Vector3(), ctr=new T.Vector3(), vd=new T.Vector3(), rt=new T.Vector3(), nm=new T.Vector3(), base=new T.Vector3();
+function updShafts(dt){ const sun=W.U.uSunDir.value, vis=(W.U.uSunVis?W.U.uSunVis.value:1)*(1-.9*Math.min(1,(W.U.uCloud?W.U.uCloud.value:0)));
+  const K=Math.min(1,k*1.6)*vis*(sun.y>-.02?1:0); hs.set(sun.x,0,sun.z); const hl=hs.length(); if(hl<1e-3||K<.01){ shafts.forEach(s=>s.m.visible=false); return; } hs.divideScalar(hl);
+  const el=Math.max(.42,Math.atan2(sun.y,hl)); sd.set(hs.x*Math.cos(el),Math.sin(el),hs.z*Math.cos(el));   // 太低時抬高光束角度，避免躺平
+  W.camera.getWorldDirection(vd); const face=Math.max(0,vd.x*hs.x+vd.z*hs.z), tt=performance.now()*.001;
+  for(const s of shafts){ const a=Math.atan2(hs.x,hs.z)+s.off; base.set(cam.x+Math.sin(a)*s.dist,0,cam.z+Math.cos(a)*s.dist);
+    ctr.copy(base).addScaledVector(sd,s.len*.5); vd.subVectors(cam,ctr).normalize();
+    rt.crossVectors(sd,vd).normalize(); nm.crossVectors(rt,sd).normalize();
+    s.m.matrix.makeBasis(rt.clone().multiplyScalar(s.w),sd.clone().multiplyScalar(s.len),nm).setPosition(ctr); s.m.matrixWorld.copy(s.m.matrix);
+    s.m.material.opacity=Math.min(.75,K*(.25+.7*face)*(.55+.45*Math.sin(tt*.35+s.ph))*1.15); s.m.visible=true; } }
 function mistK(){ const h=((c.hour()%24)+24)%24; const dawn=Math.exp(-Math.pow((h-6.5)/1.1,2)), dusk=.35*Math.exp(-Math.pow((h-19.2)/.9,2)); return Math.max(dawn,dusk); }
 function update(dt){ W.camera.getWorldPosition(cam); const wx=c.wx?c.wx():{r:0};
   wet=Math.max(wet-dt/240,(wx.r||0)>.3?1:0);                          // 雨後幾分鐘內的早晨更濃
   const target=mistK()*(.75+.5*wet)*(c.sea()?.5:1)*(c.underwater()?0:1);
   k+=(target-k)*Math.min(1,dt*.5); U.uK.value=k;
   const wd=c.wind?c.wind():null; if(wd) U.uWind.value.set(wd.x||1,wd.z||0);
-  for(const m of layers){ m.visible=k>.01; m.position.x=cam.x; m.position.z=cam.z; } }
+  for(const m of layers){ m.visible=k>.01; m.position.x=cam.x; m.position.z=cam.z; }
+  updShafts(dt); }
 return {update,level:()=>k};
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
