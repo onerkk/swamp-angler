@@ -1703,7 +1703,7 @@ function render(){
   } else if(cur==='set'){
     shT.textContent='設定';
     h+='<div class="note">切換時段</div><div class="tabs">'+PRESETS.map((p,i)=>`<button class="tab" data-a="time" data-v="${i}">${p[1]}</button>`).join('')+'</div>';
-    { const gq=save.gfx||'high'; h+='<div class="note">畫質（手機卡頓時調低）</div><div class="tabs">'+[['high','高'],['mid','中'],['low','低']].map(([k,n])=>`<button class="tab${gq===k?' on':''}" data-a="gfx" data-v="${k}">${n}</button>`).join('')+'</div><div class="note" style="font-size:12px">高：全部特效｜中：關光束、倒影降解析｜低：關倒影、霧層、雨圈、草叢，解析度 1 倍</div>'; }
+    { const gq=save.gfx||'high'; h+='<div class="note">畫質（手機卡頓時調低）</div><div class="tabs">'+[['high','高'],['mid','中'],['low','低']].map(([k,n])=>`<button class="tab${gq===k?' on':''}" data-a="gfx" data-v="${k}">${n}</button>`).join('')+'</div><div class="note" style="font-size:12px">高：全部特效｜中：關光束、倒影降解析｜低：關倒影、霧層、雨圈、草叢，解析度 1 倍（高為 2.5 倍、中為 1.5 倍）</div>'; }
     { const n=window.__DIAG?window.__DIAG.count():0; h+=`<div class="note">問題回報（目前記錄 ${n} 筆錯誤）</div><div class="tabs"><button class="tab" data-a="diag" data-v="copy">📋 複製診斷資訊</button><button class="tab" data-a="diag" data-v="clear">清除記錄</button></div><div class="note" style="font-size:12px">遇到怪問題時，按「複製診斷資訊」再貼給開發者，就能看到你手機上實際發生的錯誤和幀率。</div>`; }
     h+='<div class="note">天氣</div><div class="tabs">'+[['auto','自動'],['clear','晴'],['breezy','有風'],['cloudy','陰'],['drizzle','毛毛雨'],['rain','雨'],['storm','雷雨'],['fog','霧']].map(w=>`<button class="tab${(save.wxMode||'auto')===w[0]?' on':''}" data-a="wx" data-v="${w[0]}">${w[1]}</button>`).join('')+'</div>';
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
@@ -3607,22 +3607,32 @@ const layers=[]; for(const y of [.35,.9]){ const m=new T.Mesh(new T.PlaneGeometr
 const cam=new T.Vector3(); let k=0, wet=0;
 /* 晨光光束：沿陽光方向斜射的細長光帶，繞光軸面向鏡頭（軸向看板） */
 const sc=document.createElement('canvas'); sc.width=64; sc.height=256; { const x=sc.getContext('2d'), im=x.createImageData(64,256);
-  for(let j=0;j<256;j++) for(let i=0;i<64;i++){ const u=(i+.5)/64-.5, v=j/255, a=Math.exp(-u*u*28)*Math.pow(Math.sin(Math.PI*v),.8)*(.35+.65*(1-v)); const o=(j*64+i)*4; im.data[o]=255; im.data[o+1]=240; im.data[o+2]=210; im.data[o+3]=Math.round(255*a); }
+  const subs=[]; for(let k=0;k<5;k++) subs.push({c:(Math.random()-.5)*.7,w:.03+Math.random()*.07,b:.45+Math.random()*.55});   // 光帶內數條細光線，中間有暗縫
+  for(let j=0;j<256;j++) for(let i=0;i<64;i++){ const u=(i+.5)/64-.5, v=j/255; let st=0; for(const q of subs) st=Math.max(st,q.b*Math.exp(-Math.pow((u-q.c)/q.w,2)));
+    const a=(.25*Math.exp(-u*u*28)+.75*st)*Math.pow(Math.sin(Math.PI*v),.8)*(.35+.65*(1-v)); const o=(j*64+i)*4; im.data[o]=255; im.data[o+1]=240; im.data[o+2]=210; im.data[o+3]=Math.round(255*Math.min(1,a)); }
   x.putImageData(im,0,0); }
 const sTex=new T.CanvasTexture(sc), shafts=[];
 for(let i=0;i<10;i++){ const m=new T.Mesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial({map:sTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,fog:false,opacity:0,color:0xffe2b8}));
   m.matrixAutoUpdate=false; m.frustumCulled=false; m.renderOrder=5; m.visible=false; W.scene.add(m); if(W.reflHide) W.reflHide(m);
-  shafts.push({m,off:(i/9-.5)*0.9+(Math.random()-.5)*.12,dist:16+Math.random()*30,w:2.2+Math.random()*3.6,len:24+Math.random()*14,ph:Math.random()*6.28}); }
+  shafts.push({m,occ:1,occT:1,off:(i/9-.5)*0.9+(Math.random()-.5)*.12,dist:16+Math.random()*30,w:2.2+Math.random()*3.6,len:24+Math.random()*14,ph:Math.random()*6.28}); }
+/* 遮擋：每 1.5 秒對每道光束的左中右三點往太陽方向打射線，被樹、枯木、岩石、遊艇擋住就變暗 */
+const rc=new T.Raycaster(); rc.far=70; const ro=new T.Vector3(); let occClock=0;
+function occluders(){ const list=[]; W.scene.children.forEach(o=>{ if(!o.visible) return; if((o.userData&&o.userData.lake)||o.userData.occ) list.push(o); }); if(c.extraOcc) c.extraOcc().forEach(o=>o&&o.visible&&list.push(o)); return list; }
+function updOcc(sd2,rt2){ const occ=occluders(); if(!occ.length){ shafts.forEach(s2=>s2.occT=1); return; }
+  for(const s2 of shafts){ let hit=0; const b=s2.base||ro;
+    for(const k of [-.35,0,.35]){ ro.copy(b).addScaledVector(rt2,k*s2.w).setY(.3); rc.set(ro,sd2); if(rc.intersectObjects(occ,true).length) hit++; }
+    s2.occT=1-.8*(hit/3); } }
 const sd=new T.Vector3(), hs=new T.Vector3(), ctr=new T.Vector3(), vd=new T.Vector3(), rt=new T.Vector3(), nm=new T.Vector3(), base=new T.Vector3();
 function updShafts(dt){ const sun=W.U.uSunDir.value, vis=(W.U.uSunVis?W.U.uSunVis.value:1)*(1-.9*Math.min(1,(W.U.uCloud?W.U.uCloud.value:0)));
   const K=Math.min(1,k*1.6)*vis*(sun.y>-.02?1:0); hs.set(sun.x,0,sun.z); const hl=hs.length(); if(hl<1e-3||K<.01){ shafts.forEach(s=>s.m.visible=false); return; } hs.divideScalar(hl);
   const el=Math.max(.42,Math.atan2(sun.y,hl)); sd.set(hs.x*Math.cos(el),Math.sin(el),hs.z*Math.cos(el));   // 太低時抬高光束角度，避免躺平
   W.camera.getWorldDirection(vd); const face=Math.max(0,vd.x*hs.x+vd.z*hs.z), tt=performance.now()*.001;
-  for(const s of shafts){ const a=Math.atan2(hs.x,hs.z)+s.off; base.set(cam.x+Math.sin(a)*s.dist,0,cam.z+Math.cos(a)*s.dist);
+  occClock-=dt; if(occClock<=0){ occClock=1.5; rt.set(-hs.z,0,hs.x); updOcc(sd,rt); }
+  for(const s of shafts){ const a=Math.atan2(hs.x,hs.z)+s.off; base.set(cam.x+Math.sin(a)*s.dist,0,cam.z+Math.cos(a)*s.dist); s.base=(s.base||new T.Vector3()).copy(base); s.occ+=(s.occT-s.occ)*Math.min(1,dt*1.5);
     ctr.copy(base).addScaledVector(sd,s.len*.5); vd.subVectors(cam,ctr).normalize();
     rt.crossVectors(sd,vd).normalize(); nm.crossVectors(rt,sd).normalize();
     s.m.matrix.makeBasis(rt.clone().multiplyScalar(s.w),sd.clone().multiplyScalar(s.len),nm).setPosition(ctr); s.m.matrixWorld.copy(s.m.matrix);
-    s.m.material.opacity=Math.min(.75,K*(.25+.7*face)*(.55+.45*Math.sin(tt*.35+s.ph))*1.15); s.m.visible=true; } }
+    s.m.material.opacity=Math.min(.9,K*(.25+.7*face)*(.55+.45*Math.sin(tt*.35+s.ph))*2.0*s.occ); s.m.visible=true; } }
 function mistK(){ const h=((c.hour()%24)+24)%24; const dawn=Math.exp(-Math.pow((h-6.5)/1.1,2)), dusk=.35*Math.exp(-Math.pow((h-19.2)/.9,2)); return Math.max(dawn,dusk); }
 function update(dt){ W.camera.getWorldPosition(cam); const wx=c.wx?c.wx():{r:0};
   wet=Math.max(wet-dt/240,(wx.r||0)>.3?1:0);                          // 雨後幾分鐘內的早晨更濃
@@ -3952,7 +3962,7 @@ const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDim
 G.saveRef=save;
 const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* 畫質：高／中／低，影響倒影、霧層光束、雨圈、草叢與解析度上限 */
-window.__applyGfx=q=>{ window.__GFX=q; const cap={high:2,mid:1.5,low:1}[q]||2;
+window.__applyGfx=q=>{ window.__GFX=q; const cap={high:2.5,mid:1.5,low:1}[q]||2.5;
   if(W.setRefl) W.setRefl(q!=='low',q==='mid'?.22:.35); W.setPR(Math.min(window.devicePixelRatio||1,cap)); };
 window.__applyGfx(save.gfx||'high');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
