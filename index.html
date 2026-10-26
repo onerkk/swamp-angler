@@ -1770,13 +1770,22 @@ let cur=null, shopTab='rod', resetArm=false, dexSel=null;
 const fmtW=w=>w<1?Math.round(w*1000)+' g':w.toFixed(2)+' kg';
 const PERN={dawn:'清晨',dusk:'黃昏',night:'夜晚'};
 
+// 這個釣點現在去得了嗎（跟釣點地圖用同一套判斷：主線開放＋有需要的船）
+function spotOK(i){ const s=SPOTS[i], why=window.__STORY?window.__STORY.lock(i):(save.lv<s.lv||(s.req==='mer1'&&!(save.mer&&save.mer.n>=1)));
+  return !why&&!((s.kayak&&!save.kayak)||(s.yacht&&!save.yacht)); }
+// 這種魚可以去哪裡釣：回傳地點文字；目前去不了任何一個出沒釣點就回傳 null
+function whereOf(sp){ const L=sp.loc||'lake';
+  const ok=SPOTS.map((s,i)=>i).filter(i=>spotOK(i)&&((SPOTS[i].loc||'lake')===L||(L==='both'&&SPOTS[i].loc!=='ice')||(SPOTS[i].loc==='ice'&&sp.ice))&&(!sp.spots||sp.spots.includes(SPOTS[i].id)));
+  if(!ok.length) return null; if(sp.spots) return ok.map(i=>SPOTS[i].name).join('、');
+  return L==='sea'?'海上':L==='ice'?'冰湖':'濕地任一處'; }
 function newQuest(ex){
   const lv=save.lv, per=['dawn','dusk','night'][Math.floor(Math.random()*3)];
   const pool={
     count:()=>{ const n=3+Math.floor(lv*.6); return {n,txt:`釣到任意魚 ${n} 尾`}; },
     rare:()=>{ const n=lv<4?1:2; return {n,min:1,txt:`釣到稀有以上的魚 ${n} 尾`}; },
     weight:()=>{ const n=Math.round(3+lv*2.5); return {n,txt:`累計漁獲重量 ${n} kg`}; },
-    sp:()=>{ const cs=SPECIES.filter(s=>s.rar<=Math.min(4,Math.floor(lv/3)+1)&&(s.loc||'lake')==='lake'), s=cs[Math.floor(Math.random()*cs.length)], n=s.rar>=2?1:2; return {n,id:s.id,txt:`釣到${s.name} ${n} 尾`}; },
+    sp:()=>{ const cs=SPECIES.map(s=>[s,whereOf(s)]).filter(([s,w])=>w&&!s.special&&!s.noSell&&s.rar<=Math.min(4,Math.floor(lv/3)+1)&&s.lvl[0]<=lv*1.5+10);   // 魚的等級太高（太難釣）就先不出成任務
+      const [s,w]=cs[Math.floor(Math.random()*cs.length)]||[SPECIES.find(x=>x.id==='bluegill'),'木碼頭'], n=s.rar>=2?1:2; return {n,id:s.id,txt:`釣到${s.name} ${n} 尾（${w}）`}; },
     per:()=>{ const n=2+Math.floor(lv/4); return {n,per,txt:`在${PERN[per]}釣到魚 ${n} 尾`}; },
     perfect:()=>{ const n=2+Math.floor(lv/5); return {n,txt:`完美揚竿 ${n} 次`}; },
     release:()=>({n:2,txt:'放生 2 尾魚'}),
@@ -2701,6 +2710,9 @@ const dexV=()=>Object.values(S.dex||{});
 const maxW=()=>dexV().reduce((m,d)=>Math.max(m,d.bw||0),0);
 const golds=()=>dexV().filter(d=>(d.md||0)>=3).length;
 const merN=()=>(S.mer&&S.mer.n)||0;
+// 依釣點自動產生「專屬魚種全收集」成就：新增魚種或釣點時會自動跟著更新
+const spotAch=()=>SPOTS.map(s=>{ const ids=P.SPECIES.filter(sp=>sp.spots&&sp.spots.includes(s.id)).map(sp=>sp.id); if(!ids.length) return null;
+  return ['spot_'+s.id,s.name+'行家','收集'+s.name+'的全部專屬魚種（'+ids.length+' 種）',()=>[ids.filter(id=>S.dex&&S.dex[id]).length,ids.length],600*ids.length]; }).filter(Boolean);
 const ACH=[
  ['first','第一條魚','釣到第一條魚',()=>[S.total||0,1],100],
  ['gram1','鱷口脫險','划獨木舟撞開鬧場的鱷魚',()=>[S.gatorRam||0,1],600],
@@ -2710,6 +2722,9 @@ const ACH=[
  ['c50','釣魚老手','累計釣到 50 尾',()=>[S.total||0,50],1000],
  ['c200','濕地傳奇','累計釣到 200 尾',()=>[S.total||0,200],5000],
  ['sp6','小小圖鑑家','發現 6 種魚',()=>[dexV().length,6],800],
+ ['sp15','圖鑑新手','發現 15 種魚',()=>[dexV().length,15],1500],
+ ['sp30','圖鑑達人','發現 30 種魚',()=>[dexV().length,30],4000],
+ ['sp45','圖鑑大師','發現 45 種魚',()=>[dexV().length,45],7000],
  ['spAll','圖鑑全收集','發現所有魚種',()=>[dexV().length,c.SPN],10000],
  ['gold1','第一頂金冠','釣到金冠尺寸的魚',()=>[golds(),1],500],
  ['gold8','金冠收藏家','8 種魚拿到金冠',()=>[golds(),8],4000],
@@ -2729,6 +2744,7 @@ const ACH=[
  ['sea1','揚帆出海','第一次開遊艇出海',()=>[S.seaTrips||0,1],2000],
  ['scene3','美景獵人','拍下 3 種美景',()=>[Object.keys(S.scenes||{}).length,3],1200],
  ['sceneAll','美景收藏家','拍下全部 8 種美景',()=>[Object.keys(S.scenes||{}).length,8],8000]];
+ACH.push(...spotAch());
 const MER_NEXT=['第 1 次相遇：她會告訴你一個秘密地點','第 2 次相遇：她會送你月光餌','第 3 次相遇：人魚之竿','第 4 次相遇：人魚的祝福','第 5 次相遇：月下之歌'];
 const STORY=[
  ['她把一片發光的鱗片放在你掌心，用指尖在水面畫出一個位置。「月光灣……只告訴你。」','解鎖秘境：月光灣（獨木舟可前往，夜裡傳說生物最多）'],
