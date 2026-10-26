@@ -1,0 +1,113 @@
+/* ===== 真實 3D 模型（Sketchfab CC-BY，作者見設定頁） ===== */
+const REAL_DIR='models/';
+// 魚：[檔名, 模型裡頭朝哪個軸, 選項]
+const RFISH={bluegill:['bluegill','+x'],crappie:['crappie','+z'],lmbass:['lmbass','+z'],smbass:['smbass','+z'],channel:['channel','+z'],flathead:['flathead','+z'],
+  gar:['gar','+z'],barra:['barra','+x'],golden:['koi','-x',{gold:1}],ghost:['koi','-x',{ghost:1}],grouper:['grouper','-x'],tuna:['tuna','+z'],marlin:['marlin','-z'],
+  ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],mermaid:['mermaid3d','up',{mer:1}],trout:['trout','+z'],pike:['pike','+z'],reba:['fish_reba','+z'],bowfin:['fish_bowfin','+z'],perch:['fish_mandarin','+z'],amber:['fish_amber','+z'],mahi:['fish_mahi','+z'],sail:['fish_sail','+z'],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z'],
+  crucian:['fish_crucian','+z'],tilapia:['fish_tilapia','+z'],snakehead:['fish_snakehead','+z'],peacock:['fish_peacock','+z'],
+  clarias:['fish_clarias','+z'],spgar:['fish_spgar','+z'],carp:['fish_carp','+z'],silvercarp:['fish_silvercarp','+z'],grasscarp:['fish_grasscarp','+z'],blackcarp:['fish_blackcarp','+z'],arapaima:['fish_arapaima','+z'],
+  char:['fish_char','+z'],burbot:['fish_burbot','+z'],porgy:['fish_porgy','+z'],parrot:['fish_parrot','+z'],redbream:['fish_redbream','+z'],emperor:['fish_emperor','+z'],cobia:['fish_cobia','+z'],wrasse:['fish_wrasse','+z'],skipjack:['fish_skipjack','+z'],sawara:['fish_sawara','+z'],yellowfin:['fish_yellowfin','+z'],
+  eel:['fish_eel','+z'],mekong:['fish_mekong','+z'],yperch:['fish_yperch','+z'],whitefish:['fish_whitefish','+z'],laketrout:['fish_laketrout','+z'],taimen:['fish_taimen','+z'],gt:['fish_gt','+z'],swordfish:['fish_swordfish','+z'],
+  clownfish:['fish_clownfish','+z'],bluetang:['fish_bluetang','+z'],blenny:['fish_blenny','+z'],angelfish:['fish_angelfish','+z'],copperband:['fish_copperband','+z'],threadfin:['fish_threadfin','+z'],seabeast:['fish_seabeast','+z'],seahorse:['fish_seahorse','up',{upYaw:Math.PI/2}]};
+const RHEAD={gwhite:'+z',tigershark:'+z',dolphin:'+z',whale:'+z',gator:'+x',eagle:'+z',gull:'-x',yacht:'-z',flyfish:'-x'};
+const RSETS={lake:['mermaid3d','fish_bowfin','fish_reba','fish_mandarin','bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
+  ice:['trout','pike','bluegill','crappie'],
+  sea:['mermaid3d','fish_amber','fish_mahi','fish_sail','yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','seaking']};
+const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger Shark','ra_in_coat'],['海豚','Bottlenose Dolphin','popcornbag'],['座頭鯨','Humpback Whale','ostapblendercg'],
+  ['鱷魚','American Alligator','JeremyGrayson'],['白頭海鵰','Bald Eagle','ucdavisterc'],['海鷗','Seagull','Dayvable'],['遊艇',"Frickie's yacht",'dannzjs'],
+  ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
+  ['斑點叉尾鮰','Channel catfish','faerbogdan99'],['扁頭鯰','Flathead Catfish','faerbogdan99'],['鱷雀鱔','Alligator Gar','Jay_Tano'],['錦鯉','Koi Fish','7plus'],
+  ['石斑','lowpoly freshwater grouper','Arrangemonk9'],['黑鮪魚','Bluefin Tuna','voltairevill'],['旗魚','Blue Marlin','Gotta_go_evi'],['飛魚','Exocoetidae','victorberdug'],
+  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚・弓鰭魚・鯽魚・吳郭魚・線鱧・孔雀鱸・塘蝨・斑點雀鱔・鯉魚・鰱魚・草魚・青魚・巨骨舌魚・北極紅點鮭・江鱈・黑鯛・鸚哥魚・真鯛・青嘴龍占・海鱺・曲紋唇魚・正鰹・土魠・黃鰭鮪・鱸鰻・湄公河巨鯰・黃金鱸・白鮭・湖紅點鮭・哲羅鮭・浪人鰺・劍旗魚・公子小丑魚・擬刺尾鯛・鬚鳚・神仙魚・長吻蝴蝶魚・絲鰺・海馬・神話海馬獸・原木獨木舟','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['汐月（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
+
+const GLOW=[];
+const BAKED=new Set(['fish_clownfish','fish_bluetang','fish_blenny','fish_angelfish','fish_copperband','fish_threadfin','fish_seabeast','fish_seahorse','fish_eel','fish_mekong','fish_yperch','fish_whitefish','fish_laketrout','fish_taimen','fish_gt','fish_swordfish','fish_char','fish_burbot','fish_porgy','fish_parrot','fish_redbream','fish_emperor','fish_cobia','fish_wrasse','fish_skipjack','fish_sawara','fish_yellowfin','fish_clarias','fish_spgar','fish_carp','fish_silvercarp','fish_grasscarp','fish_blackcarp','fish_arapaima','fish_crucian','fish_tilapia','fish_snakehead','fish_peacock','fish_reba','fish_mandarin','fish_amber','fish_mahi','fish_sail','fish_bowfin','mermaid3d','seaking']);   // 依設定圖烘焙貼圖的模型
+function createModels(W){
+'use strict';
+const T=THREE, loader=new T.GLTFLoader(), files={}, waiters={}, mixers=[];
+const ang=a=>({'+x':0,'-z':Math.PI/2,'-x':Math.PI,'+z':-Math.PI/2})[a];
+function load(f){ if(files[f]) return; const e=files[f]={g:null};
+  loader.load(REAL_DIR+f+'.glb',g=>{ e.g=g; (waiters[f]||[]).forEach(fn=>{ try{ fn(g); }catch(err){ console.warn('real',f,err); } }); waiters[f]=[]; },undefined,()=>{ e.err=1; }); }
+const ready=f=>files[f]&&files[f].g;
+function onReady(f,fn){ if(ready(f)) fn(files[f].g); else (waiters[f]=waiters[f]||[]).push(fn); }
+function preload(set){ (RSETS[set]||[]).forEach(load); }
+
+/* 擺尾著色器：跟程序化魚同一套，頭在 +X、身長 1 */
+function bendify(m,uni,K){ K=K||1; m.onBeforeCompile=s=>{ s.uniforms.uSwim=uni.uSwim; s.uniforms.uAmp=uni.uAmp;
+  s.vertexShader='uniform float uSwim;\nuniform float uAmp;\n'+s.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nfloat bx_=clamp(0.5-position.x,0.0,1.6);\ntransformed.z+=sin(uSwim-position.x*5.5)*bx_*bx_*uAmp*'+K.toFixed(2)+';'); }; }
+const fishReady=id=>!!(RFISH[id]&&ready(RFISH[id][0]));
+function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0]); if(!g) return null; const opt=c[2]||{};
+  const sc=g.scene; sc.updateMatrixWorld(true); let ms=[]; sc.traverse(o=>{ if(o.isMesh) ms.push(o); });
+  if(!ms.length) return null;
+  ms.sort((a,b)=>b.geometry.attributes.position.count-a.geometry.attributes.position.count); if(opt.one) ms=[ms[0]];
+  const R=c[1]==='up'?new T.Matrix4().makeRotationY(opt.upYaw||0):new T.Matrix4().makeRotationY(ang('+x')-ang(c[1])), box=new T.Box3(), parts=[];
+  for(const m of ms){ const geo=m.geometry.clone(); geo.morphAttributes={};
+    if(m.isSkinnedMesh&&m.skeleton&&geo.attributes.skinIndex){ sc.updateMatrixWorld(true); const pa=geo.attributes.position, v=new T.Vector3();
+      for(let i=0;i<pa.count;i++){ m.boneTransform(i,v); v.applyMatrix4(m.matrixWorld); pa.setXYZ(i,v.x,v.y,v.z); }
+      pa.needsUpdate=true; geo.computeVertexNormals(); }
+    else geo.applyMatrix4(m.matrixWorld);
+    ['skinIndex','skinWeight'].forEach(k=>{ if(geo.attributes[k]) geo.deleteAttribute(k); });
+    if(!geo.attributes.normal) geo.computeVertexNormals(); geo.applyMatrix4(R); geo.computeBoundingBox(); box.union(geo.boundingBox); parts.push([geo,m.material]); }
+  const sz=box.getSize(new T.Vector3()), ct=box.getCenter(new T.Vector3()), s=1/Math.max(c[1]==='up'?sz.y:sz.x,1e-6);
+  const uni={uSwim:{value:0},uAmp:{value:0}}, grp=new T.Group();
+  for(const [geo,mat] of parts){ geo.translate(-ct.x,-ct.y,-ct.z); geo.scale(s,s,s); geo.computeBoundingSphere();
+    const conv=mm=>{ const n=new T.MeshStandardMaterial({color:mm.color?mm.color.clone():new T.Color(1,1,1),map:mm.map||null,normalMap:mm.normalMap||null,
+        roughnessMap:mm.roughnessMap||null,metalnessMap:mm.metalnessMap||null,roughness:mm.roughness!==undefined?mm.roughness:.5,metalness:mm.metalness!==undefined?mm.metalness:0,
+        transparent:!!mm.transparent,alphaTest:mm.alphaTest||0,opacity:mm.opacity!==undefined?mm.opacity:1,side:mm.side,envMapIntensity:1.25,vertexColors:!!geo.attributes.color});
+      if(opt.moon){ n.color=new T.Color(0xd8ecff); n.emissive=new T.Color(0x4aa8ff); n.emissiveIntensity=.55; n.metalness=.6; n.roughness=.2; }
+      if(opt.mer){ n.roughness=.42; n.metalness=.08; }
+      if((opt.mer||opt.king)&&n.map){ n.emissive=new T.Color(0xdde6ff); n.emissiveMap=n.map; n.emissiveIntensity=.15; GLOW.push(n); }   // 夜裡用自己的顏色微微發光
+      if(opt.king){ n.roughness=.42; n.metalness=.35; n.emissive=new T.Color(0x0a3a5a); n.emissiveIntensity=.35; }
+      if(mm.normalScale) n.normalScale.copy(mm.normalScale);
+      if(n.map&&BAKED.has(c[0])){ n.map.generateMipmaps=false; n.map.minFilter=T.LinearFilter; n.map.needsUpdate=true; }   // 烘焙貼圖（三角形成對打包）關閉多層級縮圖，避免方格之間滲色
+      [n.map,n.normalMap,n.roughnessMap,n.metalnessMap].forEach(t=>{ if(t&&t.channel) t.channel=0; });
+      if(opt.gold){ n.color=new T.Color(0xffc23a); n.emissive=new T.Color(0xffa010); n.emissiveIntensity=.18; n.metalness=.55; n.roughness=.25; }
+      if(opt.ghost){ n.color=new T.Color(0xcfeeff); n.transparent=true; n.opacity=.72; n.emissive=new T.Color(0x5fc8ff); n.emissiveIntensity=.85; n.depthWrite=false; }
+      bendify(n,uni,opt.king||opt.mer?.15:1); return n; };
+    const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
+  return {group:grp,uni,sp,real:true}; }
+
+function measure(root){ root.updateMatrixWorld(true); const b=new T.Box3(), v=new T.Vector3();
+  root.traverse(m=>{ if(!m.isMesh||!m.visible) return; const pa=m.geometry.attributes.position, step=Math.max(1,Math.floor(pa.count/4000));
+    for(let i=0;i<pa.count;i+=step){ if(m.isSkinnedMesh&&m.skeleton) m.boneTransform(i,v); else v.fromBufferAttribute(pa,i); v.applyMatrix4(m.matrixWorld); b.expandByPoint(v); } });
+  return b; }
+/* 動物：把真模型掛進原本的物件，沿用原本的位置與朝向，保留模型自帶的骨架動畫 */
+function attach(host,key,o){ const h={host,loaded:false,actions:{},mixer:null,play(n){ const a=this.actions[n]; if(!a) return; for(const k in this.actions) if(k!==n) this.actions[k].fadeOut(.2); a.reset().fadeIn(.15).play(); }};
+  onReady(key,g=>{ const obj=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene.clone();
+    const inner=new T.Group(); inner.add(obj); inner.rotation.y=ang(o.target||'+z')-ang(RHEAD[key]);
+    const wrap=new T.Group(); wrap.add(inner); wrap.updateMatrixWorld(true);
+    const b=measure(wrap), sz=b.getSize(new T.Vector3()), ax=(o.target||'+z')[1];
+    const s=o.len/Math.max(ax==='x'?sz.x:sz.z,1e-6); inner.scale.setScalar(s); wrap.updateMatrixWorld(true);
+    const b2=measure(wrap), c2=b2.getCenter(new T.Vector3());
+    inner.position.set(-c2.x,o.top!==undefined?o.top-b2.max.y:-c2.y,-c2.z);
+    if(o.pitch){ wrap.rotation.x=o.pitch; } if(o.off) wrap.position.set(...o.off);
+    obj.traverse(m=>{ m.frustumCulled=false; if(m.isMesh&&m.material){ (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=1.1; }); } });
+    if(host.isMesh){ host.material=new T.MeshBasicMaterial({visible:false}); }
+    host.children.slice().forEach(c=>{ c.visible=false; });
+    host.add(wrap); host.userData.real=true; h.wrap=wrap;
+    if(g.animations&&g.animations.length&&o.anim!==false){ const mx=new T.AnimationMixer(obj); h.mixer=mx; mixers.push(mx);
+      g.animations.forEach(cl=>{ h.actions[cl.name]=mx.clipAction(cl); });
+      const first=(o.clip&&Object.keys(h.actions).find(k=>k.indexOf(o.clip)>=0))||Object.keys(h.actions)[0];
+      const a=h.actions[first]; a.play(); a.time=Math.random()*cl0(a); if(o.speed) a.timeScale=o.speed; }
+    h.loaded=true; if(o.onLoad) o.onLoad(h,b2); });
+  return h; }
+const cl0=a=>a.getClip().duration||1;
+
+/* 遊艇：船頭在前方 4.5m，鏡頭站在前甲板，甲板高度用射線量出來 */
+function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene.clone(), wrap=new T.Group(); wrap.add(obj);
+  const L=26; let b=new T.Box3().setFromObject(wrap), sz=b.getSize(new T.Vector3()); obj.scale.setScalar(L/sz.z); wrap.updateMatrixWorld(true);
+  b=new T.Box3().setFromObject(wrap); const c=b.getCenter(new T.Vector3()), H=b.max.y-b.min.y;
+  obj.position.x-=c.x; obj.position.z+=-4.5-b.min.z; obj.position.y+=-(b.min.y+H*.1); wrap.updateMatrixWorld(true);
+  const rc=new T.Raycaster(new T.Vector3(0,100,0),new T.Vector3(0,-1,0)); const hit=rc.intersectObject(wrap,true)[0];
+  const deck=hit?hit.point.y:1.6;
+  obj.traverse(m=>{ m.frustumCulled=false; if(m.isMesh) m.castShadow=false; });
+  host.children.slice().forEach(ch=>{ ch.visible=false; }); host.add(wrap);
+  const b3=new T.Box3().setFromObject(wrap); setHull(Math.max(Math.abs(b3.min.x),b3.max.x),b3.min.z,b3.max.z);
+  spots.forEach(s=>{ if(s.yacht) s.eye=deck+1.62; }); }); }
+
+function update(dt){ for(const m of mixers) m.update(dt); }
+function credits(){ return RCREDIT.map(r=>`${r[0]}：「${r[1]}」by ${r[2]}`).join('<br>'); }
+const want=id=>{ if(RFISH[id]) load(RFISH[id][0]); };   // 圖鑑詳細頁要看哪種魚，就只下載那一種
+function glowTick(){ const lt=W.info?W.info.light:1, k=Math.max(0,.6-lt); GLOW.forEach(n=>n.emissiveIntensity=.12+k*1.0); }
+return {glowTick,preload,want,fish,fishReady,attach,attachYacht,update,credits};
+}
