@@ -3709,12 +3709,16 @@ const NP=new T.Vector3(spot.pos[0],0,spot.pos[1]).addScaledVector(fw,11).addScal
 const npc=new T.Group(); npc.position.copy(NP); npc.visible=false; S.add(npc);
 if(T.GLTFLoader) new T.GLTFLoader().load('rock_moss_set_01.glb',g=>{ const r=g.scene; r.scale.setScalar(1.3); r.position.y=-.35; npc.add(r); });
 else { const r=new T.Mesh(new T.DodecahedronGeometry(.9,1),new T.MeshStandardMaterial({color:0x3a4238,roughness:.9})); r.scale.set(1.2,.6,1); npc.add(r); }
+// 夜裡的汐月：用自己的貼圖發光（天越暗越亮），旁邊再放一盞月光，照出臉、頭髮和鱗片的立體感
+const merMats=[], moonL=new T.PointLight(0xc8d8ff,0,10,1.3); moonL.position.set(1.2,2.6,1.6); npc.add(moonL);
+const moonL2=new T.PointLight(0x8fb0ff,0,7,1.5); moonL2.position.set(-1.4,1.4,-1.0); npc.add(moonL2);
+function merNight(){ const lt=W.info?W.info.light:1, k=Math.max(0,.65-lt); merMats.forEach(m=>m.emissiveIntensity=.12+k*1.9); moonL.intensity=k*4.5; moonL2.intensity=k*2.2; }
 const merT=new T.TextureLoader().load('mermaid_front.png',t=>{ const a=t.image.width/t.image.height; mer.scale.set(1.9*a,1.9,1); }); merT.encoding=T.sRGBEncoding;
 const mer=new T.Mesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial({map:merT,transparent:true,alphaTest:.05,depthWrite:true,side:T.DoubleSide,fog:false}));
 mer.position.y=1.25; npc.add(mer);
 /* 3D 汐月：載入後取代平面圖（依玩家設定圖生成的模型） */
 let mer3=null;
-if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid3d.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.42,metalness:.08,emissive:new T.Color(0x7d9cd0),emissiveIntensity:.32}); x.frustumCulled=false; } });   // 守護月潮的人魚：夜裡散發淡淡月光藍
+if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid3d.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.42,metalness:.08,emissive:new T.Color(0xe4ecff),emissiveMap:mp||null,emissiveIntensity:.15}); merMats.push(x.material); x.frustumCulled=false; } });
   o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.9/Math.max(sz.y,1e-6); o.scale.setScalar(s);
   o.updateMatrixWorld(true); const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,.15-b2.min.y,-c2.z);
   mer3=new T.Group(); mer3.add(o); npc.add(mer3); mer.visible=false; });
@@ -3766,7 +3770,7 @@ function scaleFx(n){ fx.querySelector('b').textContent=`🌙 月鱗 ${Math.min(7
   if(n<7) setTimeout(()=>c.toast('找到新的月鱗！去聽汐月的故事','good',2600),2300); }
 let endGlow=0;
 const cam=new T.Vector3();
-function update(dt){ W.camera.getWorldPosition(cam);
+function update(dt){ W.camera.getWorldPosition(cam); merNight();
   const nk=W.U.uNight?W.U.uNight.value:0, cl=W.U.uCloud?W.U.uCloud.value:0, vis=nk*(1-.8*Math.min(1,cl));
   moonDir(c.hour?c.hour():22,MD); const above=MD.y>-.02;
   const th=2*Math.PI*phase(), il=illum(); toV.copy(MD).negate(); rgt.crossVectors(MD,upY).normalize();
