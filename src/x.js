@@ -24,9 +24,9 @@ const TEST=/[?&]ghost=(1|glide|peek|behind|jump)/.test(location.search), TEST_MO
 function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wait')&&!ev&&performance.now()-testLast>30000&&performance.now()-sessionStart>5000; }
   if(S.noScare) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
   if(c.period()!=='night'||c.loc()!=='lake') return false; const st=c.state(); if(st!=='idle'&&st!=='wait') return false;
-  if(performance.now()-sessionStart<5*60*1000) return false;   // 剛開始玩的前 5 分鐘不嚇人
+  if(performance.now()-sessionStart<10*60*1000) return false;   // 剛開始玩的前 5 分鐘不嚇人
   const g=S.ghost=S.ghost||{}; const day=new Date().toDateString(); if(g.day!==day){ g.day=day; g.n=0; }
-  if(g.n>=3) return false; if(g.last&&Date.now()-g.last<25*60*1000) return false; return true; }
+  if(g.n>=2) return false; if(g.last&&Date.now()-g.last<60*60*1000) return false; return true; }
 function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=true;
   GL.load('models/ghost.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ mt.fog=true; mt.transparent=true; mt.opacity=.88; mt.depthWrite=true; mt.roughness=1; mt.metalness=0; if(mt.map){ mt.emissive=new T.Color(0x8fa0b8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.12; } mats.push(mt); } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
@@ -82,7 +82,7 @@ function blend(dt){ if(!model||!model.visible) return; const lt=W.info?W.info.li
 function update(dt){ blend(dt);
   if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0;
       if(!model&&!loading&&(TEST||!S.noScare&&c.period()==='night'&&c.loc()==='lake')) load(()=>{});
-      if(eligible()&&(TEST||Math.random()<1/720)){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }
+      if(eligible()&&(TEST||Math.random()<1/2400)){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }
   ev.t+=dt; const t=ev.t, m=model; if(!m) return;
   if(ev.mode==='jump'){ m.position.y=Math.min(-.28,-1.9+t*2.1); faceMe(m); m.rotation.y+=Math.sin(t*9)*.04;
     if(t>.9&&!ev.face){ ev.face=true; if(ov) ov.classList.add('on'); sfx('scream_main',1); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
