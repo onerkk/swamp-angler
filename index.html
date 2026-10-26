@@ -1132,6 +1132,51 @@ const RAR=[
  {name:'幻想', en:'FANTASY', col:'#5ef2ff', w:1.2, mult:15}];
 const BASS_D=[[-.3,0],[-.25,.1],[-.12,.09],[-.04,.04],[.04,.09],[.16,.08],[.22,0]], BASS_A=[[-.3,0],[-.24,.08],[-.13,.06],[-.08,0]];
 const SPECIES=[
+ /* ---------- 冰湖、近海礁岩、遠洋深藍專屬（依玩家設定圖生成）---------- */
+ {id:'char',loc:'ice',spots:['ice'],name:'北極紅點鮭',sci:'Salvelinus alpinus',rar:2,lvl:[30, 60],len:[30, 80],k:10,price:40,
+  sh:{H:.15,W:.065,prof:1.4,eyeT:.88,eye:.026,tail:.2,fork:.4,dorsal:[[-.05,0],[0,.11],[.08,.09],[.12,0]],anal:[[-.3,0],[-.26,.06],[-.2,0]]},
+  col:{back:'#2e3428',flank:'#6a6a50',belly:'#e8603a',fin:'#d85a3a',eye:'#c09030'},pat:{t:'spots',n:14,d:.25,r:.25,k:.5,c:'#e8d8c0'},scale:1,metal:.35,
+  f:{pow:1.4,spd:1.5,agi:1.2,jump:.3,stam:1.3,win:.95},time:{dawn:1.4,day:.9,dusk:1.4,night:.6},desc:'背部深綠、腹部和魚鰭鮮紅，魚鰭鑲白邊。只生活在冰冷清澈的湖水裡，冬天的紅腹最漂亮。'},
+ {id:'burbot',loc:'ice',spots:['ice'],name:'江鱈',sci:'Lota lota',rar:1,lvl:[20, 45],len:[30, 90],k:6,price:30,
+  sh:{H:.12,W:.07,prof:1.6,eyeT:.9,eye:.022,tail:.16,fork:0,barbels:1,dorsal:[[-.36,0],[-.33,.06],[.05,.06],[.08,0]],anal:[[-.36,0],[-.33,.05],[-.02,.05],[0,0]]},
+  col:{back:'#4a3e22',flank:'#8a7444',belly:'#ece2c8',fin:'#5a4a2a',eye:'#2a2010'},pat:{t:'mottle',k:.55},scale:1,metal:.35,
+  f:{pow:1.2,spd:.8,agi:.8,jump:0,stam:1.4,win:1.05},time:{dawn:.8,day:.4,dusk:1.2,night:1.9},desc:'淡水裡唯一的鱈魚，下巴一根鬚、第二背鰭很長。最冷的冬夜最活躍，會在冰下產卵。'},
+ {id:'porgy',loc:'sea',spots:['reef'],name:'黑鯛',sci:'Acanthopagrus schlegelii',rar:0,lvl:[18, 30],len:[20, 50],k:18,price:34,
+  sh:{H:.2,W:.075,prof:1.3,eyeT:.86,eye:.032,tail:.22,fork:.5,dorsal:[[-.3,0],[-.26,.11],[.1,.09],[.2,0]],anal:[[-.3,0],[-.25,.07],[-.15,0]]},
+  col:{back:'#2a2c30',flank:'#8a8e94',belly:'#e4e6e8',fin:'#3a3c40',eye:'#c09040'},pat:{t:'bars',n:6,k:.35,c:'#2a2c30'},scale:1,metal:.35,
+  f:{pow:1.3,spd:1.1,agi:1.2,jump:.05,stam:1.1,win:1},time:{dawn:1.4,day:.9,dusk:1.4,night:.8},desc:'銀黑色、體高、背鰭硬棘尖銳。在礁岩縫隙找螃蟹貝類，中魚後會往岩縫裡衝。'},
+ {id:'parrot',loc:'sea',spots:['reef'],name:'鸚哥魚',sci:'Scarus ghobban',rar:0,lvl:[16, 28],len:[25, 75],k:13,price:30,
+  sh:{H:.2,W:.075,prof:1.3,eyeT:.86,eye:.032,tail:.22,fork:.5,dorsal:[[-.3,0],[-.26,.11],[.1,.09],[.2,0]],anal:[[-.3,0],[-.25,.07],[-.15,0]]},
+  col:{back:'#2a8a8a',flank:'#5ac0b0',belly:'#d8e8e4',fin:'#3a7ad8',eye:'#c09040'},pat:{t:'plain'},scale:1,metal:.35,
+  f:{pow:1.1,spd:1.1,agi:1.2,jump:.05,stam:1,win:1.05},time:{dawn:1,day:1.4,dusk:.8,night:.15},desc:'藍綠色大鱗片、嘴巴像鳥喙，啃食珊瑚上的藻類。夜裡會吐黏液包住自己睡覺。'},
+ {id:'redbream',loc:'sea',spots:['reef'],name:'真鯛',sci:'Pagrus major',rar:1,lvl:[22, 38],len:[25, 90],k:15,price:48,
+  sh:{H:.2,W:.075,prof:1.3,eyeT:.86,eye:.032,tail:.22,fork:.5,dorsal:[[-.3,0],[-.26,.11],[.1,.09],[.2,0]],anal:[[-.3,0],[-.25,.07],[-.15,0]]},
+  col:{back:'#c84a4a',flank:'#e8908a',belly:'#f4e4e0',fin:'#e06060',eye:'#c08030'},pat:{t:'spots',n:16,d:.15,r:.2,k:.4,c:'#6ab0e8'},scale:1,metal:.35,
+  f:{pow:1.5,spd:1.2,agi:1,jump:.05,stam:1.3,win:.95},time:{dawn:1.4,day:1,dusk:1.3,night:.6},desc:'粉紅色魚身散布藍色小點，日本稱為「魚中之王」。中魚後會分好幾段往下衝。'},
+ {id:'emperor',loc:'sea',spots:['reef'],name:'青嘴龍占',sci:'Lethrinus nebulosus',rar:1,lvl:[22, 36],len:[30, 86],k:14,price:44,
+  sh:{H:.2,W:.075,prof:1.3,eyeT:.86,eye:.032,tail:.22,fork:.5,dorsal:[[-.3,0],[-.26,.11],[.1,.09],[.2,0]],anal:[[-.3,0],[-.25,.07],[-.15,0]]},
+  col:{back:'#3a6a6a',flank:'#a8b890',belly:'#e8ecdc',fin:'#d8c040',eye:'#c08030'},pat:{t:'plain'},scale:1,metal:.35,
+  f:{pow:1.5,spd:1.4,agi:1.1,jump:.05,stam:1.3,win:.95},time:{dawn:1,day:.8,dusk:1.4,night:1.3},desc:'嘴唇和臉頰泛藍色，魚鰭帶黃色。夜裡離開礁岩到沙地覓食，拉力強勁。'},
+ {id:'cobia',loc:'sea',spots:['reef'],name:'海鱺',sci:'Rachycentron canadum',rar:2,lvl:[32, 50],len:[60, 180],k:6.5,price:44,
+  sh:{H:.13,W:.08,prof:1.5,eyeT:.88,eye:.024,tail:.22,fork:.6,dorsal:[[-.15,0],[-.1,.08],[.15,.07],[.2,0]],anal:[[-.3,0],[-.25,.06],[-.05,0]]},
+  col:{back:'#3a2a1a',flank:'#7a6448',belly:'#ece6dc',fin:'#3a2e22',eye:'#a08030'},pat:{t:'band',k:.7},scale:1,metal:.35,
+  f:{pow:1.9,spd:1.5,agi:1,jump:.15,stam:1.7,win:.9},time:{dawn:1,day:1.3,dusk:1.1,night:.6},desc:'深褐色細長身體、頭部扁平像鯊魚，身側一條白色縱帶。常跟著大魚或漂流物游動。'},
+ {id:'wrasse',loc:'sea',spots:['reef'],name:'曲紋唇魚',sci:'Cheilinus undulatus',rar:3,lvl:[40, 70],len:[60, 200],k:12,price:0,noSell:true,
+  sh:{H:.2,W:.075,prof:1.3,eyeT:.86,eye:.032,tail:.22,fork:.5,dorsal:[[-.3,0],[-.26,.11],[.1,.09],[.2,0]],anal:[[-.3,0],[-.25,.07],[-.15,0]]},
+  col:{back:'#2a6a5a',flank:'#5a9a7a',belly:'#d0e0d4',fin:'#2a5aa0',eye:'#c08030'},pat:{t:'plain'},scale:1,metal:.35,
+  f:{pow:2,spd:1,agi:.9,jump:0,stam:1.9,win:1},time:{dawn:.9,day:1.4,dusk:.9,night:.2},desc:'俗稱蘇眉，頭上有隆起、嘴唇厚。全球保育類（華盛頓公約附錄二），釣到只能拍照後放流。'},
+ {id:'skipjack',loc:'sea',spots:['blue'],name:'正鰹',sci:'Katsuwonus pelamis',rar:0,lvl:[25, 40],len:[40, 100],k:16,price:30,
+  sh:{H:.2,W:.1,prof:1.2,eyeT:.88,eye:.03,tail:.26,fork:.95,dorsal:[[-.05,0],[0,.12],[.08,.04],[.14,0]],anal:[[-.28,0],[-.24,.08],[-.18,0]]},
+  col:{back:'#1a2a4a',flank:'#a8b4c4',belly:'#eef0f2',fin:'#2a3a50',eye:'#202020'},pat:{t:'plain'},scale:1,metal:.35,
+  f:{pow:1.4,spd:1.8,agi:1.1,jump:.1,stam:1.2,win:.95},time:{dawn:1.4,day:1.2,dusk:1,night:.4},desc:'紡錘形身體、腹部有 4～6 條深色縱紋。成群高速洄游，是柴魚的原料。'},
+ {id:'sawara',loc:'sea',spots:['blue'],name:'土魠',sci:'Scomberomorus commerson',rar:1,lvl:[30, 50],len:[60, 200],k:4.5,price:46,
+  sh:{H:.2,W:.1,prof:1.2,eyeT:.88,eye:.03,tail:.26,fork:.95,dorsal:[[-.05,0],[0,.12],[.08,.04],[.14,0]],anal:[[-.28,0],[-.24,.08],[-.18,0]]},
+  col:{back:'#1e2e4a',flank:'#b4bcc8',belly:'#eef0f4',fin:'#2a3448',eye:'#202020'},pat:{t:'bars',n:14,k:.3,c:'#3a4a68'},scale:1,metal:.35,
+  f:{pow:1.5,spd:1.9,agi:1.2,jump:.2,stam:1.2,win:.9},time:{dawn:1.4,day:1,dusk:1.3,night:.5},desc:'細長銀色身體、身側波浪狀直紋，牙齒銳利能咬斷釣線。台灣冬季的人氣魚。'},
+ {id:'yellowfin',loc:'sea',spots:['blue'],name:'黃鰭鮪',sci:'Thunnus albacares',rar:3,lvl:[50, 70],len:[80, 200],k:18,price:50,
+  sh:{H:.2,W:.1,prof:1.2,eyeT:.88,eye:.03,tail:.26,fork:.95,dorsal:[[-.05,0],[0,.12],[.08,.04],[.14,0]],anal:[[-.28,0],[-.24,.08],[-.18,0]]},
+  col:{back:'#14204a',flank:'#b0b8c8',belly:'#f0f2f4',fin:'#e8c020',eye:'#202020'},pat:{t:'plain'},scale:1,metal:.35,
+  f:{pow:2,spd:2,agi:1,jump:.1,stam:2,win:.85},time:{dawn:1.4,day:1.3,dusk:1,night:.5},desc:'第二背鰭和臀鰭又長又黃，身側一條金黃縱帶。速度驚人，一口氣能拉走上百公尺的線。'},
  /* ---------- 倒木區、木碼頭、深水中央專屬（依玩家設定圖生成）---------- */
  {id:'clarias',spots:['wood'],name:'塘蝨',sci:'Clarias batrachus',rar:0,lvl:[3,14],len:[20,50],k:8,price:26,
   sh:{H:.12,W:.07,prof:1.6,eyeT:.9,eye:.02,tail:.16,fork:0,barbels:1,dorsal:[[-.36,0],[-.34,.06],[.22,.06],[.24,0]],anal:[[-.36,0],[-.34,.05],[0,.05],[.02,0]]},
@@ -1274,7 +1319,7 @@ const SPECIES=[
   sh:{H:.12,W:.09,prof:1.3,eyeT:.88,eye:.02,tail:.24,fork:1,dorsal:[[-.08,0],[-.02,.12],[.08,.05],[.14,0]],anal:[[-.15,0],[-.1,.08],[-.05,0]]},
   col:{back:'#141e3a',flank:'#8a96a8',belly:'#eef2f6',fin:'#d8b040',eye:'#1a1a1a'},pat:{t:'plain'},scale:.2,metal:.8,
   f:{pow:2.8,spd:2.4,agi:.9,jump:.1,stam:2.2,win:1.0},time:{dawn:1.4,day:1,dusk:1.3,night:.6},desc:'海洋的黑色子彈，一尾動輒上百公斤，是所有海釣人的夢想。'},
- {id:'marlin',name:'旗魚',sci:'Istiophorus platypterus',loc:'sea',rar:4,lvl:[60,78],len:[180,300],k:4,price:80,
+ {id:'marlin',name:'旗魚',sci:'Makaira nigricans',loc:'sea',rar:4,lvl:[60,78],len:[180,300],k:4,price:80,
   sh:{H:.08,W:.05,prof:1.2,snout:1,eyeT:.8,eye:.018,tail:.26,fork:1,dorsal:[[-.3,0],[-.25,.25],[.2,.3],[.28,0]],anal:[[-.3,0],[-.25,.05],[-.15,0]]},
   col:{back:'#16305a',flank:'#6a88b0',belly:'#e4ecf4',fin:'#2a5aa0',eye:'#1a1a1a'},pat:{t:'bars',n:12,k:.35,c:'#5ab0e8'},scale:0,metal:.6,
   f:{pow:2.6,spd:2.6,agi:1.4,jump:1.4,stam:2.0,win:.8},time:{dawn:1.3,day:1.2,dusk:1.2,night:.4},desc:'背鰭像一面帆，上鉤後會整條躍出水面甩頭，是海上最華麗的對決。'},
@@ -1664,12 +1709,12 @@ const GEAR={
 const BAITS=[
  {id:'worm',name:'蚯蚓',icon:'🪱',price:0,pack:0,lv:1,desc:'什麼魚都吃一點，用不完',aff:{},rare:0,wait:1},
  {id:'corn',name:'甜玉米',icon:'🌽',price:60,pack:10,lv:1,desc:'印度鯪、太陽魚愛吃，咬口快',aff:{reba:2.2,bluegill:1.6,crappie:1.3,crucian:2.2,tilapia:1.8,carp:2.5,grasscarp:2.2,silvercarp:1.2,clarias:.5},rare:-.2,wait:.75},
- {id:'shrimp',name:'活蝦',icon:'🦐',price:180,pack:10,lv:2,desc:'鱖魚、鯰魚的最愛',aff:{perch:2.2,channel:2,flathead:1.4,clarias:1.8,blackcarp:2,carp:1.2},rare:.35,wait:1},
+ {id:'shrimp',name:'活蝦',icon:'🦐',price:180,pack:10,lv:2,desc:'鱖魚、鯰魚的最愛',aff:{perch:2.2,channel:2,flathead:1.4,clarias:1.8,blackcarp:2,carp:1.2,porgy:2.2,redbream:2,emperor:1.8,burbot:1.8,wrasse:1.2},rare:.35,wait:1},
  {id:'soft',name:'軟蟲路亞',icon:'🐛',price:240,pack:10,lv:3,desc:'專攻黑鱸和弓鰭魚',aff:{lmbass:2.6,smbass:2.6,bowfin:1.5,snakehead:1.8,peacock:1.5},rare:.4,wait:1.05},
- {id:'live',name:'活魚餌',icon:'🐟',price:600,pack:5,lv:5,desc:'小魚幾乎不碰，大型掠食魚才會咬',aff:{flathead:3,gar:3,bowfin:2,channel:1.6,snakehead:2.2,peacock:2.4,arapaima:3,spgar:2,clarias:.6,bluegill:.2,crappie:.2,reba:.2,crucian:.2,tilapia:.3},rare:1.0,wait:1.4},
- {id:'spoon',lure:'spoon',name:'金屬亮片',icon:'🥄',price:900,pack:15,lv:4,desc:'中速穩定收線，閃光吸引掠食魚（路亞：自己收線操作）',aff:{perch:2,lmbass:1.8,smbass:1.8,amber:1.6,ribbon:2,peacock:1.8,snakehead:1.2,spgar:1.2},rare:.4,wait:1},
- {id:'crank',lure:'crank',name:'曲柄硬餌',icon:'🐠',price:1400,pack:15,lv:6,desc:'快速收線會下潛，黑鱸、金目鱸最愛（需要好捲線器）',aff:{lmbass:2.5,smbass:2.2,barra:2,gar:1.5,grouper:1.5,mahi:1.4,peacock:2.2,spgar:1.2,arapaima:1.2},rare:.5,wait:1},
- {id:'minnow',lure:'minnow',name:'米諾',icon:'🐟',price:1800,pack:15,lv:8,desc:'抽一下、停一下，模仿受傷小魚，大型掠食魚無法抗拒',aff:{smbass:2.2,barra:2.2,lmbass:1.6,tuna:1.6,mahi:1.8,marlin:1.4,peacock:2.6,snakehead:1.6,spgar:1.6,arapaima:1.5},rare:.6,wait:1},
+ {id:'live',name:'活魚餌',icon:'🐟',price:600,pack:5,lv:5,desc:'小魚幾乎不碰，大型掠食魚才會咬',aff:{flathead:3,gar:3,bowfin:2,channel:1.6,snakehead:2.2,peacock:2.4,arapaima:3,spgar:2,clarias:.6,cobia:2,yellowfin:1.5,sawara:1.5,emperor:1.2,char:1.6,burbot:1.5,bluegill:.2,crappie:.2,reba:.2,crucian:.2,tilapia:.3},rare:1.0,wait:1.4},
+ {id:'spoon',lure:'spoon',name:'金屬亮片',icon:'🥄',price:900,pack:15,lv:4,desc:'中速穩定收線，閃光吸引掠食魚（路亞：自己收線操作）',aff:{perch:2,lmbass:1.8,smbass:1.8,amber:1.6,ribbon:2,peacock:1.8,snakehead:1.2,spgar:1.2,sawara:2.2,skipjack:2,yellowfin:1.2,char:1.4},rare:.4,wait:1},
+ {id:'crank',lure:'crank',name:'曲柄硬餌',icon:'🐠',price:1400,pack:15,lv:6,desc:'快速收線會下潛，黑鱸、金目鱸最愛（需要好捲線器）',aff:{lmbass:2.5,smbass:2.2,barra:2,gar:1.5,grouper:1.5,mahi:1.4,peacock:2.2,spgar:1.2,arapaima:1.2,emperor:1.2,cobia:1.4},rare:.5,wait:1},
+ {id:'minnow',lure:'minnow',name:'米諾',icon:'🐟',price:1800,pack:15,lv:8,desc:'抽一下、停一下，模仿受傷小魚，大型掠食魚無法抗拒',aff:{smbass:2.2,barra:2.2,lmbass:1.6,tuna:1.6,mahi:1.8,marlin:1.4,peacock:2.6,snakehead:1.6,spgar:1.6,arapaima:1.5,yellowfin:1.8,sawara:1.6,skipjack:1.4,cobia:1.5},rare:.6,wait:1},
  {id:'moon',name:'月光餌',icon:'🌙',price:1500,pack:3,lv:3,desc:'散發微光的神秘餌，傳說中的生物會被吸引',aff:{mermaid:25,ghost:12,golden:12},rare:.6,wait:1.3}];
 const BOAT_COST={coins:25000,scale:30,bone:10,pearl:2};   // 修復老漁人的漁船
 const xpNext=lv=>Math.round(120*Math.pow(lv,1.75));   // 升級曲線：Lv 10 約 6,700、Lv 20 約 22,600
@@ -1819,7 +1864,7 @@ function dexPage(sp){ const d=save.dex[sp.id], r=RAR[sp.rar], wh=dexWhere(sp), t
   if(!d){ h+='<div class="dexsec dim">還沒釣到這種魚，釣到後會解鎖外觀、介紹與完整資料。</div>'; return `<div style="--rc:${r.col}">${h}</div>`; }
   const W=x=>sp.k*Math.pow(x/100,3), wl=W(sp.len[0])*.9, wu=W(sp.len[1])*1.12, val=w=>Math.round(sp.price*Math.pow(w+.3,.85)*r.mult*.4);
   h+=`<div class="dexsec">${sp.desc||''}</div>`;
-  h+=`<div class="dexgrid"><span>體長</span><b>${sp.len[0]}–${sp.len[1]} 公分</b><span>體重</span><b>${fmtW(wl)}–${fmtW(wu)}</b><span>等級</span><b>LVL ${sp.lvl[0]}–${sp.lvl[1]}</b><span>參考售價</span><b>🪙 ${val(wl).toLocaleString()}–${val(wu).toLocaleString()}</b><span>拉扯型態</span><b>${styOf(sp.id).n}</b></div>`;
+  h+=`<div class="dexgrid"><span>體長</span><b>${sp.len[0]}–${sp.len[1]} 公分</b><span>體重</span><b>${fmtW(wl)}–${fmtW(wu)}</b><span>等級</span><b>LVL ${sp.lvl[0]}–${sp.lvl[1]}</b><span>參考售價</span><b>${sp.noSell?'保育類・不可販售':'🪙 '+val(wl).toLocaleString()+'–'+val(wu).toLocaleString()}</b><span>拉扯型態</span><b>${styOf(sp.id).n}</b></div>`;
   if(sp.f){ h+='<div class="dexsec">'+STAT_N.map(([k,n])=>{ const mx=Math.max(...SPECIES.map(s=>s.f?s.f[k]||0:0),.01), v=Math.min(1,(sp.f[k]||0)/mx);
     return `<div class="dexbar"><span>${n}</span><i><em style="width:${(v*100).toFixed(0)}%"></em></i></div>`; }).join('')+'</div>'; }
   h+=`<div class="dexgrid"><span>累計釣獲</span><b>${d.n} 尾</b><span>最重紀錄</span><b>${fmtW(d.bw)}</b>${d.bl?`<span>最長紀錄</span><b>${Math.round(d.bl*100)} 公分</b>`:''}${d.f?`<span>首次釣獲</span><b>${new Date(d.f).toLocaleDateString('zh-TW')}</b>`:''}</div>`;
@@ -2171,7 +2216,7 @@ const STY={
  jumper:{n:'甩頭跳水',run:[.8,1.8],rest:[.8,1.8],mul:1.7,lat:1.1,spd:1,ev:'shake',evP:.35,d:.8},
  digger:{n:'往深處鑽',run:[1.5,3],rest:[1,2.5],mul:1.5,lat:.7,spd:.8,ev:'dive',evP:.4,d:1},
  brawler:{n:'短促爆衝',run:[.6,1.2],rest:[.6,1.4],mul:2.0,lat:1.2,spd:1.1,ev:'shake',evP:.2,d:.6}};
-const SP_STY={bluegill:'nibbler',crappie:'nibbler',reba:'runner',perch:'brawler',lmbass:'jumper',channel:'digger',bowfin:'brawler',smbass:'jumper',flathead:'digger',gar:'runner',golden:'brawler',ghost:'jumper',mermaid:'runner',barra:'jumper',amber:'runner',grouper:'digger',ribbon:'nibbler',mahi:'jumper',tuna:'runner',marlin:'jumper',shark:'brawler',gwhite:'brawler',sail:'jumper',trout:'jumper',pike:'brawler',moonkoi:'digger',seaking:'digger',crucian:'nibbler',tilapia:'brawler',snakehead:'digger',peacock:'brawler',clarias:'digger',spgar:'runner',carp:'runner',silvercarp:'jumper',grasscarp:'runner',blackcarp:'digger',arapaima:'jumper'};
+const SP_STY={bluegill:'nibbler',crappie:'nibbler',reba:'runner',perch:'brawler',lmbass:'jumper',channel:'digger',bowfin:'brawler',smbass:'jumper',flathead:'digger',gar:'runner',golden:'brawler',ghost:'jumper',mermaid:'runner',barra:'jumper',amber:'runner',grouper:'digger',ribbon:'nibbler',mahi:'jumper',tuna:'runner',marlin:'jumper',shark:'brawler',gwhite:'brawler',sail:'jumper',trout:'jumper',pike:'brawler',moonkoi:'digger',seaking:'digger',crucian:'nibbler',tilapia:'brawler',snakehead:'digger',peacock:'brawler',clarias:'digger',spgar:'runner',carp:'runner',silvercarp:'jumper',grasscarp:'runner',blackcarp:'digger',arapaima:'jumper',char:'runner',burbot:'digger',porgy:'brawler',parrot:'brawler',redbream:'brawler',emperor:'runner',cobia:'runner',wrasse:'digger',skipjack:'runner',sawara:'runner',yellowfin:'runner'};
 // 依魚種取拉扯型態；新魚種忘了填也不會讓畫面報錯（預設小幅亂竄）
 const styOf=id=>STY[SP_STY[id]]||STY.nibbler;
 
@@ -3178,7 +3223,8 @@ const RFISH={bluegill:['bluegill','+x'],crappie:['crappie','+z'],lmbass:['lmbass
   gar:['gar','+z'],barra:['barra','+x'],golden:['koi','-x',{gold:1}],ghost:['koi','-x',{ghost:1}],grouper:['grouper','-x'],tuna:['tuna','+z'],marlin:['marlin','-z'],
   ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],mermaid:['mermaid3d','up',{mer:1}],trout:['trout','+z'],pike:['pike','+z'],reba:['fish_reba','+z'],bowfin:['fish_bowfin','+z'],perch:['fish_mandarin','+z'],amber:['fish_amber','+z'],mahi:['fish_mahi','+z'],sail:['fish_sail','+z'],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z'],
   crucian:['fish_crucian','+z'],tilapia:['fish_tilapia','+z'],snakehead:['fish_snakehead','+z'],peacock:['fish_peacock','+z'],
-  clarias:['fish_clarias','+z'],spgar:['fish_spgar','+z'],carp:['fish_carp','+z'],silvercarp:['fish_silvercarp','+z'],grasscarp:['fish_grasscarp','+z'],blackcarp:['fish_blackcarp','+z'],arapaima:['fish_arapaima','+z']};
+  clarias:['fish_clarias','+z'],spgar:['fish_spgar','+z'],carp:['fish_carp','+z'],silvercarp:['fish_silvercarp','+z'],grasscarp:['fish_grasscarp','+z'],blackcarp:['fish_blackcarp','+z'],arapaima:['fish_arapaima','+z'],
+  char:['fish_char','+z'],burbot:['fish_burbot','+z'],porgy:['fish_porgy','+z'],parrot:['fish_parrot','+z'],redbream:['fish_redbream','+z'],emperor:['fish_emperor','+z'],cobia:['fish_cobia','+z'],wrasse:['fish_wrasse','+z'],skipjack:['fish_skipjack','+z'],sawara:['fish_sawara','+z'],yellowfin:['fish_yellowfin','+z']};
 const RHEAD={gwhite:'+z',tigershark:'+z',dolphin:'+z',whale:'+z',gator:'+x',eagle:'+z',gull:'-x',yacht:'-z',flyfish:'-x'};
 const RSETS={lake:['mermaid3d','fish_bowfin','fish_reba','fish_mandarin','bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
   ice:['trout','pike','bluegill','crappie'],
@@ -3188,9 +3234,9 @@ const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger 
   ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
   ['斑點叉尾鮰','Channel catfish','faerbogdan99'],['扁頭鯰','Flathead Catfish','faerbogdan99'],['鱷雀鱔','Alligator Gar','Jay_Tano'],['錦鯉','Koi Fish','7plus'],
   ['石斑','lowpoly freshwater grouper','Arrangemonk9'],['黑鮪魚','Bluefin Tuna','voltairevill'],['旗魚','Blue Marlin','Gotta_go_evi'],['飛魚','Exocoetidae','victorberdug'],
-  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚・弓鰭魚・鯽魚・吳郭魚・線鱧・孔雀鱸・塘蝨・斑點雀鱔・鯉魚・鰱魚・草魚・青魚・巨骨舌魚・原木獨木舟','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['汐月（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
+  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚・弓鰭魚・鯽魚・吳郭魚・線鱧・孔雀鱸・塘蝨・斑點雀鱔・鯉魚・鰱魚・草魚・青魚・巨骨舌魚・北極紅點鮭・江鱈・黑鯛・鸚哥魚・真鯛・青嘴龍占・海鱺・曲紋唇魚・正鰹・土魠・黃鰭鮪・原木獨木舟','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['汐月（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
 
-const BAKED=new Set(['fish_clarias','fish_spgar','fish_carp','fish_silvercarp','fish_grasscarp','fish_blackcarp','fish_arapaima','fish_crucian','fish_tilapia','fish_snakehead','fish_peacock','fish_reba','fish_mandarin','fish_amber','fish_mahi','fish_sail','fish_bowfin','mermaid3d','seaking']);   // 依設定圖烘焙貼圖的模型
+const BAKED=new Set(['fish_char','fish_burbot','fish_porgy','fish_parrot','fish_redbream','fish_emperor','fish_cobia','fish_wrasse','fish_skipjack','fish_sawara','fish_yellowfin','fish_clarias','fish_spgar','fish_carp','fish_silvercarp','fish_grasscarp','fish_blackcarp','fish_arapaima','fish_crucian','fish_tilapia','fish_snakehead','fish_peacock','fish_reba','fish_mandarin','fish_amber','fish_mahi','fish_sail','fish_bowfin','mermaid3d','seaking']);   // 依設定圖烘焙貼圖的模型
 function createModels(W){
 'use strict';
 const T=THREE, loader=new T.GLTFLoader(), files={}, waiters={}, mixers=[];
