@@ -4077,8 +4077,8 @@ const sheet=new T.Mesh(new T.CircleGeometry(600,96).rotateX(-Math.PI/2),mat); sh
 /* 冰洞：深色水面＋碎冰邊緣 */
 const hole=new T.Group(); hole.visible=false; g.add(hole);
 let drilled=false, prog=0, lastKey='';
-const water=new T.Mesh(new T.CircleGeometry(.34,40).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x06141c,roughness:.04,metalness:.1,envMapIntensity:1.4})); water.position.y=.012; hole.add(water);
-const rimM=new T.MeshStandardMaterial({color:0xdfeefa,roughness:.25,metalness:0,transparent:true,opacity:.92});
+const water=new T.Mesh(new T.CircleGeometry(.34,40).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x06141c,roughness:.04,metalness:.1,envMapIntensity:1.4,emissive:0x12283a,emissiveIntensity:0})); water.position.y=.012; hole.add(water);
+const rimM=new T.MeshStandardMaterial({color:0xdfeefa,roughness:.25,metalness:0,transparent:true,opacity:.92,emissive:0x4a5a72,emissiveIntensity:0});
 const rim=new T.Mesh(new T.TorusGeometry(.38,.05,8,40).rotateX(Math.PI/2),rimM); rim.position.y=.03; hole.add(rim);
 for(let i=0;i<14;i++){ const a=i/14*Math.PI*2+Math.random()*.3, r=.46+Math.random()*.22, s=.04+Math.random()*.07;
   const ch=new T.Mesh(new T.DodecahedronGeometry(s,0),rimM); ch.position.set(Math.cos(a)*r,.02+s*.4,Math.sin(a)*r); ch.rotation.set(Math.random(),Math.random(),Math.random()); ch.scale.y=.45; hole.add(ch); }
@@ -4112,7 +4112,7 @@ function updSnow(dt){ const on=c.loc()==='ice', want=on?Math.min(1,Math.max(W.U.
   fg.attributes.position.needsUpdate=true; flakes.position.set(fcam.x,0,fcam.z); }
 let strT=0;
 function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visible=on;
-  if(on){ const lt=W.info?W.info.light:1; mat.emissiveIntensity=Math.max(0,.55-lt)*.9; }
+  if(on){ const lt=W.info?W.info.light:1, k=Math.max(0,.55-lt); mat.emissiveIntensity=k*.9; rimM.emissiveIntensity=k*1.1; water.material.emissiveIntensity=k*1.2; }
   if(liftT>0){ liftT-=dt; auger.position.y+=dt*.6; auger.rotation.y+=dt*3; if(liftT<=0) auger.visible=false; }
   else if(!drilled&&on&&prog>0&&!(c.held&&c.held())) auger.visible=prog>0;
   if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
