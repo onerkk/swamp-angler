@@ -4531,7 +4531,7 @@ const causTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.heig
   const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; return t; })();
 const BG={fresh:bgTex(false),sea:bgTex(true)};
 // tanks 依水質存放每個缸：群組、尺寸、位置、魚、水草、氣泡
-const tanks={}, causList=[];
+const tanks={}, causList=[], tv2=new T.Vector3(), tv3=new T.Vector3();
 function buildTank(water,spec,x){
   const old=tanks[water]; if(old){ scene.remove(old.g); old.fish.forEach(f=>{}); }
   const g=new T.Group(), z=ROOM.zb+spec.d/2+.08, y=spec.st||.85, STAND=y; g.position.set(x,0,z); scene.add(g);
@@ -4569,7 +4569,9 @@ function buildTank(water,spec,x){
 }
 // 把水族箱裡記錄的魚做成會游的模型（用遊戲同一個魚模型，按實際體長縮放）
 function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null; const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
-  src.traverse(o=>{ o.visible=true; o.frustumCulled=false; }); const w=new T.Group(); w.add(src); w.scale.setScalar(rec.L); w.userData.rec=rec; w.userData.real=c.isReal(rec.id); return w; }
+  src.traverse(o=>{ o.visible=true; o.frustumCulled=false; if(o.isMesh&&o.material){ const mats=Array.isArray(o.material)?o.material:[o.material];
+      const nm=mats.map(m=>{ const k=m.clone(); k.onBeforeCompile=()=>{}; k.customProgramCacheKey=()=>'tank'; k.transparent=false; k.opacity=1; k.depthWrite=true; k.needsUpdate=true; return k; });
+      o.material=Array.isArray(o.material)?nm:nm[0]; o.renderOrder=1; } }); const w=new T.Group(); w.add(src); w.scale.setScalar(rec.L); w.userData.rec=rec; w.userData.real=c.isReal(rec.id); return w; }
 function bounds(tk,L){ const s=tk.spec, m=Math.min(L*.55,s.w*.4); return {x0:-s.w/2+m+.03,x1:s.w/2-m-.03,y0:tk.y+.1+L*.12,y1:tk.y+s.h-.1-L*.12,z0:-s.d/2+.06+L*.12,z1:s.d/2-.06-L*.12}; }
 function pickTarget(f,tk){ const b=bounds(tk,f.rec.L), r=(a,b)=>a+Math.random()*Math.max(0,b-a); f.tgt.set(r(b.x0,b.x1),r(b.y0,b.y1),r(Math.min(b.z0,b.z1),Math.max(b.z0,b.z1))); }
 function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.sea:[]};
@@ -4599,13 +4601,26 @@ function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.i
 const tv=new T.Vector3();
 function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
   tk.plants.forEach(p=>{ p.o.rotation.z=Math.sin(t*1.2+p.ph)*.06; p.o.rotation.x=Math.sin(t*.9+p.ph)*.04; });
-  tk.fish.forEach(f=>{ const sp=c.species(f.rec.id); const src=sp&&c.getFish(sp); if(src&&src.uni){ src.uni.uSwim.value=t*5; src.uni.uAmp.value=.55; } });
   causList.forEach(c2=>{ c2.m.map.offset.set(t*.012,t*.009); c2.m.map.repeat.set(c2.s*1.6,1.2); });
   const bp=tk.bub.geometry.attributes.position; for(let i=0;i<bp.count;i++){ let yy=bp.getY(i)+dt*(.12+(i%5)*.03); if(yy>tk.y+tk.spec.h-.06) yy=tk.y+.08; bp.setY(i,yy); } bp.needsUpdate=true;
-  tk.fish.forEach(f=>{ const o=f.o; tv.subVectors(f.tgt,o.position); const d=tv.length(); if(d<.04){ pickTarget(f,tk); return; }
-    tv.normalize(); const want=Math.atan2(-tv.z,tv.x); let dy=want-o.rotation.y; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2;
-    o.rotation.y+=dy*Math.min(1,dt*1.5); o.rotation.z=Math.sin(t*2+f.ph)*.05+tv.y*.3;
-    const sp=f.sp*(Math.abs(dy)>1?.3:1)*Math.min(1,.5+f.rec.L*2); o.position.addScaledVector(tv,sp*dt); }); } }
+  const fs=tk.fish;
+  fs.forEach(f=>{ const o=f.o; f.v=f.v||0; f.rest=f.rest||0;
+    // 偶爾停下來懸浮一會兒
+    if(f.rest>0){ f.rest-=dt; f.v+=(0.015-f.v)*Math.min(1,dt*2); }
+    else if(Math.random()<dt*.06){ f.rest=1.5+Math.random()*3; }
+    tv.subVectors(f.tgt,o.position); const d=tv.length(); if(d<.06){ pickTarget(f,tk); }
+    tv.normalize();
+    // 跟其他魚保持距離
+    fs.forEach(g2=>{ if(g2===f) return; tv2.subVectors(o.position,g2.o.position); const dd=tv2.length(), need=(f.rec.L+g2.rec.L)*.45; if(dd<need&&dd>1e-4){ tv.addScaledVector(tv2.normalize(),(need-dd)/need*1.5); } });
+    tv.y*=.6; tv.normalize();
+    const want=Math.atan2(-tv.z,tv.x); let dy=want-o.rotation.y; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2;
+    const turn=Math.min(1,dt*(0.9+f.rec.L*.5)); o.rotation.y+=dy*turn;
+    const vmax=f.sp*Math.min(1,.5+f.rec.L*2)*(Math.abs(dy)>1.2?.25:1); if(f.rest<=0) f.v+=(vmax-f.v)*Math.min(1,dt*1.2);
+    // 身體隨速度輕微擺動與傾斜（整體小幅擺尾，不會變形）
+    const wag=Math.sin(t*(4+f.v*30)+f.ph); o.rotation.y+=wag*.025*Math.min(1,f.v*12)*dt*60/60; o.rotation.z=wag*.04*Math.min(1,f.v*12)+Math.max(-.35,Math.min(.35,tv.y*.5))*-Math.cos(o.rotation.y);
+    o.rotation.x=Math.max(-.3,Math.min(.3,-tv.y*.4*Math.sin(o.rotation.y)));
+    const fwd=tv3.set(Math.cos(o.rotation.y),tv.y*.6,-Math.sin(o.rotation.y)).normalize(); o.position.addScaledVector(fwd,f.v*dt);
+    const b=bounds(tk,f.rec.L); o.position.x=Math.max(b.x0,Math.min(b.x1,o.position.x)); o.position.y=Math.max(b.y0,Math.min(b.y1,o.position.y)); o.position.z=Math.max(Math.min(b.z0,b.z1),Math.min(Math.max(b.z0,b.z1),o.position.z)); }); } }
 // 環境光：白天從窗戶進來的光多、夜裡靠爐火和檯燈
 const hemi=new T.HemisphereLight(0xfff0dd,0x3a2a1a,.5); scene.add(hemi);
 const sun=new T.DirectionalLight(0xfff4e0,.8); sun.position.set(-6,4,-1); sun.target.position.set(0,0,-1); scene.add(sun,sun.target);
