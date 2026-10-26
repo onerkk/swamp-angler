@@ -8,3 +8,4 @@
 - 海上天空：kloofendal_48d_partly_cloudy_puresky, kloppenheim_06_puresky, kloppenheim_02_puresky — Poly Haven（CC0）
 
 聲音：scream_*.mp3、wail.mp3、gasp.mp3 來自 OpenGameArt（CC0：Screams of horror、Female Scream 1 by AuraVoice）
+scream_main.mp3 / scream_b.mp3 / wail.mp3 / gasp.mp3：OpenGameArt CC0（Screams of horror; Female Scream 1 by Nocturnal_Vanguard）
