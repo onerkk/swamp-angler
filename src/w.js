@@ -101,11 +101,11 @@ for(let i=0;i<3;i++){ const lg=new T.Mesh(new T.CylinderGeometry(.06,.06,.7,8),n
 const fireL=new T.PointLight(0xff8a40,2.2,9,1.3); fireL.position.set(ROOM.x-1.1,.6,FP.z); scene.add(fireL);
 // 家具：Poly Haven 真實模型（CC0），回家時才載入。位置以房間中央偏後的客廳區為主
 const GL=new T.GLTFLoader(), mcache={}, glowM=[];
-const ART={hanging_picture_frame_01:'mermaid_a.jpg',hanging_picture_frame_02:'env_dawn_band.jpg'};
+const ART={hanging_picture_frame_01:'mermaid_a.jpg',hanging_picture_frame_02:'mermaid_a.jpg'};
 function put(name,x,y,z,ry,sc,fn){ const place=g=>{ const o=g.scene.clone(true); o.position.set(x,y,z); o.rotation.y=ry||0; o.scale.setScalar(sc||1);
     o.traverse(m=>{ if(!m.isMesh) return; m.frustumCulled=false; const mats=Array.isArray(m.material)?m.material:[m.material];
       mats.forEach((mm,i)=>{ if(!mm) return; if(mm.map) mm.map.anisotropy=4;
-        if(/_artwork$/.test(mm.name)&&ART[name]){ const nm=mm.clone(); const tx=TL.load(ART[name]); tx.encoding=T.sRGBEncoding; if(name==='hanging_picture_frame_02'){ tx.repeat.set(.6,.5); tx.offset.set(.2,.08); } nm.map=tx; nm.color.set(0xffffff); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
+        if(/_artwork$/.test(mm.name)&&ART[name]){ const nm=mm.clone(); const tx=TL.load(ART[name]); tx.encoding=T.sRGBEncoding; nm.map=tx; nm.color.set(0xffffff); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_glass$/.test(mm.name)){ const nm=new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.12,roughness:.05,metalness:0,depthWrite:false}); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_lamp$/.test(mm.name)){ const nm=mm.clone(); nm.emissive=new T.Color(0xffd080); nm.emissiveIntensity=1.2; if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; glowM.push(nm); } }); });
     scene.add(o); if(fn) fn(o); };
@@ -137,11 +137,22 @@ const lampL=new T.PointLight(0xffd8a0,1.2,5,1.4); lampL.position.set(LV.x+.2,.9,
 const TSPEC=[{w:1.2,h:.6,d:.45,st:.85},{w:1.8,h:.75,d:.55,st:.85},{w:2.6,h:1.0,d:.7,st:.7},{w:3.4,h:1.2,d:.8,st:.55}], SEA_SPEC={w:1.25,h:.62,d:.5,st:.85};
 const sandTex={fresh:pbr('clean_pebbles',2,1),sea:pbr('coral_gravel',2,1)};
 const rockM=new T.MeshStandardMaterial({color:0x6a665e,roughness:.95});
-const bgTex=(sea)=>{ const cv=document.createElement('canvas'); cv.width=4; cv.height=128; const g=cv.getContext('2d'), gr=g.createLinearGradient(0,0,0,128);
-  gr.addColorStop(0,sea?'#3ab0d8':'#4a9a90'); gr.addColorStop(1,sea?'#0a2a5a':'#0e3a3a'); g.fillStyle=gr; g.fillRect(0,0,4,128); const t=new T.CanvasTexture(cv); t.encoding=T.sRGBEncoding; return t; };
+// 缸背景：深色漸層＋從水面斜射下來的光束＋遠處朦朧的石影，像真正造景缸的背景
+const bgTex=(sea)=>{ const cv=document.createElement('canvas'); cv.width=512; cv.height=256; const g=cv.getContext('2d'), gr=g.createLinearGradient(0,0,0,256);
+  gr.addColorStop(0,sea?'#2a8ab8':'#2e7a72'); gr.addColorStop(.5,sea?'#0f3f6e':'#123f3f'); gr.addColorStop(1,sea?'#061a30':'#07201f'); g.fillStyle=gr; g.fillRect(0,0,512,256);
+  for(let i=0;i<9;i++){ const x=40+i*52+Math.random()*30, w=18+Math.random()*26; const lg=g.createLinearGradient(x,0,x+40,256); lg.addColorStop(0,'rgba(220,245,255,.22)'); lg.addColorStop(.55,'rgba(200,235,255,.05)'); lg.addColorStop(1,'rgba(200,235,255,0)');
+    g.fillStyle=lg; g.beginPath(); g.moveTo(x,0); g.lineTo(x+w,0); g.lineTo(x+w+60,256); g.lineTo(x+40,256); g.closePath(); g.fill(); }
+  for(let i=0;i<7;i++){ const x=Math.random()*512, r=40+Math.random()*70; const rg=g.createRadialGradient(x,250,0,x,250,r); rg.addColorStop(0,'rgba(0,0,0,.35)'); rg.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=rg; g.fillRect(x-r,250-r,r*2,r*2); }
+  const t=new T.CanvasTexture(cv); t.encoding=T.sRGBEncoding; return t; };
+// 圓形柔光氣泡
+const bubTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=32; const g=cv.getContext('2d'), rg=g.createRadialGradient(13,12,1,16,16,15); rg.addColorStop(0,'rgba(255,255,255,.95)'); rg.addColorStop(.45,'rgba(220,245,255,.35)'); rg.addColorStop(.8,'rgba(200,235,255,.5)'); rg.addColorStop(1,'rgba(200,235,255,0)'); g.fillStyle=rg; g.fillRect(0,0,32,32); return new T.CanvasTexture(cv); })();
+// 沙底的水波光影（焦散）
+const causTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,256,256); g.strokeStyle='rgba(255,255,255,.9)'; g.lineWidth=2.2;
+  for(let i=0;i<28;i++){ g.beginPath(); const x0=Math.random()*256, y0=Math.random()*256; g.moveTo(x0,y0); for(let k=0;k<5;k++) g.quadraticCurveTo(Math.random()*256,Math.random()*256,Math.random()*256,Math.random()*256); g.stroke(); }
+  const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; return t; })();
 const BG={fresh:bgTex(false),sea:bgTex(true)};
 // tanks 依水質存放每個缸：群組、尺寸、位置、魚、水草、氣泡
-const tanks={};
+const tanks={}, causList=[];
 function buildTank(water,spec,x){
   const old=tanks[water]; if(old){ scene.remove(old.g); old.fish.forEach(f=>{}); }
   const g=new T.Group(), z=ROOM.zb+spec.d/2+.08, y=spec.st||.85, STAND=y; g.position.set(x,0,z); scene.add(g);
@@ -149,17 +160,23 @@ function buildTank(water,spec,x){
   add(new T.BoxGeometry(spec.w+.1,STAND,spec.d+.08),wood(1,1,0,0x6a4630),0,STAND/2,0);
   add(new T.PlaneGeometry(spec.w-.02,spec.h-.02),new T.MeshBasicMaterial({map:BG[water]}),0,y+spec.h/2,-spec.d/2+.012);
   add(new T.BoxGeometry(spec.w-.02,.07,spec.d-.02),sandTex[water],0,y+.035,0);
-  for(let i=0;i<3+Math.round(spec.w*2);i++){ const r=add(new T.DodecahedronGeometry(.04+Math.random()*.06,0),rockM,(Math.random()-.5)*(spec.w-.2),y+.08,-spec.d/2+.08+Math.random()*spec.d*.35); r.scale.y=.6; r.rotation.y=Math.random()*6; }
+  for(let i=0;i<2+Math.round(spec.w*1.5);i++){ const px=(Math.random()-.5)*(spec.w-.3), pz=-spec.d/2+.1+Math.random()*spec.d*.3, sc=.025+Math.random()*.025; GL.load('rock_moss_set_01.glb',gg=>{ const o=gg.scene.clone(true); o.position.set(px,y+.06,pz); o.rotation.y=Math.random()*6; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); }); }
   const plants=[];
   // 水草：遊戲裡的真實蕨類模型縮小當作水草；沉木用枯枝模型
-  const K=Math.round(spec.w*3); for(let i=0;i<K;i++){ const ph=Math.random()*6, px=(Math.random()-.5)*(spec.w-.3), pz=-spec.d/2+.06+Math.random()*spec.d*.45, sc=.16+Math.random()*.14;
+  const K=Math.round(spec.w*4); for(let i=0;i<K;i++){ const ph=Math.random()*6, side=i%3===0, px=side?(Math.random()<.5?-1:1)*(spec.w/2-.12-Math.random()*.15):(Math.random()-.5)*(spec.w-.3), pz=-spec.d/2+.06+Math.random()*spec.d*(side?.8:.45), sc=(side?.22:.14)+Math.random()*.16;
     GL.load('fern_02.glb',gg=>{ const o=gg.scene.clone(true); o.position.set(px,y+.06,pz); o.rotation.y=Math.random()*6; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); plants.push({o,ph}); }); }
   const woods=spec.w>2.5?[[-.3,-.1,.6,.3],[.28,.05,2.6,.26]]:spec.w>1.1?[[-.22,-.1,.6,.28]]:[];
   woods.forEach(([fx,fz,ry,sc])=>GL.load('dry_branches_medium_01.glb',gg=>{ const o=gg.scene.clone(true); o.position.set(spec.w*fx,y+.07,spec.d*fz); o.rotation.set(0,ry,0); o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); }));
-  if(spec.w>1.6) for(const fx of (spec.w>2.5?[-.38,.1,.4]:[.3])) GL.load('rock_moss_set_01.glb',gg=>{ const o=gg.scene.clone(true); o.position.set(spec.w*fx,y+.06,-spec.d*.2); o.rotation.y=Math.random()*6; o.scale.setScalar(.12); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); });
+  if(spec.w>1.6) for(const fx of (spec.w>2.5?[-.38,.1,.4]:[.3])) GL.load('rock_moss_set_01.glb',gg=>{ const o=gg.scene.clone(true); o.position.set(spec.w*fx,y+.06,-spec.d*.2); o.rotation.y=Math.random()*6; o.scale.setScalar(.07); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); });
   const NB=30, bp=new Float32Array(NB*3); for(let i=0;i<NB;i++){ bp[i*3]=(Math.random()-.5)*spec.w*.8; bp[i*3+1]=y+Math.random()*spec.h; bp[i*3+2]=(Math.random()-.5)*spec.d*.6; }
   const bg=new T.BufferGeometry(); bg.setAttribute('position',new T.BufferAttribute(bp,3));
-  const bub=new T.Points(bg,new T.PointsMaterial({color:0xeaf8ff,size:.018,transparent:true,opacity:.7,depthWrite:false})); g.add(bub);
+  const bub=new T.Points(bg,new T.PointsMaterial({map:bubTex,color:0xeaf8ff,size:.028,transparent:true,opacity:.85,depthWrite:false,blending:T.AdditiveBlending})); g.add(bub);
+  // 沙底焦散：兩層慢慢漂移的水波光影
+  const cm=new T.MeshBasicMaterial({map:causTex,transparent:true,opacity:.22,blending:T.AdditiveBlending,depthWrite:false,color:water==='sea'?0x9fdcff:0xbfeedd});
+  const ca=add(new T.PlaneGeometry(spec.w-.04,spec.d-.04).rotateX(-Math.PI/2),cm,0,y+.075,0); ca.renderOrder=2; causList.push({m:cm,s:spec.w});
+  // 水面：缸內水面有一層細微的反光
+  const sm=new T.MeshStandardMaterial({color:0xcfefff,transparent:true,opacity:.22,roughness:.05,metalness:.5,side:T.DoubleSide,depthWrite:false});
+  add(new T.PlaneGeometry(spec.w-.04,spec.d-.04).rotateX(-Math.PI/2),sm,0,y+spec.h-.07,0).renderOrder=3;
   const waterM=new T.MeshStandardMaterial({color:water==='sea'?0x0a4a7a:0x0e4a4a,transparent:true,opacity:.14,roughness:.1,depthWrite:false});   // 水體只輕輕染色，不要把整缸刷淡
   const wv=add(new T.BoxGeometry(spec.w-.02,spec.h-.08,spec.d-.02),waterM,0,y+(spec.h-.08)/2,0); wv.renderOrder=3;
   const gl=add(new T.BoxGeometry(spec.w,spec.h,spec.d),new T.MeshStandardMaterial({color:0xdff4ff,transparent:true,opacity:.05,roughness:.05,metalness:.1,depthWrite:false}),0,y+spec.h/2,0); gl.renderOrder=4; gl.userData.tank=water;
@@ -204,6 +221,7 @@ const tv=new T.Vector3();
 function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
   tk.plants.forEach(p=>{ p.o.rotation.z=Math.sin(t*1.2+p.ph)*.06; p.o.rotation.x=Math.sin(t*.9+p.ph)*.04; });
   tk.fish.forEach(f=>{ const sp=c.species(f.rec.id); const src=sp&&c.getFish(sp); if(src&&src.uni){ src.uni.uSwim.value=t*5; src.uni.uAmp.value=.55; } });
+  causList.forEach(c2=>{ c2.m.map.offset.set(t*.012,t*.009); c2.m.map.repeat.set(c2.s*1.6,1.2); });
   const bp=tk.bub.geometry.attributes.position; for(let i=0;i<bp.count;i++){ let yy=bp.getY(i)+dt*(.12+(i%5)*.03); if(yy>tk.y+tk.spec.h-.06) yy=tk.y+.08; bp.setY(i,yy); } bp.needsUpdate=true;
   tk.fish.forEach(f=>{ const o=f.o; tv.subVectors(f.tgt,o.position); const d=tv.length(); if(d<.04){ pickTarget(f,tk); return; }
     tv.normalize(); const want=Math.atan2(-tv.z,tv.x); let dy=want-o.rotation.y; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2;
@@ -229,7 +247,7 @@ function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>ta
 function tapView(){ const tk=tanks[viewTank]; if(!tk) return; const h=ray.intersectObjects(tk.fish.map(f=>f.o),true)[0];
   if(!h){ ui.card.classList.add('hidden'); return; } let o=h.object; while(o&&!o.userData.rec) o=o.parent; if(o) c.showFish(o.userData.rec,ui.card); }
 function enterView(w){ mode='view'; viewTank=w; pan=panT=0; ui.view.classList.remove('hidden'); ui.btns.classList.add('hidden'); ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
-function exitView(){ mode='room'; ui.view.classList.add('hidden'); ui.card.classList.add('hidden'); ui.btns.classList.remove('hidden'); ui.hint.textContent='點水族箱可以靠近觀賞・拖曳畫面轉頭'; }
+function exitView(){ mode='room'; ui.view.classList.add('hidden'); ui.card.classList.add('hidden'); ui.btns.classList.remove('hidden'); ui.hint.textContent='搖桿走動・拖曳畫面轉頭・點水族箱靠近觀賞'; }
 document.getElementById('bViewBack').addEventListener('click',()=>{ if(mode==='dive') exitDive(); exitView(); });
 // 潛入缸內：鏡頭進到水裡，像人在缸中，可以四處轉頭近看魚；水裡有藍綠色的霧
 const diveB=document.getElementById('bDive'), fogDive=new T.FogExp2(0x15565c,.9);
@@ -240,14 +258,18 @@ el.addEventListener('pointerdown',e=>{ if(!on) return; down={x:e.clientX,y:e.cli
 el.addEventListener('pointermove',e=>{ if(!on||!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
   if(mode==='dive'){ dYawT=Math.max(-1.3,Math.min(1.3,drag.dy-dx*.005)); dPitchT=Math.max(-.6,Math.min(.6,drag.dp-dy*.004)); return; }
   if(mode==='view'){ const w=tanks[viewTank]?tanks[viewTank].spec.w:1; panT=Math.max(-w*.35,Math.min(w*.35,drag.pan-dx*.003)); return; }
-  yawT=Math.max(-1.9,Math.min(1.9,drag.yaw-dx*.006)); pitchT=Math.max(-.7,Math.min(.6,drag.pitch-dy*.005)); });
+  yawT=drag.yaw-dx*.006; pitchT=Math.max(-.7,Math.min(.6,drag.pitch-dy*.005)); });
 window.addEventListener('pointerup',e=>{ if(on&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<10&&performance.now()-down.t<450){ hit(e); if(mode==='room') tapRoom(); else tapView(); } drag=null; down=null; });   // 移動很少、時間很短才算點擊
-function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; resize(); for(const f of [syncTime,syncFish,syncMounts,exitView]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
+function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; pRoom.set(0,EYE,.9); resize(); for(const f of [syncTime,syncFish,syncMounts,exitView]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
 function exit(){ on=false; drag=null; exitDive(); exitView(); }
-const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
+const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
 function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
   vb+=((mode!=='room'?1:0)-vb)*Math.min(1,dt*4); dYaw+=(dYawT-dYaw)*Math.min(1,dt*6); dPitch+=(dPitchT-dPitch)*Math.min(1,dt*6);
+  // 在房間裡用搖桿走動：前進／後退、左右轉；不能走進水族箱、壁爐和牆
+  if(mode==='room'&&c.joy){ const j=c.joy(); if(Math.abs(j.thr)>.05||Math.abs(j.turn)>.05){ yawT-=j.turn*dt*1.7; const sp=1.3*j.thr*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw); let nx=pRoom.x+fx*sp, nz=pRoom.z+fz*sp;
+      nx=Math.max(-ROOM.x+.5,Math.min(ROOM.x-.5,nx)); nz=Math.max(ROOM.zb+1.6,Math.min(ROOM.zf-.5,nz)); if(nx>ROOM.x-1.3&&Math.abs(nz-FP.z)<1.2) nx=ROOM.x-1.3;
+      pRoom.x=nx; pRoom.z=nz; bobT.v+=dt*7; } pRoom.y=EYE+Math.sin(bobT.v)*.012; }
   eul.set(pitch,yaw,0); qRoom.setFromEuler(eul);
   const tk=tanks[viewTank]||tanks.fresh;
   if(tk){ const s=tk.spec, hf=Math.atan(Math.tan(cam.fov*Math.PI/360)*cam.aspect), dist=Math.max(s.h*.75/Math.tan(cam.fov*Math.PI/360),(s.w*.42)/Math.tan(hf))+s.d/2;
