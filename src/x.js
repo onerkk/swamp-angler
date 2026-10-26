@@ -20,7 +20,7 @@ let tt=0;
 const ov=document.getElementById('scare'), face=ov&&ov.querySelector('img');
 // 條件：第六章（月潮）完成後、夜晚、湖區、沒關閉驚嚇效果、正在閒置或等魚
 // 測試模式：網址加上 ghost 測試參數，不看章節、時段、次數，閒置或等魚約 5 秒出現、間隔 30 秒（只影響開這一頁的人）
-const TEST=/[?&]ghost=1/.test(location.search); let testLast=0;
+const TEST=/[?&]ghost=(1|glide|peek|behind|jump)/.test(location.search), TEST_MODE=(location.search.match(/[?&]ghost=(glide|peek|behind|jump)/)||[])[1]; let testLast=0;
 function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wait')&&!ev&&performance.now()-testLast>30000&&performance.now()-sessionStart>5000; }
   if(S.noScare) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
   if(c.period()!=='night'||c.loc()!=='lake') return false; const st=c.state(); if(st!=='idle'&&st!=='wait') return false;
@@ -37,7 +37,7 @@ const tv=new T.Vector3();
 const SFX={}; function sfx(name,vol){ try{ let a=SFX[name]; if(!a){ a=new Audio(name+'.mp3'); a.preload='auto'; SFX[name]=a; } a.volume=Math.max(0,Math.min(1,vol==null?1:vol)); a.currentTime=0; a.play().catch(()=>{}); return a; }catch(e){ return null; } }
 ['scream_main','scream_b','wail','gasp'].forEach(n=>{ try{ const a=new Audio(n+'.mp3'); a.preload='auto'; SFX[n]=a; }catch(e){} });
 const MODES=['glide','peek','behind','jump']; let testIdx=0;
-function pickMode(){ if(TEST){ const m=MODES[testIdx%MODES.length]; testIdx++; return m; }
+function pickMode(){ if(TEST){ if(TEST_MODE) return TEST_MODE; const m=MODES[testIdx%MODES.length]; testIdx++; return m; }
   const st=c.state(), c5=S.story&&S.story.done&&S.story.done.includes('c5');
   const w={glide:40,peek:st==='wait'?30:0,behind:18,jump:c5?22:6}; let tot=0; for(const k in w) tot+=w[k]; let r=Math.random()*tot; for(const k in w){ r-=w[k]; if(r<=0) return k; } return 'glide'; }
 function placeRel(m,fw,rt,y){ const b=c.base(), h=c.head(), f=new T.Vector3(-Math.sin(h),0,-Math.cos(h)), r=new T.Vector3(Math.cos(h),0,-Math.sin(h));
@@ -49,13 +49,31 @@ function meet(){ if(TEST) return; const g=S.ghost=S.ghost||{}; g.last=Date.now()
 function trigger(force){ if(ev) return false; if(!force&&!eligible()) return false; const mode=pickMode();
   load(m=>{ ev={t:0,mode}; meet();
     if(mode==='jump'){ const side=Math.random()<.5?-1:1; const p=placeRel(m,1.4,side*1.9,-1.9); faceMe(m); ev.p=p; m.visible=true; c.drip&&c.drip(); waterFx(p,true); if(window.__FACE) window.__FACE(p,{dur:2.4,pitch:.05}); }
-    else if(mode==='glide'){ const side=Math.random()<.5?-1:1, dist=15+Math.random()*7; const p=placeRel(m,dist,-side*4,-.7); ev.p=p; ev.dir=new T.Vector3(Math.cos(c.head()),0,-Math.sin(c.head())).multiplyScalar(side*.55); m.rotation.y=Math.atan2(ev.dir.x,ev.dir.z); m.visible=true; ev.stare=0; ev.phase='glide'; ev.wail=sfx('wail',.35); }
+    else if(mode==='glide'){ const side=Math.random()<.5?-1:1, dist=9+Math.random()*3; const p=placeRel(m,dist,-side*3.5,-1.8); ev.rise=1; ev.p=p; ev.dir=new T.Vector3(Math.cos(c.head()),0,-Math.sin(c.head())).multiplyScalar(side*.55); m.rotation.y=Math.atan2(ev.dir.x,ev.dir.z); m.visible=true; ev.stare=0; ev.phase='glide'; ev.wail=sfx('wail',.35); }
     else if(mode==='peek'){ const to=c.state()==='wait'&&c.to?c.to():null; const b=c.base(); let p; if(to){ const dx=to.x-b.x, dz=to.z-b.z, L=Math.hypot(dx,dz)||1; const sd=(Math.random()<.5?-1:1)*1.4; p=new T.Vector3(to.x+dx/L*1.2-dz/L*sd,0,to.z+dz/L*1.2+dx/L*sd); m.position.set(p.x,-1.95,p.z); } else p=placeRel(m,6,(Math.random()<.5?-1:1)*1.8,-1.95); ev.p=p; faceMe(m); m.visible=true; ev.phase='rise'; ev.st0=c.state(); }
     else { const p=placeRel(m,-2.1,0,-.28); ev.p=p; faceMe(m); m.visible=true; ev.phase='wait'; ev.wail=sfx('wail',.22); c.vib&&c.vib([15,60,15]); } });
   return true; }
 // 入水／出水：水花、泡泡、擴散的水紋與水聲
-function waterFx(p,big){ if(!p) return; c.splash&&c.splash(p.x,p.z,big?26:12,big?.9:.5); c.ripple&&c.ripple(p.x,p.z,big?1.1:.6); setTimeout(()=>{ c.ripple&&c.ripple(p.x,p.z,big?.8:.45); },350); setTimeout(()=>{ c.ripple&&c.ripple(p.x,p.z,.35); },800); c.splashSnd&&c.splashSnd(big?1:.5); }
-let bubT=0; function bubbles(p,dt,rate){ bubT-=dt; if(bubT<=0){ bubT=rate; c.splash&&c.splash(p.x+(Math.random()-.5)*.6,p.z+(Math.random()-.5)*.6,2,.12); c.ripple&&c.ripple(p.x+(Math.random()-.5)*.5,p.z+(Math.random()-.5)*.5,.12); } }
+// 她自己的水面效果（依人的尺度，不借用魚的小水花）：水線泡沫環、移動時的尾跡水紋、出入水的水花與大水圈
+const ringGeo=new T.RingGeometry(.86,1,48).rotateX(-Math.PI/2);
+const rings=[]; for(let i=0;i<18;i++){ const m=new T.Mesh(ringGeo,new T.MeshBasicMaterial({color:0xe6eef2,transparent:true,opacity:0,depthWrite:false,side:T.DoubleSide})); m.visible=false; m.renderOrder=11; W.scene.add(m); rings.push({m,t:0,life:1,r0:.3,r1:1.5,a:.5}); }
+const dropTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=32; const g=cv.getContext('2d'), rg=g.createRadialGradient(16,16,1,16,16,15); rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(.5,'rgba(230,240,248,.7)'); rg.addColorStop(1,'rgba(230,240,248,0)'); g.fillStyle=rg; g.fillRect(0,0,32,32); return new T.CanvasTexture(cv); })();
+const drops=[]; for(let i=0;i<70;i++){ const s=new T.Sprite(new T.SpriteMaterial({map:dropTex,transparent:true,depthWrite:false,opacity:0})); s.visible=false; W.scene.add(s); drops.push({s,v:new T.Vector3(),t:0,life:1}); }
+const foam=new T.Mesh(new T.RingGeometry(.2,.46,40).rotateX(-Math.PI/2),new T.MeshBasicMaterial({color:0xf2f6f8,transparent:true,opacity:0,depthWrite:false})); foam.renderOrder=11; foam.visible=false; W.scene.add(foam);
+function ring(p,r0,r1,life,a){ const R=rings.find(q=>!q.m.visible)||rings[0]; Object.assign(R,{t:0,life,r0,r1,a}); R.m.position.set(p.x,.035,p.z); R.m.visible=true; }
+function burst(p,n,pow){ for(let i=0;i<n;i++){ const D=drops.find(q=>!q.s.visible); if(!D) break; const a=Math.random()*6.283, r=Math.random()*.35;
+    D.s.position.set(p.x+Math.cos(a)*r,.05,p.z+Math.sin(a)*r); D.v.set(Math.cos(a)*(.4+Math.random())*pow,(1.6+Math.random()*2.2)*pow,Math.sin(a)*(.4+Math.random())*pow); D.t=0; D.life=.7+Math.random()*.6; const sc=.05+Math.random()*.09; D.s.scale.set(sc,sc,1); D.s.visible=true; } }
+function waterFx(p,big){ if(!p) return; burst(p,big?46:22,big?1.15:.7); ring(p,.3,big?3.2:2,1.8,.7); setTimeout(()=>ring(p,.25,big?2.4:1.5,1.6,.55),220); setTimeout(()=>ring(p,.2,big?1.6:1.1,1.4,.45),480);
+  c.splash&&c.splash(p.x,p.z,big?26:12,big?.9:.5); c.splashSnd&&c.splashSnd(big?1:.5); }
+let bubT=0; function bubbles(p,dt,rate){ bubT-=dt; if(bubT<=0){ bubT=rate; burst(new T.Vector3(p.x+(Math.random()-.5)*.5,0,p.z+(Math.random()-.5)*.5),3,.25); ring({x:p.x+(Math.random()-.5)*.4,z:p.z+(Math.random()-.5)*.4},.08,.6,1.1,.5); } }
+let wakeT=0;
+function fxTick(dt){
+  rings.forEach(R=>{ if(!R.m.visible) return; R.t+=dt; const k=R.t/R.life; if(k>=1){ R.m.visible=false; return; } const r=R.r0+(R.r1-R.r0)*(1-Math.pow(1-k,2)); R.m.scale.set(r,1,r); R.m.material.opacity=R.a*(1-k); });
+  drops.forEach(D=>{ if(!D.s.visible) return; D.t+=dt; if(D.t>=D.life||D.s.position.y<0){ if(D.s.position.y<0&&D.t<D.life) ring(D.s.position,.03,.25,.6,.35); D.s.visible=false; return; } D.v.y-=9.8*dt; D.s.position.addScaledVector(D.v,dt); D.s.material.opacity=.9*(1-D.t/D.life); });
+  // 水線泡沫環：她的身體穿過水面的地方
+  const m=model; const inWater=m&&m.visible&&m.position.y<-.05&&m.position.y>-1.75;
+  foam.visible=!!inWater; if(inWater){ foam.position.set(m.position.x,.03,m.position.z); const f=.35+.12*Math.sin(performance.now()*.006); foam.material.opacity=f; foam.scale.setScalar(1+.06*Math.sin(performance.now()*.004));
+    wakeT-=dt; if(wakeT<=0){ wakeT=.45; ring(m.position,.35,1.8,2.2,.4); } } }
 function endEv(){ if(model) model.visible=false; if(ov) ov.classList.remove('on'); if(ev&&ev.wail){ try{ ev.wail.pause(); }catch(e){} } ev=null; }
 // 跟著環境亮度：越暗越只剩月光般的微光；腳下（水面交界）有一圈水紋
 let ripT=0;
@@ -69,13 +87,13 @@ function update(dt){ blend(dt);
   if(ev.mode==='jump'){ m.position.y=Math.min(-.28,-1.9+t*2.1); faceMe(m); m.rotation.y+=Math.sin(t*9)*.04;
     if(t>.9&&!ev.face){ ev.face=true; if(ov) ov.classList.add('on'); sfx('scream_main',1); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
     if(t>2.3){ waterFx(m.position,true); endEv(); } return; }
-  if(ev.mode==='glide'){ if(ev.phase==='glide'){ const sp=.32+.12*Math.sin(t*.35); m.position.addScaledVector(ev.dir,dt*sp/.55); const b=c.base(); tv.set(b.x-m.position.x,0,b.z-m.position.z).normalize(); m.position.addScaledVector(tv,dt*.08*Math.sin(t*.25));
-      m.position.y=-.7+Math.sin(t*.8)*.05; m.rotation.z=Math.sin(t*.6)*.05; m.rotation.x=Math.sin(t*.45+1)*.03;
+  if(ev.mode==='glide'){ if(ev.phase==='glide'){ const sp=.28+.1*Math.sin(t*.35); m.position.addScaledVector(ev.dir,dt*sp/.55); const b=c.base(); tv.set(b.x-m.position.x,0,b.z-m.position.z); const dist=tv.length(); tv.normalize(); if(dist>4.2) m.position.addScaledVector(tv,dt*.32);
+      if(ev.rise){ m.position.y=Math.min(-.45,m.position.y+dt*.9); if(m.position.y>=-.45){ ev.rise=0; } if(!ev.rose){ ev.rose=1; waterFx(m.position,false); } } else m.position.y=-.45+Math.sin(t*.8)*.04; m.rotation.z=Math.sin(t*.6)*.05; m.rotation.x=Math.sin(t*.45+1)*.03;
       if(ev.lookT===undefined) ev.lookT=0; ev.lookT+=dt; const tgt=Math.atan2(ev.dir.x,ev.dir.z)+Math.sin(ev.lookT*.3)*.5; let dd=tgt-m.rotation.y; while(dd>Math.PI) dd-=Math.PI*2; while(dd<-Math.PI) dd+=Math.PI*2; m.rotation.y+=dd*Math.min(1,dt*.8);
       if(Math.random()<dt*.8) c.ripple&&c.ripple(m.position.x,m.position.z,.25); if(ev.wail) ev.wail.volume=Math.max(0,.35*(1-t/16));
       if(lookingAt(m.position,.35)) ev.stare+=dt; else ev.stare=Math.max(0,ev.stare-dt*.5);
-      if(ev.stare>2){ ev.phase='turn'; ev.t2=0; } if(t>16) ev.phase='sink'; }
-    if(ev.phase==='turn'){ ev.t2+=dt; const b=c.base(), want=Math.atan2(b.x-m.position.x,b.z-m.position.z); let d=want-m.rotation.y; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2; m.rotation.y+=d*Math.min(1,dt*1.2); if(ev.t2>3) ev.phase='sink'; }
+      if(ev.stare>4){ ev.phase='turn'; ev.t2=0; } if(t>16) ev.phase='sink'; }
+    if(ev.phase==='turn'){ ev.t2+=dt; { const b2=c.base(); tv.set(b2.x-m.position.x,0,b2.z-m.position.z); const d2=tv.length(); if(d2>3.5) m.position.addScaledVector(tv.normalize(),dt*.55); } const b=c.base(), want=Math.atan2(b.x-m.position.x,b.z-m.position.z); let d=want-m.rotation.y; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2; m.rotation.y+=d*Math.min(1,dt*1.2); if(ev.t2>3) ev.phase='sink'; }
     if(ev.phase==='sink'){ if(!ev.sk){ ev.sk=0; waterFx(m.position,false); } ev.sk+=dt; m.position.y-=dt*(.2+ev.sk*1.1); m.rotation.z*=.95; bubbles(m.position,dt,.12); if(m.position.y<-2.1){ waterFx(m.position,false); endEv(); } } return; }
   if(ev.mode==='peek'){ if(ev.phase==='rise'){ if(!ev.rs){ ev.rs=1; c.ripple&&c.ripple(m.position.x,m.position.z,.5); } m.position.y=Math.min(-1.42,m.position.y+dt*.4); bubbles(m.position,dt,.25); if(m.position.y>=-1.42) ev.phase='stare'; }
     else if(ev.phase==='stare'){ faceMe(m); m.position.y=-1.42+Math.sin(t*1.1)*.015; if(c.state()!==ev.st0||t>8){ ev.phase='down'; ev.fast=c.state()!==ev.st0; if(ev.fast){ sfx('gasp',.6); c.vib&&c.vib(40); } waterFx(m.position,ev.fast); } }
@@ -110,7 +128,7 @@ function updFinale(dt){ fin.t+=dt; const t=fin.t; if(!alive) return;
 function updCalm(dt){ if(calm){ calm.t+=dt; if(alive){ if(calm.t<2) setOpacity(alive,Math.min(.85,calm.t/2*.85)); if(calm.t>9) setOpacity(alive,Math.max(0,.85*(1-(calm.t-9)/2))); if(calm.t>11){ alive.visible=false; calm=null; } } return; }
   calmTry+=dt; if(calmTry<60) return; calmTry=0; if(c.period()!=='night'||c.loc()!=='lake'||Math.random()>.08) return;
   loadAlive(m=>{ placeAhead(m,12,(Math.random()-.5)*8); m.visible=true; setOpacity(m,0); calm={t:0}; }); }
-function update2(dt){ tt+=dt; updLamp(dt,tt); if(fin){ updFinale(dt); return; }
+function update2(dt){ tt+=dt; fxTick(dt); updLamp(dt,tt); if(fin){ updFinale(dt); return; }
   if(!TEST&&c.storyDone&&c.storyDone('lantern')){ updCalm(dt); return; }
   if(!ev&&finaleReady()&&!aliveLoading){ startFinale(); return; }
   update(dt); }
