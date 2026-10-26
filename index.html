@@ -211,6 +211,9 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #homeUI{display:none;position:fixed;left:0;right:0;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:20;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
 #homeUI .hb{display:flex;gap:10px;pointer-events:auto}#homeUI .hh{color:#fff;opacity:.7;font-size:13px;text-shadow:0 1px 3px #000}
 body.athome #homeUI{display:flex}
+#homeView{position:fixed;left:12px;top:calc(64px + env(safe-area-inset-top,0px));z-index:21}#homeView.hidden,#fishCard.hidden{display:none}
+#fishCard{position:fixed;left:16px;right:16px;bottom:calc(90px + env(safe-area-inset-bottom,0px));z-index:22;padding:14px 16px;border-radius:14px;background:rgba(14,22,26,.88);color:#fff;border:1px solid rgba(255,255,255,.12);box-shadow:0 6px 24px rgba(0,0,0,.4)}
+#fishCard b{font-size:19px;color:var(--rc,#e9c46a)}#fishCard small{opacity:.7;margin-left:6px}#fishCard .fg{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;margin-top:8px;font-size:14px}#fishCard .fg span{opacity:.6}
 body.athome #act,body.athome #joy,body.athome #fight,body.athome #top2,body.athome #hotChip,body.athome #combo,body.athome #castTag,body.athome #fxBar,body.athome #bCam,body.athome #bTour,body.athome #pop,body.athome #bGoal{display:none!important}
 .btn.home{display:block;width:100%;margin-top:8px;padding:10px;font-size:15px;background:rgba(120,90,50,.55);border:1px solid rgba(255,220,160,.35)}.btn.home.dim{opacity:.45}.btn.home.hidden{display:none}
 </style>
@@ -241,7 +244,8 @@ body.athome #act,body.athome #joy,body.athome #fight,body.athome #top2,body.atho
   <button class="chip sm" id="bGoal" aria-label="目標與成就">🎯</button>
   <button class="chip sm" id="bCam" aria-label="拍照">📷</button>
 </div>
-<div id="homeUI"><div class="hh">拖曳畫面轉頭看看</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn pri" id="bTankM">🐠 管理水族箱</button></div></div>
+<div id="homeView" class="hidden"><button class="btn" id="bViewBack">← 返回客廳</button></div><div id="fishCard" class="hidden"></div>
+<div id="homeUI"><div class="hh">點水族箱可以靠近觀賞・拖曳畫面轉頭</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn pri" id="bTankM">🐠 管理水族箱</button></div></div>
 <div id="toast"></div>
 <div id="fight" class="hidden">
   <div class="hd"><span id="fName">上鉤了！</span><b id="fDist">0.0 m</b></div>
@@ -4350,29 +4354,70 @@ for(let i=0;i<3;i++){ const lg=new T.Mesh(new T.CylinderGeometry(.06,.06,.7,8),n
 const fireL=new T.PointLight(0xff8a40,2.2,9,1.3); fireL.position.set(ROOM.x-1.1,.6,FP.z); scene.add(fireL);
 // 地毯、沙發、茶几、手記、落地燈
 const LV={x:-.9,z:-1.9};   // 客廳區：在水族箱前面
-plane(2.6,1.8,new T.MeshStandardMaterial({color:0x6a2018,roughness:1}),LV.x+.6,.005,LV.z,0,-Math.PI/2);
+plane(2.6,1.8,new T.MeshStandardMaterial({color:0x4a1812,roughness:1}),LV.x+.6,.005,LV.z,0,-Math.PI/2);
 const sofaM=new T.MeshStandardMaterial({color:0x4a5a3a,roughness:.95});
 box(.9,.42,2.0,sofaM,LV.x-.7,.21,LV.z); box(.22,.85,2.0,sofaM,LV.x-1.16,.42,LV.z); box(.9,.6,.2,sofaM,LV.x-.7,.3,LV.z-1.05); box(.9,.6,.2,sofaM,LV.x-.7,.3,LV.z+1.05);
 const tableM=wood(1,1,0,0xb08860); box(.7,.05,1.1,tableM,LV.x+.5,.45,LV.z); for(const dx of [-.3,.3]) for(const dz of [-.5,.5]) box(.05,.45,.05,tableM,LV.x+.5+dx,.225,LV.z+dz);
 box(.22,.04,.3,new T.MeshStandardMaterial({color:0x6a4a2a,roughness:.8}),LV.x+.5,.495,LV.z-.1);   // 老漁人的手記
 const mug=new T.Mesh(new T.CylinderGeometry(.04,.035,.09,12),new T.MeshStandardMaterial({color:0xe8e0d0,roughness:.4})); mug.position.set(LV.x+.65,.52,LV.z+.2); scene.add(mug);
-const lampM=new T.MeshStandardMaterial({color:0x2a2420,roughness:.5,metalness:.4}); const LP={x:2.5,z:-3.3}; box(.04,1.5,.04,lampM,LP.x,.75,LP.z); box(.3,.03,.3,lampM,LP.x,.015,LP.z);
+const lampM=new T.MeshStandardMaterial({color:0x2a2420,roughness:.5,metalness:.4}); // 落地燈在沙發旁，後牆右側留給海水缸
+const LP={x:-2.6,z:-.4}; box(.04,1.5,.04,lampM,LP.x,.75,LP.z); box(.3,.03,.3,lampM,LP.x,.015,LP.z);
 const shade=new T.Mesh(new T.CylinderGeometry(.14,.22,.25,16,1,true),new T.MeshStandardMaterial({color:0xf0e0c0,emissive:0xffd8a0,emissiveIntensity:.6,side:T.DoubleSide})); shade.position.set(LP.x,1.55,LP.z); scene.add(shade);
 const lampL=new T.PointLight(0xffd8a0,2,8,1.2); lampL.position.set(LP.x,1.45,LP.z); scene.add(lampL);
 // 書架（左牆後方）
 const shelfM=wood(1,1,0,0x8a6040); box(.35,2.0,1.2,shelfM,-ROOM.x+.18,1.0,ROOM.zb+1.0);
 const bookC=[0x6a2a20,0x2a4a6a,0x3a5a2a,0x8a6a2a,0x4a2a4a,0x2a2a2a];
 for(let r=0;r<4;r++) for(let i=0;i<9;i++){ if(Math.random()<.15) continue; const h=.22+Math.random()*.08; box(.24,h,.08,new T.MeshStandardMaterial({color:bookC[(i+r)%6],roughness:.8}),-ROOM.x+.2,.12+r*.48+h/2,ROOM.zb+.55+i*.1); }
-// 水族箱（後牆中央）：第 3 段會放魚和觀賞模式，這裡先做櫃子、玻璃、水、砂、燈
-const TK={w:1.8,h:.75,d:.5,y:.85,z:ROOM.zb+.3};
-box(TK.w+.1,TK.y,TK.d+.08,wood(1,1,0,0x6a4630),0,TK.y/2,TK.z);
-const water=box(TK.w-.02,TK.h-.08,TK.d-.02,new T.MeshStandardMaterial({color:0x3a8aa0,transparent:true,opacity:.35,roughness:.1,depthWrite:false}),0,TK.y+(TK.h-.08)/2,TK.z);
-box(TK.w-.02,.06,TK.d-.02,new T.MeshStandardMaterial({color:0xb8a888,roughness:1}),0,TK.y+.03,TK.z);
-const glassM=new T.MeshStandardMaterial({color:0xdff4ff,transparent:true,opacity:.12,roughness:.05,metalness:.1,depthWrite:false});
-box(TK.w,TK.h,TK.d,glassM,0,TK.y+TK.h/2,TK.z).renderOrder=2;
-box(TK.w+.04,.04,TK.d+.04,new T.MeshStandardMaterial({color:0x1a1a1a,roughness:.5}),0,TK.y+TK.h+.02,TK.z);
-const tankL=new T.PointLight(0x9ad8ff,1.2,3,1.4); tankL.position.set(0,TK.y+TK.h-.05,TK.z); scene.add(tankL);
-for(let i=0;i<7;i++){ const pl=new T.Mesh(new T.ConeGeometry(.03,.25+Math.random()*.25,5),new T.MeshStandardMaterial({color:0x2a7a3a,roughness:.8})); pl.position.set(-TK.w/2+.15+i*.25,TK.y+.2,TK.z-.12+Math.random()*.15); scene.add(pl); }
+// 水族箱：尺寸跟著等級變；淡水缸在後牆中央，有海水缸時放在右側
+const TSPEC=[{w:1.2,h:.6,d:.45},{w:1.8,h:.75,d:.55},{w:2.6,h:1.0,d:.7}], SEA_SPEC={w:1.25,h:.62,d:.5}, STAND=.85;
+const plantM=new T.MeshStandardMaterial({color:0x1a4a22,roughness:.85,side:T.DoubleSide}), plantM2=new T.MeshStandardMaterial({color:0x34601c,roughness:.85,side:T.DoubleSide});
+const rockM=new T.MeshStandardMaterial({color:0x6a665e,roughness:.95}), sandM=new T.MeshStandardMaterial({color:0x8a7a5a,roughness:1});
+const bgTex=(sea)=>{ const cv=document.createElement('canvas'); cv.width=4; cv.height=128; const g=cv.getContext('2d'), gr=g.createLinearGradient(0,0,0,128);
+  gr.addColorStop(0,sea?'#3ab0d8':'#4a9a90'); gr.addColorStop(1,sea?'#0a2a5a':'#0e3a3a'); g.fillStyle=gr; g.fillRect(0,0,4,128); const t=new T.CanvasTexture(cv); t.encoding=T.sRGBEncoding; return t; };
+const BG={fresh:bgTex(false),sea:bgTex(true)};
+// tanks 依水質存放每個缸：群組、尺寸、位置、魚、水草、氣泡
+const tanks={};
+function buildTank(water,spec,x){
+  const old=tanks[water]; if(old){ scene.remove(old.g); old.fish.forEach(f=>{}); }
+  const g=new T.Group(), z=ROOM.zb+spec.d/2+.08, y=STAND; g.position.set(x,0,z); scene.add(g);
+  const add=(geo,m,px,py,pz)=>{ const o=new T.Mesh(geo,m); o.position.set(px,py,pz); g.add(o); return o; };
+  add(new T.BoxGeometry(spec.w+.1,STAND,spec.d+.08),wood(1,1,0,0x6a4630),0,STAND/2,0);
+  add(new T.PlaneGeometry(spec.w-.02,spec.h-.02),new T.MeshBasicMaterial({map:BG[water]}),0,y+spec.h/2,-spec.d/2+.012);
+  add(new T.BoxGeometry(spec.w-.02,.07,spec.d-.02),sandM,0,y+.035,0);
+  for(let i=0;i<3+Math.round(spec.w*2);i++){ const r=add(new T.DodecahedronGeometry(.04+Math.random()*.06,0),rockM,(Math.random()-.5)*(spec.w-.2),y+.08,-spec.d/2+.08+Math.random()*spec.d*.35); r.scale.y=.6; r.rotation.y=Math.random()*6; }
+  const plants=[];
+  for(let i=0;i<Math.round(spec.w*9);i++){ const h=spec.h*(.35+Math.random()*.5), geo=new T.PlaneGeometry(.035,h,1,6); geo.translate(0,h/2,0);
+    const pl=add(geo,Math.random()<.5?plantM:plantM2,(Math.random()-.5)*(spec.w-.12),y+.06,-spec.d/2+.05+Math.random()*spec.d*.4); pl.rotation.y=Math.random()*3; plants.push({o:pl,ph:Math.random()*6}); }
+  const NB=30, bp=new Float32Array(NB*3); for(let i=0;i<NB;i++){ bp[i*3]=(Math.random()-.5)*spec.w*.8; bp[i*3+1]=y+Math.random()*spec.h; bp[i*3+2]=(Math.random()-.5)*spec.d*.6; }
+  const bg=new T.BufferGeometry(); bg.setAttribute('position',new T.BufferAttribute(bp,3));
+  const bub=new T.Points(bg,new T.PointsMaterial({color:0xeaf8ff,size:.018,transparent:true,opacity:.7,depthWrite:false})); g.add(bub);
+  const waterM=new T.MeshStandardMaterial({color:water==='sea'?0x0a4a7a:0x0e4a4a,transparent:true,opacity:.14,roughness:.1,depthWrite:false});   // 水體只輕輕染色，不要把整缸刷淡
+  const wv=add(new T.BoxGeometry(spec.w-.02,spec.h-.08,spec.d-.02),waterM,0,y+(spec.h-.08)/2,0); wv.renderOrder=3;
+  const gl=add(new T.BoxGeometry(spec.w,spec.h,spec.d),new T.MeshStandardMaterial({color:0xdff4ff,transparent:true,opacity:.1,roughness:.05,metalness:.1,depthWrite:false}),0,y+spec.h/2,0); gl.renderOrder=4; gl.userData.tank=water;
+  add(new T.BoxGeometry(spec.w+.04,.05,spec.d+.04),new T.MeshStandardMaterial({color:0x1a1a1a,roughness:.5}),0,y+spec.h+.025,0);
+  const L=new T.PointLight(water==='sea'?0x8ad0ff:0x9ad8ff,.75,3,1.4); L.position.set(0,y+spec.h-.05,0); g.add(L);
+  tanks[water]={g,spec,x,y,z,fish:[],plants,bub,glass:gl,sig:''};
+}
+// 把水族箱裡記錄的魚做成會游的模型（用遊戲同一個魚模型，按實際體長縮放）
+function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null; const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
+  src.traverse(o=>{ o.visible=true; o.frustumCulled=false; }); const w=new T.Group(); w.add(src); w.scale.setScalar(rec.L); w.userData.rec=rec; w.userData.real=c.isReal(rec.id); return w; }
+function bounds(tk,L){ const s=tk.spec, m=Math.min(L*.55,s.w*.4); return {x0:-s.w/2+m+.03,x1:s.w/2-m-.03,y0:tk.y+.1+L*.12,y1:tk.y+s.h-.1-L*.12,z0:-s.d/2+.06+L*.12,z1:s.d/2-.06-L*.12}; }
+function pickTarget(f,tk){ const b=bounds(tk,f.rec.L), r=(a,b)=>a+Math.random()*Math.max(0,b-a); f.tgt.set(r(b.x0,b.x1),r(b.y0,b.y1),r(Math.min(b.z0,b.z1),Math.max(b.z0,b.z1))); }
+function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.sea:[]};
+  const tierSig='t'+hd.tier+(hd.seaTank?'s':'');
+  if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?-.55:0); if(hd.seaTank) buildTank('sea',SEA_SPEC,2.25); else if(tanks.sea){ scene.remove(tanks.sea.g); delete tanks.sea; } }
+  for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=want[w]||[], sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|');
+    if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[];
+    list.forEach(rec=>{ c.want(rec.id); const o=fishObj(rec); if(!o) return; const f={o,rec,tgt:new T.Vector3(),sp:.05+Math.random()*.06,ph:Math.random()*6}; const b=bounds(tk,rec.L);
+      o.position.set((b.x0+b.x1)/2+(Math.random()-.5)*.3,(b.y0+b.y1)/2,0); pickTarget(f,tk); tk.g.add(o); tk.fish.push(f); }); } }
+const tv=new T.Vector3();
+function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
+  tk.plants.forEach(p=>{ p.o.rotation.z=Math.sin(t*1.2+p.ph)*.12; p.o.rotation.x=Math.sin(t*.9+p.ph)*.06; });
+  const bp=tk.bub.geometry.attributes.position; for(let i=0;i<bp.count;i++){ let yy=bp.getY(i)+dt*(.12+(i%5)*.03); if(yy>tk.y+tk.spec.h-.06) yy=tk.y+.08; bp.setY(i,yy); } bp.needsUpdate=true;
+  tk.fish.forEach(f=>{ const o=f.o; tv.subVectors(f.tgt,o.position); const d=tv.length(); if(d<.04){ pickTarget(f,tk); return; }
+    tv.normalize(); const want=Math.atan2(-tv.z,tv.x); let dy=want-o.rotation.y; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2;
+    o.rotation.y+=dy*Math.min(1,dt*1.5); o.rotation.z=Math.sin(t*2+f.ph)*.05+tv.y*.3;
+    const sp=f.sp*(Math.abs(dy)>1?.3:1)*Math.min(1,.5+f.rec.L*2); o.position.addScaledVector(tv,sp*dt); }); } }
 // 環境光：白天從窗戶進來的光多、夜裡靠爐火和檯燈
 const hemi=new T.HemisphereLight(0xfff0dd,0x3a2a1a,.5); scene.add(hemi);
 const sun=new T.DirectionalLight(0xfff4e0,.8); sun.position.set(-6,4,-1); sun.target.position.set(0,0,-1); scene.add(sun,sun.target);
@@ -4382,20 +4427,38 @@ function syncTime(){ const dl=daylight(), h=((c.hour()%24)+24)%24;
   hemi.intensity=.32+.45*dl; sun.intensity=.5*dl; lampL.intensity=2.2-.8*dl; shade.material.emissiveIntensity=.8-.4*dl; }
 function resize(){ const s=R.getSize(new T.Vector2()), a=s.x/s.y; cam.aspect=a;
   cam.fov=Math.max(62,Math.min(80,2*Math.atan(Math.tan(23*Math.PI/180)/a)*180/Math.PI)); cam.updateProjectionMatrix(); }   // 直式手機水平視野很窄，垂直視角放大一點
-// 拖曳轉頭（只在小屋裡生效）
-const el=R.domElement;
-el.addEventListener('pointerdown',e=>{ if(!on) return; drag={x:e.clientX,y:e.clientY,yaw:yawT,pitch:pitchT}; });
-el.addEventListener('pointermove',e=>{ if(!on||!drag) return; yawT=Math.max(-1.9,Math.min(1.9,drag.yaw-(e.clientX-drag.x)*.006)); pitchT=Math.max(-.7,Math.min(.6,drag.pitch-(e.clientY-drag.y)*.005)); });
-window.addEventListener('pointerup',()=>{ drag=null; });
-function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; resize(); syncTime(); }
-function exit(){ on=false; drag=null; }
-function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8);
-  cam.rotation.set(0,0,0); cam.rotateY(yaw); cam.rotateX(pitch);
+// 輸入：拖曳轉頭；輕點水族箱進入觀賞模式；觀賞模式裡點魚看資料
+const el=R.domElement, ray=new T.Raycaster(), ndc=new T.Vector2();
+let mode='room', viewTank=null, vb=0, pan=0, panT=0, down=null;
+const ui={view:document.getElementById('homeView'),card:document.getElementById('fishCard'),hint:document.querySelector('#homeUI .hh'),btns:document.querySelector('#homeUI .hb')};
+function hit(e){ const r=el.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(ndc,cam); }
+function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>tanks[k].glass); const h=ray.intersectObjects(gl,false)[0]; if(h) enterView(h.object.userData.tank); }
+function tapView(){ const tk=tanks[viewTank]; if(!tk) return; const h=ray.intersectObjects(tk.fish.map(f=>f.o),true)[0];
+  if(!h){ ui.card.classList.add('hidden'); return; } let o=h.object; while(o&&!o.userData.rec) o=o.parent; if(o) c.showFish(o.userData.rec,ui.card); }
+function enterView(w){ mode='view'; viewTank=w; pan=panT=0; ui.view.classList.remove('hidden'); ui.btns.classList.add('hidden'); ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
+function exitView(){ mode='room'; ui.view.classList.add('hidden'); ui.card.classList.add('hidden'); ui.btns.classList.remove('hidden'); ui.hint.textContent='點水族箱可以靠近觀賞・拖曳畫面轉頭'; }
+document.getElementById('bViewBack').addEventListener('click',exitView);
+el.addEventListener('pointerdown',e=>{ if(!on) return; down={x:e.clientX,y:e.clientY,t:performance.now()}; drag={x:e.clientX,y:e.clientY,yaw:yawT,pitch:pitchT,pan:panT}; });
+el.addEventListener('pointermove',e=>{ if(!on||!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+  if(mode==='view'){ const w=tanks[viewTank]?tanks[viewTank].spec.w:1; panT=Math.max(-w*.35,Math.min(w*.35,drag.pan-dx*.003)); return; }
+  yawT=Math.max(-1.9,Math.min(1.9,drag.yaw-dx*.006)); pitchT=Math.max(-.7,Math.min(.6,drag.pitch-dy*.005)); });
+window.addEventListener('pointerup',e=>{ if(on&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<10&&performance.now()-down.t<450){ hit(e); if(mode==='room') tapRoom(); else tapView(); } drag=null; down=null; });   // 移動很少、時間很短才算點擊
+function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; resize(); syncTime(); syncFish(); exitView(); }
+function exit(){ on=false; drag=null; exitView(); }
+const qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
+let syncT=0;
+function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
+  vb+=((mode==='view'?1:0)-vb)*Math.min(1,dt*4);
+  eul.set(pitch,yaw,0); qRoom.setFromEuler(eul);
+  const tk=tanks[viewTank]||tanks.fresh;
+  if(tk){ const s=tk.spec, hf=Math.atan(Math.tan(cam.fov*Math.PI/360)*cam.aspect), dist=Math.max(s.h*.75/Math.tan(cam.fov*Math.PI/360),(s.w*.42)/Math.tan(hf))+s.d/2;
+    pView.set(tk.x+pan,tk.y+s.h/2,tk.z+dist); lookM.lookAt(pView,tv.set(tk.x+pan,tk.y+s.h/2,tk.z),cam.up); qView.setFromRotationMatrix(lookM); }
+  const k=vb*vb*(3-2*vb); cam.position.lerpVectors(pRoom,pView,k); cam.quaternion.copy(qRoom).slerp(qView,k);
   const fl=.85+.15*Math.sin(t*9)+.08*Math.sin(t*23); fireL.intensity=2.2*fl; fireM.opacity=.7+.3*fl; fire.scale.y=.9+.15*Math.sin(t*7);
-  if(Math.floor(t*2)!==Math.floor((t-dt)*2)) syncTime();
-  R.setRenderTarget(null); R.render(scene,cam); }
+  if((syncT+=dt)>1){ syncT=0; syncTime(); syncFish(); }   // 每秒同步一次：剛帶回的魚、升級的缸、晚一步載好的真實模型
+  updTanks(dt); R.setRenderTarget(null); R.render(scene,cam); }
 window.addEventListener('resize',()=>{ if(on) resize(); });
-return {enter,exit,render,active:()=>on,scene,cam,TK};
+return {enter,exit,render,active:()=>on,scene,cam};
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
@@ -4661,7 +4724,11 @@ $('bHome').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; c
     if(HOME.mount(G.fd,at)){ toast('做成標本，掛在小屋的牆上了','good',1800); finishCatch('keep'); } return; }
   toast(b.dataset.why||'現在不能帶回家','warn',2200); });
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
-const HOME3D=createHomeScene(W,{hour:()=>G.hour});
+const HOME3D=createHomeScene(W,{hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
+  isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
+  showFish:(rec,card)=>{ const sp=SPECIES.find(s=>s.id===rec.id)||{name:rec.id,rar:0}, r=RAR[sp.rar]; card.style.setProperty('--rc',r.col);
+    card.innerHTML=`<b>${sp.name}</b><small>${r.name}${rec.g?'｜'+rec.g:''}</small><div class="fg"><span>長度</span><div>${(rec.L*100).toFixed(1)} 公分</div><span>重量</span><div>${rec.w<1?Math.round(rec.w*1000)+' 公克':rec.w.toFixed(2)+' 公斤'}</div><span>釣到地點</span><div>${rec.at||'—'}</div><span>釣到日期</span><div>${new Date(rec.d).toLocaleDateString('zh-TW')}</div></div>`;
+    card.classList.remove('hidden'); }});
 window.__HOME=createHome({save,persist:()=>persist(),toast:(...a)=>toast(...a),setCoins:()=>setCoins()}); const HOME=window.__HOME;
 const META=createMeta({W,save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS,goSpot,curSpot:()=>G.spot,setHour:h=>{ G.hour=h; W.setTime(h,true); }});
 const UW=createUnderwater(W,P);
