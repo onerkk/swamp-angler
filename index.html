@@ -4660,7 +4660,7 @@ function pickSpecies(){
 /* ---------- 動作 ---------- */
 function startCharge(){ if(G.scareT>0){ toast('驚魂未定，等一下再拋竿…','warn',1400); return; } G.state='charge'; G.chargeT=0; G.aimYawCast=G.yawT; }
 function cast(){
-  G.baitUsed=META.useBait(); LURE.bobberVis(!(G.baitUsed&&G.baitUsed.lure));
+  G.baitUsed=META.useBait(); G.noBait=false; LURE.bobberVis(!(G.baitUsed&&G.baitUsed.lure));
   const p=G.power, dist=6+p*META.gear().rod.cast, A=G.head+G.yaw, fw=tv.set(-Math.sin(A),0,-Math.cos(A)), bx=G.base.x, bz=G.base.z;
   let x=bx+fw.x*dist+rand(-.6,.6), z=bz+fw.z*dist+rand(-.6,.6);
   for(let k=0;k<14;k++){ const r=Math.hypot(x,z), maxR=W.shoreR(Math.atan2(x,-z))-6; if(r<=maxR) break; x=bx+(x-bx)*.9; z=bz+(z-bz)*.9; }
@@ -4684,7 +4684,9 @@ function prepFish(){ if(Math.random()<.085*(window.__STORY&&window.__STORY.needs
   const big=u>.96?1+(u-.96)/.04*.15:1, L=lerp(sp.len[0],sp.len[1],u)/100*big, w=sp.k*L*L*L*rand(.9,1.12);
   G.sp=sp; G.fd={sp,L,w,u,grade:gradeOf(u),lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*.4*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; if(window.__TAL) window.__TAL.applyBoss(G,SPECIES,RAR); }
 function bite(){ if(!G.fd) prepFish(); UW.bite(); G.state='bite'; G.biteT=0; FUN.hookStart(G.fd); W.addRipple(G.to.x,G.to.z,.75); P.splash(G.to.x,0,G.to.z,8,.5); Snd.bite(); vib([60,40,60]); }
-function missBite(){ FUN.hookEnd(); G.combo=0; FUN.combo(0); G.state='wait'; G.timer=rand(4,9); G.nib=Math.floor(rand(0,2.99)); G.sp=null; G.fd=null; exitUW(); vib(40); }
+// 沒揚到竿：魚大多會把餌吃掉，沒餌就不會再有魚咬，要收線重新上餌（路亞不會被吃掉）
+function missBite(){ FUN.hookEnd(); G.combo=0; FUN.combo(0); G.state='wait'; G.timer=rand(4,9); G.nib=Math.floor(rand(0,2.99)); G.sp=null; G.fd=null; exitUW(); vib(40);
+  if(!(G.baitUsed&&G.baitUsed.lure)&&Math.random()<.75){ G.noBait=true; setTimeout(()=>toast('餌被吃掉了，收線重新上餌','warn',2400),300); } }
 function hook(q){
   const sp=G.sp, L=G.fd.L; exitUW();
   const perfect=!!q; if(perfect){ save.perf=(save.perf||0)+1; if(window.__STORY) window.__STORY.onPerfect(); }
@@ -4844,7 +4846,7 @@ window.__applyGfx=q=>{ window.__GFX=q; const cap={high:2.5,mid:1.5,low:1}[q]||2.
   if(W.setRefl) W.setRefl(q!=='low',q==='mid'?.22:.35); W.setPR(Math.min(window.devicePixelRatio||1,cap)); };
 window.__applyGfx(save.gfx||'high');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
-function iceDrop(){ const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=5; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
+function iceDrop(){ G.noBait=false; const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=5; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
 const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
 const LURE=createLure(W,P,{G,toast,Snd,uwOn:()=>save.uw!==false,reelSpd:()=>META.gear().reel.spd,onChase:()=>{ if(!G.fd) prepFish(); if(!G.fd||G.fd.item) return null; const f=P.getFish(G.fd.sp); if(f) seeThrough(f.group); return f?{group:f.group,uni:f.uni,L:G.fd.L}:null; }}); window.__G=G;
@@ -4897,7 +4899,10 @@ function enterUW(){ if(UW.active()||uwBusy) return; uwBusy=true; fadeEl.classLis
   setTimeout(()=>{ if(G.fd&&(G.state==='wait'||G.state==='bite')){ UW.start(G.fd); if(G.state==='bite') UW.bite(); const r=RAR[G.fd.sp.rar];
     uwTag.style.setProperty('--rc',r.col); $('uLv').textContent=G.fd.lvl; $('uName').textContent=G.fd.sp.name; $('uRar').textContent=r.name+' '+r.en; uwTag.classList.remove('hidden'); }
     fadeEl.classList.remove('on'); uwBusy=false; },180); }
-function exitUW(){ uwTag.classList.add('hidden'); if(!UW.active()) return; fadeEl.classList.add('on'); setTimeout(()=>{ UW.end(); fadeEl.classList.remove('on'); },160); }
+let uwExiting=false;
+function exitUW(){ uwTag.classList.add('hidden'); if(!UW.active()||uwExiting) return; uwExiting=true; fadeEl.classList.add('on'); setTimeout(()=>{ UW.end(); fadeEl.classList.remove('on'); uwExiting=false; },160); }
+// 水下鏡頭只屬於「等魚、咬餌」：任何原因離開這兩個狀態（鱷魚、斷線、拉魚…）都自動關掉
+function guardUW(){ if(UW.active()&&!uwExiting&&G.state!=='wait'&&G.state!=='bite') exitUW(); }
 
 /* ---------- 每幀更新 ---------- */
 function updateFight(dt){
@@ -5009,7 +5014,8 @@ function update(dt){
     const y=W.swell(G.to.x,G.to.z,G.t)-.005;
     if(st==='wait'){
       G.timer-=dt; if(G.dip>0) G.dip-=dt;
-      if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bite(); }
+      if(G.noBait) G.timer=99;
+if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bite(); }
       if(G.state==='wait'&&G.nib===0&&G.timer<3&&!G.fd){ prepFish(); if(!G.fd.item&&(save.uw!==false||G.fd.sp.special==='mermaid')) enterUW(); }
       if(UW.active()&&G.state==='wait') UW.setProgress(1-G.timer/3);
       if(G.fd&&G.state==='wait'){ G.bubT=(G.bubT||0)-dt; if(G.bubT<=0){ G.bubT=rand(.25,.7); W.addRipple(G.to.x+rand(-.3,.3),G.to.z+rand(-.3,.3),.05); P.splash(G.to.x+rand(-.25,.25),0,G.to.z+rand(-.25,.25),1,.15); } }
@@ -5086,7 +5092,7 @@ W.setTime(G.hour,true);
 let last=performance.now(), prAcc=0, prN=0, prChecks=0;
 function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
-  try{ update(dt); if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
+  try{ update(dt); guardUW(); if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
   if(prAcc>2){ const avg=prAcc/prN; if(prChecks<10&&avg>1/40&&W.getPR()>1.01) W.setPR(Math.max(1,W.getPR()-.25)); if(prChecks===9&&avg>1/30&&(save.gfx||'high')==='high'&&!G.gfxHint){ G.gfxHint=true; toast('畫面有點卡，可以到設定把畫質調成「中」或「低」','warn',3500); } prChecks++; prAcc=0; prN=0; }
   requestAnimationFrame(frame);
