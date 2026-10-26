@@ -4247,7 +4247,8 @@ box.addEventListener('click',e=>{ const b=e.target.closest('[data-s]'); if(!b){ 
 btn.addEventListener('click',()=>{ render(); box.classList.remove('hidden'); });
 function dot(){ btn.classList.toggle('dot',st.done.some(id=>st.read.indexOf(id)<0)||active().some(ch=>!st.prog[ch.id])); }
 dot();
-return {intro:showIntro,needs,boost,showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
+function freePage(t,h){ box.innerHTML=`<div class="pn"><button class="x" data-s="close">✕</button><h3>📖 ${t}</h3><div class="page">${h}</div></div>`; box.classList.remove('hidden'); }
+return {page:freePage,intro:showIntro,needs,boost,showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
 }
 /* ===== 老漁人的小屋：水族箱與標本牆（資料與規則） ===== */
 function createHome(c){
@@ -4371,7 +4372,7 @@ for(let r=0;r<4;r++) for(let i=0;i<9;i++){ if(Math.random()<.15) continue; const
 // 水族箱：尺寸跟著等級變；淡水缸在後牆中央，有海水缸時放在右側
 const TSPEC=[{w:1.2,h:.6,d:.45},{w:1.8,h:.75,d:.55},{w:2.6,h:1.0,d:.7}], SEA_SPEC={w:1.25,h:.62,d:.5}, STAND=.85;
 const plantM=new T.MeshStandardMaterial({color:0x1a4a22,roughness:.85,side:T.DoubleSide}), plantM2=new T.MeshStandardMaterial({color:0x34601c,roughness:.85,side:T.DoubleSide});
-const rockM=new T.MeshStandardMaterial({color:0x6a665e,roughness:.95}), sandM=new T.MeshStandardMaterial({color:0x8a7a5a,roughness:1});
+const rockM=new T.MeshStandardMaterial({color:0x6a665e,roughness:.95}), sandM=new T.MeshStandardMaterial({color:0x5e5240,roughness:1});
 const bgTex=(sea)=>{ const cv=document.createElement('canvas'); cv.width=4; cv.height=128; const g=cv.getContext('2d'), gr=g.createLinearGradient(0,0,0,128);
   gr.addColorStop(0,sea?'#3ab0d8':'#4a9a90'); gr.addColorStop(1,sea?'#0a2a5a':'#0e3a3a'); g.fillStyle=gr; g.fillRect(0,0,4,128); const t=new T.CanvasTexture(cv); t.encoding=T.sRGBEncoding; return t; };
 const BG={fresh:bgTex(false),sea:bgTex(true)};
@@ -4393,7 +4394,7 @@ function buildTank(water,spec,x){
   const bub=new T.Points(bg,new T.PointsMaterial({color:0xeaf8ff,size:.018,transparent:true,opacity:.7,depthWrite:false})); g.add(bub);
   const waterM=new T.MeshStandardMaterial({color:water==='sea'?0x0a4a7a:0x0e4a4a,transparent:true,opacity:.14,roughness:.1,depthWrite:false});   // 水體只輕輕染色，不要把整缸刷淡
   const wv=add(new T.BoxGeometry(spec.w-.02,spec.h-.08,spec.d-.02),waterM,0,y+(spec.h-.08)/2,0); wv.renderOrder=3;
-  const gl=add(new T.BoxGeometry(spec.w,spec.h,spec.d),new T.MeshStandardMaterial({color:0xdff4ff,transparent:true,opacity:.1,roughness:.05,metalness:.1,depthWrite:false}),0,y+spec.h/2,0); gl.renderOrder=4; gl.userData.tank=water;
+  const gl=add(new T.BoxGeometry(spec.w,spec.h,spec.d),new T.MeshStandardMaterial({color:0xdff4ff,transparent:true,opacity:.05,roughness:.05,metalness:.1,depthWrite:false}),0,y+spec.h/2,0); gl.renderOrder=4; gl.userData.tank=water;
   add(new T.BoxGeometry(spec.w+.04,.05,spec.d+.04),new T.MeshStandardMaterial({color:0x1a1a1a,roughness:.5}),0,y+spec.h+.025,0);
   const L=new T.PointLight(water==='sea'?0x8ad0ff:0x9ad8ff,.75,3,1.4); L.position.set(0,y+spec.h-.05,0); g.add(L);
   tanks[water]={g,spec,x,y,z,fish:[],plants,bub,glass:gl,sig:''};
@@ -4410,6 +4411,21 @@ function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.s
     if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[];
     list.forEach(rec=>{ c.want(rec.id); const o=fishObj(rec); if(!o) return; const f={o,rec,tgt:new T.Vector3(),sp:.05+Math.random()*.06,ph:Math.random()*6}; const b=bounds(tk,rec.L);
       o.position.set((b.x0+b.x1)/2+(Math.random()-.5)*.3,(b.y0+b.y1)/2,0); pickTarget(f,tk); tk.g.add(o); tk.fish.push(f); }); } }
+// 標本牆：右牆、壁爐後方，兩排各四個；大魚統一縮到木板放得下的長度
+const MSLOT=[]; for(const y of [1.5,2.15]) for(const z of [-3.65,-2.85,-2.05,-1.25]) MSLOT.push({y,z});   // 先掛視線高度那一排
+const mountG=new T.Group(); scene.add(mountG); let mountSig='';
+const plaqueM=new T.MeshStandardMaterial({color:0x3a2416,roughness:.6}), plaqueEdge=new T.MeshStandardMaterial({color:0x8a6a3a,roughness:.4,metalness:.3});
+function nameTex(t1,t2){ const cv=document.createElement('canvas'); cv.width=256; cv.height=64; const g=cv.getContext('2d');
+  g.fillStyle='#c8a050'; g.fillRect(0,0,256,64); g.fillStyle='#3a2410'; g.font='bold 24px sans-serif'; g.textAlign='center'; g.fillText(t1,128,28); g.font='18px sans-serif'; g.fillText(t2,128,54);
+  const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; return tx; }
+function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|'); if(sig===mountSig) return; mountSig=sig;
+  while(mountG.children.length) mountG.remove(mountG.children[0]);
+  list.slice(0,MSLOT.length).forEach((rec,i)=>{ const sl=MSLOT[i], sp=c.species(rec.id); if(!sp) return; c.want(rec.id);
+    const b=new T.Mesh(new T.BoxGeometry(.04,.48,.62),plaqueM); b.position.set(ROOM.x-.03,sl.y,sl.z); mountG.add(b);
+    const e=new T.Mesh(new T.BoxGeometry(.02,.52,.66),plaqueEdge); e.position.set(ROOM.x-.015,sl.y,sl.z); mountG.add(e);
+    const f=fishObj(rec); if(f){ f.scale.setScalar(.56); f.rotation.set(0,-Math.PI/2,0); f.position.set(ROOM.x-.13,sl.y+.04,sl.z); f.userData.rec=rec; mountG.add(f); }
+    const np=new T.Mesh(new T.PlaneGeometry(.36,.09),new T.MeshBasicMaterial({map:nameTex(sp.name,(rec.w<1?Math.round(rec.w*1000)+' g':rec.w.toFixed(1)+' kg')+'・'+new Date(rec.d).toLocaleDateString('zh-TW'))}));
+    np.position.set(ROOM.x-.055,sl.y-.2,sl.z); np.rotation.y=-Math.PI/2; mountG.add(np); }); }
 const tv=new T.Vector3();
 function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
   tk.plants.forEach(p=>{ p.o.rotation.z=Math.sin(t*1.2+p.ph)*.12; p.o.rotation.x=Math.sin(t*.9+p.ph)*.06; });
@@ -4432,7 +4448,9 @@ const el=R.domElement, ray=new T.Raycaster(), ndc=new T.Vector2();
 let mode='room', viewTank=null, vb=0, pan=0, panT=0, down=null;
 const ui={view:document.getElementById('homeView'),card:document.getElementById('fishCard'),hint:document.querySelector('#homeUI .hh'),btns:document.querySelector('#homeUI .hb')};
 function hit(e){ const r=el.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(ndc,cam); }
-function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>tanks[k].glass); const h=ray.intersectObjects(gl,false)[0]; if(h) enterView(h.object.userData.tank); }
+function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>tanks[k].glass), h=ray.intersectObjects(gl,false)[0], hm=ray.intersectObjects(mountG.children,true)[0];
+  if(hm&&(!h||hm.distance<h.distance)){ let o=hm.object; while(o&&!o.userData.rec) o=o.parent; if(o){ c.showFish(o.userData.rec,ui.card); return; } }
+  ui.card.classList.add('hidden'); if(h) enterView(h.object.userData.tank); }
 function tapView(){ const tk=tanks[viewTank]; if(!tk) return; const h=ray.intersectObjects(tk.fish.map(f=>f.o),true)[0];
   if(!h){ ui.card.classList.add('hidden'); return; } let o=h.object; while(o&&!o.userData.rec) o=o.parent; if(o) c.showFish(o.userData.rec,ui.card); }
 function enterView(w){ mode='view'; viewTank=w; pan=panT=0; ui.view.classList.remove('hidden'); ui.btns.classList.add('hidden'); ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
@@ -4443,7 +4461,7 @@ el.addEventListener('pointermove',e=>{ if(!on||!drag) return; const dx=e.clientX
   if(mode==='view'){ const w=tanks[viewTank]?tanks[viewTank].spec.w:1; panT=Math.max(-w*.35,Math.min(w*.35,drag.pan-dx*.003)); return; }
   yawT=Math.max(-1.9,Math.min(1.9,drag.yaw-dx*.006)); pitchT=Math.max(-.7,Math.min(.6,drag.pitch-dy*.005)); });
 window.addEventListener('pointerup',e=>{ if(on&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<10&&performance.now()-down.t<450){ hit(e); if(mode==='room') tapRoom(); else tapView(); } drag=null; down=null; });   // 移動很少、時間很短才算點擊
-function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; resize(); syncTime(); syncFish(); exitView(); }
+function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; resize(); syncTime(); syncFish(); syncMounts(); exitView(); if(c.onEnter) c.onEnter(); }
 function exit(){ on=false; drag=null; exitView(); }
 const qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
@@ -4455,7 +4473,8 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
     pView.set(tk.x+pan,tk.y+s.h/2,tk.z+dist); lookM.lookAt(pView,tv.set(tk.x+pan,tk.y+s.h/2,tk.z),cam.up); qView.setFromRotationMatrix(lookM); }
   const k=vb*vb*(3-2*vb); cam.position.lerpVectors(pRoom,pView,k); cam.quaternion.copy(qRoom).slerp(qView,k);
   const fl=.85+.15*Math.sin(t*9)+.08*Math.sin(t*23); fireL.intensity=2.2*fl; fireM.opacity=.7+.3*fl; fire.scale.y=.9+.15*Math.sin(t*7);
-  if((syncT+=dt)>1){ syncT=0; syncTime(); syncFish(); }   // 每秒同步一次：剛帶回的魚、升級的缸、晚一步載好的真實模型
+  if((syncT+=dt)>1){ syncT=0; syncTime(); syncFish(); syncMounts(); }   // 每秒同步一次：剛帶回的魚、升級的缸、晚一步載好的真實模型
+  if(c.crackle&&Math.random()<dt*2.2) c.crackle();   // 爐火劈啪聲，隨機間隔
   updTanks(dt); R.setRenderTarget(null); R.render(scene,cam); }
 window.addEventListener('resize',()=>{ if(on) resize(); });
 return {enter,exit,render,active:()=>on,scene,cam};
@@ -4521,6 +4540,7 @@ const Snd=(()=>{
     bird(){ const b=2600+Math.random()*1200; for(let i=0;i<3;i++) tn(b+i*200,.07,'sine',.03,i*.09,b+600); },
     gator(){ nz(1.2,'lowpass',90,.8,.35); tn(55,1,'sawtooth',.05,0,40); },
     paddle(){ nz(.35,'bandpass',700,.8,.14,300); },
+    crackle(){ nz(.03+Math.random()*.05,'highpass',1800+Math.random()*2600,.8,.04+Math.random()*.06,900); },
     plip(){ tn(900,.05,'sine',.03,0,500); nz(.08,'bandpass',2500,1.5,.03); },
     setAmb(o){ if(!AMB) return; const t=ctx.currentTime;
       AMB.wind.g.gain.setTargetAtTime(.02+o.wind*.32,t,.6); AMB.wind.fl.frequency.setTargetAtTime(300+o.wind*700,t,.6);
@@ -4662,6 +4682,15 @@ function showCard(){
   Snd.fanfare(sp.rar); setTimeout(()=>$('bSell').focus({preventScroll:true}),50);
 }
 // 回家／出門：小屋是獨立場景，回家時改畫小屋，外面的湖照常運作；出門回到木碼頭
+// 回到小屋時：第一次會看到手記附頁；之後每天第一次回家，若收藏了 3 種以上的魚，釣友會來參觀並留下魚餌
+function homeEnter(){ const hd=HOME.data();
+  if(!hd.page){ hd.page=1; persist(); setTimeout(()=>{ if(window.__STORY&&window.__STORY.page) window.__STORY.page('手記・附頁：小屋的水族箱',
+    '牆角那個蒙著灰的玻璃缸，是我年輕時從鎮上扛回來的。<br><br>有些魚，我實在捨不得賣。牠們在缸裡游的樣子，讓我想起釣到牠們的那個早晨、那陣風、那片霧。<br><br>如果你也遇到捨不得的魚，就帶回來吧。太大的就做成標本，掛在牆上，每次經過都會想起那場拉扯。<br><br>對了，常有釣友來敲門想看看缸裡的魚。他們總會留下一點魚餌當謝禮——缸裡的魚越多樣，他們越大方。'); },900); return; }
+  const day=new Date().toDateString(); if(hd.visit===day) return;
+  const kinds=new Set([...hd.fresh,...hd.sea,...hd.mounts].map(r=>r.id)).size; if(kinds<3) return;
+  const pool=BAITS.filter(b=>['corn','shrimp','live'].includes(b.id)&&save.lv>=b.lv), bt=pool[Math.floor(Math.random()*pool.length)]; if(!bt) return;
+  const n=Math.min(8,1+Math.floor(kinds/2)); hd.visit=day; save.baits[bt.id]=(save.baits[bt.id]||0)+n; persist();
+  setTimeout(()=>toast('釣友來參觀你的 '+kinds+' 種收藏，留下了 '+bt.icon+bt.name+' ×'+n,'good',2600),1200); }
 function goHome(){ if(G.state==='home') return; if(G.state!=='idle'){ toast('先收線再回家','warn'); return; } if(!HOME.unlocked()){ toast('完成主線第一章後才能整理小屋','warn'); return; }
   G.state='travel'; fadeEl.classList.add('on'); Snd.paddle();
   setTimeout(()=>{ HOME3D.enter(); G.state='home'; document.body.classList.add('athome'); fadeEl.classList.remove('on'); toast('回到老漁人的小屋','good',1400); },650); }
@@ -4726,6 +4755,7 @@ $('bHome').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; c
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
 const HOME3D=createHomeScene(W,{hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
+  crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(),
   showFish:(rec,card)=>{ const sp=SPECIES.find(s=>s.id===rec.id)||{name:rec.id,rar:0}, r=RAR[sp.rar]; card.style.setProperty('--rc',r.col);
     card.innerHTML=`<b>${sp.name}</b><small>${r.name}${rec.g?'｜'+rec.g:''}</small><div class="fg"><span>長度</span><div>${(rec.L*100).toFixed(1)} 公分</div><span>重量</span><div>${rec.w<1?Math.round(rec.w*1000)+' 公克':rec.w.toFixed(2)+' 公斤'}</div><span>釣到地點</span><div>${rec.at||'—'}</div><span>釣到日期</span><div>${new Date(rec.d).toLocaleDateString('zh-TW')}</div></div>`;
     card.classList.remove('hidden'); }});
