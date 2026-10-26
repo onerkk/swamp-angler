@@ -42,6 +42,7 @@ const rimM=new T.MeshStandardMaterial({map:col,color:0xffffff,roughness:.9,emiss
     const bump=Math.sin(a*3+1.2)*.6+Math.sin(a*9+.4)*.35+Math.sin(a*17+2)*.2+(Math.random()-.5)*.9, k=Math.pow(Math.sin(Math.min(1,(r-.17)/.33)*Math.PI),.7);
     pp.setY(i,Math.max(0,k*(.03+.035*bump))*(a>-.6&&a<1.4?1.7:1)); }
   rg.computeVertexNormals(); const rim=new T.Mesh(rg,rimM); rim.position.y=.012; hole.add(rim);
+  const lip=new T.Mesh(new T.TorusGeometry(.175,.022,8,40).rotateX(Math.PI/2),rimM); lip.position.y=.02; hole.add(lip);
   // 冰鑽帶上來的壓實雪塊，散在洞口
   for(let i=0;i<11;i++){ const a=Math.random()*6.28, r=.24+Math.random()*.32, s=.018+Math.random()*.035, cl=new T.Mesh(new T.IcosahedronGeometry(s,1),rimM);
     const ps=cl.geometry.attributes.position; for(let j=0;j<ps.count;j++) ps.setXYZ(j,ps.getX(j)*(1+(Math.random()-.5)*.5),ps.getY(j)*(.5+Math.random()*.3),ps.getZ(j)*(1+(Math.random()-.5)*.5)); cl.geometry.computeVertexNormals();
@@ -49,12 +50,13 @@ const rimM=new T.MeshStandardMaterial({map:col,color:0xffffff,roughness:.9,emiss
 const holePos=new T.Vector3();
 // 手搖冰鑽：鑿冰時邊轉邊往下鑽，完成後拔出來
 const auger=new T.Group(); auger.visible=false; g.add(auger);
+let crankRef=null;
 { const steel=new T.MeshStandardMaterial({color:0x9aa4ac,metalness:.85,roughness:.32}), red=new T.MeshStandardMaterial({color:0xb02a20,metalness:.3,roughness:.45}), grip=new T.MeshStandardMaterial({color:0x1a1a1a,roughness:.8});
   const shaft=new T.Mesh(new T.CylinderGeometry(.018,.018,1.15,10),steel); shaft.position.y=.575; auger.add(shaft);
   const pts=[]; for(let i=0;i<=120;i++){ const a=i/120*Math.PI*2*5.5, y=i/120*.55; pts.push(new T.Vector3(Math.cos(a)*.075,y,Math.sin(a)*.075)); }
   const blade=new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),240,.012,6,false),steel); blade.scale.set(1,1,1); auger.add(blade);
   const tip=new T.Mesh(new T.ConeGeometry(.06,.08,10),steel); tip.rotation.x=Math.PI; tip.position.y=-.03; auger.add(tip);
-  const crank=new T.Group(); crank.position.y=1.15; auger.add(crank);
+  const crank=new T.Group(); crank.position.y=1.15; auger.add(crank); crankRef=crank;
   const bar=new T.Mesh(new T.CylinderGeometry(.016,.016,.38,8),red); bar.rotation.z=Math.PI/2; bar.position.x=.19; crank.add(bar);
   const k1=new T.Mesh(new T.CylinderGeometry(.022,.022,.12,10),grip); k1.position.set(.38,.06,0); crank.add(k1);
   const top=new T.Mesh(new T.CylinderGeometry(.024,.024,.14,10),grip); top.position.y=.07; crank.add(top);
@@ -83,9 +85,12 @@ function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visib
   if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
       W.addRipple(holePos.x,holePos.z,.15+.2*T2); if(T2>.6){ c.chips&&0; if(c.splash) c.splash(holePos,T2); } } } if(!on){ drilled=false; prog=0; return; }
   const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; auger.visible=false; liftT=0; }
-  holePos.set(b.x-Math.sin(h)*5,0,b.z-Math.cos(h)*5); hole.position.copy(holePos); hole.visible=drilled;
+  holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); hole.position.copy(holePos); hole.visible=drilled;
   sheet.position.x=b.x; sheet.position.z=b.z; col.offset.set(b.x/600*90/2,-b.z/600*90/2); }
 /* 鑿冰洞：按住約 2 秒，冰屑四濺，完成後冰洞出現 */
 function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); auger.visible=true; auger.position.set(holePos.x,.02-prog*.42,holePos.z); auger.rotation.y+=dt*9; if(c.grind&&Math.random()<dt*10) c.grind(); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; liftT=1.2; if(c.done) c.done(holePos); } return prog; }
-return {update,holePos:()=>holePos,drilled:()=>drilled,drill,progress:()=>prog};
+const gripTmp=new T.Vector3();
+function grip(side,out){ auger.updateMatrixWorld(true); if(side==='R'){ gripTmp.set(.38,.06,0); crankRef.localToWorld(gripTmp); } else { gripTmp.set(0,1.29,0); auger.localToWorld(gripTmp); } out.copy(gripTmp); return out; }
+function drilling(){ return auger.visible&&!drilled&&prog>0&&prog<1; }
+return {update,holePos:()=>holePos,drilled:()=>drilled,drill,progress:()=>prog,grip,drilling};
 }

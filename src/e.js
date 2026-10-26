@@ -167,6 +167,7 @@ function update(dt){
   if(!on) return; tt+=dt;
   const L=Math.max(clamp(W.info.light,0,1.2),.62), day=W.info.day;   // 夜裡水下鏡頭保留月光亮度，才看得清楚魚
   const sea=W.isSea&&W.isSea(); weeds.visible=!sea; const mid=tmpC.copy(cDark).lerp(sea?cSea:cMid,clamp(L,0,1));
+  fog.density+=((biteT<0?.42:.17)-fog.density)*Math.min(1,dt*3);
   fog.color.copy(mid); bgU.uMid.value.copy(mid); bgU.uTop.value.copy(mid).multiplyScalar(2.4).add(cTint.clone().multiplyScalar(L*.6)); bgU.uBot.value.copy(mid).multiplyScalar(.35);
   surfU.uCol.value.copy(mid).multiplyScalar(5); surfU.uFog.value.copy(mid);
   hemi.color.copy(mid).multiplyScalar(3.2); hemi.groundColor.copy(mid).multiplyScalar(.6);
@@ -334,10 +335,10 @@ function render(){
     const fl=(arr,water)=>arr.length?arr.map((f,i)=>row(nm(f.id)+(f.g?' <small class="cnt">'+f.g+'</small>':''),`${Math.round(f.L*100)} 公分・${fmtW(f.w)}・${f.at||''} ${dt(f.d)}`,`<button class="sbtn" data-a="hrel" data-v="${water}:${i}">放回湖裡</button>`)).join(''):'<div class="note" style="font-size:12px">還是空的。釣到魚時按「🏠 帶回家」就會放進來。</div>';
     h+=`<div class="note">${t.n}（淡水）${hd.fresh.length}/${t.cap}・最大可放 ${Math.round(t.maxL*100)} 公分${hd.chiller?'・已裝冷水機':''}</div>`+fl(hd.fresh,'fresh');
     if(hd.seaTank) h+=`<div class="note">海水缸 ${hd.sea.length}/${HM.SEA_TANK.cap}・最大可放 ${Math.round(HM.SEA_TANK.maxL*100)} 公分</div>`+fl(hd.sea,'sea');
-    h+=`<div class="note">標本牆 ${hd.mounts.length}/${HM.MOUNT_MAX}</div>`+(hd.mounts.length?hd.mounts.map(f=>row('🖼 '+nm(f.id),`${Math.round(f.L*100)} 公分・${fmtW(f.w)}・${f.at||''} ${dt(f.d)}`,'')).join(''):'<div class="note" style="font-size:12px">放不進水族箱的大魚，可以花錢做成標本掛在牆上。</div>');
+    h+=`<div class="note">標本牆 ${hd.mounts.length}/${HM.MOUNT_MAX}</div>`+(hd.mounts.length?hd.mounts.map((f,i)=>row('🖼 '+nm(f.id),`${Math.round(f.L*100)} 公分・${fmtW(f.w)}・${f.at||''} ${dt(f.d)}`,`<button class="sbtn" data-a="hrel" data-v="mounts:${i}">取下</button>`)).join(''):'<div class="note" style="font-size:12px">放不進水族箱的大魚，可以花錢做成標本掛在牆上。</div>');
     h+='<div class="note">小屋設備</div>'; const nx=HM.TANKS[hd.tier+1];
     if(nx) h+=row('換成'+nx.n,`容量 ${nx.cap} 條、最大可放 ${Math.round(nx.maxL*100)} 公分`,`<button class="sbtn pri" data-a="hbuy" data-v="tier">🪙 ${nx.price.toLocaleString()}</button>`);
-    if(!hd.chiller) h+=row('冷水機','裝了才能養冰湖的魚',save.lv<HM.CHILLER.lv?`<span class="lk">Lv ${HM.CHILLER.lv} 解鎖</span>`:`<button class="sbtn pri" data-a="hbuy" data-v="chiller">🪙 ${HM.CHILLER.price.toLocaleString()}</button>`);
+    if(!hd.chiller) h+=row('冷水機','裝了才能養冰湖的魚',`<button class="sbtn pri" data-a="hbuy" data-v="chiller">🪙 ${HM.CHILLER.price.toLocaleString()}</button>`);
     if(!hd.seaTank) h+=row('海水缸','另一個水族箱，專門養海水魚',!save.yacht?'<span class="lk">需要漁船</span>':`<button class="sbtn pri" data-a="hbuy" data-v="sea">🪙 ${HM.SEA_TANK.price.toLocaleString()}</button>`);
   } else if(cur==='set'){
     shT.textContent='設定';
@@ -485,7 +486,7 @@ shB.addEventListener('click',e=>{
   else if(a==='homeP'){ cur='home'; render(); shB.scrollTop=0; return; }
   else if(a==='homeGo'){ close(); if(window.__goHome) window.__goHome(); return; }
   else if(a==='mapBack'){ cur='spot'; render(); return; }
-  else if(a==='hrel'){ const [wt,i]=v.split(':'), f=window.__HOME.release(wt,+i); if(f) toast('把'+((SPECIES.find(s=>s.id===f.id)||{}).name||'魚')+'放回湖裡了','good'); render(); return; }
+  else if(a==='hrel'){ const [wt,i]=v.split(':'), f=window.__HOME.release(wt,+i); if(f) toast(wt==='mounts'?'取下了標本，牆上空出一個位置':'把'+((SPECIES.find(s=>s.id===f.id)||{}).name||'魚')+'放回湖裡了','good'); render(); return; }
   else if(a==='hbuy'){ const m=window.__HOME.buy(v); toast(m||'買好了，已經裝進小屋',m?'bad':'good'); render(); syncHUD(); return; }
   else if(a==='dex'){ dexSel=v; render(); shB.scrollTop=0; return; }
   else if(a==='dexback'){ dexSel=null; render(); return; }

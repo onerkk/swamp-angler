@@ -24,7 +24,7 @@ function check(fd){
   return {ok:true,water:sea?'sea':'fresh'};
 }
 // 放不進水族箱的魚可以做成標本（要花錢：約賣價的一半）
-function big(fd,why,short){ const h=H(), cost=Math.max(200,Math.round(fd.value*.5/10)*10);
+function big(fd,why,short){ const h=H(), cost=Math.min(6000,Math.max(200,Math.round(fd.value*.5/10)*10));
   if(h.mounts.length>=MOUNT_MAX) return {ok:false,why:why+'；標本牆也掛滿了（'+MOUNT_MAX+' 個）'};
   return {ok:false,mount:true,cost,why,short}; }
 const rec=(fd,spotName)=>({id:fd.sp.id,L:+fd.L.toFixed(3),w:+fd.w.toFixed(3),g:fd.grade||'',d:Date.now(),at:spotName||''});
@@ -35,7 +35,7 @@ function buy(what){ const h=H();
   if(what==='tier'){ const nx=TANKS[h.tier+1]; if(!nx) return '已經是最大的水族箱了'; if(S.coins<nx.price) return '金幣不夠';
     S.coins-=nx.price; h.tier++; }
   else if(what==='sea'){ if(h.seaTank) return '已經有海水缸了'; if(!S.yacht) return '有漁船、能出海之後才需要海水缸'; if(S.coins<SEA_TANK.price) return '金幣不夠'; S.coins-=SEA_TANK.price; h.seaTank=true; }
-  else if(what==='chiller'){ if(h.chiller) return '已經裝了冷水機'; if(S.lv<CHILLER.lv) return 'Lv '+CHILLER.lv+' 才能裝冷水機'; if(S.coins<CHILLER.price) return '金幣不夠'; S.coins-=CHILLER.price; h.chiller=true; }
+  else if(what==='chiller'){ if(h.chiller) return '已經裝了冷水機'; if(S.coins<CHILLER.price) return '金幣不夠'; S.coins-=CHILLER.price; h.chiller=true; }
   c.persist(); c.setCoins(); return ''; }
 return {TANKS,SEA_TANK,CHILLER,MOUNT_MAX,unlocked,check,keep,mount,release,buy,data:H,tank};
 }
@@ -105,7 +105,7 @@ const ART={hanging_picture_frame_01:'mermaid_a.jpg',hanging_picture_frame_02:'en
 function put(name,x,y,z,ry,sc,fn){ const place=g=>{ const o=g.scene.clone(true); o.position.set(x,y,z); o.rotation.y=ry||0; o.scale.setScalar(sc||1);
     o.traverse(m=>{ if(!m.isMesh) return; m.frustumCulled=false; const mats=Array.isArray(m.material)?m.material:[m.material];
       mats.forEach((mm,i)=>{ if(!mm) return; if(mm.map) mm.map.anisotropy=4;
-        if(/_artwork$/.test(mm.name)&&ART[name]){ const nm=mm.clone(); const tx=TL.load(ART[name]); tx.encoding=T.sRGBEncoding; nm.map=tx; nm.color.set(0xffffff); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
+        if(/_artwork$/.test(mm.name)&&ART[name]){ const nm=mm.clone(); const tx=TL.load(ART[name]); tx.encoding=T.sRGBEncoding; if(name==='hanging_picture_frame_02'){ tx.repeat.set(.6,.5); tx.offset.set(.2,.08); } nm.map=tx; nm.color.set(0xffffff); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_glass$/.test(mm.name)){ const nm=new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.12,roughness:.05,metalness:0,depthWrite:false}); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_lamp$/.test(mm.name)){ const nm=mm.clone(); nm.emissive=new T.Color(0xffd080); nm.emissiveIntensity=1.2; if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; glowM.push(nm); } }); });
     scene.add(o); if(fn) fn(o); };
@@ -203,6 +203,7 @@ function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.i
 const tv=new T.Vector3();
 function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
   tk.plants.forEach(p=>{ p.o.rotation.z=Math.sin(t*1.2+p.ph)*.06; p.o.rotation.x=Math.sin(t*.9+p.ph)*.04; });
+  tk.fish.forEach(f=>{ const sp=c.species(f.rec.id); const src=sp&&c.getFish(sp); if(src&&src.uni){ src.uni.uSwim.value=t*5; src.uni.uAmp.value=.55; } });
   const bp=tk.bub.geometry.attributes.position; for(let i=0;i<bp.count;i++){ let yy=bp.getY(i)+dt*(.12+(i%5)*.03); if(yy>tk.y+tk.spec.h-.06) yy=tk.y+.08; bp.setY(i,yy); } bp.needsUpdate=true;
   tk.fish.forEach(f=>{ const o=f.o; tv.subVectors(f.tgt,o.position); const d=tv.length(); if(d<.04){ pickTarget(f,tk); return; }
     tv.normalize(); const want=Math.atan2(-tv.z,tv.x); let dy=want-o.rotation.y; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2;

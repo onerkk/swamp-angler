@@ -1758,6 +1758,7 @@ function update(dt){
   if(!on) return; tt+=dt;
   const L=Math.max(clamp(W.info.light,0,1.2),.62), day=W.info.day;   // 夜裡水下鏡頭保留月光亮度，才看得清楚魚
   const sea=W.isSea&&W.isSea(); weeds.visible=!sea; const mid=tmpC.copy(cDark).lerp(sea?cSea:cMid,clamp(L,0,1));
+  fog.density+=((biteT<0?.42:.17)-fog.density)*Math.min(1,dt*3);
   fog.color.copy(mid); bgU.uMid.value.copy(mid); bgU.uTop.value.copy(mid).multiplyScalar(2.4).add(cTint.clone().multiplyScalar(L*.6)); bgU.uBot.value.copy(mid).multiplyScalar(.35);
   surfU.uCol.value.copy(mid).multiplyScalar(5); surfU.uFog.value.copy(mid);
   hemi.color.copy(mid).multiplyScalar(3.2); hemi.groundColor.copy(mid).multiplyScalar(.6);
@@ -1925,10 +1926,10 @@ function render(){
     const fl=(arr,water)=>arr.length?arr.map((f,i)=>row(nm(f.id)+(f.g?' <small class="cnt">'+f.g+'</small>':''),`${Math.round(f.L*100)} 公分・${fmtW(f.w)}・${f.at||''} ${dt(f.d)}`,`<button class="sbtn" data-a="hrel" data-v="${water}:${i}">放回湖裡</button>`)).join(''):'<div class="note" style="font-size:12px">還是空的。釣到魚時按「🏠 帶回家」就會放進來。</div>';
     h+=`<div class="note">${t.n}（淡水）${hd.fresh.length}/${t.cap}・最大可放 ${Math.round(t.maxL*100)} 公分${hd.chiller?'・已裝冷水機':''}</div>`+fl(hd.fresh,'fresh');
     if(hd.seaTank) h+=`<div class="note">海水缸 ${hd.sea.length}/${HM.SEA_TANK.cap}・最大可放 ${Math.round(HM.SEA_TANK.maxL*100)} 公分</div>`+fl(hd.sea,'sea');
-    h+=`<div class="note">標本牆 ${hd.mounts.length}/${HM.MOUNT_MAX}</div>`+(hd.mounts.length?hd.mounts.map(f=>row('🖼 '+nm(f.id),`${Math.round(f.L*100)} 公分・${fmtW(f.w)}・${f.at||''} ${dt(f.d)}`,'')).join(''):'<div class="note" style="font-size:12px">放不進水族箱的大魚，可以花錢做成標本掛在牆上。</div>');
+    h+=`<div class="note">標本牆 ${hd.mounts.length}/${HM.MOUNT_MAX}</div>`+(hd.mounts.length?hd.mounts.map((f,i)=>row('🖼 '+nm(f.id),`${Math.round(f.L*100)} 公分・${fmtW(f.w)}・${f.at||''} ${dt(f.d)}`,`<button class="sbtn" data-a="hrel" data-v="mounts:${i}">取下</button>`)).join(''):'<div class="note" style="font-size:12px">放不進水族箱的大魚，可以花錢做成標本掛在牆上。</div>');
     h+='<div class="note">小屋設備</div>'; const nx=HM.TANKS[hd.tier+1];
     if(nx) h+=row('換成'+nx.n,`容量 ${nx.cap} 條、最大可放 ${Math.round(nx.maxL*100)} 公分`,`<button class="sbtn pri" data-a="hbuy" data-v="tier">🪙 ${nx.price.toLocaleString()}</button>`);
-    if(!hd.chiller) h+=row('冷水機','裝了才能養冰湖的魚',save.lv<HM.CHILLER.lv?`<span class="lk">Lv ${HM.CHILLER.lv} 解鎖</span>`:`<button class="sbtn pri" data-a="hbuy" data-v="chiller">🪙 ${HM.CHILLER.price.toLocaleString()}</button>`);
+    if(!hd.chiller) h+=row('冷水機','裝了才能養冰湖的魚',`<button class="sbtn pri" data-a="hbuy" data-v="chiller">🪙 ${HM.CHILLER.price.toLocaleString()}</button>`);
     if(!hd.seaTank) h+=row('海水缸','另一個水族箱，專門養海水魚',!save.yacht?'<span class="lk">需要漁船</span>':`<button class="sbtn pri" data-a="hbuy" data-v="sea">🪙 ${HM.SEA_TANK.price.toLocaleString()}</button>`);
   } else if(cur==='set'){
     shT.textContent='設定';
@@ -2076,7 +2077,7 @@ shB.addEventListener('click',e=>{
   else if(a==='homeP'){ cur='home'; render(); shB.scrollTop=0; return; }
   else if(a==='homeGo'){ close(); if(window.__goHome) window.__goHome(); return; }
   else if(a==='mapBack'){ cur='spot'; render(); return; }
-  else if(a==='hrel'){ const [wt,i]=v.split(':'), f=window.__HOME.release(wt,+i); if(f) toast('把'+((SPECIES.find(s=>s.id===f.id)||{}).name||'魚')+'放回湖裡了','good'); render(); return; }
+  else if(a==='hrel'){ const [wt,i]=v.split(':'), f=window.__HOME.release(wt,+i); if(f) toast(wt==='mounts'?'取下了標本，牆上空出一個位置':'把'+((SPECIES.find(s=>s.id===f.id)||{}).name||'魚')+'放回湖裡了','good'); render(); return; }
   else if(a==='hbuy'){ const m=window.__HOME.buy(v); toast(m||'買好了，已經裝進小屋',m?'bad':'good'); render(); syncHUD(); return; }
   else if(a==='dex'){ dexSel=v; render(); shB.scrollTop=0; return; }
   else if(a==='dexback'){ dexSel=null; render(); return; }
@@ -4140,6 +4141,7 @@ const rimM=new T.MeshStandardMaterial({map:col,color:0xffffff,roughness:.9,emiss
     const bump=Math.sin(a*3+1.2)*.6+Math.sin(a*9+.4)*.35+Math.sin(a*17+2)*.2+(Math.random()-.5)*.9, k=Math.pow(Math.sin(Math.min(1,(r-.17)/.33)*Math.PI),.7);
     pp.setY(i,Math.max(0,k*(.03+.035*bump))*(a>-.6&&a<1.4?1.7:1)); }
   rg.computeVertexNormals(); const rim=new T.Mesh(rg,rimM); rim.position.y=.012; hole.add(rim);
+  const lip=new T.Mesh(new T.TorusGeometry(.175,.022,8,40).rotateX(Math.PI/2),rimM); lip.position.y=.02; hole.add(lip);
   // 冰鑽帶上來的壓實雪塊，散在洞口
   for(let i=0;i<11;i++){ const a=Math.random()*6.28, r=.24+Math.random()*.32, s=.018+Math.random()*.035, cl=new T.Mesh(new T.IcosahedronGeometry(s,1),rimM);
     const ps=cl.geometry.attributes.position; for(let j=0;j<ps.count;j++) ps.setXYZ(j,ps.getX(j)*(1+(Math.random()-.5)*.5),ps.getY(j)*(.5+Math.random()*.3),ps.getZ(j)*(1+(Math.random()-.5)*.5)); cl.geometry.computeVertexNormals();
@@ -4147,12 +4149,13 @@ const rimM=new T.MeshStandardMaterial({map:col,color:0xffffff,roughness:.9,emiss
 const holePos=new T.Vector3();
 // 手搖冰鑽：鑿冰時邊轉邊往下鑽，完成後拔出來
 const auger=new T.Group(); auger.visible=false; g.add(auger);
+let crankRef=null;
 { const steel=new T.MeshStandardMaterial({color:0x9aa4ac,metalness:.85,roughness:.32}), red=new T.MeshStandardMaterial({color:0xb02a20,metalness:.3,roughness:.45}), grip=new T.MeshStandardMaterial({color:0x1a1a1a,roughness:.8});
   const shaft=new T.Mesh(new T.CylinderGeometry(.018,.018,1.15,10),steel); shaft.position.y=.575; auger.add(shaft);
   const pts=[]; for(let i=0;i<=120;i++){ const a=i/120*Math.PI*2*5.5, y=i/120*.55; pts.push(new T.Vector3(Math.cos(a)*.075,y,Math.sin(a)*.075)); }
   const blade=new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),240,.012,6,false),steel); blade.scale.set(1,1,1); auger.add(blade);
   const tip=new T.Mesh(new T.ConeGeometry(.06,.08,10),steel); tip.rotation.x=Math.PI; tip.position.y=-.03; auger.add(tip);
-  const crank=new T.Group(); crank.position.y=1.15; auger.add(crank);
+  const crank=new T.Group(); crank.position.y=1.15; auger.add(crank); crankRef=crank;
   const bar=new T.Mesh(new T.CylinderGeometry(.016,.016,.38,8),red); bar.rotation.z=Math.PI/2; bar.position.x=.19; crank.add(bar);
   const k1=new T.Mesh(new T.CylinderGeometry(.022,.022,.12,10),grip); k1.position.set(.38,.06,0); crank.add(k1);
   const top=new T.Mesh(new T.CylinderGeometry(.024,.024,.14,10),grip); top.position.y=.07; crank.add(top);
@@ -4181,11 +4184,14 @@ function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visib
   if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
       W.addRipple(holePos.x,holePos.z,.15+.2*T2); if(T2>.6){ c.chips&&0; if(c.splash) c.splash(holePos,T2); } } } if(!on){ drilled=false; prog=0; return; }
   const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; auger.visible=false; liftT=0; }
-  holePos.set(b.x-Math.sin(h)*5,0,b.z-Math.cos(h)*5); hole.position.copy(holePos); hole.visible=drilled;
+  holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); hole.position.copy(holePos); hole.visible=drilled;
   sheet.position.x=b.x; sheet.position.z=b.z; col.offset.set(b.x/600*90/2,-b.z/600*90/2); }
 /* 鑿冰洞：按住約 2 秒，冰屑四濺，完成後冰洞出現 */
 function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); auger.visible=true; auger.position.set(holePos.x,.02-prog*.42,holePos.z); auger.rotation.y+=dt*9; if(c.grind&&Math.random()<dt*10) c.grind(); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; liftT=1.2; if(c.done) c.done(holePos); } return prog; }
-return {update,holePos:()=>holePos,drilled:()=>drilled,drill,progress:()=>prog};
+const gripTmp=new T.Vector3();
+function grip(side,out){ auger.updateMatrixWorld(true); if(side==='R'){ gripTmp.set(.38,.06,0); crankRef.localToWorld(gripTmp); } else { gripTmp.set(0,1.29,0); auger.localToWorld(gripTmp); } out.copy(gripTmp); return out; }
+function drilling(){ return auger.visible&&!drilled&&prog>0&&prog<1; }
+return {update,holePos:()=>holePos,drilled:()=>drilled,drill,progress:()=>prog,grip,drilling};
 }
 /* ===== 診斷：錯誤記錄、效能取樣、一鍵複製給開發者 ===== */
 function createDiag(W,c){
@@ -4397,7 +4403,7 @@ function check(fd){
   return {ok:true,water:sea?'sea':'fresh'};
 }
 // 放不進水族箱的魚可以做成標本（要花錢：約賣價的一半）
-function big(fd,why,short){ const h=H(), cost=Math.max(200,Math.round(fd.value*.5/10)*10);
+function big(fd,why,short){ const h=H(), cost=Math.min(6000,Math.max(200,Math.round(fd.value*.5/10)*10));
   if(h.mounts.length>=MOUNT_MAX) return {ok:false,why:why+'；標本牆也掛滿了（'+MOUNT_MAX+' 個）'};
   return {ok:false,mount:true,cost,why,short}; }
 const rec=(fd,spotName)=>({id:fd.sp.id,L:+fd.L.toFixed(3),w:+fd.w.toFixed(3),g:fd.grade||'',d:Date.now(),at:spotName||''});
@@ -4408,7 +4414,7 @@ function buy(what){ const h=H();
   if(what==='tier'){ const nx=TANKS[h.tier+1]; if(!nx) return '已經是最大的水族箱了'; if(S.coins<nx.price) return '金幣不夠';
     S.coins-=nx.price; h.tier++; }
   else if(what==='sea'){ if(h.seaTank) return '已經有海水缸了'; if(!S.yacht) return '有漁船、能出海之後才需要海水缸'; if(S.coins<SEA_TANK.price) return '金幣不夠'; S.coins-=SEA_TANK.price; h.seaTank=true; }
-  else if(what==='chiller'){ if(h.chiller) return '已經裝了冷水機'; if(S.lv<CHILLER.lv) return 'Lv '+CHILLER.lv+' 才能裝冷水機'; if(S.coins<CHILLER.price) return '金幣不夠'; S.coins-=CHILLER.price; h.chiller=true; }
+  else if(what==='chiller'){ if(h.chiller) return '已經裝了冷水機'; if(S.coins<CHILLER.price) return '金幣不夠'; S.coins-=CHILLER.price; h.chiller=true; }
   c.persist(); c.setCoins(); return ''; }
 return {TANKS,SEA_TANK,CHILLER,MOUNT_MAX,unlocked,check,keep,mount,release,buy,data:H,tank};
 }
@@ -4478,7 +4484,7 @@ const ART={hanging_picture_frame_01:'mermaid_a.jpg',hanging_picture_frame_02:'en
 function put(name,x,y,z,ry,sc,fn){ const place=g=>{ const o=g.scene.clone(true); o.position.set(x,y,z); o.rotation.y=ry||0; o.scale.setScalar(sc||1);
     o.traverse(m=>{ if(!m.isMesh) return; m.frustumCulled=false; const mats=Array.isArray(m.material)?m.material:[m.material];
       mats.forEach((mm,i)=>{ if(!mm) return; if(mm.map) mm.map.anisotropy=4;
-        if(/_artwork$/.test(mm.name)&&ART[name]){ const nm=mm.clone(); const tx=TL.load(ART[name]); tx.encoding=T.sRGBEncoding; nm.map=tx; nm.color.set(0xffffff); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
+        if(/_artwork$/.test(mm.name)&&ART[name]){ const nm=mm.clone(); const tx=TL.load(ART[name]); tx.encoding=T.sRGBEncoding; if(name==='hanging_picture_frame_02'){ tx.repeat.set(.6,.5); tx.offset.set(.2,.08); } nm.map=tx; nm.color.set(0xffffff); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_glass$/.test(mm.name)){ const nm=new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.12,roughness:.05,metalness:0,depthWrite:false}); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_lamp$/.test(mm.name)){ const nm=mm.clone(); nm.emissive=new T.Color(0xffd080); nm.emissiveIntensity=1.2; if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; glowM.push(nm); } }); });
     scene.add(o); if(fn) fn(o); };
@@ -4576,6 +4582,7 @@ function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.i
 const tv=new T.Vector3();
 function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
   tk.plants.forEach(p=>{ p.o.rotation.z=Math.sin(t*1.2+p.ph)*.06; p.o.rotation.x=Math.sin(t*.9+p.ph)*.04; });
+  tk.fish.forEach(f=>{ const sp=c.species(f.rec.id); const src=sp&&c.getFish(sp); if(src&&src.uni){ src.uni.uSwim.value=t*5; src.uni.uAmp.value=.55; } });
   const bp=tk.bub.geometry.attributes.position; for(let i=0;i<bp.count;i++){ let yy=bp.getY(i)+dt*(.12+(i%5)*.03); if(yy>tk.y+tk.spec.h-.06) yy=tk.y+.08; bp.setY(i,yy); } bp.needsUpdate=true;
   tk.fish.forEach(f=>{ const o=f.o; tv.subVectors(f.tgt,o.position); const d=tv.length(); if(d<.04){ pickTarget(f,tk); return; }
     tv.normalize(); const want=Math.atan2(-tv.z,tv.x); let dy=want-o.rotation.y; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2;
@@ -5086,7 +5093,7 @@ window.__applyGfx=q=>{ window.__GFX=q; const cap={high:2.5,mid:1.5,low:1}[q]||2.
   if(W.setRefl) W.setRefl(q!=='low',q==='mid'?.22:.35); W.setPR(Math.min(window.devicePixelRatio||1,cap)); };
 window.__applyGfx(save.gfx||'high');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,held:()=>G.held,grind:()=>Snd.grind&&Snd.grind(),splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
-function iceDrop(){ G.noBait=false; const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=5; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
+function iceDrop(){ G.noBait=false; const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=1.6; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
 const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
 const LURE=createLure(W,P,{G,toast,Snd,uwOn:()=>save.uw!==false,reelSpd:()=>META.gear().reel.spd,onChase:()=>{ if(!G.fd) prepFish(); if(!G.fd||G.fd.item) return null; const f=P.getFish(G.fd.sp); if(f) seeThrough(f.group); return f?{group:f.group,uni:f.uni,L:G.fd.L}:null; }}); window.__G=G;
@@ -5235,7 +5242,7 @@ function update(dt){
   const info=W.setTime(G.hour); W.update(dt,G.t); updateKayak(dt);
   if(keys.ArrowLeft||keys.ArrowRight){ const k=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0); if(G.state==='fight') G.rodSideT=k; else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(G.yawT-k*dt*1.2,-.95,.95); }
   G.rodSide+=(G.rodSideT-G.rodSide)*Math.min(1,dt*8); rod.side=G.rodSide;
-  if(G.state!=='fight'){ rod.end=null; rod.bendT=.03; } bob.visible=!G.snapped; bob.rotation.set(0,0,0);
+  if(G.state!=='fight'){ rod.end=null; rod.bendT=.03; } bob.visible=!G.snapped&&!((G.drillK||0)>.5); bob.rotation.set(0,0,0);
   let lineEnd=null, slack=.35, lineOn=!G.snapped, trem=0;
   const st=G.state;
   if(st==='intro'||st==='idle'||st==='charge'){
@@ -5312,12 +5319,14 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
     }
     if(lineOn){ W.head.localToWorld(tv.set(0,.14*D+.03,-D+.02)); lineEnd=tv; slack=.05; }
   }
+  if((G.drillK||0)>.5) lineOn=false;
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light, trem);
   if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
   P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); if(!save.lookTip&&W.info.day<.15&&G.state==='idle'&&G.t>20){ save.lookTip=1; persist(); toast('🌌 上下拖曳畫面可以抬頭看星空','good',3500); }
   if(G.cinePan) G.yawT=Math.sin(performance.now()*.00011)*.55;   // 開場過場：鏡頭緩慢左右擺動
-  window.__MOON.update(dt); if(window.__TAL) window.__TAL.tick(G); if(window.__STORY) window.__STORY.tick(dt); ARMS.update(!UW.active(),G.state,G.power,dt,{k:WL.padOn(),grip:WL.padGrip}); SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt); ICE.update(dt);
+  window.__MOON.update(dt); if(window.__TAL) window.__TAL.tick(G); if(window.__STORY) window.__STORY.tick(dt); { const dr=G.loc==='ice'&&G.held&&G.state==='idle'&&ICE.drilling&&ICE.drilling(); G.drillK=(G.drillK||0)+((dr?1:0)-(G.drillK||0))*Math.min(1,dt*8); if(G.drillK>.01){ stowRod(Math.max(WL.padOn(),G.drillK)); G.pitchT=Math.min(G.pitchT||0,-.4*G.drillK); }
+    ARMS.update(!UW.active(),G.state,G.power,dt,G.drillK>.01?{k:G.drillK,grip:(sd,o)=>ICE.grip(sd,o)}:{k:WL.padOn(),grip:WL.padGrip}); } SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt); ICE.update(dt);
   { const z=WL.zoneId?WL.zoneId():'', tgt=G.loc==='ice'?[.03,.08,.12]:G.loc==='sea'?(z==='reef'?[.02,.2,.25]:[.01,.08,.2]):[.04,.13,.15], v=SEE_U.value, k=Math.min(1,dt*1.5);   // 水下物體混入的水色依地點
     v.set(v.x+(tgt[0]-v.x)*k,v.y+(tgt[1]-v.y)*k,v.z+(tgt[2]-v.z)*k); }
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
