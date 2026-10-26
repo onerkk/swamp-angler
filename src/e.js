@@ -349,6 +349,11 @@ function render(){
     const tg=(k,name,sub,onv)=>row(name,sub,`<button class="sbtn${onv?' pri':''}" data-a="tg" data-v="${k}">${onv?'開':'關'}</button>`);
     h+=tg('sound','音效','環境聲、捲線器、水花',Snd.isOn());
     h+=tg('vibe','震動','咬餌、拉扯時的手機震動',save.vibe!==false);
+    { const st=window.__CLOUD?window.__CLOUD.status():{state:'nocfg'};
+      if(st.state==='in') h+=row('☁️ 雲端存檔','已登入 '+st.name+'，進度會自動同步到你的 Google 帳號',`<button class="sbtn" data-a="cloud" data-v="out">登出</button>`);
+      else if(st.state==='out') h+=row('☁️ 雲端存檔','用 Google 帳號登入，換手機或清除瀏覽器也不會丟進度。目前的本機進度會先上傳，不會被洗掉',`<button class="sbtn pri" data-a="cloud" data-v="in">Google 登入</button>`);
+      else h+=row('☁️ 雲端存檔','Google 登入尚未設定',`<span class="lk">尚未設定</span>`);
+      h+=row('📲 安裝到桌面',PWA.installed()?'已安裝成 App，從桌面開啟時進度一樣保留':'像 App 一樣從手機桌面開啟，進度與瀏覽器共用',PWA.installed()?`<span class="lk">已安裝</span>`:`<button class="sbtn pri" data-a="pwa">安裝</button>`); }
     h+=tg('uw','水下鏡頭','魚靠近餌時切到水下看牠咬餌',save.uw!==false);
     h+=tg('scare','驚嚇效果','夜裡偶爾會有嚇人的事……心臟不好或小朋友玩請關閉',!save.noScare);
     h+=tg('imm','沉浸模式','隱藏上方大部分介面，只留設定和動作按鈕',!!save.imm);
@@ -461,6 +466,7 @@ $('bShop').addEventListener('click',()=>open('shop'));
 $('bQuest').addEventListener('click',()=>open('quest'));
 $('bLog').addEventListener('click',()=>open('log'));
 $('bSet').addEventListener('click',()=>open('set'));
+window.__SHEET={refresh:k=>{ if(cur===k) render(); }};
 $('bMap').addEventListener('click',()=>open('spot'));
 $('baitChip').addEventListener('click',()=>{ shopTab='bait'; open('shop'); });
 $('shX').addEventListener('click',close);
@@ -493,6 +499,8 @@ shB.addEventListener('click',e=>{
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
   else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
+  else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else window.__CLOUD.logout(); }
+  else if(a==='pwa'){ PWA.install().then(r=>{ if(r==='ios') toast('iPhone：按 Safari 的「分享」→「加入主畫面」','',4200); else if(r==='manual') toast('瀏覽器選單 ⋮ →「加到主畫面」或「安裝應用程式」','',4200); else if(r==='installed') toast('已經安裝了','',1600); }); }
   else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem('swampAngler.v1'); }catch(_){} location.reload(); return; } }
   render(); syncHUD();
 });

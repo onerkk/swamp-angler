@@ -1,7 +1,7 @@
 # 濕地垂釣 原始碼與組裝
 
 ## 組裝（在放有 src 內容的目錄執行）
-JS="b.js c.js e.js f.js g.js h.js i.js j.js k.js l.js m.js stars.js n.js o.js p.js q.js r.js s.js t.js u.js v.js w.js x.js d.js"
+JS="b.js c.js e.js f.js g.js h.js i.js j.js k.js l.js m.js stars.js n.js o.js p.js q.js r.js s.js t.js u.js v.js w.js x.js y.js d.js"
 cat scan.js $JS > all.js && node --check all.js && python3 tools/lintc.py && \
 { cat a.html; echo "<script>"; cat scan.js; echo "</script>"; echo "<script>"; cat $JS; echo "</script>"; echo "</body></html>"; } > ../index.html
 
@@ -22,3 +22,4 @@ u 診斷 | v 主線故事（章節順序 c1 c2 c3 c4 ice c5 c6 c7）| w 老漁�
 cutany.sh（自動分格→找魚塊）或 cutbox.py（手動指定範圍）→ gen.py（Hunyuan3D-2mv，gradio_client）→ bake4.py（四視角烘焙，支援 back 與缺角度）→ gt/tojpg.mjs 壓縮
 → 加入 c.js SPECIES（spots/loc/water/tide/noSell）、g.js SP_STY、e.js 餌 aff、m.js RFISH+BAKED → models/fish_<id>.glb
 x 阿蘅（夜裡的驚嚇事件與隱藏章節）
+y 雲端存檔（Firebase Google 登入）與 PWA 安裝

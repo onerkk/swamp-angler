@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0b1210">
 <title>濕地垂釣</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0a1f2e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="濕地垂釣">
+<script>
+/* Firebase 設定：由專案擁有者在 Firebase 主控台取得後填入；未填時 Google 登入會顯示「尚未設定」 */
+window.FIREBASE_CFG=null;
+</script>
 <style>
 :root{
   --glass:rgba(12,18,15,.5);--glass-strong:rgba(9,13,11,.86);--stroke:rgba(255,255,255,.14);
@@ -1928,6 +1940,11 @@ function render(){
     const tg=(k,name,sub,onv)=>row(name,sub,`<button class="sbtn${onv?' pri':''}" data-a="tg" data-v="${k}">${onv?'開':'關'}</button>`);
     h+=tg('sound','音效','環境聲、捲線器、水花',Snd.isOn());
     h+=tg('vibe','震動','咬餌、拉扯時的手機震動',save.vibe!==false);
+    { const st=window.__CLOUD?window.__CLOUD.status():{state:'nocfg'};
+      if(st.state==='in') h+=row('☁️ 雲端存檔','已登入 '+st.name+'，進度會自動同步到你的 Google 帳號',`<button class="sbtn" data-a="cloud" data-v="out">登出</button>`);
+      else if(st.state==='out') h+=row('☁️ 雲端存檔','用 Google 帳號登入，換手機或清除瀏覽器也不會丟進度。目前的本機進度會先上傳，不會被洗掉',`<button class="sbtn pri" data-a="cloud" data-v="in">Google 登入</button>`);
+      else h+=row('☁️ 雲端存檔','Google 登入尚未設定',`<span class="lk">尚未設定</span>`);
+      h+=row('📲 安裝到桌面',PWA.installed()?'已安裝成 App，從桌面開啟時進度一樣保留':'像 App 一樣從手機桌面開啟，進度與瀏覽器共用',PWA.installed()?`<span class="lk">已安裝</span>`:`<button class="sbtn pri" data-a="pwa">安裝</button>`); }
     h+=tg('uw','水下鏡頭','魚靠近餌時切到水下看牠咬餌',save.uw!==false);
     h+=tg('scare','驚嚇效果','夜裡偶爾會有嚇人的事……心臟不好或小朋友玩請關閉',!save.noScare);
     h+=tg('imm','沉浸模式','隱藏上方大部分介面，只留設定和動作按鈕',!!save.imm);
@@ -2040,6 +2057,7 @@ $('bShop').addEventListener('click',()=>open('shop'));
 $('bQuest').addEventListener('click',()=>open('quest'));
 $('bLog').addEventListener('click',()=>open('log'));
 $('bSet').addEventListener('click',()=>open('set'));
+window.__SHEET={refresh:k=>{ if(cur===k) render(); }};
 $('bMap').addEventListener('click',()=>open('spot'));
 $('baitChip').addEventListener('click',()=>{ shopTab='bait'; open('shop'); });
 $('shX').addEventListener('click',close);
@@ -2072,6 +2090,8 @@ shB.addEventListener('click',e=>{
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
   else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
+  else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else window.__CLOUD.logout(); }
+  else if(a==='pwa'){ PWA.install().then(r=>{ if(r==='ios') toast('iPhone：按 Safari 的「分享」→「加入主畫面」','',4200); else if(r==='manual') toast('瀏覽器選單 ⋮ →「加到主畫面」或「安裝應用程式」','',4200); else if(r==='installed') toast('已經安裝了','',1600); }); }
   else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem('swampAngler.v1'); }catch(_){} location.reload(); return; } }
   render(); syncHUD();
 });
@@ -4689,6 +4709,50 @@ function update2(dt){ tt+=dt; updLamp(dt,tt); if(fin){ updFinale(dt); return; }
   update(dt); }
 return {update:update2,trigger,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};
 }
+/* ===== 雲端存檔：Google 帳號登入（Firebase），本機進度永遠不會被洗掉 ===== */
+function createCloud(c){
+'use strict';
+const KEY='swampAngler.cloud', BK='swampAngler.backup';
+let auth=null, db=null, user=null, dirtyT=null, inited=null, busy=false;
+const score=s=>s?((s.lv||1)*1000+(s.xp||0)+Object.keys(s.dex||{}).length*60+Math.min(50000,(s.coins||0))/100):0;
+function addScript(u){ return new Promise((ok,no)=>{ const s=document.createElement('script'); s.src=u; s.onload=ok; s.onerror=()=>no(new Error('載入失敗 '+u)); document.head.appendChild(s); }); }
+async function init(){ if(inited) return inited; if(!window.FIREBASE_CFG) return null;
+  inited=(async()=>{ const V='10.14.1'; for(const m of ['app','auth','firestore']) await addScript(`https://www.gstatic.com/firebasejs/${V}/firebase-${m}-compat.js`);
+    firebase.initializeApp(window.FIREBASE_CFG); auth=firebase.auth(); db=firebase.firestore();
+    try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
+    try{ const r=await auth.getRedirectResult(); if(r&&r.user) c.toast('已登入 '+(r.user.displayName||''),'good',2000); }catch(e){ c.toast('登入失敗：'+(e.message||e),'bad',3000); }
+    auth.onAuthStateChanged(u=>{ user=u; if(u){ localStorage.setItem(KEY,'1'); onLogin(); } c.refresh&&c.refresh(); }); return true; })();
+  return inited; }
+async function login(){ if(!window.FIREBASE_CFG){ c.toast('Google 登入尚未設定（需要專案擁有者填入 Firebase 設定）','warn',3200); return; }
+  if(busy) return; busy=true; try{ await init(); const p=new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({prompt:'select_account'});
+    try{ await auth.signInWithPopup(p); }catch(e){ if(/popup|blocked|cancelled|closed/i.test(e.code||'')) await auth.signInWithRedirect(p); else throw e; }
+  }catch(e){ c.toast('登入失敗：'+(e.message||e),'bad',3200); } busy=false; }
+async function logout(){ if(!auth) return; await push(); await auth.signOut(); localStorage.removeItem(KEY); c.toast('已登出，本機進度保留','',2000); }
+function docRef(){ return db.collection('saves').doc(user.uid); }
+async function push(){ if(!user||!db) return; try{ await docRef().set({save:c.save(),t:Date.now(),name:user.displayName||'',v:1}); c.refresh&&c.refresh(); }catch(e){ console.warn('cloud push',e); } }
+// 登入當下：雲端沒有存檔 → 把本機進度存上去；雲端有而且進度較高 → 詢問；其他情況以本機為準
+async function onLogin(){ try{ const d=await docRef().get(); const local=c.save();
+    if(!d.exists||!d.data().save){ await push(); c.toast('已把目前的進度存到雲端','good',2400); return; }
+    const cloud=d.data().save; if(JSON.stringify(cloud)===JSON.stringify(local)) return;
+    const sl=score(local), sc=score(cloud);
+    if(sc>sl+1&&confirm(`雲端有進度較高的存檔（Lv ${cloud.lv||1}、金幣 ${(cloud.coins||0).toLocaleString()}）。\n要載入雲端存檔嗎？\n目前本機進度會先備份，不會消失。`)){ try{ localStorage.setItem(BK,JSON.stringify(local)); }catch(e){} c.apply(cloud); return; }
+    await push(); }catch(e){ console.warn('cloud pull',e); c.toast('雲端存檔讀取失敗，使用本機進度','warn',2600); } }
+function dirty(){ if(!user) return; clearTimeout(dirtyT); dirtyT=setTimeout(push,6000); }
+function status(){ if(!window.FIREBASE_CFG) return {state:'nocfg'}; if(!user) return {state:'out'}; return {state:'in',name:user.displayName||user.email||''}; }
+// 之前登入過就自動接上
+if(localStorage.getItem(KEY)==='1'&&window.FIREBASE_CFG) init().catch(()=>{});
+window.addEventListener('beforeunload',()=>{ if(user&&dirtyT){ clearTimeout(dirtyT); push(); } });
+return {login,logout,dirty,status,restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
+}
+/* ===== 安裝到桌面（PWA） ===== */
+const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferred=e; });
+  window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
+  if('serviceWorker' in navigator) window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  async function install(){ if(installed) return 'installed'; if(deferred){ deferred.prompt(); const r=await deferred.userChoice; deferred=null; return r.outcome; }
+    return /iPhone|iPad/.test(navigator.userAgent)?'ios':'manual'; }
+  return {install,canPrompt:()=>!!deferred,installed:()=>installed};
+})();
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
 'use strict';
@@ -4701,7 +4765,7 @@ const RAR=P.RAR, SPECIES=P.SPECIES, MAX_LINE=80;
 const SAVE_KEY='swampAngler.v1';
 let save={coins:0,total:0,sound:true,dex:{}};
 try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); if(s) save=Object.assign(save,s); }catch(e){}
-function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} }
+function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} if(window.__CLOUD) window.__CLOUD.dirty(); }
 
 /* ---------- 音效（全程序合成） ---------- */
 const Snd=(()=>{
@@ -4980,6 +5044,8 @@ $('bHome').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; c
   toast(b.dataset.why||'現在不能帶回家','warn',2200); });
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
 const ITEMS_BY=id=>(FUN.items||[]).find(x=>x.id===id);
+window.__CLOUD=createCloud({save:()=>save,toast,refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
+  apply:obj=>{ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} location.reload(); }});
 const GHOST=createGhost(W,{save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>G.state,base:()=>G.base,head:()=>G.head,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
 window.__GHOST=GHOST;
 const HOME3D=createHomeScene(W,{hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
