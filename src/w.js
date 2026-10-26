@@ -85,6 +85,7 @@ const pbr=(name,rx,ry,extra)=>{ const mk=f=>{ const x=TL.load('models/home/'+nam
 const stoneM=pbr('castle_brick_07',1.2,1.2);
 // 壁爐（右牆）：左右石柱＋上方石樑，中間是真的爐口，爐火會閃爍
 const FP={z:.5}, FX=ROOM.x-.28;
+const fpParts=[];
 box(.55,1.3,.32,stoneM,FX,.65,FP.z-.66); box(.55,1.3,.32,stoneM,FX,.65,FP.z+.66);
 box(.55,.5,1.0,stoneM,FX,1.05,FP.z); box(.45,1.6,1.0,stoneM,ROOM.x-.22,2.1,FP.z);
 box(.75,.08,1.9,new T.MeshStandardMaterial({color:0x5a4030,roughness:.8}),ROOM.x-.36,1.34,FP.z);
@@ -96,7 +97,7 @@ const flameTex=(()=>{ const cv=document.createElement('canvas'); cv.width=128; c
     g.fillStyle=gr; g.beginPath(); g.ellipse(x,85,20,44,0,0,Math.PI*2); g.fill(); }
   const t=new T.CanvasTexture(cv); t.encoding=T.sRGBEncoding; return t; })();
 const fireM=new T.MeshBasicMaterial({map:flameTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false});
-const fire=plane(.8,.55,fireM,ROOM.x-.3,.42,FP.z,-Math.PI/2); plane(.7,.5,fireM,ROOM.x-.3,.4,FP.z,-Math.PI/2+.6);
+const fire=plane(.8,.55,fireM,ROOM.x-.3,.42,FP.z,-Math.PI/2); fpParts.push(fire); plane(.7,.5,fireM,ROOM.x-.3,.4,FP.z,-Math.PI/2+.6);
 for(let i=0;i<3;i++){ const lg=new T.Mesh(new T.CylinderGeometry(.06,.06,.7,8),new T.MeshStandardMaterial({color:0x3a2416,roughness:.9})); lg.rotation.x=Math.PI/2; lg.position.set(ROOM.x-.3,.13+(i===2?.1:0),FP.z+(i-1)*.12); scene.add(lg); }
 const fireL=new T.PointLight(0xff8a40,2.2,9,1.3); fireL.position.set(ROOM.x-1.1,.6,FP.z); scene.add(fireL);
 // 家具：Poly Haven 真實模型（CC0），回家時才載入。位置以房間中央偏後的客廳區為主
@@ -258,7 +259,8 @@ const ui={view:document.getElementById('homeView'),card:document.getElementById(
 function hit(e){ const r=el.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(ndc,cam); }
 function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>tanks[k].glass), h=ray.intersectObjects(gl,false)[0], hm=ray.intersectObjects(mountG.children,true)[0];
   if(hm&&(!h||hm.distance<h.distance)){ let o=hm.object; while(o&&!o.userData.rec) o=o.parent; if(o){ c.showFish(o.userData.rec,ui.card); return; } }
-  ui.card.classList.add('hidden'); if(h) enterView(h.object.userData.tank); }
+  ui.card.classList.add('hidden'); if(h){ enterView(h.object.userData.tank); return; }
+  const hf=ray.intersectObjects(fpParts,true)[0]; if(hf) pickFish(); }
 function tapView(){ const tk=tanks[viewTank]; if(!tk) return; const h=ray.intersectObjects(tk.fish.map(f=>f.o),true)[0];
   if(!h){ ui.card.classList.add('hidden'); return; } let o=h.object; while(o&&!o.userData.rec) o=o.parent; if(o) c.showFish(o.userData.rec,ui.card); }
 function enterView(w){ mode='view'; viewTank=w; pan=panT=0; ui.view.classList.remove('hidden'); ui.btns.classList.add('hidden'); ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
@@ -275,8 +277,68 @@ el.addEventListener('pointermove',e=>{ if(!on||!drag) return; const dx=e.clientX
   if(mode==='view'){ const w=tanks[viewTank]?tanks[viewTank].spec.w:1; panT=Math.max(-w*.35,Math.min(w*.35,drag.pan-dx*.003)); return; }
   yawT=drag.yaw-dx*.006; pitchT=Math.max(-.7,Math.min(.6,drag.pitch-dy*.005)); });
 window.addEventListener('pointerup',e=>{ if(on&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<10&&performance.now()-down.t<450){ hit(e); if(mode==='room') tapRoom(); else tapView(); } drag=null; down=null; });   // 移動很少、時間很短才算點擊
+/* ===== 壁爐烤魚：魚串在鐵叉上，靠火的那面會熟；魚皮依熟度從生色→金黃→焦黑，出現烤痕；冒煙、油滴竄火、滋滋聲 ===== */
+const GR={on:false};
+const grillUI=document.getElementById('grillUI'), pickUI=document.getElementById('grillPick');
+const smokeTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=64; const g=cv.getContext('2d'), rg=g.createRadialGradient(32,32,2,32,32,30); rg.addColorStop(0,'rgba(255,255,255,.55)'); rg.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=rg; g.fillRect(0,0,64,64); return new T.CanvasTexture(cv); })();
+const smokes=[]; for(let i=0;i<26;i++){ const m=new T.Sprite(new T.SpriteMaterial({map:smokeTex,transparent:true,depthWrite:false,opacity:0})); m.visible=false; scene.add(m); smokes.push({m,t:0,life:0}); }
+const sparkM=new T.SpriteMaterial({map:smokeTex,color:0xffb050,transparent:true,depthWrite:false,blending:T.AdditiveBlending,opacity:0}); const flare=new T.Sprite(sparkM); flare.scale.set(.5,.5,1); flare.visible=false; scene.add(flare);
+const GP=new T.Vector3(ROOM.x-.62,.66,FP.z);
+const rig=new T.Group(); rig.position.copy(GP); rig.visible=false; scene.add(rig);
+{ const iron=new T.MeshStandardMaterial({color:0x2a2622,metalness:.8,roughness:.45});
+  const sk=new T.Mesh(new T.CylinderGeometry(.006,.006,.95,8),iron); sk.rotation.x=Math.PI/2; rig.add(sk);
+  for(const z of [-.42,.42]){ const st=new T.Mesh(new T.CylinderGeometry(.01,.012,.66,8),iron); st.position.set(0,-.33,z); rig.add(st); const y1=new T.Mesh(new T.CylinderGeometry(.007,.007,.07,6),iron); y1.position.set(.025,.02,z); y1.rotation.z=.6; rig.add(y1); const y2=y1.clone(); y2.position.x=-.025; y2.rotation.z=-.6; rig.add(y2); } }
+const spin=new T.Group(); rig.add(spin);
+function cookMat(m){ const k=m.clone(); k.onBeforeCompile=sh=>{ sh.uniforms.uCA=GR.uA; sh.uniforms.uCB=GR.uB;
+    sh.vertexShader='varying float vSZ;\nvarying vec3 vWP;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvSZ=normal.z;').replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWP=(modelMatrix*vec4(transformed,1.0)).xyz;');
+    sh.fragmentShader='uniform float uCA;\nuniform float uCB;\nvarying float vSZ;\nvarying vec3 vWP;\n'+sh.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
+      float ck=mix(uCB,uCA,smoothstep(-0.35,0.35,vSZ));
+      vec3 flesh=mix(diffuseColor.rgb,vec3(0.86,0.78,0.66),0.45);
+      vec3 gold=vec3(0.62,0.38,0.16), char_=vec3(0.06,0.045,0.035);
+      vec3 c=mix(diffuseColor.rgb,flesh,smoothstep(0.05,0.35,ck));
+      c=mix(c,gold*(0.7+0.5*dot(diffuseColor.rgb,vec3(0.33))),smoothstep(0.35,0.85,ck));
+      float mark=smoothstep(0.82,0.98,sin(vWP.z*55.0))*smoothstep(0.5,0.8,ck);
+      c=mix(c,c*0.35,mark);
+      c=mix(c,char_,smoothstep(0.92,1.25,ck));
+      diffuseColor.rgb=c;`); };
+  k.customProgramCacheKey=()=>'grillfish'; k.needsUpdate=true; return k; }
+GR.uA={value:0}; GR.uB={value:0};
+function pickFish(){ const list=(c.save.cooler||[]); if(!list.length){ c.toast&&c.toast('保冷箱是空的：釣到魚時按「🔥 放進保冷箱」','warn',2600); return; }
+  pickUI.innerHTML='<div style="font-weight:700;margin-bottom:6px">保冷箱（'+list.length+'/5）・選一條來烤</div>'+list.map((r,i)=>{ const sp=c.species(r.id); return `<div class="it"><span>${sp?sp.name:r.id}　<small>${Math.round(r.L*100)} 公分</small></span><button class="sbtn pri" data-g="${i}">烤這條</button></div>`; }).join('')+'<div style="text-align:right;margin-top:8px"><button class="sbtn" data-g="x">關閉</button></div>';
+  pickUI.classList.remove('hidden'); document.body.classList.add('grilling'); }
+pickUI.addEventListener('click',e=>{ const b=e.target.closest('[data-g]'); if(!b) return; pickUI.classList.add('hidden'); if(b.dataset.g==='x'){ document.body.classList.remove('grilling'); return; } startGrill(+b.dataset.g); });
+function startGrill(i){ const rec=(c.save.cooler||[])[i]; if(!rec) return; const sp=c.species(rec.id); if(!sp){ document.body.classList.remove('grilling'); return; }
+  const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
+  src.traverse(o=>{ o.visible=true; o.frustumCulled=false; if(o.isMesh&&o.material){ const ms=Array.isArray(o.material)?o.material:[o.material]; const nm=ms.map(cookMat); o.material=Array.isArray(o.material)?nm:nm[0]; } });
+  const L=Math.min(.55,Math.max(.18,rec.L)); const w=new T.Group(); w.add(src); w.scale.setScalar(L); w.rotation.y=Math.PI/2;
+  spin.clear(); spin.add(w); spin.rotation.set(0,0,0); rig.visible=true;
+  const need=7+Math.min(14,Math.sqrt(rec.w||.5)*6);
+  Object.assign(GR,{on:true,i,rec,sp,a:0,b:0,face:0,flipT:0,need,t:0,dripT:1,smT:0}); GR.uA.value=0; GR.uB.value=0;
+  document.getElementById('gTitle').textContent='烤 '+sp.name+'（約 '+Math.round(need)+' 秒一面）';
+  grillUI.classList.remove('hidden'); pickUI.classList.add('hidden'); document.body.classList.add('grilling'); mode='grill'; }
+function endGrill(){ GR.on=false; rig.visible=false; spin.clear(); grillUI.classList.add('hidden'); document.body.classList.remove('grilling'); mode='room'; smokes.forEach(s=>{ s.m.visible=false; }); flare.visible=false; }
+document.getElementById('gFlip').addEventListener('click',()=>{ if(!GR.on||GR.flipT>0) return; GR.flipT=.6; c.sizzle&&c.sizzle(.6); });
+document.getElementById('gQuit').addEventListener('click',()=>{ if(!GR.on) return; endGrill(); });
+document.getElementById('gDone').addEventListener('click',()=>{ if(!GR.on) return; const r=GR.rec, a=GR.a, b=GR.b; c.save.cooler.splice(GR.i,1); c.persist&&c.persist(); endGrill(); if(c.onGrilled) c.onGrilled(r,a,b); });
+const grade=x=>x<.55?'生':x<.78?'半熟':x<.92?'完美':'焦';
+function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
+  // 翻面：整支鐵叉轉 180 度
+  if(GR.flipT>0){ GR.flipT-=dt; const p=1-Math.max(0,GR.flipT)/.6; spin.rotation.z=(GR.face+p)*Math.PI; if(GR.flipT<=0){ GR.face=(GR.face+1)%2; spin.rotation.z=GR.face*Math.PI; } }
+  const heat=(1/GR.need)*(fireM.opacity+.3)/1.15;
+  if(GR.flipT<=0){ if(GR.face===0) GR.a+=heat*dt; else GR.b+=heat*dt; }
+  GR.uA.value=GR.a; GR.uB.value=GR.b;
+  const top=GR.face===0?GR.a:GR.b, oth=GR.face===0?GR.b:GR.a;
+  document.getElementById('gA').style.left=Math.min(100,top*82)+'%'; document.getElementById('gB').style.left=Math.min(100,oth*82)+'%';
+  document.getElementById('gHint').textContent=top>1.05?'冒黑煙了！快翻面！':top>.78?'這面完美了，可以翻面':top>.55?'魚皮開始金黃…':top>.25?'滋滋作響，魚肉漸漸變白':'等魚皮慢慢變色…';
+  // 煙：熟度越高越多，焦了變黑煙
+  GR.smT-=dt; if(GR.smT<=0&&top>.15){ GR.smT=top>1?.06:.18; const s=smokes.find(x=>!x.m.visible); if(s){ s.m.visible=true; s.t=0; s.life=1.6+Math.random()*1.2; s.m.position.copy(GP).add(tv.set((Math.random()-.5)*.1,.03,(Math.random()-.5)*.35)); s.dark=top>1; s.m.material.color.set(top>1?0x2a2420:0xd8d4cc); } }
+  smokes.forEach(s=>{ if(!s.m.visible) return; s.t+=dt; const k=s.t/s.life; if(k>=1){ s.m.visible=false; return; } s.m.position.y+=dt*.35; s.m.position.x-=dt*.05; const sc=.12+k*.45; s.m.scale.set(sc,sc,1); s.m.material.opacity=(s.dark?.55:.32)*Math.sin(k*Math.PI); });
+  // 油滴進火：火光竄起、滋滋聲
+  GR.dripT-=dt; if(GR.dripT<=0&&top>.3){ GR.dripT=.6+Math.random()*1.6; flare.visible=true; flare.position.copy(GP).add(tv.set(.12,-.2,(Math.random()-.5)*.3)); sparkM.opacity=.9; fireL.intensity*=1.6; c.sizzle&&c.sizzle(.35+Math.random()*.3); }
+  if(flare.visible){ sparkM.opacity-=dt*2.2; flare.scale.setScalar(.35+(.9-sparkM.opacity)*.3); if(sparkM.opacity<=0) flare.visible=false; }
+  spin.position.y=Math.sin(GR.t*1.3)*.003; }
 function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; pRoom.set(0,EYE,.9); resize(); for(const f of [syncTime,syncFish,syncMounts,exitView]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
-function exit(){ on=false; drag=null; exitDive(); exitView(); }
+function exit(){ on=false; drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
 function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
@@ -289,13 +351,15 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
   const tk=tanks[viewTank]||tanks.fresh;
   if(tk){ const s=tk.spec, hf=Math.atan(Math.tan(cam.fov*Math.PI/360)*cam.aspect), dist=Math.max(s.h*.75/Math.tan(cam.fov*Math.PI/360),(s.w*.42)/Math.tan(hf))+s.d/2;
     pView.set(tk.x+pan,tk.y+s.h/2,tk.z+dist); lookM.lookAt(pView,tv.set(tk.x+pan,tk.y+s.h/2,tk.z),cam.up); qView.setFromRotationMatrix(lookM); }
-  if(mode==='dive'&&tk){ const s2=tk.spec; pDive.set(tk.x+Math.sin(t*.25)*s2.w*.12,tk.y+s2.h*.5+Math.sin(t*.4)*.02,tk.z+s2.d*.32); eul.set(dPitch,dYaw,0); qDive.setFromEuler(eul);
+  if(mode==='grill'){ pDive.set(ROOM.x-1.45,1.0,FP.z-.15); lookM.lookAt(pDive,tv.set(GP.x,GP.y-.05,GP.z),cam.up); qDive.setFromRotationMatrix(lookM); cam.position.lerp(pDive,Math.min(1,dt*3)); cam.quaternion.slerp(qDive,Math.min(1,dt*4)); }
+  else if(mode==='dive'&&tk){ const s2=tk.spec; pDive.set(tk.x+Math.sin(t*.25)*s2.w*.12,tk.y+s2.h*.5+Math.sin(t*.4)*.02,tk.z+s2.d*.32); eul.set(dPitch,dYaw,0); qDive.setFromEuler(eul);
     cam.position.lerp(pDive,Math.min(1,dt*3)); cam.quaternion.slerp(qDive,Math.min(1,dt*4)); }
   else { const k=vb*vb*(3-2*vb); cam.position.lerpVectors(pRoom,pView,k); cam.quaternion.copy(qRoom).slerp(qView,k); }
   const fl=.85+.15*Math.sin(t*9)+.08*Math.sin(t*23); fireL.intensity=2.2*fl; fireM.opacity=.7+.3*fl; fire.scale.y=.9+.15*Math.sin(t*7);
   if((syncT+=dt)>1){ syncT=0; try{ syncTime(); syncFish(); syncMounts(); }catch(err){ console.error('home sync',err); } }   // 每秒同步一次：剛帶回的魚、升級的缸、晚一步載好的真實模型
-  if(c.crackle&&Math.random()<dt*2.2) c.crackle();   // 爐火劈啪聲，隨機間隔
+  if(c.crackle&&Math.random()<dt*2.2) c.crackle();
+  updGrill(dt);   // 爐火劈啪聲，隨機間隔
   updTanks(dt); R.setRenderTarget(null); R.render(scene,cam); }
 window.addEventListener('resize',()=>{ if(on) resize(); });
-return {enter,exit,render,active:()=>on,scene,cam};
+return {enter,exit,render,active:()=>on,scene,cam,grill:()=>pickFish()};
 }

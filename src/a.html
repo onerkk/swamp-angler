@@ -233,6 +233,15 @@ body.athome #drops,body.athome #flare,body.athome #act,body.athome #fight,body.a
 #scare.on{display:flex;animation:scareBg 1.4s steps(1) forwards}#scare img{width:160vw;max-width:none;animation:scareIn 1.4s cubic-bezier(.1,.9,.2,1) forwards;filter:contrast(1.25) brightness(.9)}
 @keyframes scareIn{0%{transform:scale(.55) translate(2%,6%);opacity:0}8%{opacity:1;transform:scale(.9) translate(-1%,-2%)}40%{transform:scale(1.18) translate(1%,1%)}60%{transform:scale(1.12) translate(-2%,0)}100%{transform:scale(1.3) translate(0,2%);opacity:0}}
 @keyframes scareBg{0%{opacity:1}85%{opacity:1}100%{opacity:0}}
+#grillUI{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:22;background:rgba(20,14,10,.78);border:1px solid rgba(255,200,140,.3);border-radius:16px;padding:12px 14px;color:#f3e6d2}
+#grillUI.hidden,#grillPick.hidden{display:none}#grillUI .gt{font-weight:700;font-size:16px;margin-bottom:6px}
+#grillUI .gb{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12px}#grillUI .gb span{width:56px;opacity:.8}
+#grillUI .bar{position:relative;flex:1;height:12px;border-radius:6px;background:linear-gradient(90deg,#e8c9b0 0 55%,#d89a3a 55% 78%,#c05a1a 78% 88%,#2a1a10 88%);overflow:hidden}
+#grillUI .bar i{position:absolute;top:0;bottom:0;left:0;width:2px;background:#fff;box-shadow:0 0 6px #fff}#grillUI .bar b{position:absolute;top:0;bottom:0;left:60%;width:22%;border:1px solid rgba(255,255,255,.7);border-radius:3px}
+#grillUI .gh{font-size:13px;opacity:.85;margin:6px 0 8px;min-height:18px}#grillUI .gbtns{display:flex;gap:8px}#grillUI .gbtns .btn{flex:1;padding:10px}
+#grillPick{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:22;background:rgba(20,14,10,.85);border:1px solid rgba(255,200,140,.3);border-radius:16px;padding:12px;color:#f3e6d2;max-height:55vh;overflow:auto}
+#grillPick .it{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08)}
+body.grilling #homeUI,body.grilling #joy{display:none!important}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -262,6 +271,12 @@ body.athome #drops,body.athome #flare,body.athome #act,body.athome #fight,body.a
   <button class="chip sm" id="bCam" aria-label="拍照">📷</button>
 </div>
 <div id="scare"><img src="ghost_face.jpg" alt=""></div>
+<div id="grillUI" class="hidden"><div class="gt" id="gTitle">烤魚</div>
+<div class="gb"><span>靠火這面</span><div class="bar"><i id="gA"></i><b></b></div></div>
+<div class="gb"><span>另一面</span><div class="bar"><i id="gB"></i><b></b></div></div>
+<div class="gh" id="gHint">等魚皮慢慢變金黃…</div>
+<div class="gbtns"><button class="btn" id="gQuit">放棄</button><button class="btn pri" id="gFlip">翻面</button><button class="btn" id="gDone">起鍋</button></div></div>
+<div id="grillPick" class="hidden"></div>
 <div id="homeView" class="hidden"><button class="btn" id="bViewBack">← 返回客廳</button><button class="btn" id="bDive">🤿 潛入缸內</button></div><div id="fishCard" class="hidden"></div>
 <div id="homeUI"><div class="hh">點水族箱可以靠近觀賞・拖曳畫面轉頭</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn pri" id="bTankM">🐠 管理水族箱</button></div></div>
 <div id="toast"></div>
@@ -302,7 +317,7 @@ body.athome #drops,body.athome #flare,body.athome #act,body.athome #fight,body.a
       <div class="stat"><small>價值</small><b id="cVal"></b></div>
     </div>
     <p class="desc" id="cDesc"></p>
-    <div class="btns"><button class="btn ph" id="bPhoto" aria-label="拍照留念">📸</button><button class="btn" id="bRel">放生</button><button class="btn pri" id="bSell">賣出</button></div><button class="btn home" id="bHome">🏠 帶回家</button>
+    <div class="btns"><button class="btn ph" id="bPhoto" aria-label="拍照留念">📸</button><button class="btn" id="bRel">放生</button><button class="btn pri" id="bSell">賣出</button></div><button class="btn home" id="bHome">🏠 帶回家</button><button class="btn home" id="bGrill">🔥 放進保冷箱，帶回去烤</button>
   </div>
 </div>
 <div id="sheet" class="hidden"><div class="sheet"><div class="sh-hd"><b id="shT"></b><button class="ib" id="shX" aria-label="關閉">✕</button></div><div id="shB"></div></div></div>

@@ -61,6 +61,7 @@ const Snd=(()=>{
     paddle(){ nz(.35,'bandpass',700,.8,.14,300); },
     drip(){ tn(1200,.08,'sine',.05,0,300); },
     rumble(){ nz(1.2,'lowpass',140,.6,.18,90); tn(48,1.0,'sine',.12,0,38); },
+    sizzle(k){ nz(.5+.6*(k||.5),'highpass',3800,.5,.12*(k||.5),6000); },
     scream(){ if(!ctx) return; const t=ctx.currentTime, o=ctx.createOscillator(), o2=ctx.createOscillator(), g=ctx.createGain(), lfo=ctx.createOscillator(), lg=ctx.createGain();
       o.type='sawtooth'; o2.type='square'; o.frequency.setValueAtTime(850,t); o.frequency.exponentialRampToValueAtTime(1500,t+.35); o.frequency.exponentialRampToValueAtTime(1100,t+1.1);
       o2.frequency.setValueAtTime(1710,t); o2.frequency.exponentialRampToValueAtTime(2900,t+.4); lfo.frequency.value=28; lg.gain.value=60; lfo.connect(lg); lg.connect(o.frequency);
@@ -209,6 +210,7 @@ function showCard(){
   $('cVal').textContent='🪙 '+fd.value.toLocaleString(); $('cDesc').textContent=sp.desc+' 拉扯型態：'+styOf(sp.id).n+'，難度 '+stars(fd)+'。';
   { const mm=sp.special==='mermaid', ns=mm||!!sp.noSell; $('bSell').classList.toggle('hidden',ns); $('bRel').textContent=mm?'送她回家（收下謝禮）':sp.noSell?'拍照後放流':'放生'; if(mm) $('cW').textContent='？？？';
     if(sp.noSell&&!mm) $('cVal').textContent='保育類・不可販售'; }
+  $('bGrill').classList.toggle('hidden',!canGrill(fd)||!HOME.unlocked()); $('bGrill').textContent='🔥 放進保冷箱，帶回去烤（'+((save.cooler||[]).length)+'/5）';
   { const hr=HOME.check(fd), b=$('bHome'); b.classList.toggle('hidden',!!hr.hide||!HOME.unlocked()); b.textContent=hr.mount?'🖼 '+hr.short+'，做成標本 🪙'+hr.cost.toLocaleString():'🏠 帶回家';
     b.dataset.mode=hr.ok?'keep':hr.mount?'mount':'no'; b.dataset.why=hr.why||''; b.classList.toggle('dim',!hr.ok&&!hr.mount); }
   FUN.medalBadge(fd); FUN.goalsDot(); if(sp.special==='mermaid'){ G.fish.group.visible=false; FUN.mermaidScene(); }
@@ -290,6 +292,11 @@ window.addEventListener('keyup',e=>{ keys[e.code]=false; if(e.code==='Space'){ e
 $('startBtn').addEventListener('click',()=>{ Snd.init(); $('intro').classList.add('hidden'); G.state='idle'; toast('按住按鈕蓄力，放開拋竿','',2200); });
 $('bSell').addEventListener('click',()=>{ if(G.state==='catch') finishCatch(true); });
 $('bRel').addEventListener('click',()=>{ if(G.state==='catch') finishCatch(false); });
+// 保冷箱：魚帶回小屋烤（最多 5 條；保冷類、寶物、美人魚與幻想生物不能烤）
+function canGrill(fd){ return fd&&fd.sp&&!fd.item&&!fd.sp.noSell&&!fd.sp.special&&fd.sp.rar<5; }
+$('bGrill').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; save.cooler=save.cooler||[];
+  if(save.cooler.length>=5){ toast('保冷箱滿了（5 條），先回小屋烤掉幾條','warn',2200); return; }
+  save.cooler.push({id:G.fd.sp.id,L:+G.fd.L.toFixed(3),w:+G.fd.w.toFixed(3),d:Date.now()}); persist(); toast('放進保冷箱，回小屋點壁爐就能烤','good',2000); finishCatch('keep'); });
 $('bHome').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; const b=$('bHome'), at=(SPOTS.find(s=>s.id===WL.zoneId())||SPOTS[G.spot]||{}).name;
   if(b.dataset.mode==='keep'){ if(HOME.keep(G.fd,at)){ toast('把'+G.fd.sp.name+'帶回小屋的水族箱了','good',1800); finishCatch('keep'); } return; }
   if(b.dataset.mode==='mount'){ const r=HOME.check(G.fd); if(save.coins<r.cost){ toast('金幣不夠做標本（需要 🪙'+r.cost.toLocaleString()+'）','bad'); return; }
@@ -297,11 +304,21 @@ $('bHome').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; c
   toast(b.dataset.why||'現在不能帶回家','warn',2200); });
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
 const ITEMS_BY=id=>(FUN.items||[]).find(x=>x.id===id);
+window.__GRILL=()=>HOME3D.grill();
 window.__CLOUD=createCloud({save:()=>save,toast,refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
   apply:obj=>{ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} location.reload(); }});
 const GHOST=createGhost(W,{save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>G.state,base:()=>G.base,head:()=>G.head,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
 window.__GHOST=GHOST;
-const HOME3D=createHomeScene(W,{joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
+// 烤好了：依兩面熟度評分，吃下去依魚的來源得到效果
+function onGrilled(rec,a,b){ const sp=SPECIES.find(s=>s.id===rec.id); if(!sp) return; const g=x=>x<.55?0:x<.78?1:x<.92?3:-1, ga=g(a), gb=g(b);
+  const burnt=ga<0||gb<0, q=burnt?0:Math.min(ga,gb), name=burnt?'烤焦了':q>=3?'完美':q>=1?'半熟':'還是生的';
+  const fx=sp.loc==='sea'||sp.water==='sea'?{id:'luck',n:'好運',i:'🍀'}:sp.loc==='ice'||(sp.spots||[]).includes('ice')?{id:'glow',n:'暖身（咬餌更快）',i:'♨️'}:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'};
+  save.cook=save.cook||{}; const ck=save.cook[rec.id]=save.cook[rec.id]||{n:0,best:0}; ck.n++; if(q>ck.best) ck.best=q;
+  if(q<=0){ persist(); toast('🔥 '+sp.name+'：'+name+'……吞不下去，沒有效果','warn',2600); return; }
+  const min=Math.round((q>=3?12:5)*Math.min(2,.6+Math.sqrt(rec.w||.5)*.5)); save.fx=save.fx||{}; save.fx[fx.id]=Math.max(save.fx[fx.id]||0,Date.now())+min*60000;
+  persist(); if(window.__ECO&&window.__ECO.render) window.__ECO.render();
+  toast('🍽 '+sp.name+'：'+name+'！'+fx.i+' '+fx.n+' '+min+' 分鐘','good',3000); Snd.coin&&Snd.coin(); }
+const HOME3D=createHomeScene(W,{save,onGrilled,sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
   crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(),
   showFish:(rec,card)=>{ const sp=SPECIES.find(s=>s.id===rec.id)||{name:rec.id,rar:0}, r=RAR[sp.rar]; card.style.setProperty('--rc',r.col);
@@ -425,7 +442,7 @@ function updateFight(dt){
   if(f.T<.1) f.slk+=dt/(2.8*DF.slack); else f.slk=Math.max(0,f.slk-dt*1.5);
   const zone=f.T>.4&&f.T<.8;
   const drain=(3+18*f.T)*(1+.8*clamp(good,0,1))*(zone?1.2:1)/(fs.stam*DF.stam*(.7+.25*Math.sqrt(fd.w)));
-  f.stam=clamp(f.stam-drain*dt+(f.T<.2?2.5*dt:0),0,100);
+  f.stam=clamp(f.stam-drain*(window.__ECO&&window.__ECO.fxOn('meal_str')?1.3:1)*dt+(f.T<.2?2.5*dt:0),0,100);
   const reel=G.held?META.gear().reel.spd*clamp(1.25-f.T,.15,1)*(f.stam<8?1.4:1)*(zone?1.15:1)*(dive?.3:1):0;
   const run=f.run?fs.spd*ST.spd*stamF*1.5*(G.held?.35:1)*(dive?.4:1):(G.held?0:.05);
   f.d=Math.max(0,f.d+(run-reel)*dt);

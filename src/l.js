@@ -129,7 +129,7 @@ const fxBar=document.getElementById('fxBar');
 function tick(){ const t1=document.getElementById('top'), t2=document.getElementById('top2');
   const bot=e=>{ if(!e) return 0; const r=e.getBoundingClientRect(); return r.height>0?r.bottom:0; }; const y=Math.max(bot(t1),bot(t2));
   document.documentElement.style.setProperty('--hudY',Math.round(y)+'px');
-  if(fxBar) fxBar.innerHTML=CONS.filter(it=>it.min&&fxOn(it.id)).map(it=>`<span>${it.i} ${Math.ceil((S.fx[it.id]-now())/60000)}分</span>`).join(''); }
+  if(fxBar) fxBar.innerHTML=CONS.filter(it=>it.min&&fxOn(it.id)).map(it=>`<span>${it.i} ${Math.ceil((S.fx[it.id]-now())/60000)}分</span>`).join('')+(fxOn('meal_str')?`<span>💪 ${Math.ceil((S.fx.meal_str-now())/60000)}分</span>`:''); }
 setInterval(tick,1000); window.addEventListener('resize',tick); setTimeout(tick,300);
 return {fxOn,enhance,drop,dropItem,lastDrop:()=>lastD,priceMul,useLeader,applySkins,render,click,matLine};
 }
