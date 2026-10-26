@@ -32,8 +32,13 @@ const CH=[
  {id:'c5',spot:'moon',name:'第六章　月潮',open:{after:'ice'},
   intro:'月光灣只在夜裡發光。汐月還在這裡，等著那個提燈的人。\n提示：晚上（約 19:48～04:48）划獨木舟到月光灣釣魚，有機會在魚肚裡找到月鱗；月亮越圓，找到的機會越高。',
   tasks:[{t:'moon',n:1,txt:'集滿 7 片月鱗，聽完汐月的故事'}],
-  page:'手記第五頁\n「我老了，提不動燈了。汐月說，等堤防打開、月潮回來，她就能回家。\n可是河口外的海不平靜——深海裡有什麼東西，從堤防築起那年就一直在發怒。\n我的舊漁船還停在河口的船塢裡。修好它，替我出海看看吧。」',
+  page:'手記第五頁\n「我老了，提不動燈了。汐月說，等堤防打開、月潮回來，她就能回家。\n可是河口外的海不平靜——深海裡有什麼東西，從堤防築起那年就一直在發怒。\n我的舊漁船還停在河口的船塢裡。修好它，替我出海看看吧。」\n\n——汐月游進水道前回頭說：「湖裡還有一個人在等燈。」',
   xp:8000,coins:3000,unlock:'近海礁岩（需修復老漁人的漁船，在 🗺️ 釣點清單）'},
+ {id:'lantern',spot:'lily',hidden:1,name:'隱藏章節　湖裡還有人等燈',open:{after:'c5'},
+  intro:'汐月走之前回頭說了一句：「湖裡還有一個人在等燈。」她沒說是誰。浮萍灣的夜晚，好像有什麼在看你。',
+  tasks:[{t:'item',id:'hairpin',n:1,txt:'夜裡在浮萍灣釣起一件遺物'},{t:'meet',n:3,txt:'在夜裡遇見「她」3 次'},{t:'scene',id:'lantern',n:1,txt:'滿月的夜晚，提著老漁人的燈到浮萍灣'}],
+  page:'手記・最後一頁（夾在封底）\n「阿蘅，三十年前那個雨夜，妳提著燈在浮萍灣等我，我卻遲了一步。\n我每個滿月提燈去灣裡，不是為了汐月，是想讓妳看見燈，知道回家的路。\n如果有人替我把燈提到妳面前——阿蘅，妳可以走了。爸爸不怪妳，妳也別怪自己。」',
+  title:'守燈人',xp:6000,coins:3000,unlock:'稱號「守燈人」；她不會再嚇你，偶爾會在遠處安靜地看著燈'},
  {id:'c6',spot:'reef',name:'第七章　河口之外',open:{after:'c5',yacht:1},
   intro:'第一次把船開出河口。汐月回到了大海，海卻變得不安：魚群躁動，鯊魚出現得比以前頻繁。',
   tasks:[{t:'catch',zone:'reef',sp:'amber',n:1,txt:'在近海礁岩釣到一尾紅甘'},{t:'catch',sp:'grouper',n:1,txt:'釣到一尾石斑'},{t:'scene',id:'dolphin',n:1,txt:'拍下一次海豚群（白天出海，海豚出現時按 📷）'}],
@@ -64,13 +69,13 @@ function bump(match){ let changed=false;
   for(const ch of active()){ const p=prog(ch); ch.tasks.forEach((t,i)=>{ if(p[i]>=t.n) return; const d=match(t); if(d>0){ p[i]=Math.min(t.n,p[i]+d); changed=true; if(p[i]>=t.n) c.toast('📜 任務完成：'+t.txt,'good',2400); } });
     if(p.every((v,i)=>v>=ch.tasks[i].n)) finish(ch); }
   if(changed){ c.persist(); dot(); } }
-function finish(ch){ if(isDone(ch.id)) return; st.done.push(ch.id); c.addXP(ch.xp); S.coins+=ch.coins; if(ch.baits){ S.baits=S.baits||{}; for(const k in ch.baits) S.baits[k]=(S.baits[k]||0)+ch.baits[k]; } c.setCoins(); if(c.syncHUD) c.syncHUD(); c.persist(); dot();
+function finish(ch){ if(isDone(ch.id)) return; st.done.push(ch.id); c.addXP(ch.xp); S.coins+=ch.coins; if(ch.title){ S.titles=S.titles||[]; if(S.titles.indexOf(ch.title)<0) S.titles.push(ch.title); } if(ch.baits){ S.baits=S.baits||{}; for(const k in ch.baits) S.baits[k]=(S.baits[k]||0)+ch.baits[k]; } c.setCoins(); if(c.syncHUD) c.syncHUD(); c.persist(); dot();
   if(ch.id==='c7'){ S.titles=S.titles||[]; if(S.titles.indexOf('守湖人')<0) S.titles.push('守湖人'); }
   setTimeout(()=>{ if(ch.id==='c7') showEnding(ch); else showPage(ch,true); c.Snd&&c.Snd.fanfare&&c.Snd.fanfare(2); c.vib&&c.vib([40,40,120]); },1800); }
 /* 事件掛鉤 */
 function onCatch(fd,ctx){ if(!fd||!fd.sp) return; bump(t=>{ if(t.t!=='catch') return 0;
   if(t.sp&&fd.sp.id!==t.sp) return 0; if(t.zone&&ctx.zone!==t.zone) return 0; if(t.loc&&ctx.loc!==t.loc) return 0; if(t.per&&ctx.per!==t.per) return 0; if(t.rain&&!ctx.rain) return 0; if(t.rar&&fd.sp.rar<t.rar) return 0; return 1; }); }
-const onPerfect=()=>bump(t=>t.t==='perfect'?1:0), onItem=()=>bump(t=>t.t==='item'?1:0);
+const onPerfect=()=>bump(t=>t.t==='perfect'?1:0), onItem=id=>bump(t=>t.t==='item'&&(!t.id||t.id===id)?1:0), onMeet=()=>bump(t=>t.t==='meet'?1:0);
 const onScene=id=>bump(t=>t.t==='scene'&&t.id===id?1:0), onBoss=id=>bump(t=>t.t==='boss'&&t.id===id?1:0);
 /* 主線正在追的魚：在指定地點（沒指定就任何地方）出現率 ×3；任務完成後恢復 */
 function needs(type){ return active().some(ch=>{ const p=prog(ch); return ch.tasks.some((t,i)=>t.t===type&&p[i]<t.n); }); }
@@ -98,7 +103,7 @@ function endIntro(){ cin.classList.add('hidden'); document.body.classList.remove
 const SPOTN={dock:'木碼頭',lily:'浮萍灣',wood:'倒木區',deep:'深水中央',moon:'月光灣',reef:'近海礁岩',blue:'遠洋深藍',ice:'冰湖'};
 function showCard(ch){ cinOn=true; const i=SPOT_IDS.indexOf(ch.spot), here=c.curSpot&&c.curSpot()===i, lk=lock(i), boat=(ch.open.kayak&&!S.kayak)?'獨木舟':(ch.open.yacht&&!S.yacht)?'漁船':null;
   const act=here?'<button class="go" data-c="close" style="animation-delay:2.2s">開始</button>':(!lk&&!boat)?`<button class="go" data-c="go" data-v="${i}" style="animation-delay:2.2s">前往${SPOTN[ch.spot]}</button><br><button class="sk" style="position:static;margin-top:12px;opacity:.8" data-c="close">稍後再去</button>`:`<p class="tn" style="animation-delay:2s">${boat==='漁船'?'先到 🗺️ 釣點清單修復老漁人的漁船':boat?'先到 🗺️ 釣點清單購買'+boat:'尚未開放'}</p><button class="go" data-c="close" style="animation-delay:2.4s">知道了</button>`;
-  cin.innerHTML=`<div class="ct" style="animation-delay:.6s">${ch.side?'支線':'新章節'}</div><h2 style="animation-delay:1s">${ch.name.replace(/^.*　/,'')}</h2><div class="ct" style="animation-delay:1.2s;letter-spacing:1px">${ch.name.split('　')[0]}・${SPOTN[ch.spot]}</div><p style="animation-delay:1.6s;font-size:15px">${ch.intro.split('\n')[0]}</p><div class="tn" style="animation-delay:2s">${ch.tasks.length} 個任務，詳情在 📜 手記</div>`+act;
+  cin.innerHTML=`<div class="ct" style="animation-delay:.6s">${ch.side?'支線':ch.hidden?'隱藏章節':'新章節'}</div><h2 style="animation-delay:1s">${ch.name.replace(/^.*　/,'')}</h2><div class="ct" style="animation-delay:1.2s;letter-spacing:1px">${ch.name.split('　')[0]}・${SPOTN[ch.spot]}</div><p style="animation-delay:1.6s;font-size:15px">${ch.intro.split('\n')[0]}</p><div class="tn" style="animation-delay:2s">${ch.tasks.length} 個任務，詳情在 📜 手記</div>`+act;
   cin.classList.remove('hidden'); document.body.classList.add('cine'); if(st.seen.indexOf(ch.id)<0){ st.seen.push(ch.id); c.persist(); } }
 cin.addEventListener('click',e=>{ const b=e.target.closest('[data-c]'); if(!b) return; const a=b.dataset.c;
   if(a==='end') endIntro(); else { cin.classList.add('hidden'); document.body.classList.remove('cine'); cinOn=false; if(c.pan) c.pan(false); cardAt=performance.now()+1500; if(a==='go') c.goSpot(+b.dataset.v); } });
@@ -123,7 +128,7 @@ const css=document.createElement('style'); css.textContent=`#storyBtn{position:r
 document.head.appendChild(css);
 function render(){ const act=active(); let h='<div class="pn"><button class="x" data-s="close">✕</button><h3>📜 老漁人的手記</h3>';
   if(!act.length&&isDone('c7')) h+='<div class="intro">所有章節都完成了。月潮回到了湖裡，你成了守湖人。</div>';
-  for(const ch of act){ const p=prog(ch); h+=`<div class="sec">${ch.side?'支線':'目前章節'}</div><h3 style="font-size:17px">${ch.name}</h3><div class="intro">${ch.intro}</div>`;
+  for(const ch of act){ const p=prog(ch); h+=`<div class="sec">${ch.side?'支線':ch.hidden?'隱藏章節':'目前章節'}</div><h3 style="font-size:17px">${ch.name}</h3><div class="intro">${ch.intro}</div>`;
     h+=ch.tasks.map((t,i)=>`<div class="tk${p[i]>=t.n?' ok':''}">${p[i]>=t.n?'✅':'▫️'} ${t.txt}<b>${Math.min(p[i],t.n)}/${t.n}</b></div>`).join('');
     h+=`<div class="rw">完成獎勵：經驗 ${ch.xp.toLocaleString()}、金幣 ${ch.coins.toLocaleString()}，開放 ${ch.unlock}</div>`; }
   const nxt=CH.filter(ch=>!isDone(ch.id)&&!avail(ch));
@@ -150,5 +155,5 @@ btn.addEventListener('click',()=>{ render(); box.classList.remove('hidden'); });
 function dot(){ btn.classList.toggle('dot',st.done.some(id=>st.read.indexOf(id)<0)||active().some(ch=>!st.prog[ch.id])); }
 dot();
 function freePage(t,h){ box.innerHTML=`<div class="pn"><button class="x" data-s="close">✕</button><h3>📖 ${t}</h3><div class="page">${h}</div></div>`; box.classList.remove('hidden'); }
-return {page:freePage,intro:showIntro,needs,boost,showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
+return {progOf:id=>{ const ch=byId(id); return ch?prog(ch).slice():null; },isActive:id=>active().some(ch=>ch.id===id),page:freePage,intro:showIntro,needs,boost,onMeet,wants:id=>active().some(ch=>ch.tasks.some((t,i)=>t.t==='item'&&t.id===id&&prog(ch)[i]<t.n)),showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
 }

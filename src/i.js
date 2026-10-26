@@ -5,7 +5,8 @@ const ITEMS=[
  {id:'jug',name:'生鏽鐵壺',file:'item_metal_jug.glb',w:1.1,val:40,size:.35,rare:0,p:20,desc:'老式鐵壺，洗乾淨或許能賣給古董商。'},
  {id:'compass',name:'航海羅盤',file:'item_seadogs_compass.glb',w:.5,val:250,size:.3,rare:2,p:10,desc:'黃銅羅盤。拿到的瞬間，指針指向了一群正在覓食的魚。'},
  {id:'watch',name:'古董懷錶',file:'item_pocket_watch.glb',w:.2,val:400,size:.25,rare:2,p:8,desc:'背面刻著名字和年份，指針停在午夜。帶著它，好運加滿。'},
- {id:'chest',name:'沉沒的寶箱',file:'item_treasure_chest.glb',w:18,val:1200,size:.9,rare:3,p:4,desc:'滿滿的舊金幣！今天是你的幸運日。'}];
+ {id:'chest',name:'沉沒的寶箱',file:'item_treasure_chest.glb',w:18,val:1200,size:.9,rare:3,p:4,desc:'滿滿的舊金幣！今天是你的幸運日。'},
+ {id:'hairpin',name:'褪色的髮簪',file:'item_hairpin.glb',w:.05,val:0,size:.22,rare:3,p:0,desc:'銀質髮簪，花瓣已經褪色。背面刻著一個「蘅」字。釣起來的時候，水面安靜得不像話。'}];
 const ITEM_SP={id:'item',name:'物品',rar:0,len:[30,30],k:1,price:0,sh:{H:.1,W:.1},f:{pow:.7,spd:.4,agi:.3,jump:0,stam:.6,win:1.5},time:{},desc:''};
 
 function createFun(W,P,AT,c){
@@ -198,5 +199,5 @@ function update(dt){
   if(hk.on){ hk.t+=dt; hgM.style.bottom=(hpos()*100)+'%'; htF.style.height=(clamp(1-hk.t/hk.win,0,1)*100)+'%'; }
   updHot(dt); updTour(dt);
 }
-return {spawnHot,goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,hookExpired,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
+return {items:ITEMS,spawnHot,goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,hookExpired,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
 }
