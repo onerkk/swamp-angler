@@ -236,6 +236,7 @@ function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.
   setTimeout(()=>{ HOME3D.exit(); document.body.classList.remove('athome'); G.state='idle'; fadeEl.classList.remove('on'); if(then) then(); else if(G.spot!==0) goSpot(0); },650); }
 window.__goHome=goHome;
 $('bOut').addEventListener('click',()=>leaveHome());
+$('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
 function finishCatch(sell){
   const keep=sell==='keep'; if(keep) sell=false;   // 帶回家：不賣、也不算放生

@@ -28,7 +28,7 @@ function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wa
   const g=S.ghost=S.ghost||{}; const day=new Date().toDateString(); if(g.day!==day){ g.day=day; g.n=0; }
   if(g.n>=3) return false; if(g.last&&Date.now()-g.last<25*60*1000) return false; return true; }
 function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=true;
-  GL.load('models/ghost.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ mt.emissive=new T.Color(0xbfc8d8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.55; mats.push(mt); } } });
+  GL.load('models/ghost.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ mt.fog=true; mt.transparent=true; mt.opacity=.88; mt.depthWrite=true; mt.roughness=1; mt.metalness=0; if(mt.map){ mt.emissive=new T.Color(0x8fa0b8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.12; } mats.push(mt); } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z);
     model=new T.Group(); model.add(o); model.visible=false; W.scene.add(model); loading=false; fn(model); },undefined,()=>{ loading=false; }); }
@@ -47,21 +47,25 @@ function meet(){ if(TEST) return; const g=S.ghost=S.ghost||{}; g.last=Date.now()
 // 四種出現方式：遠處飄過、水裡露頭、身後、撲臉
 function trigger(force){ if(ev) return false; if(!force&&!eligible()) return false; const mode=pickMode();
   load(m=>{ ev={t:0,mode}; meet();
-    if(mode==='jump'){ const side=Math.random()<.5?-1:1; const p=placeRel(m,1.4,side*1.9,-1.7); faceMe(m); ev.p=p; m.visible=true; c.drip&&c.drip(); if(window.__FACE) window.__FACE(p,{dur:2.4,pitch:.05}); }
-    else if(mode==='glide'){ const side=Math.random()<.5?-1:1, dist=15+Math.random()*7; const p=placeRel(m,dist,-side*4,-.55); ev.p=p; ev.dir=new T.Vector3(Math.cos(c.head()),0,-Math.sin(c.head())).multiplyScalar(side*.55); m.rotation.y=Math.atan2(ev.dir.x,ev.dir.z); m.visible=true; ev.stare=0; ev.phase='glide'; ev.wail=sfx('wail',.35); }
-    else if(mode==='peek'){ const to=c.state()==='wait'&&c.to?c.to():null; const b=c.base(); let p; if(to){ const dx=to.x-b.x, dz=to.z-b.z, L=Math.hypot(dx,dz)||1; p=new T.Vector3(to.x+dx/L*1.6+(Math.random()-.5),0,to.z+dz/L*1.6+(Math.random()-.5)); m.position.set(p.x,-1.95,p.z); } else p=placeRel(m,6,1.5,-1.95); ev.p=p; faceMe(m); m.visible=true; ev.phase='rise'; ev.st0=c.state(); }
-    else { const p=placeRel(m,-2.1,0,0); ev.p=p; faceMe(m); m.visible=true; ev.phase='wait'; ev.wail=sfx('wail',.22); c.vib&&c.vib([15,60,15]); } });
+    if(mode==='jump'){ const side=Math.random()<.5?-1:1; const p=placeRel(m,1.4,side*1.9,-1.9); faceMe(m); ev.p=p; m.visible=true; c.drip&&c.drip(); if(window.__FACE) window.__FACE(p,{dur:2.4,pitch:.05}); }
+    else if(mode==='glide'){ const side=Math.random()<.5?-1:1, dist=15+Math.random()*7; const p=placeRel(m,dist,-side*4,-.7); ev.p=p; ev.dir=new T.Vector3(Math.cos(c.head()),0,-Math.sin(c.head())).multiplyScalar(side*.55); m.rotation.y=Math.atan2(ev.dir.x,ev.dir.z); m.visible=true; ev.stare=0; ev.phase='glide'; ev.wail=sfx('wail',.35); }
+    else if(mode==='peek'){ const to=c.state()==='wait'&&c.to?c.to():null; const b=c.base(); let p; if(to){ const dx=to.x-b.x, dz=to.z-b.z, L=Math.hypot(dx,dz)||1; const sd=(Math.random()<.5?-1:1)*1.4; p=new T.Vector3(to.x+dx/L*1.2-dz/L*sd,0,to.z+dz/L*1.2+dx/L*sd); m.position.set(p.x,-1.95,p.z); } else p=placeRel(m,6,(Math.random()<.5?-1:1)*1.8,-1.95); ev.p=p; faceMe(m); m.visible=true; ev.phase='rise'; ev.st0=c.state(); }
+    else { const p=placeRel(m,-2.1,0,-.28); ev.p=p; faceMe(m); m.visible=true; ev.phase='wait'; ev.wail=sfx('wail',.22); c.vib&&c.vib([15,60,15]); } });
   return true; }
 function endEv(){ if(model) model.visible=false; if(ov) ov.classList.remove('on'); if(ev&&ev.wail){ try{ ev.wail.pause(); }catch(e){} } ev=null; }
-function update(dt){
+// 跟著環境亮度：越暗越只剩月光般的微光；腳下（水面交界）有一圈水紋
+let ripT=0;
+function blend(dt){ if(!model||!model.visible) return; const lt=W.info?W.info.light:1; mats.forEach(m=>{ if(m.emissiveIntensity!==undefined) m.emissiveIntensity=.1+Math.max(0,.5-lt)*.7; });
+  ripT-=dt; if(ripT<=0&&model.position.y>-1.9){ ripT=.9+Math.random()*.6; if(W.addRipple) W.addRipple(model.position.x,model.position.z,.35); } }
+function update(dt){ blend(dt);
   if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0;
       if(!model&&!loading&&(TEST||!S.noScare&&c.period()==='night'&&c.loc()==='lake')) load(()=>{});
       if(eligible()&&(TEST||Math.random()<1/720)){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }
   ev.t+=dt; const t=ev.t, m=model; if(!m) return;
-  if(ev.mode==='jump'){ m.position.y=Math.min(0,-1.7+t*2.1); faceMe(m); m.rotation.y+=Math.sin(t*9)*.04;
+  if(ev.mode==='jump'){ m.position.y=Math.min(-.28,-1.9+t*2.1); faceMe(m); m.rotation.y+=Math.sin(t*9)*.04;
     if(t>.9&&!ev.face){ ev.face=true; if(ov) ov.classList.add('on'); sfx('scream_main',1); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
     if(t>2.3) endEv(); return; }
-  if(ev.mode==='glide'){ if(ev.phase==='glide'){ m.position.addScaledVector(ev.dir,dt); m.position.y=-.55+Math.sin(t*.8)*.04; if(ev.wail) ev.wail.volume=Math.max(0,.35*(1-t/16));
+  if(ev.mode==='glide'){ if(ev.phase==='glide'){ m.position.addScaledVector(ev.dir,dt); m.position.y=-.7+Math.sin(t*.8)*.04; if(ev.wail) ev.wail.volume=Math.max(0,.35*(1-t/16));
       if(lookingAt(m.position,.35)) ev.stare+=dt; else ev.stare=Math.max(0,ev.stare-dt*.5);
       if(ev.stare>2){ ev.phase='turn'; ev.t2=0; } if(t>16) ev.phase='sink'; }
     if(ev.phase==='turn'){ ev.t2+=dt; const b=c.base(), want=Math.atan2(b.x-m.position.x,b.z-m.position.z); let d=want-m.rotation.y; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2; m.rotation.y+=d*Math.min(1,dt*1.2); if(ev.t2>3) ev.phase='sink'; }
