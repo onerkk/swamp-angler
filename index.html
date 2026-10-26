@@ -3076,7 +3076,7 @@ function updChase(dt){ if(!chase) return; if(chase.delay>0){ chase.delay-=dt; if
 function endChase(){ chase=null; if(ev.id!=='shark') sfin.visible=false; }
 
 /* ---------- 拍照收集 ---------- */
-$('bCam').addEventListener('click',()=>{ try{
+$('bCam').addEventListener('click',()=>{ if(window.__GHOST&&window.__GHOST.onPhoto&&window.__GHOST.onPhoto()) toast('……照片裡好像多了什麼','warn',2400); try{
   W.render(); const src=W.renderer.domElement, cv=document.createElement('canvas'); cv.width=src.width; cv.height=src.height; const x=cv.getContext('2d'); x.drawImage(src,0,0);
   const s=cv.width/400, lbl=ev.id?SCENES[ev.id]:(loc==='sea'?'外海':'濕地'); x.fillStyle='rgba(0,0,0,.45)'; x.fillRect(0,cv.height-44*s,cv.width,44*s);
   x.fillStyle='#fff'; x.font=`800 ${15*s}px sans-serif`; x.fillText('濕地垂釣・'+lbl+'・'+new Date().toLocaleDateString('zh-TW'),14*s,cv.height-17*s);
@@ -4814,30 +4814,58 @@ const ov=document.getElementById('scare'), face=ov&&ov.querySelector('img');
 // 測試模式：網址加上 ghost 測試參數，不看章節、時段、次數，閒置或等魚約 5 秒出現、間隔 30 秒（只影響開這一頁的人）
 const TEST=/[?&]ghost=1/.test(location.search); let testLast=0;
 function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wait')&&!ev&&performance.now()-testLast>30000&&performance.now()-sessionStart>5000; }
-  if(S.noScare) return false; if(!(S.story&&S.story.done&&S.story.done.includes('c5'))) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
+  if(S.noScare) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
   if(c.period()!=='night'||c.loc()!=='lake') return false; const st=c.state(); if(st!=='idle'&&st!=='wait') return false;
   if(performance.now()-sessionStart<5*60*1000) return false;   // 剛開始玩的前 5 分鐘不嚇人
   const g=S.ghost=S.ghost||{}; const day=new Date().toDateString(); if(g.day!==day){ g.day=day; g.n=0; }
-  if(g.n>=2) return false; if(g.last&&Date.now()-g.last<40*60*1000) return false; return true; }
+  if(g.n>=3) return false; if(g.last&&Date.now()-g.last<25*60*1000) return false; return true; }
 function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=true;
   GL.load('models/ghost.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ mt.emissive=new T.Color(0xbfc8d8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.55; mats.push(mt); } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z);
     model=new T.Group(); model.add(o); model.visible=false; W.scene.add(model); loading=false; fn(model); },undefined,()=>{ loading=false; }); }
-// 驚嚇流程：0.9 秒從水裡浮出來站在身旁 → 臉部特寫撲上來＋尖叫 1.3 秒 → 消失
-function trigger(force){ if(ev) return false; if(!force&&!eligible()) return false;
-  load(m=>{ const b=c.base(), h=c.head(), side=Math.random()<.5?-1:1, rt=new T.Vector3(Math.cos(h),0,-Math.sin(h)), fw=new T.Vector3(-Math.sin(h),0,-Math.cos(h));
-    const p=new T.Vector3(b.x,0,b.z).addScaledVector(rt,side*1.9).addScaledVector(fw,1.4); m.position.set(p.x,-1.7,p.z);
-    m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); m.visible=true; ev={t:0,side,p}; if(window.__FACE) window.__FACE(p,{dur:2.4,snap:false,pitch:.05}); if(!TEST){ const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist(); if(c.onMeet) c.onMeet(g.met); } c.drip&&c.drip(); }); return true; }
+// 真人尖叫與哀鳴（OpenGameArt CC0）
+const SFX={}; function sfx(name,vol){ try{ let a=SFX[name]; if(!a){ a=new Audio(name+'.mp3'); a.preload='auto'; SFX[name]=a; } a.volume=Math.max(0,Math.min(1,vol==null?1:vol)); a.currentTime=0; a.play().catch(()=>{}); return a; }catch(e){ return null; } }
+['scream_main','scream_b','wail','gasp'].forEach(n=>{ try{ const a=new Audio(n+'.mp3'); a.preload='auto'; SFX[n]=a; }catch(e){} });
+const MODES=['glide','peek','behind','jump']; let testIdx=0;
+function pickMode(){ if(TEST){ const m=MODES[testIdx%MODES.length]; testIdx++; return m; }
+  const st=c.state(), c5=S.story&&S.story.done&&S.story.done.includes('c5');
+  const w={glide:40,peek:st==='wait'?30:0,behind:18,jump:c5?22:6}; let tot=0; for(const k in w) tot+=w[k]; let r=Math.random()*tot; for(const k in w){ r-=w[k]; if(r<=0) return k; } return 'glide'; }
+function placeRel(m,fw,rt,y){ const b=c.base(), h=c.head(), f=new T.Vector3(-Math.sin(h),0,-Math.cos(h)), r=new T.Vector3(Math.cos(h),0,-Math.sin(h));
+  const p=new T.Vector3(b.x,0,b.z).addScaledVector(f,fw).addScaledVector(r,rt); m.position.set(p.x,y,p.z); return p; }
+function faceMe(m){ const b=c.base(); m.rotation.y=Math.atan2(b.x-m.position.x,b.z-m.position.z); }
+function lookingAt(p,tol){ const b=c.base(), yaw=c.head()+(c.yaw?c.yaw():0); const want=Math.atan2(-(p.x-b.x),-(p.z-b.z)); let d=want-yaw; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2; return Math.abs(d)<(tol||.45); }
+function meet(){ if(TEST) return; const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist(); if(c.onMeet) c.onMeet(g.met); }
+// 四種出現方式：遠處飄過、水裡露頭、身後、撲臉
+function trigger(force){ if(ev) return false; if(!force&&!eligible()) return false; const mode=pickMode();
+  load(m=>{ ev={t:0,mode}; meet();
+    if(mode==='jump'){ const side=Math.random()<.5?-1:1; const p=placeRel(m,1.4,side*1.9,-1.7); faceMe(m); ev.p=p; m.visible=true; c.drip&&c.drip(); if(window.__FACE) window.__FACE(p,{dur:2.4,pitch:.05}); }
+    else if(mode==='glide'){ const side=Math.random()<.5?-1:1, dist=15+Math.random()*7; const p=placeRel(m,dist,-side*4,-.55); ev.p=p; ev.dir=new T.Vector3(Math.cos(c.head()),0,-Math.sin(c.head())).multiplyScalar(side*.55); m.rotation.y=Math.atan2(ev.dir.x,ev.dir.z); m.visible=true; ev.stare=0; ev.phase='glide'; ev.wail=sfx('wail',.35); }
+    else if(mode==='peek'){ const to=c.state()==='wait'&&c.to?c.to():null; const b=c.base(); let p; if(to){ const dx=to.x-b.x, dz=to.z-b.z, L=Math.hypot(dx,dz)||1; p=new T.Vector3(to.x+dx/L*1.6+(Math.random()-.5),0,to.z+dz/L*1.6+(Math.random()-.5)); m.position.set(p.x,-1.95,p.z); } else p=placeRel(m,6,1.5,-1.95); ev.p=p; faceMe(m); m.visible=true; ev.phase='rise'; ev.st0=c.state(); }
+    else { const p=placeRel(m,-2.1,0,0); ev.p=p; faceMe(m); m.visible=true; ev.phase='wait'; ev.wail=sfx('wail',.22); c.vib&&c.vib([15,60,15]); } });
+  return true; }
+function endEv(){ if(model) model.visible=false; if(ov) ov.classList.remove('on'); if(ev&&ev.wail){ try{ ev.wail.pause(); }catch(e){} } ev=null; }
 function update(dt){
   if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0;
-      if(!model&&!loading&&(TEST||!S.noScare&&S.story&&S.story.done&&S.story.done.includes('c5')&&c.period()==='night'&&c.loc()==='lake')) load(()=>{});   // 夜裡先悄悄載入，第一次出現才不會延遲
-      if(eligible()&&(TEST||Math.random()<1/900)){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }   // 夜裡平均約 15 分鐘一次
-  ev.t+=dt; const t=ev.t;
-  if(model){ model.position.y=Math.min(0,-1.7+t*2.1); const b=c.base(); model.rotation.y=Math.atan2(b.x-ev.p.x,b.z-ev.p.z)+Math.sin(t*9)*.04; }
-  if(t>.9&&!ev.face){ ev.face=true; if(ov){ ov.classList.add('on'); } c.scream&&c.scream(); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
-  if(t>2.3){ if(model) model.visible=false; if(ov) ov.classList.remove('on'); ev=null; }
+      if(!model&&!loading&&(TEST||!S.noScare&&c.period()==='night'&&c.loc()==='lake')) load(()=>{});
+      if(eligible()&&(TEST||Math.random()<1/720)){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }
+  ev.t+=dt; const t=ev.t, m=model; if(!m) return;
+  if(ev.mode==='jump'){ m.position.y=Math.min(0,-1.7+t*2.1); faceMe(m); m.rotation.y+=Math.sin(t*9)*.04;
+    if(t>.9&&!ev.face){ ev.face=true; if(ov) ov.classList.add('on'); sfx('scream_main',1); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
+    if(t>2.3) endEv(); return; }
+  if(ev.mode==='glide'){ if(ev.phase==='glide'){ m.position.addScaledVector(ev.dir,dt); m.position.y=-.55+Math.sin(t*.8)*.04; if(ev.wail) ev.wail.volume=Math.max(0,.35*(1-t/16));
+      if(lookingAt(m.position,.35)) ev.stare+=dt; else ev.stare=Math.max(0,ev.stare-dt*.5);
+      if(ev.stare>2){ ev.phase='turn'; ev.t2=0; } if(t>16) ev.phase='sink'; }
+    if(ev.phase==='turn'){ ev.t2+=dt; const b=c.base(), want=Math.atan2(b.x-m.position.x,b.z-m.position.z); let d=want-m.rotation.y; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2; m.rotation.y+=d*Math.min(1,dt*1.2); if(ev.t2>3) ev.phase='sink'; }
+    if(ev.phase==='sink'){ m.position.y-=dt*.45; if(m.position.y<-2) endEv(); } return; }
+  if(ev.mode==='peek'){ if(ev.phase==='rise'){ m.position.y=Math.min(-1.42,m.position.y+dt*.4); if(m.position.y>=-1.42) ev.phase='stare'; }
+    else if(ev.phase==='stare'){ faceMe(m); m.position.y=-1.42+Math.sin(t*1.1)*.015; if(c.state()!==ev.st0||t>8){ ev.phase='down'; if(c.state()!==ev.st0){ sfx('gasp',.6); c.vib&&c.vib(40); } } }
+    else { m.position.y-=dt*1.6; if(m.position.y<-2.2) endEv(); } return; }
+  if(ev.mode==='behind'){ faceMe(m); if(lookingAt(m.position,.6)||t>14){ if(t<14){ sfx('gasp',.7); c.vib&&c.vib([60,30,60]); } endEv(); } return; }
 }
+// 拍到她：遠處飄過時按 📷，手記多一頁
+function onPhoto(){ if(!ev||ev.mode!=='glide'||ev.phase==='sink') return false; const g=S.ghost=S.ghost||{}; if(!g.photo){ g.photo=1; c.persist(); if(window.__STORY&&window.__STORY.page) setTimeout(()=>window.__STORY.page('手記・夾頁：拍到了什麼','那晚我在灣裡拍湖面，回家洗出來，水上多了一個人影。<br><br>白衣，長髮，背對著我。放大看，她的腳不在水裡——她是浮著的。<br><br>我沒有刪掉那張照片。'),900); }
+  return true; }
 // 生前模樣的模型（結局與之後的安靜出現）
 function loadAlive(fn){ if(alive) return fn(alive); if(aliveLoading||!GL) return; aliveLoading=true;
   GL.load('models/ghost_alive.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ mt.emissive=new T.Color(0xe8e2d8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.7; mt.transparent=true; } } });
@@ -4865,7 +4893,7 @@ function update2(dt){ tt+=dt; updLamp(dt,tt); if(fin){ updFinale(dt); return; }
   if(!TEST&&c.storyDone&&c.storyDone('lantern')){ updCalm(dt); return; }
   if(!ev&&finaleReady()&&!aliveLoading){ startFinale(); return; }
   update(dt); }
-return {update:update2,trigger,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};
+return {dbg:()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t.toFixed(1)},pos:model&&model.visible?[+model.position.x.toFixed(2),+model.position.y.toFixed(2),+model.position.z.toFixed(2)]:null,base:[+c.base().x.toFixed(2),+c.base().z.toFixed(2)],head:+c.head().toFixed(2),yaw:+(c.yaw?c.yaw():0).toFixed(2)}),update:update2,trigger,onPhoto,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};
 }
 /* ===== 雲端存檔：Google 帳號登入（Firebase），本機進度永遠不會被洗掉 ===== */
 function createCloud(c){
@@ -5220,7 +5248,7 @@ const ITEMS_BY=id=>(FUN.items||[]).find(x=>x.id===id);
 window.__GRILL=()=>HOME3D.grill();
 window.__CLOUD=createCloud({save:()=>save,toast,refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
   apply:obj=>{ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} location.reload(); }});
-const GHOST=createGhost(W,{save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>G.state,base:()=>G.base,head:()=>G.head,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
+const GHOST=createGhost(W,{save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>G.state,base:()=>G.base,head:()=>G.head,yaw:()=>G.yaw,to:()=>G.to,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
 window.__GHOST=GHOST;
 // 烤好了：依兩面熟度評分，吃下去依魚的來源得到效果
 function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id); if(!sp) return; const lo=season==='lemon'?.72:.78, hi=season==='lemon'?.95:.92, g=x=>x<.55?0:x<lo?1:x<hi?3:-1, ga=g(a), gb=g(b);

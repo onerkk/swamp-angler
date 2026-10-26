@@ -171,7 +171,7 @@ function updChase(dt){ if(!chase) return; if(chase.delay>0){ chase.delay-=dt; if
 function endChase(){ chase=null; if(ev.id!=='shark') sfin.visible=false; }
 
 /* ---------- 拍照收集 ---------- */
-$('bCam').addEventListener('click',()=>{ try{
+$('bCam').addEventListener('click',()=>{ if(window.__GHOST&&window.__GHOST.onPhoto&&window.__GHOST.onPhoto()) toast('……照片裡好像多了什麼','warn',2400); try{
   W.render(); const src=W.renderer.domElement, cv=document.createElement('canvas'); cv.width=src.width; cv.height=src.height; const x=cv.getContext('2d'); x.drawImage(src,0,0);
   const s=cv.width/400, lbl=ev.id?SCENES[ev.id]:(loc==='sea'?'外海':'濕地'); x.fillStyle='rgba(0,0,0,.45)'; x.fillRect(0,cv.height-44*s,cv.width,44*s);
   x.fillStyle='#fff'; x.font=`800 ${15*s}px sans-serif`; x.fillText('濕地垂釣・'+lbl+'・'+new Date().toLocaleDateString('zh-TW'),14*s,cv.height-17*s);
