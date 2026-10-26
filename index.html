@@ -217,6 +217,10 @@ body.sheetOn #homeUI,body.sheetOn #homeView,body.sheetOn #fishCard{display:none!
 #fishCard b{font-size:19px;color:var(--rc,#e9c46a)}#fishCard small{opacity:.7;margin-left:6px}#fishCard .fg{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;margin-top:8px;font-size:14px}#fishCard .fg span{opacity:.6}
 body.athome #drops,body.athome #flare,body.athome #act,body.athome #joy,body.athome #fight,body.athome #top2,body.athome #hotChip,body.athome #combo,body.athome #castTag,body.athome #fxBar,body.athome #bCam,body.athome #bTour,body.athome #pop,body.athome #bGoal{display:none!important}
 .btn.home{display:block;width:100%;margin-top:8px;padding:10px;font-size:15px;background:rgba(120,90,50,.55);border:1px solid rgba(255,220,160,.35)}.btn.home.dim{opacity:.45}.btn.home.hidden{display:none}
+#scare{position:fixed;inset:0;z-index:60;background:#000;display:none;align-items:center;justify-content:center;overflow:hidden;pointer-events:none}
+#scare.on{display:flex;animation:scareBg 1.4s steps(1) forwards}#scare img{width:160vw;max-width:none;animation:scareIn 1.4s cubic-bezier(.1,.9,.2,1) forwards;filter:contrast(1.25) brightness(.9)}
+@keyframes scareIn{0%{transform:scale(.55) translate(2%,6%);opacity:0}8%{opacity:1;transform:scale(.9) translate(-1%,-2%)}40%{transform:scale(1.18) translate(1%,1%)}60%{transform:scale(1.12) translate(-2%,0)}100%{transform:scale(1.3) translate(0,2%);opacity:0}}
+@keyframes scareBg{0%{opacity:1}85%{opacity:1}100%{opacity:0}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -245,6 +249,7 @@ body.athome #drops,body.athome #flare,body.athome #act,body.athome #joy,body.ath
   <button class="chip sm" id="bGoal" aria-label="目標與成就">🎯</button>
   <button class="chip sm" id="bCam" aria-label="拍照">📷</button>
 </div>
+<div id="scare"><img src="ghost_face.jpg" alt=""></div>
 <div id="homeView" class="hidden"><button class="btn" id="bViewBack">← 返回客廳</button><button class="btn" id="bDive">🤿 潛入缸內</button></div><div id="fishCard" class="hidden"></div>
 <div id="homeUI"><div class="hh">點水族箱可以靠近觀賞・拖曳畫面轉頭</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn pri" id="bTankM">🐠 管理水族箱</button></div></div>
 <div id="toast"></div>
@@ -1924,6 +1929,7 @@ function render(){
     h+=tg('sound','音效','環境聲、捲線器、水花',Snd.isOn());
     h+=tg('vibe','震動','咬餌、拉扯時的手機震動',save.vibe!==false);
     h+=tg('uw','水下鏡頭','魚靠近餌時切到水下看牠咬餌',save.uw!==false);
+    h+=tg('scare','驚嚇效果','夜裡偶爾會有嚇人的事……心臟不好或小朋友玩請關閉',!save.noScare);
     h+=tg('imm','沉浸模式','隱藏上方大部分介面，只留設定和動作按鈕',!!save.imm);
     h+='<div class="note">真實魚模型：Barramundi Fish © Microsoft 2017，CC0 授權（Khronos glTF Sample Assets）</div>';
     h+='<div class="note">真實動物與魚類 3D 模型（Sketchfab，CC-BY 4.0）：<br>'+(window.__MDL?window.__MDL.credits():'')+'</div>';
@@ -2064,7 +2070,7 @@ shB.addEventListener('click',e=>{
     save.coins-=need.coins; m.scale-=need.scale; m.bone-=need.bone; m.pearl-=need.pearl; save.yacht=true; persist(); setCoins(); Snd.coin(); toast('🛥️ 老漁人的漁船修好了！可以出海了','good',3000); }
   else if(a==='go'){ close(); c.goSpot(+v); return; }
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
-  else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else save[v]=!(save[v]!==false); persist(); }
+  else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
   else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem('swampAngler.v1'); }catch(_){} location.reload(); return; } }
   render(); syncHUD();
@@ -4602,6 +4608,38 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
 window.addEventListener('resize',()=>{ if(on) resize(); });
 return {enter,exit,render,active:()=>on,scene,cam};
 }
+/* ===== 湖裡還有人等燈：阿蘅（夜裡偶爾出現的驚嚇事件，之後接隱藏章節） ===== */
+function createGhost(W,c){
+'use strict';
+const T=THREE, S=c.save, GL=T.GLTFLoader?new T.GLTFLoader():null;
+let model=null, loading=false, mats=[], ev=null, lastTry=0, sessionStart=performance.now();
+const ov=document.getElementById('scare'), face=ov&&ov.querySelector('img');
+// 條件：第六章（月潮）完成後、夜晚、湖區、沒關閉驚嚇效果、正在閒置或等魚
+function eligible(){ if(S.noScare) return false; if(!(S.story&&S.story.done&&S.story.done.includes('c5'))) return false;
+  if(c.period()!=='night'||c.loc()!=='lake') return false; const st=c.state(); if(st!=='idle'&&st!=='wait') return false;
+  if(performance.now()-sessionStart<5*60*1000) return false;   // 剛開始玩的前 5 分鐘不嚇人
+  const g=S.ghost=S.ghost||{}; const day=new Date().toDateString(); if(g.day!==day){ g.day=day; g.n=0; }
+  if(g.n>=2) return false; if(g.last&&Date.now()-g.last<40*60*1000) return false; return true; }
+function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=true;
+  GL.load('models/ghost.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ mt.emissive=new T.Color(0xbfc8d8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.55; mats.push(mt); } } });
+    o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
+    const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z);
+    model=new T.Group(); model.add(o); model.visible=false; W.scene.add(model); loading=false; fn(model); },undefined,()=>{ loading=false; }); }
+// 驚嚇流程：0.9 秒從水裡浮出來站在身旁 → 臉部特寫撲上來＋尖叫 1.3 秒 → 消失
+function trigger(force){ if(ev) return false; if(!force&&!eligible()) return false;
+  load(m=>{ const b=c.base(), h=c.head(), side=Math.random()<.5?-1:1, rt=new T.Vector3(Math.cos(h),0,-Math.sin(h)), fw=new T.Vector3(-Math.sin(h),0,-Math.cos(h));
+    const p=new T.Vector3(b.x,0,b.z).addScaledVector(rt,side*1.9).addScaledVector(fw,1.4); m.position.set(p.x,-1.7,p.z);
+    m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); m.visible=true; ev={t:0,side,p}; const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist();
+    if(c.onMeet) c.onMeet(g.met); c.drip&&c.drip(); }); return true; }
+function update(dt){
+  if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0; if(eligible()&&Math.random()<1/900) trigger(); } return; }   // 夜裡平均約 15 分鐘一次
+  ev.t+=dt; const t=ev.t;
+  if(model){ model.position.y=Math.min(0,-1.7+t*2.1); const b=c.base(); model.rotation.y=Math.atan2(b.x-ev.p.x,b.z-ev.p.z)+Math.sin(t*9)*.04; }
+  if(t>.9&&!ev.face){ ev.face=true; if(ov){ ov.classList.add('on'); } c.scream&&c.scream(); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
+  if(t>2.3){ if(model) model.visible=false; if(ov) ov.classList.remove('on'); ev=null; }
+}
+return {update,trigger,active:()=>!!ev};
+}
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
 'use strict';
@@ -4663,6 +4701,12 @@ const Snd=(()=>{
     bird(){ const b=2600+Math.random()*1200; for(let i=0;i<3;i++) tn(b+i*200,.07,'sine',.03,i*.09,b+600); },
     gator(){ nz(1.2,'lowpass',90,.8,.35); tn(55,1,'sawtooth',.05,0,40); },
     paddle(){ nz(.35,'bandpass',700,.8,.14,300); },
+    drip(){ tn(1200,.08,'sine',.05,0,300); },
+    scream(){ if(!ctx) return; const t=ctx.currentTime, o=ctx.createOscillator(), o2=ctx.createOscillator(), g=ctx.createGain(), lfo=ctx.createOscillator(), lg=ctx.createGain();
+      o.type='sawtooth'; o2.type='square'; o.frequency.setValueAtTime(850,t); o.frequency.exponentialRampToValueAtTime(1500,t+.35); o.frequency.exponentialRampToValueAtTime(1100,t+1.1);
+      o2.frequency.setValueAtTime(1710,t); o2.frequency.exponentialRampToValueAtTime(2900,t+.4); lfo.frequency.value=28; lg.gain.value=60; lfo.connect(lg); lg.connect(o.frequency);
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.45,t+.04); g.gain.setValueAtTime(.45,t+.8); g.gain.exponentialRampToValueAtTime(.001,t+1.25);
+      o.connect(g); o2.connect(g); g.connect(ctx.destination); o.start(t); o2.start(t); lfo.start(t); o.stop(t+1.3); o2.stop(t+1.3); lfo.stop(t+1.3); nz(.5,'highpass',2500,.6,.25,4000); },
     grind(){ nz(.06,'bandpass',1200+Math.random()*900,1.2,.05,500); },
     crackle(){ nz(.03+Math.random()*.05,'highpass',1800+Math.random()*2600,.8,.04+Math.random()*.06,900); },
     plip(){ tn(900,.05,'sine',.03,0,500); nz(.08,'bandpass',2500,1.5,.03); },
@@ -4884,6 +4928,8 @@ $('bHome').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; c
     if(HOME.mount(G.fd,at)){ toast('做成標本，掛在小屋的牆上了','good',1800); finishCatch('keep'); } return; }
   toast(b.dataset.why||'現在不能帶回家','warn',2200); });
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
+const GHOST=createGhost(W,{save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>G.state,base:()=>G.base,head:()=>G.head,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; }});
+window.__GHOST=GHOST;
 const HOME3D=createHomeScene(W,{hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
   crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(),
@@ -5165,7 +5211,7 @@ W.setTime(G.hour,true);
 let last=performance.now(), prAcc=0, prN=0, prChecks=0;
 function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
-  try{ update(dt); guardUW(); MDL.glowTick(); if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
+  try{ update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()) GHOST.update(dt); if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
   if(prAcc>2){ const avg=prAcc/prN; if(prChecks<10&&avg>1/40&&W.getPR()>1.01) W.setPR(Math.max(1,W.getPR()-.25)); if(prChecks===9&&avg>1/30&&(save.gfx||'high')==='high'&&!G.gfxHint){ G.gfxHint=true; toast('畫面有點卡，可以到設定把畫質調成「中」或「低」','warn',3500); } prChecks++; prAcc=0; prN=0; }
   requestAnimationFrame(frame);

@@ -59,6 +59,12 @@ const Snd=(()=>{
     bird(){ const b=2600+Math.random()*1200; for(let i=0;i<3;i++) tn(b+i*200,.07,'sine',.03,i*.09,b+600); },
     gator(){ nz(1.2,'lowpass',90,.8,.35); tn(55,1,'sawtooth',.05,0,40); },
     paddle(){ nz(.35,'bandpass',700,.8,.14,300); },
+    drip(){ tn(1200,.08,'sine',.05,0,300); },
+    scream(){ if(!ctx) return; const t=ctx.currentTime, o=ctx.createOscillator(), o2=ctx.createOscillator(), g=ctx.createGain(), lfo=ctx.createOscillator(), lg=ctx.createGain();
+      o.type='sawtooth'; o2.type='square'; o.frequency.setValueAtTime(850,t); o.frequency.exponentialRampToValueAtTime(1500,t+.35); o.frequency.exponentialRampToValueAtTime(1100,t+1.1);
+      o2.frequency.setValueAtTime(1710,t); o2.frequency.exponentialRampToValueAtTime(2900,t+.4); lfo.frequency.value=28; lg.gain.value=60; lfo.connect(lg); lg.connect(o.frequency);
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.45,t+.04); g.gain.setValueAtTime(.45,t+.8); g.gain.exponentialRampToValueAtTime(.001,t+1.25);
+      o.connect(g); o2.connect(g); g.connect(ctx.destination); o.start(t); o2.start(t); lfo.start(t); o.stop(t+1.3); o2.stop(t+1.3); lfo.stop(t+1.3); nz(.5,'highpass',2500,.6,.25,4000); },
     grind(){ nz(.06,'bandpass',1200+Math.random()*900,1.2,.05,500); },
     crackle(){ nz(.03+Math.random()*.05,'highpass',1800+Math.random()*2600,.8,.04+Math.random()*.06,900); },
     plip(){ tn(900,.05,'sine',.03,0,500); nz(.08,'bandpass',2500,1.5,.03); },
@@ -280,6 +286,8 @@ $('bHome').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; c
     if(HOME.mount(G.fd,at)){ toast('做成標本，掛在小屋的牆上了','good',1800); finishCatch('keep'); } return; }
   toast(b.dataset.why||'現在不能帶回家','warn',2200); });
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
+const GHOST=createGhost(W,{save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>G.state,base:()=>G.base,head:()=>G.head,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; }});
+window.__GHOST=GHOST;
 const HOME3D=createHomeScene(W,{hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
   crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(),
@@ -561,7 +569,7 @@ W.setTime(G.hour,true);
 let last=performance.now(), prAcc=0, prN=0, prChecks=0;
 function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
-  try{ update(dt); guardUW(); MDL.glowTick(); if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
+  try{ update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()) GHOST.update(dt); if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
   if(prAcc>2){ const avg=prAcc/prN; if(prChecks<10&&avg>1/40&&W.getPR()>1.01) W.setPR(Math.max(1,W.getPR()-.25)); if(prChecks===9&&avg>1/30&&(save.gfx||'high')==='high'&&!G.gfxHint){ G.gfxHint=true; toast('畫面有點卡，可以到設定把畫質調成「中」或「低」','warn',3500); } prChecks++; prAcc=0; prN=0; }
   requestAnimationFrame(frame);

@@ -350,6 +350,7 @@ function render(){
     h+=tg('sound','音效','環境聲、捲線器、水花',Snd.isOn());
     h+=tg('vibe','震動','咬餌、拉扯時的手機震動',save.vibe!==false);
     h+=tg('uw','水下鏡頭','魚靠近餌時切到水下看牠咬餌',save.uw!==false);
+    h+=tg('scare','驚嚇效果','夜裡偶爾會有嚇人的事……心臟不好或小朋友玩請關閉',!save.noScare);
     h+=tg('imm','沉浸模式','隱藏上方大部分介面，只留設定和動作按鈕',!!save.imm);
     h+='<div class="note">真實魚模型：Barramundi Fish © Microsoft 2017，CC0 授權（Khronos glTF Sample Assets）</div>';
     h+='<div class="note">真實動物與魚類 3D 模型（Sketchfab，CC-BY 4.0）：<br>'+(window.__MDL?window.__MDL.credits():'')+'</div>';
@@ -490,7 +491,7 @@ shB.addEventListener('click',e=>{
     save.coins-=need.coins; m.scale-=need.scale; m.bone-=need.bone; m.pearl-=need.pearl; save.yacht=true; persist(); setCoins(); Snd.coin(); toast('🛥️ 老漁人的漁船修好了！可以出海了','good',3000); }
   else if(a==='go'){ close(); c.goSpot(+v); return; }
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
-  else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else save[v]=!(save[v]!==false); persist(); }
+  else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
   else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem('swampAngler.v1'); }catch(_){} location.reload(); return; } }
   render(); syncHUD();

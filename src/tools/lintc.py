@@ -1,5 +1,5 @@
 import re,sys
-files=['b.js','c.js','d.js','e.js','f.js','g.js','h.js','i.js','j.js','k.js','l.js','m.js','n.js','o.js','p.js','q.js','r.js','s.js','t.js','u.js','v.js','w.js']
+files=['b.js','c.js','d.js','e.js','f.js','g.js','h.js','i.js','j.js','k.js','l.js','m.js','n.js','o.js','p.js','q.js','r.js','s.js','t.js','u.js','v.js','w.js','x.js']
 bad=0
 for f in files:
     for n,line in enumerate(open(f,encoding='utf-8').read().split('\n'),1):

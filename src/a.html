@@ -217,6 +217,10 @@ body.sheetOn #homeUI,body.sheetOn #homeView,body.sheetOn #fishCard{display:none!
 #fishCard b{font-size:19px;color:var(--rc,#e9c46a)}#fishCard small{opacity:.7;margin-left:6px}#fishCard .fg{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;margin-top:8px;font-size:14px}#fishCard .fg span{opacity:.6}
 body.athome #drops,body.athome #flare,body.athome #act,body.athome #joy,body.athome #fight,body.athome #top2,body.athome #hotChip,body.athome #combo,body.athome #castTag,body.athome #fxBar,body.athome #bCam,body.athome #bTour,body.athome #pop,body.athome #bGoal{display:none!important}
 .btn.home{display:block;width:100%;margin-top:8px;padding:10px;font-size:15px;background:rgba(120,90,50,.55);border:1px solid rgba(255,220,160,.35)}.btn.home.dim{opacity:.45}.btn.home.hidden{display:none}
+#scare{position:fixed;inset:0;z-index:60;background:#000;display:none;align-items:center;justify-content:center;overflow:hidden;pointer-events:none}
+#scare.on{display:flex;animation:scareBg 1.4s steps(1) forwards}#scare img{width:160vw;max-width:none;animation:scareIn 1.4s cubic-bezier(.1,.9,.2,1) forwards;filter:contrast(1.25) brightness(.9)}
+@keyframes scareIn{0%{transform:scale(.55) translate(2%,6%);opacity:0}8%{opacity:1;transform:scale(.9) translate(-1%,-2%)}40%{transform:scale(1.18) translate(1%,1%)}60%{transform:scale(1.12) translate(-2%,0)}100%{transform:scale(1.3) translate(0,2%);opacity:0}}
+@keyframes scareBg{0%{opacity:1}85%{opacity:1}100%{opacity:0}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -245,6 +249,7 @@ body.athome #drops,body.athome #flare,body.athome #act,body.athome #joy,body.ath
   <button class="chip sm" id="bGoal" aria-label="目標與成就">🎯</button>
   <button class="chip sm" id="bCam" aria-label="拍照">📷</button>
 </div>
+<div id="scare"><img src="ghost_face.jpg" alt=""></div>
 <div id="homeView" class="hidden"><button class="btn" id="bViewBack">← 返回客廳</button><button class="btn" id="bDive">🤿 潛入缸內</button></div><div id="fishCard" class="hidden"></div>
 <div id="homeUI"><div class="hh">點水族箱可以靠近觀賞・拖曳畫面轉頭</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn pri" id="bTankM">🐠 管理水族箱</button></div></div>
 <div id="toast"></div>
