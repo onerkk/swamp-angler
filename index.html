@@ -4493,7 +4493,7 @@ function buildTank(water,spec,x){
   for(let i=0;i<3+Math.round(spec.w*2);i++){ const r=add(new T.DodecahedronGeometry(.04+Math.random()*.06,0),rockM,(Math.random()-.5)*(spec.w-.2),y+.08,-spec.d/2+.08+Math.random()*spec.d*.35); r.scale.y=.6; r.rotation.y=Math.random()*6; }
   const plants=[];
   // 水草：遊戲裡的真實蕨類模型縮小當作水草；沉木用枯枝模型
-  const K=Math.round(spec.w*4.5); for(let i=0;i<K;i++){ const ph=Math.random()*6, px=(Math.random()-.5)*(spec.w-.3), pz=-spec.d/2+.06+Math.random()*spec.d*.45, sc=.16+Math.random()*.14;
+  const K=Math.round(spec.w*3); for(let i=0;i<K;i++){ const ph=Math.random()*6, px=(Math.random()-.5)*(spec.w-.3), pz=-spec.d/2+.06+Math.random()*spec.d*.45, sc=.16+Math.random()*.14;
     GL.load('fern_02.glb',gg=>{ const o=gg.scene.clone(true); o.position.set(px,y+.06,pz); o.rotation.y=Math.random()*6; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); plants.push({o,ph}); }); }
   const woods=spec.w>2.5?[[-.3,-.1,.6,.3],[.28,.05,2.6,.26]]:spec.w>1.1?[[-.22,-.1,.6,.28]]:[];
   woods.forEach(([fx,fz,ry,sc])=>GL.load('dry_branches_medium_01.glb',gg=>{ const o=gg.scene.clone(true); o.position.set(spec.w*fx,y+.07,spec.d*fz); o.rotation.set(0,ry,0); o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); }));
@@ -5044,8 +5044,9 @@ function updateFight(dt){
   if(f.d>MAX_LINE) return lose('spool');
   if(f.d<(G.spot===0?4.0:2.6)){
     // 魚還有力氣就拉不上來：靠近時再衝出去，要遛到沒力才能收進來
-    if(f.stam<=25) return land();
-    f.d+=2+Math.random()*2; f.run=true; f.phaseT=rand(1,1.8); P.splash(G.to.x,0,G.to.z,14,.8); vib([30,20,40]);
+    // 衝出去會消耗魚的體力，最多衝兩次；體力低於 45% 或衝過兩次就拉得上來
+    f.surges=f.surges||0; if(f.stam<=45||f.surges>=2) return land();
+    f.surges++; f.stam=Math.max(0,f.stam-25); f.d+=2+Math.random()*2; f.run=true; f.phaseT=rand(1,1.8); P.splash(G.to.x,0,G.to.z,14,.8); vib([30,20,40]);
     if(!f.surgeTip){ f.surgeTip=1; toast('魚還有力氣，又衝出去了','warn',1500); } }
 }
 

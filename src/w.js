@@ -152,7 +152,7 @@ function buildTank(water,spec,x){
   for(let i=0;i<3+Math.round(spec.w*2);i++){ const r=add(new T.DodecahedronGeometry(.04+Math.random()*.06,0),rockM,(Math.random()-.5)*(spec.w-.2),y+.08,-spec.d/2+.08+Math.random()*spec.d*.35); r.scale.y=.6; r.rotation.y=Math.random()*6; }
   const plants=[];
   // 水草：遊戲裡的真實蕨類模型縮小當作水草；沉木用枯枝模型
-  const K=Math.round(spec.w*4.5); for(let i=0;i<K;i++){ const ph=Math.random()*6, px=(Math.random()-.5)*(spec.w-.3), pz=-spec.d/2+.06+Math.random()*spec.d*.45, sc=.16+Math.random()*.14;
+  const K=Math.round(spec.w*3); for(let i=0;i<K;i++){ const ph=Math.random()*6, px=(Math.random()-.5)*(spec.w-.3), pz=-spec.d/2+.06+Math.random()*spec.d*.45, sc=.16+Math.random()*.14;
     GL.load('fern_02.glb',gg=>{ const o=gg.scene.clone(true); o.position.set(px,y+.06,pz); o.rotation.y=Math.random()*6; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); plants.push({o,ph}); }); }
   const woods=spec.w>2.5?[[-.3,-.1,.6,.3],[.28,.05,2.6,.26]]:spec.w>1.1?[[-.22,-.1,.6,.28]]:[];
   woods.forEach(([fx,fz,ry,sc])=>GL.load('dry_branches_medium_01.glb',gg=>{ const o=gg.scene.clone(true); o.position.set(spec.w*fx,y+.07,spec.d*fz); o.rotation.set(0,ry,0); o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); }));
