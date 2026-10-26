@@ -304,22 +304,38 @@ function cookMat(m){ const k=m.clone(); k.onBeforeCompile=sh=>{ sh.uniforms.uCA=
   k.customProgramCacheKey=()=>'grillfish'; k.needsUpdate=true; return k; }
 GR.uA={value:0}; GR.uB={value:0};
 function pickFish(){ const list=(c.save.cooler||[]); if(!list.length){ c.toast&&c.toast('保冷箱是空的：釣到魚時按「🔥 放進保冷箱」','warn',2600); return; }
-  pickUI.innerHTML='<div style="font-weight:700;margin-bottom:6px">保冷箱（'+list.length+'/5）・選一條來烤</div>'+list.map((r,i)=>{ const sp=c.species(r.id); return `<div class="it"><span>${sp?sp.name:r.id}　<small>${Math.round(r.L*100)} 公分</small></span><button class="sbtn pri" data-g="${i}">烤這條</button></div>`; }).join('')+'<div style="text-align:right;margin-top:8px"><button class="sbtn" data-g="x">關閉</button></div>';
+  const inv=c.save.inv=c.save.inv||{}, sea=GR.season||'salt';
+  const SZ=[['salt','🧂 鹽','免費・效果時間 +20%',null],['lemon','🍋 檸檬','完美的範圍變寬・效果時間 +30%',150],['herb','🌿 香草','完美時再多一個效果（咬餌更快）',300]];
+  const sz=SZ.map(([id,n,d,p])=>{ const have=p===null?'∞':(inv[id]||0), on=sea===id;
+    return `<div class="it"><span>${n} <small>${d}</small><br><small style="opacity:.7">持有 ${have}</small></span><span>${p!==null?`<button class="sbtn" data-buy="${id}" data-p="${p}">買 🪙${p}</button> `:''}<button class="sbtn${on?' pri':''}" data-sz="${id}">${on?'使用中':'使用'}</button></span></div>`; }).join('');
+  const ck=c.save.cook||{}, perf=Object.keys(ck).filter(k=>ck[k].best>=3);
+  const dex=`<div style="margin-top:10px;font-weight:700">📖 料理圖鑑：完美 ${perf.length} 種</div><div style="font-size:12px;opacity:.85;line-height:1.8">${Object.keys(ck).map(k=>{ const sp=c.species(k); return (sp?sp.name:k)+(ck[k].best>=3?'⭐':ck[k].best>=1?'🟡':'⚫'); }).join('　')||'還沒烤過魚'}</div>`;
+  pickUI.innerHTML='<div style="font-weight:700;margin-bottom:6px">保冷箱（'+list.length+'/5）・選一條來烤</div>'+list.map((r,i)=>{ const sp=c.species(r.id); return `<div class="it"><span>${sp?sp.name:r.id}　<small>${Math.round(r.L*100)} 公分</small></span><button class="sbtn pri" data-g="${i}">烤這條</button></div>`; }).join('')
+    +'<div style="margin-top:10px;font-weight:700">調味</div>'+sz+dex+'<div style="text-align:right;margin-top:8px"><button class="sbtn" data-g="x">關閉</button></div>';
   pickUI.classList.remove('hidden'); document.body.classList.add('grilling'); }
-pickUI.addEventListener('click',e=>{ const b=e.target.closest('[data-g]'); if(!b) return; pickUI.classList.add('hidden'); if(b.dataset.g==='x'){ document.body.classList.remove('grilling'); return; } startGrill(+b.dataset.g); });
+pickUI.addEventListener('click',e=>{ const bz=e.target.closest('[data-sz],[data-buy]');
+  if(bz){ if(bz.dataset.buy){ if(c.buy&&c.buy(bz.dataset.buy,+bz.dataset.p)){ c.save.inv[bz.dataset.buy]=(c.save.inv[bz.dataset.buy]||0)+1; c.persist&&c.persist(); } }
+    else { const id=bz.dataset.sz; if(id!=='salt'&&!(c.save.inv[id]>0)){ c.toast&&c.toast('先買一份','warn',1400); return; } GR.season=id; }
+    document.body.classList.remove('grilling'); pickFish(); return; }
+  if(e.target.closest('[data-eat]')) return; const b=e.target.closest('[data-g]'); if(!b) return; pickUI.classList.add('hidden'); if(b.dataset.g==='x'){ document.body.classList.remove('grilling'); return; } startGrill(+b.dataset.g); });
 function startGrill(i){ const rec=(c.save.cooler||[])[i]; if(!rec) return; const sp=c.species(rec.id); if(!sp){ document.body.classList.remove('grilling'); return; }
   const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
   src.traverse(o=>{ o.visible=true; o.frustumCulled=false; if(o.isMesh&&o.material){ const ms=Array.isArray(o.material)?o.material:[o.material]; const nm=ms.map(cookMat); o.material=Array.isArray(o.material)?nm:nm[0]; } });
   const L=Math.min(.55,Math.max(.18,rec.L)); const w=new T.Group(); w.add(src); w.scale.setScalar(L); w.rotation.y=Math.PI/2;
   spin.clear(); spin.add(w); spin.rotation.set(0,0,0); rig.visible=true;
   const need=7+Math.min(14,Math.sqrt(rec.w||.5)*6);
-  Object.assign(GR,{on:true,i,rec,sp,a:0,b:0,face:0,flipT:0,need,t:0,dripT:1,smT:0}); GR.uA.value=0; GR.uB.value=0;
+  let season=GR.season||'salt'; if(season!=='salt'){ const inv=c.save.inv||{}; if((inv[season]||0)>0) inv[season]--; else season='salt'; }
+  Object.assign(GR,{on:true,i,rec,sp,a:0,b:0,face:0,flipT:0,need,t:0,dripT:1,smT:0,useSeason:season}); GR.uA.value=0; GR.uB.value=0;
   document.getElementById('gTitle').textContent='烤 '+sp.name+'（約 '+Math.round(need)+' 秒一面）';
   grillUI.classList.remove('hidden'); pickUI.classList.add('hidden'); document.body.classList.add('grilling'); mode='grill'; }
 function endGrill(){ GR.on=false; rig.visible=false; spin.clear(); grillUI.classList.add('hidden'); document.body.classList.remove('grilling'); mode='room'; smokes.forEach(s=>{ s.m.visible=false; }); flare.visible=false; }
 document.getElementById('gFlip').addEventListener('click',()=>{ if(!GR.on||GR.flipT>0) return; GR.flipT=.6; c.sizzle&&c.sizzle(.6); });
 document.getElementById('gQuit').addEventListener('click',()=>{ if(!GR.on) return; endGrill(); });
-document.getElementById('gDone').addEventListener('click',()=>{ if(!GR.on) return; const r=GR.rec, a=GR.a, b=GR.b; c.save.cooler.splice(GR.i,1); c.persist&&c.persist(); endGrill(); if(c.onGrilled) c.onGrilled(r,a,b); });
+document.getElementById('gDone').addEventListener('click',()=>{ if(!GR.on) return; const r=GR.rec, a=GR.a, b=GR.b, sz=GR.useSeason; c.save.cooler.splice(GR.i,1); c.persist&&c.persist(); endGrill();
+  const sp=c.species(r.id); pickUI.innerHTML=`<div style="font-weight:700;margin-bottom:8px">🍽 ${sp?sp.name:''}起鍋了</div><div style="font-size:13px;opacity:.85;margin-bottom:10px">要自己吃，還是招待來訪的釣友？</div>
+    <div class="gbtns" style="display:flex;gap:8px"><button class="btn pri" data-eat="me" style="flex:1;padding:10px">自己吃（得到效果）</button><button class="btn" data-eat="friend" style="flex:1;padding:10px">招待釣友（金幣＋魚餌）</button></div>`;
+  pickUI.classList.remove('hidden'); document.body.classList.add('grilling');
+  pickUI.onclick=e=>{ const bt=e.target.closest('[data-eat]'); if(!bt) return; pickUI.onclick=null; pickUI.classList.add('hidden'); document.body.classList.remove('grilling'); if(c.onGrilled) c.onGrilled(r,a,b,sz,bt.dataset.eat); }; });
 const grade=x=>x<.55?'生':x<.78?'半熟':x<.92?'完美':'焦';
 function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
   // 翻面：整支鐵叉轉 180 度

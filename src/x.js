@@ -19,7 +19,10 @@ function updLamp(dt,t){ const want=lampWanted(); if(want&&!lamp){ loadLamp(()=>{
 let tt=0;
 const ov=document.getElementById('scare'), face=ov&&ov.querySelector('img');
 // 條件：第六章（月潮）完成後、夜晚、湖區、沒關閉驚嚇效果、正在閒置或等魚
-function eligible(){ if(S.noScare) return false; if(!(S.story&&S.story.done&&S.story.done.includes('c5'))) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
+// 測試模式：網址加上 ghost 測試參數，不看章節、時段、次數，閒置或等魚約 5 秒出現、間隔 30 秒（只影響開這一頁的人）
+const TEST=/[?&]ghost=1/.test(location.search); let testLast=0;
+function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wait')&&!ev&&performance.now()-testLast>30000&&performance.now()-sessionStart>5000; }
+  if(S.noScare) return false; if(!(S.story&&S.story.done&&S.story.done.includes('c5'))) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
   if(c.period()!=='night'||c.loc()!=='lake') return false; const st=c.state(); if(st!=='idle'&&st!=='wait') return false;
   if(performance.now()-sessionStart<5*60*1000) return false;   // 剛開始玩的前 5 分鐘不嚇人
   const g=S.ghost=S.ghost||{}; const day=new Date().toDateString(); if(g.day!==day){ g.day=day; g.n=0; }
@@ -33,12 +36,11 @@ function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=
 function trigger(force){ if(ev) return false; if(!force&&!eligible()) return false;
   load(m=>{ const b=c.base(), h=c.head(), side=Math.random()<.5?-1:1, rt=new T.Vector3(Math.cos(h),0,-Math.sin(h)), fw=new T.Vector3(-Math.sin(h),0,-Math.cos(h));
     const p=new T.Vector3(b.x,0,b.z).addScaledVector(rt,side*1.9).addScaledVector(fw,1.4); m.position.set(p.x,-1.7,p.z);
-    m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); m.visible=true; ev={t:0,side,p}; if(window.__FACE) window.__FACE(p,{dur:2.4,snap:false,pitch:.05}); const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist();
-    if(c.onMeet) c.onMeet(g.met); c.drip&&c.drip(); }); return true; }
+    m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); m.visible=true; ev={t:0,side,p}; if(window.__FACE) window.__FACE(p,{dur:2.4,snap:false,pitch:.05}); if(!TEST){ const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist(); if(c.onMeet) c.onMeet(g.met); } c.drip&&c.drip(); }); return true; }
 function update(dt){
   if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0;
-      if(!model&&!loading&&!S.noScare&&S.story&&S.story.done&&S.story.done.includes('c5')&&c.period()==='night'&&c.loc()==='lake') load(()=>{});   // 夜裡先悄悄載入，第一次出現才不會延遲
-      if(eligible()&&Math.random()<1/900) trigger(); } return; }   // 夜裡平均約 15 分鐘一次
+      if(!model&&!loading&&(TEST||!S.noScare&&S.story&&S.story.done&&S.story.done.includes('c5')&&c.period()==='night'&&c.loc()==='lake')) load(()=>{});   // 夜裡先悄悄載入，第一次出現才不會延遲
+      if(eligible()&&(TEST||Math.random()<1/900)){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }   // 夜裡平均約 15 分鐘一次
   ev.t+=dt; const t=ev.t;
   if(model){ model.position.y=Math.min(0,-1.7+t*2.1); const b=c.base(); model.rotation.y=Math.atan2(b.x-ev.p.x,b.z-ev.p.z)+Math.sin(t*9)*.04; }
   if(t>.9&&!ev.face){ ev.face=true; if(ov){ ov.classList.add('on'); } c.scream&&c.scream(); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
@@ -68,7 +70,7 @@ function updCalm(dt){ if(calm){ calm.t+=dt; if(alive){ if(calm.t<2) setOpacity(a
   calmTry+=dt; if(calmTry<60) return; calmTry=0; if(c.period()!=='night'||c.loc()!=='lake'||Math.random()>.08) return;
   loadAlive(m=>{ placeAhead(m,12,(Math.random()-.5)*8); m.visible=true; setOpacity(m,0); calm={t:0}; }); }
 function update2(dt){ tt+=dt; updLamp(dt,tt); if(fin){ updFinale(dt); return; }
-  if(c.storyDone&&c.storyDone('lantern')){ updCalm(dt); return; }
+  if(!TEST&&c.storyDone&&c.storyDone('lantern')){ updCalm(dt); return; }
   if(!ev&&finaleReady()&&!aliveLoading){ startFinale(); return; }
   update(dt); }
 return {update:update2,trigger,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};

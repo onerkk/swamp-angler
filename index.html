@@ -4715,22 +4715,38 @@ function cookMat(m){ const k=m.clone(); k.onBeforeCompile=sh=>{ sh.uniforms.uCA=
   k.customProgramCacheKey=()=>'grillfish'; k.needsUpdate=true; return k; }
 GR.uA={value:0}; GR.uB={value:0};
 function pickFish(){ const list=(c.save.cooler||[]); if(!list.length){ c.toast&&c.toast('保冷箱是空的：釣到魚時按「🔥 放進保冷箱」','warn',2600); return; }
-  pickUI.innerHTML='<div style="font-weight:700;margin-bottom:6px">保冷箱（'+list.length+'/5）・選一條來烤</div>'+list.map((r,i)=>{ const sp=c.species(r.id); return `<div class="it"><span>${sp?sp.name:r.id}　<small>${Math.round(r.L*100)} 公分</small></span><button class="sbtn pri" data-g="${i}">烤這條</button></div>`; }).join('')+'<div style="text-align:right;margin-top:8px"><button class="sbtn" data-g="x">關閉</button></div>';
+  const inv=c.save.inv=c.save.inv||{}, sea=GR.season||'salt';
+  const SZ=[['salt','🧂 鹽','免費・效果時間 +20%',null],['lemon','🍋 檸檬','完美的範圍變寬・效果時間 +30%',150],['herb','🌿 香草','完美時再多一個效果（咬餌更快）',300]];
+  const sz=SZ.map(([id,n,d,p])=>{ const have=p===null?'∞':(inv[id]||0), on=sea===id;
+    return `<div class="it"><span>${n} <small>${d}</small><br><small style="opacity:.7">持有 ${have}</small></span><span>${p!==null?`<button class="sbtn" data-buy="${id}" data-p="${p}">買 🪙${p}</button> `:''}<button class="sbtn${on?' pri':''}" data-sz="${id}">${on?'使用中':'使用'}</button></span></div>`; }).join('');
+  const ck=c.save.cook||{}, perf=Object.keys(ck).filter(k=>ck[k].best>=3);
+  const dex=`<div style="margin-top:10px;font-weight:700">📖 料理圖鑑：完美 ${perf.length} 種</div><div style="font-size:12px;opacity:.85;line-height:1.8">${Object.keys(ck).map(k=>{ const sp=c.species(k); return (sp?sp.name:k)+(ck[k].best>=3?'⭐':ck[k].best>=1?'🟡':'⚫'); }).join('　')||'還沒烤過魚'}</div>`;
+  pickUI.innerHTML='<div style="font-weight:700;margin-bottom:6px">保冷箱（'+list.length+'/5）・選一條來烤</div>'+list.map((r,i)=>{ const sp=c.species(r.id); return `<div class="it"><span>${sp?sp.name:r.id}　<small>${Math.round(r.L*100)} 公分</small></span><button class="sbtn pri" data-g="${i}">烤這條</button></div>`; }).join('')
+    +'<div style="margin-top:10px;font-weight:700">調味</div>'+sz+dex+'<div style="text-align:right;margin-top:8px"><button class="sbtn" data-g="x">關閉</button></div>';
   pickUI.classList.remove('hidden'); document.body.classList.add('grilling'); }
-pickUI.addEventListener('click',e=>{ const b=e.target.closest('[data-g]'); if(!b) return; pickUI.classList.add('hidden'); if(b.dataset.g==='x'){ document.body.classList.remove('grilling'); return; } startGrill(+b.dataset.g); });
+pickUI.addEventListener('click',e=>{ const bz=e.target.closest('[data-sz],[data-buy]');
+  if(bz){ if(bz.dataset.buy){ if(c.buy&&c.buy(bz.dataset.buy,+bz.dataset.p)){ c.save.inv[bz.dataset.buy]=(c.save.inv[bz.dataset.buy]||0)+1; c.persist&&c.persist(); } }
+    else { const id=bz.dataset.sz; if(id!=='salt'&&!(c.save.inv[id]>0)){ c.toast&&c.toast('先買一份','warn',1400); return; } GR.season=id; }
+    document.body.classList.remove('grilling'); pickFish(); return; }
+  if(e.target.closest('[data-eat]')) return; const b=e.target.closest('[data-g]'); if(!b) return; pickUI.classList.add('hidden'); if(b.dataset.g==='x'){ document.body.classList.remove('grilling'); return; } startGrill(+b.dataset.g); });
 function startGrill(i){ const rec=(c.save.cooler||[])[i]; if(!rec) return; const sp=c.species(rec.id); if(!sp){ document.body.classList.remove('grilling'); return; }
   const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
   src.traverse(o=>{ o.visible=true; o.frustumCulled=false; if(o.isMesh&&o.material){ const ms=Array.isArray(o.material)?o.material:[o.material]; const nm=ms.map(cookMat); o.material=Array.isArray(o.material)?nm:nm[0]; } });
   const L=Math.min(.55,Math.max(.18,rec.L)); const w=new T.Group(); w.add(src); w.scale.setScalar(L); w.rotation.y=Math.PI/2;
   spin.clear(); spin.add(w); spin.rotation.set(0,0,0); rig.visible=true;
   const need=7+Math.min(14,Math.sqrt(rec.w||.5)*6);
-  Object.assign(GR,{on:true,i,rec,sp,a:0,b:0,face:0,flipT:0,need,t:0,dripT:1,smT:0}); GR.uA.value=0; GR.uB.value=0;
+  let season=GR.season||'salt'; if(season!=='salt'){ const inv=c.save.inv||{}; if((inv[season]||0)>0) inv[season]--; else season='salt'; }
+  Object.assign(GR,{on:true,i,rec,sp,a:0,b:0,face:0,flipT:0,need,t:0,dripT:1,smT:0,useSeason:season}); GR.uA.value=0; GR.uB.value=0;
   document.getElementById('gTitle').textContent='烤 '+sp.name+'（約 '+Math.round(need)+' 秒一面）';
   grillUI.classList.remove('hidden'); pickUI.classList.add('hidden'); document.body.classList.add('grilling'); mode='grill'; }
 function endGrill(){ GR.on=false; rig.visible=false; spin.clear(); grillUI.classList.add('hidden'); document.body.classList.remove('grilling'); mode='room'; smokes.forEach(s=>{ s.m.visible=false; }); flare.visible=false; }
 document.getElementById('gFlip').addEventListener('click',()=>{ if(!GR.on||GR.flipT>0) return; GR.flipT=.6; c.sizzle&&c.sizzle(.6); });
 document.getElementById('gQuit').addEventListener('click',()=>{ if(!GR.on) return; endGrill(); });
-document.getElementById('gDone').addEventListener('click',()=>{ if(!GR.on) return; const r=GR.rec, a=GR.a, b=GR.b; c.save.cooler.splice(GR.i,1); c.persist&&c.persist(); endGrill(); if(c.onGrilled) c.onGrilled(r,a,b); });
+document.getElementById('gDone').addEventListener('click',()=>{ if(!GR.on) return; const r=GR.rec, a=GR.a, b=GR.b, sz=GR.useSeason; c.save.cooler.splice(GR.i,1); c.persist&&c.persist(); endGrill();
+  const sp=c.species(r.id); pickUI.innerHTML=`<div style="font-weight:700;margin-bottom:8px">🍽 ${sp?sp.name:''}起鍋了</div><div style="font-size:13px;opacity:.85;margin-bottom:10px">要自己吃，還是招待來訪的釣友？</div>
+    <div class="gbtns" style="display:flex;gap:8px"><button class="btn pri" data-eat="me" style="flex:1;padding:10px">自己吃（得到效果）</button><button class="btn" data-eat="friend" style="flex:1;padding:10px">招待釣友（金幣＋魚餌）</button></div>`;
+  pickUI.classList.remove('hidden'); document.body.classList.add('grilling');
+  pickUI.onclick=e=>{ const bt=e.target.closest('[data-eat]'); if(!bt) return; pickUI.onclick=null; pickUI.classList.add('hidden'); document.body.classList.remove('grilling'); if(c.onGrilled) c.onGrilled(r,a,b,sz,bt.dataset.eat); }; });
 const grade=x=>x<.55?'生':x<.78?'半熟':x<.92?'完美':'焦';
 function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
   // 翻面：整支鐵叉轉 180 度
@@ -4795,7 +4811,10 @@ function updLamp(dt,t){ const want=lampWanted(); if(want&&!lamp){ loadLamp(()=>{
 let tt=0;
 const ov=document.getElementById('scare'), face=ov&&ov.querySelector('img');
 // 條件：第六章（月潮）完成後、夜晚、湖區、沒關閉驚嚇效果、正在閒置或等魚
-function eligible(){ if(S.noScare) return false; if(!(S.story&&S.story.done&&S.story.done.includes('c5'))) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
+// 測試模式：網址加上 ghost 測試參數，不看章節、時段、次數，閒置或等魚約 5 秒出現、間隔 30 秒（只影響開這一頁的人）
+const TEST=/[?&]ghost=1/.test(location.search); let testLast=0;
+function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wait')&&!ev&&performance.now()-testLast>30000&&performance.now()-sessionStart>5000; }
+  if(S.noScare) return false; if(!(S.story&&S.story.done&&S.story.done.includes('c5'))) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
   if(c.period()!=='night'||c.loc()!=='lake') return false; const st=c.state(); if(st!=='idle'&&st!=='wait') return false;
   if(performance.now()-sessionStart<5*60*1000) return false;   // 剛開始玩的前 5 分鐘不嚇人
   const g=S.ghost=S.ghost||{}; const day=new Date().toDateString(); if(g.day!==day){ g.day=day; g.n=0; }
@@ -4809,12 +4828,11 @@ function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=
 function trigger(force){ if(ev) return false; if(!force&&!eligible()) return false;
   load(m=>{ const b=c.base(), h=c.head(), side=Math.random()<.5?-1:1, rt=new T.Vector3(Math.cos(h),0,-Math.sin(h)), fw=new T.Vector3(-Math.sin(h),0,-Math.cos(h));
     const p=new T.Vector3(b.x,0,b.z).addScaledVector(rt,side*1.9).addScaledVector(fw,1.4); m.position.set(p.x,-1.7,p.z);
-    m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); m.visible=true; ev={t:0,side,p}; if(window.__FACE) window.__FACE(p,{dur:2.4,snap:false,pitch:.05}); const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist();
-    if(c.onMeet) c.onMeet(g.met); c.drip&&c.drip(); }); return true; }
+    m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); m.visible=true; ev={t:0,side,p}; if(window.__FACE) window.__FACE(p,{dur:2.4,snap:false,pitch:.05}); if(!TEST){ const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist(); if(c.onMeet) c.onMeet(g.met); } c.drip&&c.drip(); }); return true; }
 function update(dt){
   if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0;
-      if(!model&&!loading&&!S.noScare&&S.story&&S.story.done&&S.story.done.includes('c5')&&c.period()==='night'&&c.loc()==='lake') load(()=>{});   // 夜裡先悄悄載入，第一次出現才不會延遲
-      if(eligible()&&Math.random()<1/900) trigger(); } return; }   // 夜裡平均約 15 分鐘一次
+      if(!model&&!loading&&(TEST||!S.noScare&&S.story&&S.story.done&&S.story.done.includes('c5')&&c.period()==='night'&&c.loc()==='lake')) load(()=>{});   // 夜裡先悄悄載入，第一次出現才不會延遲
+      if(eligible()&&(TEST||Math.random()<1/900)){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }   // 夜裡平均約 15 分鐘一次
   ev.t+=dt; const t=ev.t;
   if(model){ model.position.y=Math.min(0,-1.7+t*2.1); const b=c.base(); model.rotation.y=Math.atan2(b.x-ev.p.x,b.z-ev.p.z)+Math.sin(t*9)*.04; }
   if(t>.9&&!ev.face){ ev.face=true; if(ov){ ov.classList.add('on'); } c.scream&&c.scream(); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
@@ -4844,7 +4862,7 @@ function updCalm(dt){ if(calm){ calm.t+=dt; if(alive){ if(calm.t<2) setOpacity(a
   calmTry+=dt; if(calmTry<60) return; calmTry=0; if(c.period()!=='night'||c.loc()!=='lake'||Math.random()>.08) return;
   loadAlive(m=>{ placeAhead(m,12,(Math.random()-.5)*8); m.visible=true; setOpacity(m,0); calm={t:0}; }); }
 function update2(dt){ tt+=dt; updLamp(dt,tt); if(fin){ updFinale(dt); return; }
-  if(c.storyDone&&c.storyDone('lantern')){ updCalm(dt); return; }
+  if(!TEST&&c.storyDone&&c.storyDone('lantern')){ updCalm(dt); return; }
   if(!ev&&finaleReady()&&!aliveLoading){ startFinale(); return; }
   update(dt); }
 return {update:update2,trigger,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};
@@ -5205,15 +5223,23 @@ window.__CLOUD=createCloud({save:()=>save,toast,refresh:()=>{ if(window.__SHEET&
 const GHOST=createGhost(W,{save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>G.state,base:()=>G.base,head:()=>G.head,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
 window.__GHOST=GHOST;
 // 烤好了：依兩面熟度評分，吃下去依魚的來源得到效果
-function onGrilled(rec,a,b){ const sp=SPECIES.find(s=>s.id===rec.id); if(!sp) return; const g=x=>x<.55?0:x<.78?1:x<.92?3:-1, ga=g(a), gb=g(b);
+function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id); if(!sp) return; const lo=season==='lemon'?.72:.78, hi=season==='lemon'?.95:.92, g=x=>x<.55?0:x<lo?1:x<hi?3:-1, ga=g(a), gb=g(b);
   const burnt=ga<0||gb<0, q=burnt?0:Math.min(ga,gb), name=burnt?'烤焦了':q>=3?'完美':q>=1?'半熟':'還是生的';
   const fx=sp.loc==='sea'||sp.water==='sea'?{id:'luck',n:'好運',i:'🍀'}:sp.loc==='ice'||(sp.spots||[]).includes('ice')?{id:'glow',n:'暖身（咬餌更快）',i:'♨️'}:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'};
   save.cook=save.cook||{}; const ck=save.cook[rec.id]=save.cook[rec.id]||{n:0,best:0}; ck.n++; if(q>ck.best) ck.best=q;
-  if(q<=0){ persist(); toast('🔥 '+sp.name+'：'+name+'……吞不下去，沒有效果','warn',2600); return; }
-  const min=Math.round((q>=3?12:5)*Math.min(2,.6+Math.sqrt(rec.w||.5)*.5)); save.fx=save.fx||{}; save.fx[fx.id]=Math.max(save.fx[fx.id]||0,Date.now())+min*60000;
+  // 料理圖鑑稱號：完美過的魚種數
+  { const perf=Object.keys(save.cook).filter(k=>save.cook[k].best>=3).length; save.titles=save.titles||[]; for(const [n,tt] of [[5,'烤魚師傅'],[15,'爐火大師']]) if(perf>=n&&save.titles.indexOf(tt)<0){ save.titles.push(tt); setTimeout(()=>toast('🏅 獲得稱號「'+tt+'」：完美烤過 '+n+' 種魚','good',3200),1600); } }
+  if(q<=0){ persist(); toast('🔥 '+sp.name+'：'+name+(who==='friend'?'……釣友客氣地吃了一口':'……吞不下去，沒有效果'),'warn',2600); return; }
+  const legend=(sp.rar||0)>=4&&q>=3;
+  if(who==='friend'){ const coins=Math.round((sp.price||20)*Math.pow((rec.w||.5)+.3,.85)*(q>=3?2.2:1.2)*(legend?2:1)); save.coins+=coins; setCoins();
+    save.baits=save.baits||{}; const bt=q>=3?(legend?'moon':'live'):'shrimp', bn=q>=3?(legend?1:3):2; save.baits[bt]=(save.baits[bt]||0)+bn; persist();
+    toast('🎁 釣友吃得很開心'+(q>=3?'，直說好吃！':'')+' 🪙'+coins+'・'+({moon:'月光餌',live:'活魚餌',shrimp:'活蝦'}[bt])+' ×'+bn,'good',3200); Snd.coin&&Snd.coin(); return; }
+  const min=Math.round((q>=3?12:5)*Math.min(2,.6+Math.sqrt(rec.w||.5)*.5)*({salt:1.2,lemon:1.3}[season]||1)*(legend?2:1)); save.fx=save.fx||{}; save.fx[fx.id]=Math.max(save.fx[fx.id]||0,Date.now())+min*60000;
+  if(q>=3&&season==='herb') save.fx.glow=Math.max(save.fx.glow||0,Date.now())+Math.round(min*.6)*60000;
+  if(legend){ const other=fx.id==='luck'?'meal_str':'luck'; save.fx[other]=Math.max(save.fx[other]||0,Date.now())+min*60000; }
   persist(); if(window.__ECO&&window.__ECO.render) window.__ECO.render();
-  toast('🍽 '+sp.name+'：'+name+'！'+fx.i+' '+fx.n+' '+min+' 分鐘','good',3000); Snd.coin&&Snd.coin(); }
-const HOME3D=createHomeScene(W,{save,onGrilled,sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
+  toast((legend?'👑 傳說料理！':'🍽 ')+sp.name+'：'+name+'！'+fx.i+' '+fx.n+' '+min+' 分鐘'+(q>=3&&season==='herb'?'・♨️ 咬餌更快':'')+(legend?'・雙重效果':''),'good',3200); Snd.coin&&Snd.coin(); }
+const HOME3D=createHomeScene(W,{save,persist:()=>persist(),onGrilled,buy:(id,p)=>{ if(save.coins<p){ toast('金幣不夠','warn',1400); return false; } save.coins-=p; setCoins(); persist(); return true; },sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
   crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(),
   showFish:(rec,card)=>{ const sp=SPECIES.find(s=>s.id===rec.id)||{name:rec.id,rar:0}, r=RAR[sp.rar]; card.style.setProperty('--rc',r.col);
