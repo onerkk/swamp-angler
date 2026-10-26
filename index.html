@@ -1142,6 +1142,39 @@ const RAR=[
  {name:'幻想', en:'FANTASY', col:'#5ef2ff', w:1.2, mult:15}];
 const BASS_D=[[-.3,0],[-.25,.1],[-.12,.09],[-.04,.04],[.04,.09],[.16,.08],[.22,0]], BASS_A=[[-.3,0],[-.24,.08],[-.13,.06],[-.08,0]];
 const SPECIES=[
+ /* ---------- 月光灣專屬：通往大海的潟湖，滿月漲潮時海水魚會游進來（依玩家設定圖生成）---------- */
+ {id:'clownfish',spots:['moon'],name:'公子小丑魚',sci:'Amphiprion ocellaris',rar:0,lvl:[10, 25],len:[5, 11],k:20,price:26,tide:true,water:'sea',
+  sh:{H:.3,W:.07,prof:1.2,eyeT:.84,eye:.034,tail:.2,fork:.2,dorsal:[[-.3,0],[-.25,.14],[.12,.12],[.2,0]],anal:[[-.3,0],[-.25,.1],[-.1,0]]},
+  col:{back:'#e86a1a',flank:'#f08a2a',belly:'#f8c070',fin:'#e86a1a',eye:'#202020'},pat:{t:'bars',n:3,k:.9,c:'#ffffff'},scale:1,metal:.3,
+  f:{pow:.6,spd:.9,agi:1.3,jump:0,stam:.7,win:1.1},time:{dawn:.6,day:.15,dusk:.9,night:2},desc:'橘色魚身配三條白帶。原本住在海葵裡，滿月漲潮時被海水帶進潟湖，躲在月光灣的水草間。'},
+ {id:'bluetang',spots:['moon'],name:'擬刺尾鯛',sci:'Paracanthurus hepatus',rar:1,lvl:[20, 40],len:[12, 31],k:22,price:34,tide:true,water:'sea',
+  sh:{H:.3,W:.07,prof:1.2,eyeT:.84,eye:.034,tail:.2,fork:.2,dorsal:[[-.3,0],[-.25,.14],[.12,.12],[.2,0]],anal:[[-.3,0],[-.25,.1],[-.1,0]]},
+  col:{back:'#1a3ad8',flank:'#2a5aff',belly:'#8aa8ff',fin:'#f0d020',eye:'#202020'},pat:{t:'band',k:.8},scale:1,metal:.3,
+  f:{pow:.9,spd:1.3,agi:1.3,jump:.05,stam:1,win:1},time:{dawn:.6,day:.15,dusk:.9,night:2},desc:'寶藍色魚身、黑色花紋、黃色尾鰭。尾柄有一對像刀片的硬棘，拿的時候要小心。'},
+ {id:'blenny',spots:['moon'],name:'鬚鳚',sci:'Blenniidae（鳚科）',rar:1,lvl:[18, 38],len:[12, 30],k:8,price:30,tide:true,water:'sea',
+  sh:{H:.1,W:.06,prof:1.5,eyeT:.88,eye:.03,tail:.18,fork:0,dorsal:[[-.36,0],[-.33,.08],[.25,.08],[.28,0]],anal:[[-.36,0],[-.33,.06],[0,.06],[.02,0]]},
+  col:{back:'#6a5a40',flank:'#c8b898',belly:'#ece4d8',fin:'#d8c8a8',eye:'#c08030'},pat:{t:'spots',n:16,d:.3,r:.3,k:.7,c:'#3a2a1a'},scale:1,metal:.3,
+  f:{pow:.8,spd:.9,agi:1.4,jump:0,stam:.9,win:1.05},time:{dawn:.6,day:.15,dusk:.9,night:2},desc:'頭上長著鬚狀突起，背鰭和臀鰭又長又密。白天藏在石縫裡，月光下才出來覓食。'},
+ {id:'angelfish',spots:['moon'],name:'神仙魚',sci:'Pterophyllum scalare',rar:1,lvl:[15, 35],len:[8, 18],k:30,price:28,
+  sh:{H:.3,W:.07,prof:1.2,eyeT:.84,eye:.034,tail:.2,fork:.2,dorsal:[[-.3,0],[-.25,.14],[.12,.12],[.2,0]],anal:[[-.3,0],[-.25,.1],[-.1,0]]},
+  col:{back:'#8a8050',flank:'#d8d8c8',belly:'#f0f0e8',fin:'#c8c8b8',eye:'#c03020'},pat:{t:'bars',n:4,k:.85,c:'#1a1a14'},scale:1,metal:.3,
+  f:{pow:.6,spd:.8,agi:1.2,jump:0,stam:.7,win:1.1},time:{dawn:.8,day:.6,dusk:1.2,night:1.5},desc:'高大的三角形身體、黑色直條紋、長長的腹鰭。月光灣裡唯一土生土長的淡水觀賞魚。'},
+ {id:'copperband',spots:['moon'],name:'長吻蝴蝶魚',sci:'Chelmon rostratus',rar:2,lvl:[25, 45],len:[10, 20],k:25,price:40,tide:true,water:'sea',
+  sh:{H:.3,W:.07,prof:1.2,eyeT:.84,eye:.034,tail:.2,fork:.2,dorsal:[[-.3,0],[-.25,.14],[.12,.12],[.2,0]],anal:[[-.3,0],[-.25,.1],[-.1,0]]},
+  col:{back:'#d8a020',flank:'#f0f0e8',belly:'#f8f4ec',fin:'#f0c020',eye:'#202020'},pat:{t:'bars',n:4,k:.8,c:'#e08020'},scale:1,metal:.3,
+  f:{pow:.6,spd:.9,agi:1.4,jump:0,stam:.7,win:1.1},time:{dawn:.6,day:.15,dusk:.9,night:2},desc:'橘白相間的直條紋，背鰭上有一個假眼斑。用細長的吻部伸進石縫裡夾食物。'},
+ {id:'threadfin',spots:['moon'],name:'絲鰺',sci:'Alectis ciliaris',rar:2,lvl:[35, 60],len:[40, 130],k:10,price:46,tide:true,water:'sea',
+  sh:{H:.3,W:.07,prof:1.2,eyeT:.84,eye:.034,tail:.2,fork:.2,dorsal:[[-.3,0],[-.25,.14],[.12,.12],[.2,0]],anal:[[-.3,0],[-.25,.1],[-.1,0]]},
+  col:{back:'#4a6a7a',flank:'#c8d4dc',belly:'#eef2f4',fin:'#3a4a5a',eye:'#202020'},pat:{t:'plain'},scale:1,metal:.3,
+  f:{pow:1.6,spd:1.6,agi:1.1,jump:.2,stam:1.4,win:.9},time:{dawn:.6,day:.15,dusk:.9,night:2},desc:'銀色側扁的身體，背鰭和臀鰭拖著長長的細絲，在月光下像一面飄動的旗子。'},
+ {id:'seahorse',spots:['moon'],name:'海馬',sci:'Hippocampus kuda',rar:3,lvl:[30, 60],len:[10, 30],k:6,price:0,tide:true,water:'sea',noSell:true,
+  sh:{H:.14,W:.08,prof:1.4,eyeT:.86,eye:.03,tail:.1,fork:0,dorsal:[[-.1,0],[-.05,.06],[.05,0]],anal:[[-.3,0],[-.28,.02],[-.26,0]]},
+  col:{back:'#a88030',flank:'#d8b050',belly:'#e8d090',fin:'#f0e8d0',eye:'#202020'},pat:{t:'spots',n:12,d:.2,r:.2,k:.6,c:'#4a3010'},scale:1,metal:.3,
+  f:{pow:.3,spd:.3,agi:.6,jump:0,stam:.5,win:1.2},time:{dawn:.6,day:.15,dusk:.9,night:2},desc:'直立游動、尾巴會捲住水草。全球保育類（華盛頓公約附錄二），釣到只能拍照後放流。'},
+ {id:'seabeast',spots:['moon'],name:'神話海馬獸',sci:'Hippocampus draconis（幻想）',rar:5,lvl:[90, 99],len:[180, 260],k:3,price:120,water:'sea',special:'seabeast',
+  sh:{H:.08,W:.06,prof:1.6,eyeT:.9,eye:.02,tail:.24,fork:0,dorsal:[[-.3,0],[-.2,.12],[.3,.12],[.35,0]],anal:[[-.3,0],[-.25,.05],[-.1,0]]},
+  col:{back:'#2a5a8a',flank:'#8ab0c8',belly:'#e8e0c8',fin:'#5a8ad8',eye:'#c09030'},pat:{t:'plain'},scale:1,metal:.3,
+  f:{pow:2.6,spd:2,agi:1.6,jump:.6,stam:2.6,win:.8},time:{dawn:0,day:0,dusk:.3,night:2},desc:'頭長鹿角、身披藍金色長鰭的海中神獸。傳說只在滿月深夜，順著潮水游進月光灣。'},
  /* ---------- 最後一批（依玩家重畫的設定圖生成）---------- */
  {id:'eel',loc:'lake',spots:['wood'],name:'鱸鰻',sci:'Anguilla marmorata',rar:3,lvl:[35, 60],len:[60, 180],k:2.2,price:58,
   sh:{H:.07,W:.06,prof:1.7,eyeT:.92,eye:.016,tail:.1,fork:0,dorsal:[[-.4,0],[-.38,.04],[.1,.04],[.12,0]],anal:[[-.4,0],[-.38,.03],[-.05,.03],[-.03,0]]},
@@ -1752,13 +1785,13 @@ const GEAR={
 const BAITS=[
  {id:'worm',name:'蚯蚓',icon:'🪱',price:0,pack:0,lv:1,desc:'什麼魚都吃一點，用不完',aff:{},rare:0,wait:1},
  {id:'corn',name:'甜玉米',icon:'🌽',price:60,pack:10,lv:1,desc:'鯉魚、草魚、鯽魚、印度鯪愛吃，咬口快',aff:{reba:2.2,bluegill:1.6,crappie:1.3,crucian:2.2,tilapia:1.8,carp:2.5,grasscarp:2.2,silvercarp:1.2,clarias:.5,mekong:1.5,yperch:.8,whitefish:.8},rare:-.2,wait:.75},
- {id:'shrimp',name:'活蝦',icon:'🦐',price:180,pack:10,lv:2,desc:'鱖魚、鯰魚、黑鯛、真鯛、江鱈的最愛',aff:{perch:2.2,channel:2,flathead:1.4,clarias:1.8,blackcarp:2,carp:1.2,porgy:2.2,redbream:2,emperor:1.8,burbot:1.8,wrasse:1.2,yperch:1.8,whitefish:1.6,eel:1.6,laketrout:1.2},rare:.35,wait:1},
+ {id:'shrimp',name:'活蝦',icon:'🦐',price:180,pack:10,lv:2,desc:'鱖魚、鯰魚、黑鯛、真鯛、江鱈的最愛',aff:{perch:2.2,channel:2,flathead:1.4,clarias:1.8,blackcarp:2,carp:1.2,porgy:2.2,redbream:2,emperor:1.8,burbot:1.8,wrasse:1.2,yperch:1.8,whitefish:1.6,eel:1.6,laketrout:1.2,clownfish:1.6,copperband:1.6,bluetang:1.2,seahorse:1.8,blenny:1.4,angelfish:1.2},rare:.35,wait:1},
  {id:'soft',name:'軟蟲路亞',icon:'🐛',price:240,pack:10,lv:3,desc:'專攻黑鱸和弓鰭魚',aff:{lmbass:2.6,smbass:2.6,bowfin:1.5,snakehead:1.8,peacock:1.5},rare:.4,wait:1.05},
- {id:'live',name:'活魚餌',icon:'🐟',price:600,pack:5,lv:5,desc:'小魚幾乎不碰，大型掠食魚才會咬',aff:{flathead:3,gar:3,bowfin:2,channel:1.6,snakehead:2.2,peacock:2.4,arapaima:3,spgar:2,clarias:.6,cobia:2,yellowfin:1.5,sawara:1.5,emperor:1.2,char:1.6,burbot:1.5,bluegill:.2,crappie:.2,reba:.2,crucian:.2,tilapia:.3,eel:2.5,taimen:2.5,laketrout:2,gt:2.2,swordfish:1.8,mekong:.3,yperch:.3,whitefish:.3},rare:1.0,wait:1.4},
- {id:'spoon',lure:'spoon',name:'金屬亮片',icon:'🥄',price:900,pack:15,lv:4,desc:'中速穩定收線，閃光吸引掠食魚（路亞：自己收線操作）',aff:{perch:2,lmbass:1.8,smbass:1.8,amber:1.6,ribbon:2,peacock:1.8,snakehead:1.2,spgar:1.2,sawara:2.2,skipjack:2,yellowfin:1.2,char:1.4,laketrout:1.8,taimen:1.6,yperch:1.2,gt:1.2},rare:.4,wait:1},
+ {id:'live',name:'活魚餌',icon:'🐟',price:600,pack:5,lv:5,desc:'小魚幾乎不碰，大型掠食魚才會咬',aff:{flathead:3,gar:3,bowfin:2,channel:1.6,snakehead:2.2,peacock:2.4,arapaima:3,spgar:2,clarias:.6,cobia:2,yellowfin:1.5,sawara:1.5,emperor:1.2,char:1.6,burbot:1.5,bluegill:.2,crappie:.2,reba:.2,crucian:.2,tilapia:.3,eel:2.5,taimen:2.5,laketrout:2,gt:2.2,swordfish:1.8,mekong:.3,yperch:.3,whitefish:.3,threadfin:2},rare:1.0,wait:1.4},
+ {id:'spoon',lure:'spoon',name:'金屬亮片',icon:'🥄',price:900,pack:15,lv:4,desc:'中速穩定收線，閃光吸引掠食魚（路亞：自己收線操作）',aff:{perch:2,lmbass:1.8,smbass:1.8,amber:1.6,ribbon:2,peacock:1.8,snakehead:1.2,spgar:1.2,sawara:2.2,skipjack:2,yellowfin:1.2,char:1.4,laketrout:1.8,taimen:1.6,yperch:1.2,gt:1.2,threadfin:1.4},rare:.4,wait:1},
  {id:'crank',lure:'crank',name:'曲柄硬餌',icon:'🐠',price:1400,pack:15,lv:6,desc:'快速收線會下潛，黑鱸、金目鱸最愛（需要好捲線器）',aff:{lmbass:2.5,smbass:2.2,barra:2,gar:1.5,grouper:1.5,mahi:1.4,peacock:2.2,spgar:1.2,arapaima:1.2,emperor:1.2,cobia:1.4,gt:1.6,taimen:1.4},rare:.5,wait:1},
- {id:'minnow',lure:'minnow',name:'米諾',icon:'🐟',price:1800,pack:15,lv:8,desc:'抽一下、停一下，模仿受傷小魚，大型掠食魚無法抗拒',aff:{smbass:2.2,barra:2.2,lmbass:1.6,tuna:1.6,mahi:1.8,marlin:1.4,peacock:2.6,snakehead:1.6,spgar:1.6,arapaima:1.5,yellowfin:1.8,sawara:1.6,skipjack:1.4,cobia:1.5,gt:2.4,taimen:2,laketrout:1.6,swordfish:1.2},rare:.6,wait:1},
- {id:'moon',name:'月光餌',icon:'🌙',price:1500,pack:3,lv:3,desc:'散發微光的神秘餌，傳說中的生物會被吸引',aff:{mermaid:25,ghost:12,golden:12},rare:.6,wait:1.3}];
+ {id:'minnow',lure:'minnow',name:'米諾',icon:'🐟',price:1800,pack:15,lv:8,desc:'抽一下、停一下，模仿受傷小魚，大型掠食魚無法抗拒',aff:{smbass:2.2,barra:2.2,lmbass:1.6,tuna:1.6,mahi:1.8,marlin:1.4,peacock:2.6,snakehead:1.6,spgar:1.6,arapaima:1.5,yellowfin:1.8,sawara:1.6,skipjack:1.4,cobia:1.5,gt:2.4,taimen:2,laketrout:1.6,swordfish:1.2,threadfin:1.6},rare:.6,wait:1},
+ {id:'moon',name:'月光餌',icon:'🌙',price:1500,pack:3,lv:3,desc:'散發微光的神秘餌，傳說中的生物會被吸引',aff:{mermaid:25,ghost:12,golden:12,seabeast:10},rare:.6,wait:1.3}];
 const BOAT_COST={coins:25000,scale:30,bone:10,pearl:2};   // 修復老漁人的漁船
 const xpNext=lv=>Math.round(120*Math.pow(lv,1.75));   // 升級曲線：Lv 10 約 6,700、Lv 20 約 22,600
 /* 等級里程碑：每級解鎖什麼（升級提示與 ⭐ 面板共用） */
@@ -2287,7 +2320,7 @@ const STY={
  jumper:{n:'甩頭跳水',run:[.8,1.8],rest:[.8,1.8],mul:1.7,lat:1.1,spd:1,ev:'shake',evP:.35,d:.8},
  digger:{n:'往深處鑽',run:[1.5,3],rest:[1,2.5],mul:1.5,lat:.7,spd:.8,ev:'dive',evP:.4,d:1},
  brawler:{n:'短促爆衝',run:[.6,1.2],rest:[.6,1.4],mul:2.0,lat:1.2,spd:1.1,ev:'shake',evP:.2,d:.6}};
-const SP_STY={bluegill:'nibbler',crappie:'nibbler',reba:'runner',perch:'brawler',lmbass:'jumper',channel:'digger',bowfin:'brawler',smbass:'jumper',flathead:'digger',gar:'runner',golden:'brawler',ghost:'jumper',mermaid:'runner',barra:'jumper',amber:'runner',grouper:'digger',ribbon:'nibbler',mahi:'jumper',tuna:'runner',marlin:'jumper',shark:'brawler',gwhite:'brawler',sail:'jumper',trout:'jumper',pike:'brawler',moonkoi:'digger',seaking:'digger',crucian:'nibbler',tilapia:'brawler',snakehead:'digger',peacock:'brawler',clarias:'digger',spgar:'runner',carp:'runner',silvercarp:'jumper',grasscarp:'runner',blackcarp:'digger',arapaima:'jumper',char:'runner',burbot:'digger',porgy:'brawler',parrot:'brawler',redbream:'brawler',emperor:'runner',cobia:'runner',wrasse:'digger',skipjack:'runner',sawara:'runner',yellowfin:'runner',eel:'digger',mekong:'digger',yperch:'nibbler',whitefish:'nibbler',laketrout:'digger',taimen:'runner',gt:'digger',swordfish:'runner'};
+const SP_STY={bluegill:'nibbler',crappie:'nibbler',reba:'runner',perch:'brawler',lmbass:'jumper',channel:'digger',bowfin:'brawler',smbass:'jumper',flathead:'digger',gar:'runner',golden:'brawler',ghost:'jumper',mermaid:'runner',barra:'jumper',amber:'runner',grouper:'digger',ribbon:'nibbler',mahi:'jumper',tuna:'runner',marlin:'jumper',shark:'brawler',gwhite:'brawler',sail:'jumper',trout:'jumper',pike:'brawler',moonkoi:'digger',seaking:'digger',crucian:'nibbler',tilapia:'brawler',snakehead:'digger',peacock:'brawler',clarias:'digger',spgar:'runner',carp:'runner',silvercarp:'jumper',grasscarp:'runner',blackcarp:'digger',arapaima:'jumper',char:'runner',burbot:'digger',porgy:'brawler',parrot:'brawler',redbream:'brawler',emperor:'runner',cobia:'runner',wrasse:'digger',skipjack:'runner',sawara:'runner',yellowfin:'runner',eel:'digger',mekong:'digger',yperch:'nibbler',whitefish:'nibbler',laketrout:'digger',taimen:'runner',gt:'digger',swordfish:'runner',clownfish:'nibbler',bluetang:'brawler',blenny:'nibbler',angelfish:'nibbler',copperband:'nibbler',threadfin:'runner',seahorse:'nibbler',seabeast:'runner'};
 // 依魚種取拉扯型態；新魚種忘了填也不會讓畫面報錯（預設小幅亂竄）
 const styOf=id=>STY[SP_STY[id]]||STY.nibbler;
 
@@ -3303,7 +3336,8 @@ const RFISH={bluegill:['bluegill','+x'],crappie:['crappie','+z'],lmbass:['lmbass
   crucian:['fish_crucian','+z'],tilapia:['fish_tilapia','+z'],snakehead:['fish_snakehead','+z'],peacock:['fish_peacock','+z'],
   clarias:['fish_clarias','+z'],spgar:['fish_spgar','+z'],carp:['fish_carp','+z'],silvercarp:['fish_silvercarp','+z'],grasscarp:['fish_grasscarp','+z'],blackcarp:['fish_blackcarp','+z'],arapaima:['fish_arapaima','+z'],
   char:['fish_char','+z'],burbot:['fish_burbot','+z'],porgy:['fish_porgy','+z'],parrot:['fish_parrot','+z'],redbream:['fish_redbream','+z'],emperor:['fish_emperor','+z'],cobia:['fish_cobia','+z'],wrasse:['fish_wrasse','+z'],skipjack:['fish_skipjack','+z'],sawara:['fish_sawara','+z'],yellowfin:['fish_yellowfin','+z'],
-  eel:['fish_eel','+z'],mekong:['fish_mekong','+z'],yperch:['fish_yperch','+z'],whitefish:['fish_whitefish','+z'],laketrout:['fish_laketrout','+z'],taimen:['fish_taimen','+z'],gt:['fish_gt','+z'],swordfish:['fish_swordfish','+z']};
+  eel:['fish_eel','+z'],mekong:['fish_mekong','+z'],yperch:['fish_yperch','+z'],whitefish:['fish_whitefish','+z'],laketrout:['fish_laketrout','+z'],taimen:['fish_taimen','+z'],gt:['fish_gt','+z'],swordfish:['fish_swordfish','+z'],
+  clownfish:['fish_clownfish','+z'],bluetang:['fish_bluetang','+z'],blenny:['fish_blenny','+z'],angelfish:['fish_angelfish','+z'],copperband:['fish_copperband','+z'],threadfin:['fish_threadfin','+z'],seabeast:['fish_seabeast','+z'],seahorse:['fish_seahorse','up',{upYaw:Math.PI/2}]};
 const RHEAD={gwhite:'+z',tigershark:'+z',dolphin:'+z',whale:'+z',gator:'+x',eagle:'+z',gull:'-x',yacht:'-z',flyfish:'-x'};
 const RSETS={lake:['mermaid3d','fish_bowfin','fish_reba','fish_mandarin','bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
   ice:['trout','pike','bluegill','crappie'],
@@ -3313,9 +3347,9 @@ const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger 
   ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
   ['斑點叉尾鮰','Channel catfish','faerbogdan99'],['扁頭鯰','Flathead Catfish','faerbogdan99'],['鱷雀鱔','Alligator Gar','Jay_Tano'],['錦鯉','Koi Fish','7plus'],
   ['石斑','lowpoly freshwater grouper','Arrangemonk9'],['黑鮪魚','Bluefin Tuna','voltairevill'],['旗魚','Blue Marlin','Gotta_go_evi'],['飛魚','Exocoetidae','victorberdug'],
-  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚・弓鰭魚・鯽魚・吳郭魚・線鱧・孔雀鱸・塘蝨・斑點雀鱔・鯉魚・鰱魚・草魚・青魚・巨骨舌魚・北極紅點鮭・江鱈・黑鯛・鸚哥魚・真鯛・青嘴龍占・海鱺・曲紋唇魚・正鰹・土魠・黃鰭鮪・鱸鰻・湄公河巨鯰・黃金鱸・白鮭・湖紅點鮭・哲羅鮭・浪人鰺・劍旗魚・原木獨木舟','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['汐月（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
+  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚・弓鰭魚・鯽魚・吳郭魚・線鱧・孔雀鱸・塘蝨・斑點雀鱔・鯉魚・鰱魚・草魚・青魚・巨骨舌魚・北極紅點鮭・江鱈・黑鯛・鸚哥魚・真鯛・青嘴龍占・海鱺・曲紋唇魚・正鰹・土魠・黃鰭鮪・鱸鰻・湄公河巨鯰・黃金鱸・白鮭・湖紅點鮭・哲羅鮭・浪人鰺・劍旗魚・公子小丑魚・擬刺尾鯛・鬚鳚・神仙魚・長吻蝴蝶魚・絲鰺・海馬・神話海馬獸・原木獨木舟','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['汐月（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['深淵海王','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
 
-const BAKED=new Set(['fish_eel','fish_mekong','fish_yperch','fish_whitefish','fish_laketrout','fish_taimen','fish_gt','fish_swordfish','fish_char','fish_burbot','fish_porgy','fish_parrot','fish_redbream','fish_emperor','fish_cobia','fish_wrasse','fish_skipjack','fish_sawara','fish_yellowfin','fish_clarias','fish_spgar','fish_carp','fish_silvercarp','fish_grasscarp','fish_blackcarp','fish_arapaima','fish_crucian','fish_tilapia','fish_snakehead','fish_peacock','fish_reba','fish_mandarin','fish_amber','fish_mahi','fish_sail','fish_bowfin','mermaid3d','seaking']);   // 依設定圖烘焙貼圖的模型
+const BAKED=new Set(['fish_clownfish','fish_bluetang','fish_blenny','fish_angelfish','fish_copperband','fish_threadfin','fish_seabeast','fish_seahorse','fish_eel','fish_mekong','fish_yperch','fish_whitefish','fish_laketrout','fish_taimen','fish_gt','fish_swordfish','fish_char','fish_burbot','fish_porgy','fish_parrot','fish_redbream','fish_emperor','fish_cobia','fish_wrasse','fish_skipjack','fish_sawara','fish_yellowfin','fish_clarias','fish_spgar','fish_carp','fish_silvercarp','fish_grasscarp','fish_blackcarp','fish_arapaima','fish_crucian','fish_tilapia','fish_snakehead','fish_peacock','fish_reba','fish_mandarin','fish_amber','fish_mahi','fish_sail','fish_bowfin','mermaid3d','seaking']);   // 依設定圖烘焙貼圖的模型
 function createModels(W){
 'use strict';
 const T=THREE, loader=new T.GLTFLoader(), files={}, waiters={}, mixers=[];
@@ -3334,7 +3368,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
   const sc=g.scene; sc.updateMatrixWorld(true); let ms=[]; sc.traverse(o=>{ if(o.isMesh) ms.push(o); });
   if(!ms.length) return null;
   ms.sort((a,b)=>b.geometry.attributes.position.count-a.geometry.attributes.position.count); if(opt.one) ms=[ms[0]];
-  const R=c[1]==='up'?new T.Matrix4():new T.Matrix4().makeRotationY(ang('+x')-ang(c[1])), box=new T.Box3(), parts=[];
+  const R=c[1]==='up'?new T.Matrix4().makeRotationY(opt.upYaw||0):new T.Matrix4().makeRotationY(ang('+x')-ang(c[1])), box=new T.Box3(), parts=[];
   for(const m of ms){ const geo=m.geometry.clone(); geo.morphAttributes={};
     if(m.isSkinnedMesh&&m.skeleton&&geo.attributes.skinIndex){ sc.updateMatrixWorld(true); const pa=geo.attributes.position, v=new T.Vector3();
       for(let i=0;i<pa.count;i++){ m.boneTransform(i,v); v.applyMatrix4(m.matrixWorld); pa.setXYZ(i,v.x,v.y,v.z); }
@@ -4261,7 +4295,7 @@ function H(){ const h=S.home=S.home||{}; h.fresh=h.fresh||[]; h.sea=h.sea||[]; h
 // 小屋在完成主線第一章後開放（開場就說老漁人留下了小屋）
 const unlocked=()=>!!(S.story&&S.story.done&&S.story.done.includes('c1'));
 const tank=()=>TANKS[H().tier];
-const waterOf=sp=>(sp.loc||'lake')==='sea'?'sea':'fresh';
+const waterOf=sp=>(sp.water||sp.loc||'lake')==='sea'?'sea':'fresh';   // 月光灣的海水魚雖然在湖區，仍要放海水缸
 // 這條魚能不能帶回家：回傳是否可以、是否改做標本、原因、標本費用
 function check(fd){
   const sp=fd&&fd.sp, h=H();
@@ -4573,7 +4607,10 @@ const PER_WAIT={dawn:.75,day:1.1,dusk:.75,night:1.0};
 function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.02,-.5,Math.cos(G.t*1.1)*.015)); }
 
 /* ---------- 選魚 ---------- */
-function specialK(sp){ if(!sp.special) return 1; const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone>=3||G.spot>=3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; if(sp.special==='king') return 0; if(sp.special==='moonkoi') return window.__MOON?window.__MOON.koiK():0; return 1; }
+function specialK(sp){ if(!sp.special) return 1;
+  // 神話海馬獸只在月亮八成五以上、深夜出現
+  if(sp.special==='seabeast') return (period(G.hour)==='night'&&window.__MOONPH&&window.__MOONPH.illum()>.85)?1:0;
+  const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone>=3||G.spot>=3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; if(sp.special==='king') return 0; if(sp.special==='moonkoi') return window.__MOON?window.__MOON.koiK():0; return 1; }
 /* 魚群警覺：同一個方向一直釣，魚會變少、變小、變慢咬；換方向或換釣點就恢復（每分鐘消退 1） */
 /* 透水：水下物體在水面之後繪製，越深越透明、越帶水色（湖底沒有地形，所以讓物體透出來，而不是讓水變透明） */
 const SEE_U={value:new THREE.Vector3(.04,.13,.15)}, SEE_K={value:1}; window.__SEE_K=SEE_K;
@@ -4592,7 +4629,7 @@ function depAdd(k,n){ const v=depNow(k)+n, w=v>=2&&DEPL[k]&&DEPL[k].warned; DEPL
 const reachK=()=>G.loc==='ice'?.78:clamp((G.castDist-4)/(24*(1-.05*TR('cast'))),0,1);
 function pickSpecies(){
   const per=period(G.hour), pw=clamp((G.castDist-6)/30,0,1); let tot=0;
-  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(window.__ECO&&window.__ECO.fxOn('luck')?.4:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*WL.spotAff(sp.id)*(sp.spots?(sp.spots.includes(WL.zoneId())?1:0):1)*WL.wxAff(sp.id)*(((sp.loc==='both'&&G.loc!=='ice')||(sp.loc||'lake')===(G.loc||'lake')||(G.loc==='ice'&&sp.ice))?1:0)*(G.loc==='sea'?1+sp.rar*.08*TR('sea'):1)*Math.pow(.12+.88*reachK(),sp.rar)/(1+.3*depNow(G.depK||'')*sp.rar)*(bt.aff[sp.id]||(bt.lure&&G.loc!=='ice'?0:1))*(window.__STORY?window.__STORY.boost(sp.id,(SPOTS[G.spot]||{}).id):1)*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
+  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(window.__ECO&&window.__ECO.fxOn('luck')?.4:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*(sp.tide&&window.__MOONPH?(.25+1.5*window.__MOONPH.illum()):1)*WL.spotAff(sp.id)*(sp.spots?(sp.spots.includes(WL.zoneId())?1:0):1)*WL.wxAff(sp.id)*(((sp.loc==='both'&&G.loc!=='ice')||(sp.loc||'lake')===(G.loc||'lake')||(G.loc==='ice'&&sp.ice))?1:0)*(G.loc==='sea'?1+sp.rar*.08*TR('sea'):1)*Math.pow(.12+.88*reachK(),sp.rar)/(1+.3*depNow(G.depK||'')*sp.rar)*(bt.aff[sp.id]||(bt.lure&&G.loc!=='ice'?0:1))*(window.__STORY?window.__STORY.boost(sp.id,(SPOTS[G.spot]||{}).id):1)*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
   let x=Math.random()*tot; for(let i=0;i<ws.length;i++){ x-=ws[i]; if(x<=0) return SPECIES[i]; } return SPECIES[0];
 }
 
@@ -4795,7 +4832,7 @@ function goSpot(i){ if(G.state==='home'){ leaveHome(()=>goSpot(i)); return; }   
   if(G.state!=='idle'){ toast('先收線再移動','warn'); return; } { const lk=window.__STORY&&window.__STORY.lock(i); if(lk){ toast('🔒 '+lk,'warn',2400); return; } }
   // 上一行：所有入口共用的開放檢查
   const s=SPOTS[i]; G.state='travel'; fadeEl.classList.add('on'); Snd.paddle(); setTimeout(()=>Snd.paddle(),380);
-  setTimeout(()=>{ G.spot=i; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; G.yaw=G.yawT=0; save.spot=i; persist(); WL.setSpot(i); if((s.loc||'lake')!==SEA.loc()) SEA.setLoc(s.loc||'lake'); fadeEl.classList.remove('on'); G.state='idle'; toast('抵達'+s.name); },750); }
+  setTimeout(()=>{ G.spot=i; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; G.yaw=G.yawT=0; save.spot=i; persist(); WL.setSpot(i); if((s.loc||'lake')!==SEA.loc()) SEA.setLoc(s.loc||'lake'); fadeEl.classList.remove('on'); G.state='idle'; toast('抵達'+s.name); if(s.id==='moon'&&!save.lagoonPg){ save.lagoonPg=1; persist(); setTimeout(()=>{ if(window.__STORY&&window.__STORY.page) window.__STORY.page('手記・附頁：月光灣的秘密','月光灣不是普通的湖灣。<br><br>灣底有一條很深的石縫，一路通到外海。平常潮水進不來，可是每逢月圓、大潮漲到最高的那幾夜，海水就會從石縫湧進灣裡。<br><br>那幾夜，我在這裡釣過小丑魚、藍色的刺尾鯛、拖著長絲的鰺……都是海裡才有的魚。月亮越圓，牠們越多。<br><br>汐月說，她就是順著那條水道游進來的。<br><br>還有一件事，我只敢寫在這裡：有一年滿月的深夜，我看見一隻長著鹿角的海馬，比我的船還長，在月光下慢慢游過灣口。'); },1600); }; },750); }
 const KY={v:0,w:0,thr:0,turn:0,wake:0,ptr:null,x0:0,y0:0,zone:-1};
 const joy=$('joy'), joyK=$('joyK');
 function joyMove(e){ if(e.pointerId!==KY.ptr) return; let dx=(e.clientX-KY.x0)/45, dy=(e.clientY-KY.y0)/45; const L=Math.hypot(dx,dy); if(L>1){ dx/=L; dy/=L; }
