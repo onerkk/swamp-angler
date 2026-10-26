@@ -109,7 +109,7 @@ function updateGator(dt){
     const spd=d<4?2.6:1.2+.04*gs.t; gP.addScaledVector(tv,Math.min(d,spd*dt)); placeGator(gP,Math.atan2(tv.x,tv.z)); gator.rotation.x=d<4?-.22*Math.sin(gs.t*9):0;   // 最後 4 米撲上來
     const k=ctx.kayak?ctx.kayak():null;
     if(k&&k.on&&k.v>.55){ bow.set(b.x-Math.sin(k.yaw)*1.6,0,b.z-Math.cos(k.yaw)*1.6); if(bow.distanceTo(tv3.set(gP.x,0,gP.z))<1.7){ gator.rotation.x=0; gatorFlee('ram'); return; } }   // 獨木舟夠快撞上 → 撞開
-    if(d<1.4){ gator.rotation.x=0; tapB.classList.add('hidden'); if(ctx.onBite) ctx.onBite(); P.splash(gP.x,0,gP.z,30,1.1); gs={mode:'leave',t:0,dir:tv.clone().negate()}; }
+    if(d<1.4){ gator.rotation.x=0; tapB.classList.add('hidden'); if(ctx.onBite) ctx.onBite(gP); P.splash(gP.x,0,gP.z,30,1.1); gs={mode:'leave',t:0,dir:tv.clone().negate()}; }
     if(gs.mode==='raid'&&gs.t>40){ tapB.classList.add('hidden'); gs={mode:'sink',t:0}; } }
   else if(gs.mode==='flee'){ gs.t+=dt; gP.addScaledVector(gs.dir,dt*3.2); placeGator(gP,Math.atan2(gs.dir.x,gs.dir.z)); gator.rotation.z=gs.why==='ram'&&gs.t<.8?Math.sin(gs.t*20)*.6:0;
     if(gs.t>2.4){ gator.rotation.z=0; gs={mode:'sink',t:0}; } }

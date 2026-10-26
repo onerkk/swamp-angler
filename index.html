@@ -2210,7 +2210,7 @@ function updateGator(dt){
     const spd=d<4?2.6:1.2+.04*gs.t; gP.addScaledVector(tv,Math.min(d,spd*dt)); placeGator(gP,Math.atan2(tv.x,tv.z)); gator.rotation.x=d<4?-.22*Math.sin(gs.t*9):0;   // 最後 4 米撲上來
     const k=ctx.kayak?ctx.kayak():null;
     if(k&&k.on&&k.v>.55){ bow.set(b.x-Math.sin(k.yaw)*1.6,0,b.z-Math.cos(k.yaw)*1.6); if(bow.distanceTo(tv3.set(gP.x,0,gP.z))<1.7){ gator.rotation.x=0; gatorFlee('ram'); return; } }   // 獨木舟夠快撞上 → 撞開
-    if(d<1.4){ gator.rotation.x=0; tapB.classList.add('hidden'); if(ctx.onBite) ctx.onBite(); P.splash(gP.x,0,gP.z,30,1.1); gs={mode:'leave',t:0,dir:tv.clone().negate()}; }
+    if(d<1.4){ gator.rotation.x=0; tapB.classList.add('hidden'); if(ctx.onBite) ctx.onBite(gP); P.splash(gP.x,0,gP.z,30,1.1); gs={mode:'leave',t:0,dir:tv.clone().negate()}; }
     if(gs.mode==='raid'&&gs.t>40){ tapB.classList.add('hidden'); gs={mode:'sink',t:0}; } }
   else if(gs.mode==='flee'){ gs.t+=dt; gP.addScaledVector(gs.dir,dt*3.2); placeGator(gP,Math.atan2(gs.dir.x,gs.dir.z)); gator.rotation.z=gs.why==='ram'&&gs.t<.8?Math.sin(gs.t*20)*.6:0;
     if(gs.t>2.4){ gator.rotation.z=0; gs={mode:'sink',t:0}; } }
@@ -3182,7 +3182,7 @@ function updSnatch(rdt){
   shark.position.copy(nose).addScaledVector(uV,-HL);
   jaw.rotation.x=up?.9*sstep(0,.35,q):.9*(1-sstep(.48,.58,q));
   if(q>.06&&!J.s1){ J.s1=true; for(let i=0;i<4;i++) P.splash(p.x+o.x*1.2+rand(-.8,.8),0,p.z+o.z*1.2+rand(-.8,.8),50,2.2); W.addRipple(p.x+o.x,p.z+o.z,1.4); c.Snd.splash(2); shake=.8; }
-  if(q>.48&&!J.bit){ J.bit=true; if(G.fish) G.fish.group.visible=false; c.vib(120); shake=1; if(J.onBite) J.onBite(); }
+  if(q>.48&&!J.bit){ J.bit=true; if(G.fish) G.fish.group.visible=false; c.vib(120); shake=1; if(window.__FACE) window.__FACE(shark.position,{dur:2.4,pitch:-.15}); if(J.onBite) J.onBite(); }
   if(q>.95&&!J.s2){ J.s2=true; const sx=p.x+o.x*3, sz=p.z+o.z*3; for(let i=0;i<5;i++) P.splash(sx+rand(-1.5,1.5),0,sz+rand(-1.5,1.5),60,2.6); W.addRipple(sx,sz,1.6); AT.ring(sx,sz,4); c.Snd.splash(2.5); shake=1.2; }
   if(t>2.4){ shark.visible=false; snatchJob=null; slow=0; }
 }
@@ -3201,7 +3201,7 @@ function updOver(rdt){ const J=overJob; if(!J) return;
   if(!J.bit&&G.fish&&u>.3) G.fish.group.position.lerp(nP,Math.min(1,rdt*7));
   if(u>.04&&!J.s1){ J.s1=true; overPos(J,0,nP); for(let i=0;i<5;i++) P.splash(nP.x+rand(-1,1),0,nP.z+rand(-1,1),55,2.4); W.addRipple(nP.x,nP.z,1.5); c.Snd.splash(2.2); shake=.9; }
   J.drip-=rdt; if(ow.y>.3&&J.drip<=0){ J.drip=.05; P.splash(ow.x,ow.y-.3,ow.z,5,.35); }
-  if(u>=.5&&!J.bit){ J.bit=true; if(G.fish) G.fish.group.visible=false; c.vib([150,40,150]); shake=1.5; if(J.onBite) J.onBite(); }
+  if(u>=.5&&!J.bit){ J.bit=true; if(G.fish) G.fish.group.visible=false; c.vib([150,40,150]); shake=1.5; if(window.__FACE) window.__FACE(shark.position,{dur:2.4,pitch:.1}); if(J.onBite) J.onBite(); }
   if(u>.96&&!J.s2){ J.s2=true; overPos(J,1,nP); for(let i=0;i<6;i++) P.splash(nP.x+rand(-1.5,1.5),0,nP.z+rand(-1.5,1.5),65,2.8); W.addRipple(nP.x,nP.z,1.8); AT.ring(nP.x,nP.z,4); c.Snd.splash(2.6); shake=1.1; }
   if(J.u>=1.08){ shark.visible=false; overJob=null; slow=0; }
 }
@@ -4713,7 +4713,7 @@ function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=
 function trigger(force){ if(ev) return false; if(!force&&!eligible()) return false;
   load(m=>{ const b=c.base(), h=c.head(), side=Math.random()<.5?-1:1, rt=new T.Vector3(Math.cos(h),0,-Math.sin(h)), fw=new T.Vector3(-Math.sin(h),0,-Math.cos(h));
     const p=new T.Vector3(b.x,0,b.z).addScaledVector(rt,side*1.9).addScaledVector(fw,1.4); m.position.set(p.x,-1.7,p.z);
-    m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); m.visible=true; ev={t:0,side,p}; const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist();
+    m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); m.visible=true; ev={t:0,side,p}; if(window.__FACE) window.__FACE(p,{dur:2.4,snap:false,pitch:.05}); const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist();
     if(c.onMeet) c.onMeet(g.met); c.drip&&c.drip(); }); return true; }
 function update(dt){
   if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0;
@@ -5113,7 +5113,7 @@ const tvSea=new THREE.Vector3();
 window.__MDL=createModels(W); const MDL=window.__MDL; MDL.preload('lake');
 const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,
   state:()=>G.state, loc:()=>G.loc||'lake', kayak:()=>({on:!!SPOTS[G.spot].kayak,v:Math.abs(KY.v),yaw:G.head}),
-  onBite:()=>{ if(G.state==='wait'||G.state==='bite'){ G.state='lost'; G.stT=0; G.snapped=true; }   // 鱷魚咬船：斷線、連擊歸零、驚魂未定
+  onBite:(pos)=>{ faceThreat(pos,{dur:2.6,pitch:-.25}); if(G.state==='wait'||G.state==='bite'){ G.state='lost'; G.stT=0; G.snapped=true; }   // 鱷魚咬船：斷線、連擊歸零、驚魂未定
     G.combo=0; FUN.combo(0); G.scareT=6; G.gShake=1.6; vib([200,60,260,60,200]); Snd.splash(2); toast('🐊 ……！','bad',1600); },
   onScare:why=>{ const ram=why==='ram', xp=Math.round(window.__LVINFO.xpNext(save.lv)*(ram?.04:.02)), cn=Math.round((ram?20:10)+save.lv*(ram?10:5));
     if(ram) save.gatorRam=(save.gatorRam||0)+1; else save.gatorScare=(save.gatorScare||0)+1; META.addXP(xp); save.coins+=cn; setCoins(); META.syncHUD(); persist(); G.gShake=ram?.9:.3;
@@ -5180,13 +5180,16 @@ function updateKayak(dt){
 }
 const fadeEl=$('fade'), uwTag=$('uwTag');
 let uwBusy=false;
-function enterUW(){ if(UW.active()||uwBusy) return; uwBusy=true; fadeEl.classList.add('on');
+function enterUW(){ if(UW.active()||uwBusy||(G.uwBlock&&G.t<G.uwBlock)) return; uwBusy=true; fadeEl.classList.add('on');
   setTimeout(()=>{ if(G.fd&&(G.state==='wait'||G.state==='bite')){ UW.start(G.fd); if(G.state==='bite') UW.bite(); const r=RAR[G.fd.sp.rar];
     // 咬餌之前不揭露魚種：只給模糊的體型暗示，留住期待感（稀有以上有低沉的提示聲）
     const L=G.fd.L||.3, hint=G.fd.item?'好像勾到什麼東西…':L>1.2?'水裡有個很大的影子…':L>.6?'看起來不小…':L>.3?'有東西靠過來了…':'小小的影子在打轉…';
     uwTag.style.setProperty('--rc','#9aa4ae'); $('uLv').textContent='?'; $('uName').textContent='？？？'; $('uRar').textContent=hint; uwTag.classList.remove('hidden');
     if(!G.fd.item&&(G.fd.sp.rar||0)>=2) Snd.rumble&&Snd.rumble(); }
     fadeEl.classList.remove('on'); uwBusy=false; },180); }
+// 強制面對威脅（鯊魚、鱷魚、阿蘅）：鏡頭轉向攻擊者（可超過平常的轉頭限制），持續一段時間後回到原本視角；水下鏡頭立刻關閉且幾秒內不重開
+function faceThreat(pos,opt){ opt=opt||{}; if(!pos) return; G.look={x:pos.x,z:pos.z,until:G.t+(opt.dur||2.4),snap:!!opt.snap,prev:G.look?G.look.prev:G.yawT,pitch:opt.pitch||0}; exitUW(); G.uwBlock=G.t+5; }
+window.__FACE=faceThreat;
 let uwExiting=false;
 function exitUW(){ uwTag.classList.add('hidden'); if(!UW.active()||uwExiting) return; uwExiting=true; fadeEl.classList.add('on'); setTimeout(()=>{ UW.end(); fadeEl.classList.remove('on'); uwExiting=false; },160); }
 // 水下鏡頭只屬於「等魚、咬餌」：任何原因離開這兩個狀態（鱷魚、斷線、拉魚…）都自動關掉
@@ -5369,8 +5372,10 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
     v.set(v.x+(tgt[0]-v.x)*k,v.y+(tgt[1]-v.y)*k,v.z+(tgt[2]-v.z)*k); }
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
     const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
-  G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
-  if(G.state!=='idle'&&G.state!=='wait') G.pitchT=0; G.pitch=(G.pitch||0)+((G.pitchT||0)-(G.pitch||0))*Math.min(1,dt*5);   // 蓄力、拉魚時視角自動回正
+  if(G.look){ if(G.t>G.look.until){ G.yawT=clamp(G.look.prev,-.95,.95); G.look=null; }
+    else { let a=Math.atan2(-(G.look.x-G.base.x),-(G.look.z-G.base.z))-G.head; while(a-G.yaw>Math.PI) a-=Math.PI*2; while(a-G.yaw<-Math.PI) a+=Math.PI*2; G.yawT=a; if(G.look.snap){ G.yaw=a; G.look.snap=false; } } }
+  G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(G.look?9:st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;
+  if(G.state!=='idle'&&G.state!=='wait') G.pitchT=0; if(G.look) G.pitchT=G.look.pitch; G.pitch=(G.pitch||0)+((G.pitchT||0)-(G.pitch||0))*Math.min(1,dt*5);   // 蓄力、拉魚時視角自動回正
   if(G.scareT>0) G.scareT-=dt; if(G.gShake>0) G.gShake=Math.max(0,G.gShake-dt*.7);
   { const f=G.state==='fight'?G.f:null, want=(f?((f.run?.45:0)+(f.ev&&f.ev.k==='shake'?.6:0)+(f.T>.85?.35:0)):0)+(G.gShake||0); G.shk=(G.shk||0)+(want-(G.shk||0))*Math.min(1,dt*6);
     W.head.rotation.x=-.16+(G.pitch||0)+Math.sin(G.t*.5)*.004+Math.sin(G.t*29)*.005*G.shk; W.camera.rotation.z=Math.sin(G.t*.37)*.003+Math.sin(G.t*23+1.7)*.004*G.shk; }

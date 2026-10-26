@@ -33,7 +33,7 @@ function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=
 function trigger(force){ if(ev) return false; if(!force&&!eligible()) return false;
   load(m=>{ const b=c.base(), h=c.head(), side=Math.random()<.5?-1:1, rt=new T.Vector3(Math.cos(h),0,-Math.sin(h)), fw=new T.Vector3(-Math.sin(h),0,-Math.cos(h));
     const p=new T.Vector3(b.x,0,b.z).addScaledVector(rt,side*1.9).addScaledVector(fw,1.4); m.position.set(p.x,-1.7,p.z);
-    m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); m.visible=true; ev={t:0,side,p}; const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist();
+    m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); m.visible=true; ev={t:0,side,p}; if(window.__FACE) window.__FACE(p,{dur:2.4,snap:false,pitch:.05}); const g=S.ghost=S.ghost||{}; g.last=Date.now(); g.n=(g.n||0)+1; g.met=(g.met||0)+1; c.persist();
     if(c.onMeet) c.onMeet(g.met); c.drip&&c.drip(); }); return true; }
 function update(dt){
   if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0;

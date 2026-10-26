@@ -115,7 +115,7 @@ function updSnatch(rdt){
   shark.position.copy(nose).addScaledVector(uV,-HL);
   jaw.rotation.x=up?.9*sstep(0,.35,q):.9*(1-sstep(.48,.58,q));
   if(q>.06&&!J.s1){ J.s1=true; for(let i=0;i<4;i++) P.splash(p.x+o.x*1.2+rand(-.8,.8),0,p.z+o.z*1.2+rand(-.8,.8),50,2.2); W.addRipple(p.x+o.x,p.z+o.z,1.4); c.Snd.splash(2); shake=.8; }
-  if(q>.48&&!J.bit){ J.bit=true; if(G.fish) G.fish.group.visible=false; c.vib(120); shake=1; if(J.onBite) J.onBite(); }
+  if(q>.48&&!J.bit){ J.bit=true; if(G.fish) G.fish.group.visible=false; c.vib(120); shake=1; if(window.__FACE) window.__FACE(shark.position,{dur:2.4,pitch:-.15}); if(J.onBite) J.onBite(); }
   if(q>.95&&!J.s2){ J.s2=true; const sx=p.x+o.x*3, sz=p.z+o.z*3; for(let i=0;i<5;i++) P.splash(sx+rand(-1.5,1.5),0,sz+rand(-1.5,1.5),60,2.6); W.addRipple(sx,sz,1.6); AT.ring(sx,sz,4); c.Snd.splash(2.5); shake=1.2; }
   if(t>2.4){ shark.visible=false; snatchJob=null; slow=0; }
 }
@@ -134,7 +134,7 @@ function updOver(rdt){ const J=overJob; if(!J) return;
   if(!J.bit&&G.fish&&u>.3) G.fish.group.position.lerp(nP,Math.min(1,rdt*7));
   if(u>.04&&!J.s1){ J.s1=true; overPos(J,0,nP); for(let i=0;i<5;i++) P.splash(nP.x+rand(-1,1),0,nP.z+rand(-1,1),55,2.4); W.addRipple(nP.x,nP.z,1.5); c.Snd.splash(2.2); shake=.9; }
   J.drip-=rdt; if(ow.y>.3&&J.drip<=0){ J.drip=.05; P.splash(ow.x,ow.y-.3,ow.z,5,.35); }
-  if(u>=.5&&!J.bit){ J.bit=true; if(G.fish) G.fish.group.visible=false; c.vib([150,40,150]); shake=1.5; if(J.onBite) J.onBite(); }
+  if(u>=.5&&!J.bit){ J.bit=true; if(G.fish) G.fish.group.visible=false; c.vib([150,40,150]); shake=1.5; if(window.__FACE) window.__FACE(shark.position,{dur:2.4,pitch:.1}); if(J.onBite) J.onBite(); }
   if(u>.96&&!J.s2){ J.s2=true; overPos(J,1,nP); for(let i=0;i<6;i++) P.splash(nP.x+rand(-1.5,1.5),0,nP.z+rand(-1.5,1.5),65,2.8); W.addRipple(nP.x,nP.z,1.8); AT.ring(nP.x,nP.z,4); c.Snd.splash(2.6); shake=1.1; }
   if(J.u>=1.08){ shark.visible=false; overJob=null; slow=0; }
 }
