@@ -4070,6 +4070,8 @@ const col=rep(tl.load('snow_Diffuse.jpg'),90); col.encoding=T.sRGBEncoding;
 const mat=new T.MeshStandardMaterial({map:col,normalMap:rep(tl.load('snow_nor_gl.jpg'),90),roughnessMap:rep(tl.load('snow_Rough.jpg'),90),roughness:.82,metalness:0,color:0xffffff,envMapIntensity:1.6,normalScale:new T.Vector2(.45,.45)});
 /* 打散重複紋路：同一張材質以另一個比例、偏移再疊一層，加上大範圍明暗起伏 */
 mat.onBeforeCompile=sh=>{ sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n  vec4 t2_=mapTexelToLinear(texture2D(map,vUv*0.27+vec2(0.31,0.17)));\n  diffuseColor.rgb=mix(diffuseColor.rgb,t2_.rgb*diffuse,0.45);\n  diffuseColor.rgb*=0.95+0.07*sin(vUv.x*0.21+1.3)*sin(vUv.y*0.17+0.4);'); };
+// 夜裡雪地反射月光與星光，呈藍灰色，不會全黑：依環境亮度補一點自發光
+mat.emissive=new T.Color(0x3a4a62); mat.emissiveIntensity=0;
 const g=new T.Group(); g.visible=false; W.scene.add(g);
 const sheet=new T.Mesh(new T.CircleGeometry(600,96).rotateX(-Math.PI/2),mat); sheet.position.y=.01; g.add(sheet);
 /* 冰洞：深色水面＋碎冰邊緣 */
@@ -4081,6 +4083,19 @@ const rim=new T.Mesh(new T.TorusGeometry(.38,.05,8,40).rotateX(Math.PI/2),rimM);
 for(let i=0;i<14;i++){ const a=i/14*Math.PI*2+Math.random()*.3, r=.46+Math.random()*.22, s=.04+Math.random()*.07;
   const ch=new T.Mesh(new T.DodecahedronGeometry(s,0),rimM); ch.position.set(Math.cos(a)*r,.02+s*.4,Math.sin(a)*r); ch.rotation.set(Math.random(),Math.random(),Math.random()); ch.scale.y=.45; hole.add(ch); }
 const holePos=new T.Vector3();
+// 手搖冰鑽：鑿冰時邊轉邊往下鑽，完成後拔出來
+const auger=new T.Group(); auger.visible=false; g.add(auger);
+{ const steel=new T.MeshStandardMaterial({color:0x9aa4ac,metalness:.85,roughness:.32}), red=new T.MeshStandardMaterial({color:0xb02a20,metalness:.3,roughness:.45}), grip=new T.MeshStandardMaterial({color:0x1a1a1a,roughness:.8});
+  const shaft=new T.Mesh(new T.CylinderGeometry(.018,.018,1.15,10),steel); shaft.position.y=.575; auger.add(shaft);
+  const pts=[]; for(let i=0;i<=120;i++){ const a=i/120*Math.PI*2*5.5, y=i/120*.55; pts.push(new T.Vector3(Math.cos(a)*.075,y,Math.sin(a)*.075)); }
+  const blade=new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),240,.012,6,false),steel); blade.scale.set(1,1,1); auger.add(blade);
+  const tip=new T.Mesh(new T.ConeGeometry(.06,.08,10),steel); tip.rotation.x=Math.PI; tip.position.y=-.03; auger.add(tip);
+  const crank=new T.Group(); crank.position.y=1.15; auger.add(crank);
+  const bar=new T.Mesh(new T.CylinderGeometry(.016,.016,.38,8),red); bar.rotation.z=Math.PI/2; bar.position.x=.19; crank.add(bar);
+  const k1=new T.Mesh(new T.CylinderGeometry(.022,.022,.12,10),grip); k1.position.set(.38,.06,0); crank.add(k1);
+  const top=new T.Mesh(new T.CylinderGeometry(.024,.024,.14,10),grip); top.position.y=.07; crank.add(top);
+  auger.traverse(o=>{ o.frustumCulled=false; }); }
+let liftT=0;
 /* 下雪：冰湖的雨全部換成雪，陰天很重時也會飄小雪 */
 const NF=2600, fg=new T.BufferGeometry(), fp=new Float32Array(NF*3), fs=new Float32Array(NF);
 for(let i=0;i<NF;i++){ fp[i*3]=(Math.random()-.5)*40; fp[i*3+1]=Math.random()*18; fp[i*3+2]=(Math.random()-.5)*40; fs[i]=Math.random(); }
@@ -4097,13 +4112,16 @@ function updSnow(dt){ const on=c.loc()==='ice', want=on?Math.min(1,Math.max(W.U.
   fg.attributes.position.needsUpdate=true; flakes.position.set(fcam.x,0,fcam.z); }
 let strT=0;
 function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visible=on;
+  if(on){ const lt=W.info?W.info.light:1; mat.emissiveIntensity=Math.max(0,.55-lt)*.9; }
+  if(liftT>0){ liftT-=dt; auger.position.y+=dt*.6; auger.rotation.y+=dt*3; if(liftT<=0) auger.visible=false; }
+  else if(!drilled&&on&&prog>0&&!(c.held&&c.held())) auger.visible=prog>0;
   if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
       W.addRipple(holePos.x,holePos.z,.15+.2*T2); if(T2>.6){ c.chips&&0; if(c.splash) c.splash(holePos,T2); } } } if(!on){ drilled=false; prog=0; return; }
-  const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; }
+  const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; auger.visible=false; liftT=0; }
   holePos.set(b.x-Math.sin(h)*5,0,b.z-Math.cos(h)*5); hole.position.copy(holePos); hole.visible=drilled;
   sheet.position.x=b.x; sheet.position.z=b.z; col.offset.set(b.x/600*90/2,-b.z/600*90/2); }
 /* 鑿冰洞：按住約 2 秒，冰屑四濺，完成後冰洞出現 */
-function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; if(c.done) c.done(holePos); } return prog; }
+function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); auger.visible=true; auger.position.set(holePos.x,.02-prog*.42,holePos.z); auger.rotation.y+=dt*9; if(c.grind&&Math.random()<dt*10) c.grind(); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; liftT=1.2; if(c.done) c.done(holePos); } return prog; }
 return {update,holePos:()=>holePos,drilled:()=>drilled,drill,progress:()=>prog};
 }
 /* ===== 診斷：錯誤記錄、效能取樣、一鍵複製給開發者 ===== */
@@ -4598,6 +4616,7 @@ const Snd=(()=>{
     bird(){ const b=2600+Math.random()*1200; for(let i=0;i<3;i++) tn(b+i*200,.07,'sine',.03,i*.09,b+600); },
     gator(){ nz(1.2,'lowpass',90,.8,.35); tn(55,1,'sawtooth',.05,0,40); },
     paddle(){ nz(.35,'bandpass',700,.8,.14,300); },
+    grind(){ nz(.06,'bandpass',1200+Math.random()*900,1.2,.05,500); },
     crackle(){ nz(.03+Math.random()*.05,'highpass',1800+Math.random()*2600,.8,.04+Math.random()*.06,900); },
     plip(){ tn(900,.05,'sine',.03,0,500); nz(.08,'bandpass',2500,1.5,.03); },
     setAmb(o){ if(!AMB) return; const t=ctx.currentTime;
@@ -4690,7 +4709,7 @@ function missBite(){ FUN.hookEnd(); G.combo=0; FUN.combo(0); G.state='wait'; G.t
 function hook(q){
   const sp=G.sp, L=G.fd.L; exitUW();
   const perfect=!!q; if(perfect){ save.perf=(save.perf||0)+1; if(window.__STORY) window.__STORY.onPerfect(); }
-  G.f={perfect,d:G.castDist,az0:Math.atan2(-(G.to.x-G.base.x),-(G.to.z-G.base.z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
+  G.f={perfect,d:G.loc==='ice'?rand(10,18):G.castDist,az0:Math.atan2(-(G.to.x-G.base.x),-(G.to.z-G.base.z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
   G.state='fight'; P.splash(G.to.x,0,G.to.z,22,1); W.addRipple(G.to.x,G.to.z,.7); Snd.splash(.7); vib(40);
   toast(perfect?'完美揚竿！':'上鉤了！',perfect?'good':'',1200);
   ui.fight.classList.remove('hidden'); WL.onHook(G.fd,()=>fishPos(G.chaseV,0)); SEA.onHook(G.fd,()=>fishPos(G.chaseV,0));
@@ -4845,7 +4864,7 @@ const SKY=createNightSky(W,G); window.__SKY=SKY;
 window.__applyGfx=q=>{ window.__GFX=q; const cap={high:2.5,mid:1.5,low:1}[q]||2.5;
   if(W.setRefl) W.setRefl(q!=='low',q==='mid'?.22:.35); W.setPR(Math.min(window.devicePixelRatio||1,cap)); };
 window.__applyGfx(save.gfx||'high');
-const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
+const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,held:()=>G.held,grind:()=>Snd.grind&&Snd.grind(),splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
 function iceDrop(){ G.noBait=false; const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=5; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
 const MIST=createMorningMist(W,{hour:()=>G.hour,wx:()=>WL.wx(),sea:()=>G.loc==='sea',underwater:()=>UW.active(),wind:()=>WL.wind()}); window.__MIST=MIST;
 const ARMS=createArms(W,P); window.__ARMS=ARMS;
@@ -4974,7 +4993,11 @@ function updateFight(dt){
   if(f.brk>=1){ if(window.__ECO&&window.__ECO.useLeader()){ f.brk=.35; toast('⛓️ 鋼絲前導線撐住了！','good',1600); vib(60); } else return lose('snap'); }
   if(f.slk>=1) return lose('slack');
   if(f.d>MAX_LINE) return lose('spool');
-  if(f.d<(G.spot===0?4.0:2.6)) return land();
+  if(f.d<(G.spot===0?4.0:2.6)){
+    // 魚還有力氣就拉不上來：靠近時再衝出去，要遛到沒力才能收進來
+    if(f.stam<=25) return land();
+    f.d+=2+Math.random()*2; f.run=true; f.phaseT=rand(1,1.8); P.splash(G.to.x,0,G.to.z,14,.8); vib([30,20,40]);
+    if(!f.surgeTip){ f.surgeTip=1; toast('魚還有力氣，又衝出去了','warn',1500); } }
 }
 
 function update(dt){
