@@ -4068,20 +4068,48 @@ function createIce(W,c){
 const T=THREE, tl=new T.TextureLoader(), rep=(t,n)=>{ t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(n,n); t.anisotropy=4; return t; };
 const col=rep(tl.load('snow_Diffuse.jpg'),90); col.encoding=T.sRGBEncoding;
 const mat=new T.MeshStandardMaterial({map:col,normalMap:rep(tl.load('snow_nor_gl.jpg'),90),roughnessMap:rep(tl.load('snow_Rough.jpg'),90),roughness:.82,metalness:0,color:0xffffff,envMapIntensity:1.6,normalScale:new T.Vector2(.45,.45)});
-/* 打散重複紋路：同一張材質以另一個比例、偏移再疊一層，加上大範圍明暗起伏 */
-mat.onBeforeCompile=sh=>{ sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n  vec4 t2_=mapTexelToLinear(texture2D(map,vUv*0.27+vec2(0.31,0.17)));\n  diffuseColor.rgb=mix(diffuseColor.rgb,t2_.rgb*diffuse,0.45);\n  diffuseColor.rgb*=0.95+0.07*sin(vUv.x*0.21+1.3)*sin(vUv.y*0.17+0.4);'); };
+// 真實結冰湖面：風吹乾淨的地方是深色透明冰（ambientCG Ice003，CC0，裂紋網），其他地方是積雪；用大範圍雜訊自然混合
+const iceC=rep(tl.load('ice_Color.jpg'),60); iceC.encoding=T.sRGBEncoding; const iceN=rep(tl.load('ice_nor.jpg'),60);
+mat.onBeforeCompile=sh=>{ sh.uniforms.iceMap={value:iceC}; sh.uniforms.iceNor={value:iceN};
+  sh.fragmentShader='uniform sampler2D iceMap; uniform sampler2D iceNor;\nfloat hh_(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }\nfloat vn_(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hh_(i),hh_(i+vec2(1,0)),f.x),mix(hh_(i+vec2(0,1)),hh_(i+vec2(1,1)),f.x),f.y); }\n'+sh.fragmentShader;
+  sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
+  vec4 t2_=mapTexelToLinear(texture2D(map,vUv*0.27+vec2(0.31,0.17)));
+  diffuseColor.rgb=mix(diffuseColor.rgb,t2_.rgb*diffuse,0.45);
+  vec2 q_=vUv*1.2; float n_=vn_(q_)*0.6+vn_(q_*2.7+3.1)*0.3+vn_(q_*7.3+8.2)*0.1;
+  float iceK=smoothstep(0.47,0.62,n_);
+  vec3 ic_=mapTexelToLinear(texture2D(iceMap,vUv*1.5)).rgb*vec3(0.78,0.9,0.95);
+  float edge_=smoothstep(0.47,0.53,n_)*(1.0-smoothstep(0.53,0.6,n_));
+  diffuseColor.rgb=mix(diffuseColor.rgb,ic_,iceK)+vec3(0.18,0.2,0.22)*edge_*0.6;`);
+  sh.fragmentShader=sh.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n  roughnessFactor=mix(roughnessFactor,0.12,iceK);');
+  sh.fragmentShader=sh.fragmentShader.replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n  { vec3 n2_=texture2D(iceNor,vUv*1.5).xyz*2.0-1.0; normal=normalize(mix(normal,normalize(normal+vec3(n2_.xy*0.25,0.0)),iceK)); }');
+};
 // 夜裡雪地反射月光與星光，呈藍灰色，不會全黑：依環境亮度補一點自發光
 mat.emissive=new T.Color(0x3a4a62); mat.emissiveIntensity=0;
 const g=new T.Group(); g.visible=false; W.scene.add(g);
 const sheet=new T.Mesh(new T.CircleGeometry(600,96).rotateX(-Math.PI/2),mat); sheet.position.y=.01; g.add(sheet);
-/* 冰洞：深色水面＋碎冰邊緣 */
+// 冰洞：看得到約 35 公分厚的冰層斷面（上白下藍綠、半透明），水面在冰層下，浮著冰沙；洞口一圈是冰鑽帶上來的雪屑
 const hole=new T.Group(); hole.visible=false; g.add(hole);
 let drilled=false, prog=0, lastKey='';
-const water=new T.Mesh(new T.CircleGeometry(.34,40).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x06141c,roughness:.04,metalness:.1,envMapIntensity:1.4,emissive:0x12283a,emissiveIntensity:0})); water.position.y=.012; hole.add(water);
-const rimM=new T.MeshStandardMaterial({color:0xdfeefa,roughness:.25,metalness:0,transparent:true,opacity:.92,emissive:0x4a5a72,emissiveIntensity:0});
-const rim=new T.Mesh(new T.TorusGeometry(.38,.05,8,40).rotateX(Math.PI/2),rimM); rim.position.y=.03; hole.add(rim);
-for(let i=0;i<14;i++){ const a=i/14*Math.PI*2+Math.random()*.3, r=.46+Math.random()*.22, s=.04+Math.random()*.07;
-  const ch=new T.Mesh(new T.DodecahedronGeometry(s,0),rimM); ch.position.set(Math.cos(a)*r,.02+s*.4,Math.sin(a)*r); ch.rotation.set(Math.random(),Math.random(),Math.random()); ch.scale.y=.45; hole.add(ch); }
+const wallTex=(()=>{ const cv=document.createElement('canvas'); cv.width=8; cv.height=128; const x=cv.getContext('2d'), gr=x.createLinearGradient(0,0,0,128);
+  gr.addColorStop(0,'#eef6fa'); gr.addColorStop(.12,'#cfe6ee'); gr.addColorStop(.45,'#6fa8b8'); gr.addColorStop(.8,'#1e5868'); gr.addColorStop(1,'#0a2a34'); x.fillStyle=gr; x.fillRect(0,0,8,128);
+  for(let i=0;i<10;i++){ x.fillStyle='rgba(255,255,255,'+(0.08+Math.random()*.12)+')'; x.fillRect(0,10+Math.random()*100,8,1); }
+  const t=new T.CanvasTexture(cv); t.encoding=T.sRGBEncoding; return t; })();
+const wallM=new T.MeshStandardMaterial({map:wallTex,roughness:.15,metalness:0,side:T.BackSide,transparent:true,opacity:.96,emissive:0x2a4a5a,emissiveIntensity:0});
+const wall=new T.Mesh(new T.CylinderGeometry(.17,.16,.36,40,1,true),wallM); wall.position.y=-.17; hole.add(wall);
+const water=new T.Mesh(new T.CircleGeometry(.165,40).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x07202a,roughness:.05,metalness:.1,envMapIntensity:1.6,emissive:0x12283a,emissiveIntensity:0})); water.position.y=-.06; hole.add(water);
+const slushM=new T.MeshStandardMaterial({color:0xdcecf2,roughness:.4,transparent:true,opacity:.85,emissive:0x4a5a72,emissiveIntensity:0});
+const slush=[]; for(let i=0;i<9;i++){ const sz=.012+Math.random()*.03, m=new T.Mesh(new T.CircleGeometry(sz,6).rotateX(-Math.PI/2),slushM); const a=Math.random()*6.28, r=Math.random()*.12; m.position.set(Math.cos(a)*r,-.055,Math.sin(a)*r); hole.add(m); slush.push({m,a,r,ph:Math.random()*6}); }
+// 雪屑堆：用雪地同一個材質，做成高低不平的一圈
+const rimM=new T.MeshStandardMaterial({map:col,color:0xffffff,roughness:.9,emissive:0x4a5a72,emissiveIntensity:0});
+{ const rg=new T.RingGeometry(.17,.5,64,8).rotateX(-Math.PI/2), pp=rg.attributes.position;
+  for(let i=0;i<pp.count;i++){ const x=pp.getX(i), z=pp.getZ(i), r=Math.hypot(x,z), a=Math.atan2(z,x);
+    const bump=Math.sin(a*3+1.2)*.6+Math.sin(a*9+.4)*.35+Math.sin(a*17+2)*.2+(Math.random()-.5)*.9, k=Math.pow(Math.sin(Math.min(1,(r-.17)/.33)*Math.PI),.7);
+    pp.setY(i,Math.max(0,k*(.03+.035*bump))*(a>-.6&&a<1.4?1.7:1)); }
+  rg.computeVertexNormals(); const rim=new T.Mesh(rg,rimM); rim.position.y=.012; hole.add(rim);
+  // 冰鑽帶上來的壓實雪塊，散在洞口
+  for(let i=0;i<11;i++){ const a=Math.random()*6.28, r=.24+Math.random()*.32, s=.018+Math.random()*.035, cl=new T.Mesh(new T.IcosahedronGeometry(s,1),rimM);
+    const ps=cl.geometry.attributes.position; for(let j=0;j<ps.count;j++) ps.setXYZ(j,ps.getX(j)*(1+(Math.random()-.5)*.5),ps.getY(j)*(.5+Math.random()*.3),ps.getZ(j)*(1+(Math.random()-.5)*.5)); cl.geometry.computeVertexNormals();
+    cl.position.set(Math.cos(a)*r,.015+s*.25,Math.sin(a)*r); cl.rotation.y=Math.random()*6; hole.add(cl); } }
 const holePos=new T.Vector3();
 // 手搖冰鑽：鑿冰時邊轉邊往下鑽，完成後拔出來
 const auger=new T.Group(); auger.visible=false; g.add(auger);
@@ -4112,7 +4140,8 @@ function updSnow(dt){ const on=c.loc()==='ice', want=on?Math.min(1,Math.max(W.U.
   fg.attributes.position.needsUpdate=true; flakes.position.set(fcam.x,0,fcam.z); }
 let strT=0;
 function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visible=on;
-  if(on){ const lt=W.info?W.info.light:1, k=Math.max(0,.55-lt); mat.emissiveIntensity=k*.9; rimM.emissiveIntensity=k*1.1; water.material.emissiveIntensity=k*1.2; }
+  if(on){ const lt=W.info?W.info.light:1, k=Math.max(0,.55-lt); mat.emissiveIntensity=k*.9; rimM.emissiveIntensity=k*.9; water.material.emissiveIntensity=k*1.2; wallM.emissiveIntensity=k*1.2; slushM.emissiveIntensity=k;
+    if(drilled){ const tt=performance.now()/1000; slush.forEach(o=>{ o.m.position.x=Math.cos(o.a+tt*.05)*o.r; o.m.position.z=Math.sin(o.a+tt*.05)*o.r; o.m.position.y=-.055+Math.sin(tt*1.3+o.ph)*.003; }); } }
   if(liftT>0){ liftT-=dt; auger.position.y+=dt*.6; auger.rotation.y+=dt*3; if(liftT<=0) auger.visible=false; }
   else if(!drilled&&on&&prog>0&&!(c.held&&c.held())) auger.visible=prog>0;
   if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
@@ -4485,8 +4514,9 @@ function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.s
   if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?(hd.tier>=3?-.75:-.55):0); if(hd.seaTank) buildTank('sea',SEA_SPEC,2.25); else if(tanks.sea){ scene.remove(tanks.sea.g); delete tanks.sea; } }
   for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=want[w]||[], sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|');
     if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[];
-    list.forEach(rec=>{ c.want(rec.id); const o=fishObj(rec); if(!o) return; const f={o,rec,tgt:new T.Vector3(),sp:.05+Math.random()*.06,ph:Math.random()*6}; const b=bounds(tk,rec.L);
-      o.position.set(b.x0+Math.random()*(b.x1-b.x0),b.y0+Math.random()*(b.y1-b.y0),(Math.random()-.5)*.1); o.rotation.y=Math.random()<.5?0:Math.PI; pickTarget(f,tk); tk.g.add(o); tk.fish.push(f); }); } }
+    list.forEach(rec=>{ try{ c.want(rec.id); const o=fishObj(rec); if(!o) return; const f={o,rec,tgt:new T.Vector3(),sp:.05+Math.random()*.06,ph:Math.random()*6}; const b=bounds(tk,rec.L);
+      o.position.set(b.x0+Math.random()*(b.x1-b.x0),b.y0+Math.random()*(b.y1-b.y0),(Math.random()-.5)*.1); o.rotation.y=Math.random()<.5?0:Math.PI; pickTarget(f,tk); tk.g.add(o); tk.fish.push(f);
+      }catch(err){ console.error('tank fish',rec&&rec.id,err); } }); } }
 // 標本牆：右牆、壁爐後方，兩排各四個；大魚統一縮到木板放得下的長度
 const MSLOT=[]; for(const y of [1.5,2.15]) for(const z of [-3.65,-2.85,-2.05,-1.25]) MSLOT.push({y,z});   // 先掛視線高度那一排
 const mountG=new T.Group(); scene.add(mountG); let mountSig='';
@@ -4496,12 +4526,13 @@ function nameTex(t1,t2){ const cv=document.createElement('canvas'); cv.width=256
   const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; return tx; }
 function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|'); if(sig===mountSig) return; mountSig=sig;
   while(mountG.children.length) mountG.remove(mountG.children[0]);
-  list.slice(0,MSLOT.length).forEach((rec,i)=>{ const sl=MSLOT[i], sp=c.species(rec.id); if(!sp) return; c.want(rec.id);
+  list.slice(0,MSLOT.length).forEach((rec,i)=>{ try{ const sl=MSLOT[i], sp=c.species(rec.id); if(!sp) return; c.want(rec.id);
     const b=new T.Mesh(new T.BoxGeometry(.04,.48,.62),plaqueM); b.position.set(ROOM.x-.03,sl.y,sl.z); mountG.add(b);
     const e=new T.Mesh(new T.BoxGeometry(.02,.52,.66),plaqueEdge); e.position.set(ROOM.x-.015,sl.y,sl.z); mountG.add(e);
     const f=fishObj(rec); if(f){ f.scale.setScalar(.56); f.rotation.set(0,-Math.PI/2,0); f.position.set(ROOM.x-.13,sl.y+.04,sl.z); f.userData.rec=rec; mountG.add(f); }
     const np=new T.Mesh(new T.PlaneGeometry(.36,.09),new T.MeshBasicMaterial({map:nameTex(sp.name,(rec.w<1?Math.round(rec.w*1000)+' g':rec.w.toFixed(1)+' kg')+'・'+new Date(rec.d).toLocaleDateString('zh-TW'))}));
-    np.position.set(ROOM.x-.055,sl.y-.2,sl.z); np.rotation.y=-Math.PI/2; mountG.add(np); }); }
+    np.position.set(ROOM.x-.055,sl.y-.2,sl.z); np.rotation.y=-Math.PI/2; mountG.add(np);
+    }catch(err){ console.error('mount',rec&&rec.id,err); } }); }   // 單一個標本出錯就跳過，不影響其他東西
 const tv=new T.Vector3();
 function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
   tk.plants.forEach(p=>{ p.o.rotation.z=Math.sin(t*1.2+p.ph)*.06; p.o.rotation.x=Math.sin(t*.9+p.ph)*.04; });
@@ -4537,7 +4568,7 @@ el.addEventListener('pointermove',e=>{ if(!on||!drag) return; const dx=e.clientX
   if(mode==='view'){ const w=tanks[viewTank]?tanks[viewTank].spec.w:1; panT=Math.max(-w*.35,Math.min(w*.35,drag.pan-dx*.003)); return; }
   yawT=Math.max(-1.9,Math.min(1.9,drag.yaw-dx*.006)); pitchT=Math.max(-.7,Math.min(.6,drag.pitch-dy*.005)); });
 window.addEventListener('pointerup',e=>{ if(on&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<10&&performance.now()-down.t<450){ hit(e); if(mode==='room') tapRoom(); else tapView(); } drag=null; down=null; });   // 移動很少、時間很短才算點擊
-function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; resize(); syncTime(); syncFish(); syncMounts(); exitView(); if(c.onEnter) c.onEnter(); }
+function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; resize(); for(const f of [syncTime,syncFish,syncMounts,exitView]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
 function exit(){ on=false; drag=null; exitView(); }
 const qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
@@ -4549,7 +4580,7 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
     pView.set(tk.x+pan,tk.y+s.h/2,tk.z+dist); lookM.lookAt(pView,tv.set(tk.x+pan,tk.y+s.h/2,tk.z),cam.up); qView.setFromRotationMatrix(lookM); }
   const k=vb*vb*(3-2*vb); cam.position.lerpVectors(pRoom,pView,k); cam.quaternion.copy(qRoom).slerp(qView,k);
   const fl=.85+.15*Math.sin(t*9)+.08*Math.sin(t*23); fireL.intensity=2.2*fl; fireM.opacity=.7+.3*fl; fire.scale.y=.9+.15*Math.sin(t*7);
-  if((syncT+=dt)>1){ syncT=0; syncTime(); syncFish(); syncMounts(); }   // 每秒同步一次：剛帶回的魚、升級的缸、晚一步載好的真實模型
+  if((syncT+=dt)>1){ syncT=0; try{ syncTime(); syncFish(); syncMounts(); }catch(err){ console.error('home sync',err); } }   // 每秒同步一次：剛帶回的魚、升級的缸、晚一步載好的真實模型
   if(c.crackle&&Math.random()<dt*2.2) c.crackle();   // 爐火劈啪聲，隨機間隔
   updTanks(dt); R.setRenderTarget(null); R.render(scene,cam); }
 window.addEventListener('resize',()=>{ if(on) resize(); });
@@ -4775,7 +4806,7 @@ function homeEnter(){ const hd=HOME.data();
   setTimeout(()=>toast('釣友來參觀你的 '+kinds+' 種收藏，留下了 '+bt.icon+bt.name+' ×'+n,'good',2600),1200); }
 function goHome(){ if(G.state==='home') return; if(G.state!=='idle'){ toast('先收線再回家','warn'); return; } if(!HOME.unlocked()){ toast('完成主線第一章後才能整理小屋','warn'); return; }
   G.state='travel'; fadeEl.classList.add('on'); Snd.paddle();
-  setTimeout(()=>{ HOME3D.enter(); G.state='home'; document.body.classList.add('athome'); fadeEl.classList.remove('on'); toast('回到老漁人的小屋','good',1400); },650); }
+  setTimeout(()=>{ try{ HOME3D.enter(); }catch(err){ console.error('goHome',err); } G.state='home'; document.body.classList.add('athome'); fadeEl.classList.remove('on'); toast('回到老漁人的小屋','good',1400); },650); }
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit(); document.body.classList.remove('athome'); G.state='idle'; fadeEl.classList.remove('on'); if(then) then(); else if(G.spot!==0) goSpot(0); },650); }
 window.__goHome=goHome;
