@@ -1,9 +1,9 @@
 /* ===== 沉浸感更新 · 難度、拉扯型態、空氣與水面生態、鏡頭效果 ===== */
 const DIFF={
  easy:{n:'休閒',line:1.25,win:1.25,stam:.95,slack:1.4,jit:.8,rew:.8},
- normal:{n:'標準',line:.92,win:.8,stam:1.3,slack:.85,jit:1.15,rew:1},
- hard:{n:'硬派',line:.8,win:.65,stam:1.6,slack:.7,jit:1.4,rew:1.3},
- expert:{n:'專家',line:.68,win:.52,stam:1.9,slack:.55,jit:1.75,rew:1.6}};
+ normal:{n:'標準',line:.86,win:.74,stam:1.55,slack:.75,jit:1.25,rew:1},
+ hard:{n:'硬派',line:.76,win:.62,stam:1.85,slack:.62,jit:1.5,rew:1.3},
+ expert:{n:'專家',line:.65,win:.5,stam:2.15,slack:.5,jit:1.85,rew:1.6}};
 const STY={
  nibbler:{n:'小幅亂竄',run:[.4,.9],rest:[.4,1],mul:1.4,lat:1.6,spd:1,ev:null,evP:0,d:0},
  runner:{n:'長距離狂奔',run:[2.2,4.5],rest:[1.2,2.4],mul:1.5,lat:.6,spd:1.5,ev:'long',evP:.5,d:.8},

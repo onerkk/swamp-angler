@@ -18,7 +18,7 @@ const clamp=(x,a,b)=>x<a?a:x>b?b:x, rand=(a,b)=>a+Math.random()*(b-a);
 const hk={on:false,t:0,win:1.8,w:3.5,ph:0,good:.3,perf:.22};
 const hookEl=$('hook'), hgM=$('hgM'), htF=$('htF');
 function hookStart(fd){ const r=fd.sp.rar||0, D=c.D();
-  hk.on=true; hk.t=0; hk.win=1.9*(fd.sp.f.win||1)*D.win*(fd.item?1.4:1); hk.w=(2.8+.7*r)*(.85+.25*D.jit); hk.ph=rand(0,6.28);
+  hk.on=true; hk.t=0; hk.win=1.9*(fd.sp.f.win||1)*D.win*(fd.item?1.4:1)*(1-.06*Math.min(5,r)); hk.w=(2.8+.7*r)*(.85+.25*D.jit); hk.ph=rand(0,6.28);
   hk.good=.3; hk.perf=Math.max(.1,.24-.025*r);
   $('hz2').style.bottom=(hk.good*100)+'%'; $('hz2').style.height=(hk.perf*100)+'%'; $('hz3').style.bottom=((hk.good+hk.perf)*100)+'%';
   hookEl.classList.remove('hidden'); }

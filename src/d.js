@@ -60,6 +60,7 @@ const Snd=(()=>{
     gator(){ nz(1.2,'lowpass',90,.8,.35); tn(55,1,'sawtooth',.05,0,40); },
     paddle(){ nz(.35,'bandpass',700,.8,.14,300); },
     drip(){ tn(1200,.08,'sine',.05,0,300); },
+    rumble(){ nz(1.2,'lowpass',140,.6,.18,90); tn(48,1.0,'sine',.12,0,38); },
     scream(){ if(!ctx) return; const t=ctx.currentTime, o=ctx.createOscillator(), o2=ctx.createOscillator(), g=ctx.createGain(), lfo=ctx.createOscillator(), lg=ctx.createGain();
       o.type='sawtooth'; o2.type='square'; o.frequency.setValueAtTime(850,t); o.frequency.exponentialRampToValueAtTime(1500,t+.35); o.frequency.exponentialRampToValueAtTime(1100,t+1.1);
       o2.frequency.setValueAtTime(1710,t); o2.frequency.exponentialRampToValueAtTime(2900,t+.4); lfo.frequency.value=28; lg.gain.value=60; lfo.connect(lg); lg.connect(o.frequency);
@@ -143,7 +144,7 @@ function landBobber(){
   FUN.castTag(G.castDist); G.hot=FUN.inHot(G.to); if(G.hot){ G.timer*=.3; toast('正中魚群！','good',1200); }
 }
 function startRetrieve(msg,cls){ exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
-function nibble(){ G.dip=.28; W.addRipple(G.to.x,G.to.z,.18); Snd.nibble(); vib(12); G.approach=Math.max(G.approach,.01); }
+function nibble(){ const big=Math.random()<.25; G.dip=big?.75:.28; G.dipMax=G.dip; G.dipAmp=big?.14:.035; W.addRipple(G.to.x,G.to.z,big?.5:.18); if(big){ P.splash(G.to.x,0,G.to.z,5,.35); Snd.bite(); vib([40,30,60]); } else { Snd.nibble(); vib(12); } G.approach=Math.max(G.approach,.01); }
 // 體型等級：u 是這條魚在該魚種體型範圍內的位置（0 最小、1 最大，巨物可再超出）
 const GRADES=[[.2,'幼魚'],[.7,'成魚'],[.93,'大物'],[9,'巨物']];
 const gradeOf=u=>GRADES.find(g=>u<g[0])[1];
@@ -273,7 +274,14 @@ cv.addEventListener('pointermove',e=>{ if(e.pointerId!==dragPtr) return; const d
   if(G.state==='fight') G.rodSideT=clamp(dx/70,-1,1); else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(yaw0-dx*.005,-.95,.95);   // 拋竿後（等魚、咬餌、路亞）也能自由轉視角
   if(G.state==='idle'||G.state==='wait') G.pitchT=clamp(pitch0+(e.clientY-dragY0)*.004,0,.62); });   // 上下拖曳：抬頭看天空
 const dragRel=e=>{ if(e.pointerId!==dragPtr) return; dragPtr=null; if(actPtr===null) G.rodSideT=0; };
-cv.addEventListener('pointerup',dragRel); cv.addEventListener('pointercancel',dragRel);
+cv.addEventListener('pointerup',dragRel); cv.addEventListener('pointercancel',dragRel); cv.addEventListener('lostpointercapture',dragRel);
+ui.act.addEventListener('lostpointercapture',actRel);
+// 保險：手機瀏覽器偶爾會漏掉「放開」事件，讓按鈕／拖曳／搖桿永遠卡住。視窗層級再接一次，螢幕上沒有手指時全部清掉
+function releaseAll(){ if(actPtr!==null){ actPtr=null; actUp(); } dragPtr=null; G.rodSideT=0; if(typeof KY!=='undefined'&&KY.ptr!==null){ KY.ptr=null; KY.thr=0; KY.turn=0; joyK.style.transform=''; } }
+window.addEventListener('pointerup',e=>{ if(e.pointerId===dragPtr) dragRel(e); if(e.pointerId===actPtr) actRel(e); if(typeof KY!=='undefined'&&e.pointerId===KY.ptr) joyEnd(e); },true);
+window.addEventListener('pointercancel',e=>{ if(e.pointerId===dragPtr) dragRel(e); if(e.pointerId===actPtr) actRel(e); if(typeof KY!=='undefined'&&e.pointerId===KY.ptr) joyEnd(e); },true);
+window.addEventListener('touchend',e=>{ if(e.touches.length===0) setTimeout(()=>{ if(!(navigator.maxTouchPoints>0&&(dragPtr!==null||actPtr!==null))) return; releaseAll(); },120); },{passive:true});
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) releaseAll(); });
 let dragY0=0, pitch0=0;
 const keys={};
 window.addEventListener('keydown',e=>{ if(e.repeat) return; keys[e.code]=true; if(e.code==='Space'&&G.state!=='intro'&&G.state!=='catch'){ e.preventDefault(); actDown(); } });
@@ -374,7 +382,10 @@ const fadeEl=$('fade'), uwTag=$('uwTag');
 let uwBusy=false;
 function enterUW(){ if(UW.active()||uwBusy) return; uwBusy=true; fadeEl.classList.add('on');
   setTimeout(()=>{ if(G.fd&&(G.state==='wait'||G.state==='bite')){ UW.start(G.fd); if(G.state==='bite') UW.bite(); const r=RAR[G.fd.sp.rar];
-    uwTag.style.setProperty('--rc',r.col); $('uLv').textContent=G.fd.lvl; $('uName').textContent=G.fd.sp.name; $('uRar').textContent=r.name+' '+r.en; uwTag.classList.remove('hidden'); }
+    // 咬餌之前不揭露魚種：只給模糊的體型暗示，留住期待感（稀有以上有低沉的提示聲）
+    const L=G.fd.L||.3, hint=G.fd.item?'好像勾到什麼東西…':L>1.2?'水裡有個很大的影子…':L>.6?'看起來不小…':L>.3?'有東西靠過來了…':'小小的影子在打轉…';
+    uwTag.style.setProperty('--rc','#9aa4ae'); $('uLv').textContent='?'; $('uName').textContent='？？？'; $('uRar').textContent=hint; uwTag.classList.remove('hidden');
+    if(!G.fd.item&&(G.fd.sp.rar||0)>=2) Snd.rumble&&Snd.rumble(); }
     fadeEl.classList.remove('on'); uwBusy=false; },180); }
 let uwExiting=false;
 function exitUW(){ uwTag.classList.add('hidden'); if(!UW.active()||uwExiting) return; uwExiting=true; fadeEl.classList.add('on'); setTimeout(()=>{ UW.end(); fadeEl.classList.remove('on'); uwExiting=false; },160); }
@@ -461,7 +472,9 @@ function updateFight(dt){
 
 function update(dt){
   // 拉魚開始時記住拋竿瞄準的方向；離開拉魚（釣到、跑掉、斷線）就轉回去。放在最前面，不受後面任何錯誤影響
-  if(G.prevSt==='fight'&&G.state!=='fight') G.yawT=G.aimYaw||0; if(G.state==='fight'&&G.prevSt!=='fight') G.aimYaw=G.aimYawCast!=null?G.aimYawCast:G.yawT; G.prevSt=G.state;
+  // 離開拉魚：釣竿傾斜一律歸零，不受手指狀態影響
+  if(G.prevSt==='fight'&&G.state!=='fight'){ G.yawT=G.aimYaw||0; G.rodSideT=0; }
+  if(G.state==='fight'&&G.prevSt!=='fight') G.aimYaw=G.aimYawCast!=null?G.aimYawCast:G.yawT; G.prevSt=G.state;
   G.t+=dt; G.hour+=dt/40;
   G.hSave=(G.hSave||0)+dt; if(G.hSave>10){ G.hSave=0; save.hour=((G.hour%24)+24)%24; persist(); }
   const info=W.setTime(G.hour); W.update(dt,G.t); updateKayak(dt);
@@ -502,7 +515,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       if(UW.active()&&G.state==='wait') UW.setProgress(1-G.timer/3);
       if(G.fd&&G.state==='wait'){ G.bubT=(G.bubT||0)-dt; if(G.bubT<=0){ G.bubT=rand(.25,.7); W.addRipple(G.to.x+rand(-.3,.3),G.to.z+rand(-.3,.3),.05); P.splash(G.to.x+rand(-.25,.25),0,G.to.z+rand(-.25,.25),1,.15); } }
       { const wv=WL.wind(); G.to.x+=wv.x*wv.s*.05*dt; G.to.z+=wv.z*wv.s*.05*dt; }
-      const dip=G.dip>0?Math.sin((G.dip/.28)*Math.PI)*.035:0;
+      const dip=G.dip>0?Math.sin((G.dip/(G.dipMax||.28))*Math.PI)*(G.dipAmp||.035):0;
       bob.position.set(G.to.x,y-dip,G.to.z);
       if(G.nib===0&&G.timer<3) G.approach=Math.min(1,G.approach+dt*.5);
       if(G.approach>0){ const a=G.t*.8; P.shadow.position.set(G.to.x+Math.cos(a)*.9,.012,G.to.z+Math.sin(a)*.9); P.shadow.rotation.y=-a; P.shadow.scale.setScalar(.45); P.shadow.material.opacity=.18*G.approach; }
