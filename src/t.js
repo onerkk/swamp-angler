@@ -39,7 +39,7 @@ const slush=[]; for(let i=0;i<9;i++){ const sz=.012+Math.random()*.03, m=new T.M
 const rimM=new T.MeshStandardMaterial({map:col,color:0xffffff,roughness:.9,emissive:0x4a5a72,emissiveIntensity:0});
 { const rg=new T.RingGeometry(.17,.5,64,8).rotateX(-Math.PI/2), pp=rg.attributes.position;
   for(let i=0;i<pp.count;i++){ const x=pp.getX(i), z=pp.getZ(i), r=Math.hypot(x,z), a=Math.atan2(z,x);
-    const bump=Math.sin(a*3+1.2)*.6+Math.sin(a*9+.4)*.35+Math.sin(a*17+2)*.2+(Math.random()-.5)*.9, k=Math.pow(Math.sin(Math.min(1,(r-.17)/.33)*Math.PI),.7);
+    const bump=Math.sin(a*3+1.2)*.6+Math.sin(a*9+.4)*.35+Math.sin(a*17+2)*.2+(Math.random()-.5)*.9, k=Math.pow(Math.max(0,Math.sin(Math.min(1,Math.max(0,(r-.17)/.33))*Math.PI)),.7);
     pp.setY(i,Math.max(0,k*(.03+.035*bump))*(a>-.6&&a<1.4?1.7:1)); }
   rg.computeVertexNormals(); const rim=new T.Mesh(rg,rimM); rim.position.y=.012; hole.add(rim);
   const lip=new T.Mesh(new T.TorusGeometry(.175,.022,8,40).rotateX(Math.PI/2),rimM); lip.position.y=.02; hole.add(lip);

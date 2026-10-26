@@ -25,7 +25,7 @@ const cam=new T.Vector3(); let k=0, wet=0;
 const sc=document.createElement('canvas'); sc.width=64; sc.height=256; { const x=sc.getContext('2d'), im=x.createImageData(64,256);
   const subs=[]; for(let k=0;k<5;k++) subs.push({c:(Math.random()-.5)*.7,w:.03+Math.random()*.07,b:.45+Math.random()*.55});   // 光帶內數條細光線，中間有暗縫
   for(let j=0;j<256;j++) for(let i=0;i<64;i++){ const u=(i+.5)/64-.5, v=j/255; let st=0; for(const q of subs) st=Math.max(st,q.b*Math.exp(-Math.pow((u-q.c)/q.w,2)));
-    const a=(.25*Math.exp(-u*u*28)+.75*st)*Math.pow(Math.sin(Math.PI*v),.8)*(.35+.65*(1-v)); const o=(j*64+i)*4; im.data[o]=255; im.data[o+1]=240; im.data[o+2]=210; im.data[o+3]=Math.round(255*Math.min(1,a)); }
+    const a=(.25*Math.exp(-u*u*28)+.75*st)*Math.pow(Math.max(0,Math.sin(Math.PI*v)),.8)*(.35+.65*(1-v)); const o=(j*64+i)*4; im.data[o]=255; im.data[o+1]=240; im.data[o+2]=210; im.data[o+3]=Math.round(255*Math.min(1,a)); }
   x.putImageData(im,0,0); }
 const sTex=new T.CanvasTexture(sc), shafts=[];
 for(let i=0;i<10;i++){ const m=new T.Mesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial({map:sTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,fog:false,opacity:0,color:0xffe2b8}));

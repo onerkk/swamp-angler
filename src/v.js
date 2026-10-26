@@ -64,7 +64,7 @@ function why(ch){ const o=ch.open, r=[]; if(o.after&&!isDone(o.after)) r.push('�
 function lock(i){ const id=SPOT_IDS[i]; if(id==='dock'||st.grand.indexOf(id)>=0) return null; const ch=CH.find(x=>x.spot===id); if(!ch) return null;
   const r=why(ch).filter(x=>x!=='獨木舟'&&x!=='漁船'); return r.length?'需要：'+r.join('、'):null; }
 function active(){ return CH.filter(ch=>!isDone(ch.id)&&avail(ch)); }
-function prog(ch){ return st.prog[ch.id]=st.prog[ch.id]||ch.tasks.map(()=>0); }
+function prog(ch){ let p=st.prog[ch.id]; if(!Array.isArray(p)) p=[]; if(p.length!==ch.tasks.length) p=ch.tasks.map((t,i)=>Math.min(t.n,+p[i]||0)); return st.prog[ch.id]=p; }
 function bump(match){ let changed=false;
   for(const ch of active()){ const p=prog(ch); ch.tasks.forEach((t,i)=>{ if(p[i]>=t.n) return; const d=match(t); if(d>0){ p[i]=Math.min(t.n,p[i]+d); changed=true; if(p[i]>=t.n) c.toast('📜 任務完成：'+t.txt,'good',2400); } });
     if(p.every((v,i)=>v>=ch.tasks[i].n)) finish(ch); }
