@@ -208,6 +208,10 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 .dexsec{margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px;line-height:1.6}.dexsec.dim{opacity:.6}
 .dexgrid{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px}.dexgrid span{opacity:.65}
 .dexbar{display:flex;align-items:center;gap:10px;margin:3px 0}.dexbar span{width:3em;opacity:.7}.dexbar i{flex:1;height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}.dexbar em{display:block;height:100%;background:var(--rc,#e9b949);border-radius:4px}
+#homeUI{display:none;position:fixed;left:0;right:0;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:20;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+#homeUI .hb{display:flex;gap:10px;pointer-events:auto}#homeUI .hh{color:#fff;opacity:.7;font-size:13px;text-shadow:0 1px 3px #000}
+body.athome #homeUI{display:flex}
+body.athome #act,body.athome #joy,body.athome #fight,body.athome #top2,body.athome #hotChip,body.athome #combo,body.athome #castTag,body.athome #fxBar,body.athome #bCam,body.athome #bTour,body.athome #pop,body.athome #bGoal{display:none!important}
 .btn.home{display:block;width:100%;margin-top:8px;padding:10px;font-size:15px;background:rgba(120,90,50,.55);border:1px solid rgba(255,220,160,.35)}.btn.home.dim{opacity:.45}.btn.home.hidden{display:none}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
@@ -237,6 +241,7 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
   <button class="chip sm" id="bGoal" aria-label="目標與成就">🎯</button>
   <button class="chip sm" id="bCam" aria-label="拍照">📷</button>
 </div>
+<div id="homeUI"><div class="hh">拖曳畫面轉頭看看</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn pri" id="bTankM">🐠 管理水族箱</button></div></div>
 <div id="toast"></div>
 <div id="fight" class="hidden">
   <div class="hd"><span id="fName">上鉤了！</span><b id="fDist">0.0 m</b></div>
@@ -1890,7 +1895,7 @@ function render(){
   else if(cur==='spot'){
     shT.textContent='釣點';
     if(window.__HOME&&window.__HOME.unlocked()){ const HM=window.__HOME, hd=HM.data(), t=HM.tank();
-      h+=row('🏠 老漁人的小屋',`${t.n} ${hd.fresh.length}/${t.cap}${hd.seaTank?'・海水缸 '+hd.sea.length+'/'+HM.SEA_TANK.cap:''}・標本 ${hd.mounts.length}/${HM.MOUNT_MAX}`,'<button class="sbtn pri" data-a="homeP">管理</button>'); }
+      h+=row('🏠 老漁人的小屋',`${t.n} ${hd.fresh.length}/${t.cap}${hd.seaTank?'・海水缸 '+hd.sea.length+'/'+HM.SEA_TANK.cap:''}・標本 ${hd.mounts.length}/${HM.MOUNT_MAX}`,'<div class="bb"><button class="sbtn" data-a="homeP">管理</button><button class="sbtn pri" data-a="homeGo">回家</button></div>'); }
     if(!save.kayak) h+=row('🛶 獨木舟','買了才能划到湖裡的其他釣點','<button class="sbtn pri" data-a="kayak">🪙 800</button>');
     if(!save.yacht){ const ok=window.__STORY&&window.__STORY.done('c5'), m=save.mat||{}, need=BOAT_COST, have=k=>(m[k]||0)>=need[k];
       h+=ok?row('🛥️ 修復老漁人的漁船',`停在河口船塢的舊漁船，修好就能出海。需要 🪙 ${need.coins.toLocaleString()}、魚鱗 ${need.scale}（有 ${m.scale||0}）、魚骨 ${need.bone}（有 ${m.bone||0}）、珍珠 ${need.pearl}（有 ${m.pearl||0}）`,`<button class="sbtn pri" data-a="yacht"${save.coins>=need.coins&&have('scale')&&have('bone')&&have('pearl')?'':' disabled'}>修復</button>`)
@@ -1985,6 +1990,7 @@ const DEXV=(()=>{ const T=THREE, R=c.W.renderer; let scene,cam,rt,cv,ctx,img,buf
   function thumbs(list){ tq=list.slice(); if(!traf) traf=requestAnimationFrame(tstep); }
   return {show,stop,thumbs,cached,BLANK}; })();
 function open(k){ cur=k; if(k==='log') dexSel=null; resetArm=false; render(); sheet.classList.remove('hidden'); }
+window.__openSheet=k=>open(k);
 function close(){ sheet.classList.add('hidden'); cur=null; DEXV.stop(); }
 $('bShop').addEventListener('click',()=>open('shop'));
 $('bQuest').addEventListener('click',()=>open('quest'));
@@ -2006,6 +2012,7 @@ shB.addEventListener('click',e=>{
   else if(a==='ub'){ save.bait=BAITS[+v].id; persist(); toast('改用'+BAITS[+v].name); }
   else if(a==='claim') claim(+v);
   else if(a==='homeP'){ cur='home'; render(); shB.scrollTop=0; return; }
+  else if(a==='homeGo'){ close(); if(window.__goHome) window.__goHome(); return; }
   else if(a==='mapBack'){ cur='spot'; render(); return; }
   else if(a==='hrel'){ const [wt,i]=v.split(':'), f=window.__HOME.release(wt,+i); if(f) toast('把'+((SPECIES.find(s=>s.id===f.id)||{}).name||'魚')+'放回湖裡了','good'); render(); return; }
   else if(a==='hbuy'){ const m=window.__HOME.buy(v); toast(m||'買好了，已經裝進小屋',m?'bad':'good'); render(); syncHUD(); return; }
@@ -4279,6 +4286,117 @@ function buy(what){ const h=H();
   c.persist(); c.setCoins(); return ''; }
 return {TANKS,SEA_TANK,CHILLER,MOUNT_MAX,unlocked,check,keep,mount,release,buy,data:H,tank};
 }
+
+/* ===== 小屋內部：第一人稱木屋場景（獨立場景，回家時改畫這裡，外面的湖照常運作） ===== */
+function createHomeScene(W,c){
+'use strict';
+const T=THREE, R=W.renderer, scene=new T.Scene(), cam=new T.PerspectiveCamera(62,1,.05,60), TL=new T.TextureLoader();
+let on=false, yaw=0, pitch=-.08, yawT=0, pitchT=-.08, drag=null, t=0;
+const EYE=1.6, ROOM={x:3.2,zb:-4.2,zf:2.8,h:2.9};
+// 站在房間中段：轉頭時左邊窗戶、右邊壁爐都在畫面中央
+cam.position.set(0,EYE,.9); scene.background=new T.Color(0x1a120c);
+// 真實木紋貼圖（碼頭用的那組），每個用途各自一份，才能設不同重複次數
+const wood=(rx,ry,rot,tint)=>{ const mk=f=>{ const x=TL.load(f); x.wrapS=x.wrapT=T.RepeatWrapping; x.repeat.set(rx,ry); x.rotation=rot||0; x.anisotropy=4; return x; };
+  const d=mk('dock_diff.jpg'); d.encoding=T.sRGBEncoding; return new T.MeshStandardMaterial({map:d,normalMap:mk('dock_nor.jpg'),roughnessMap:mk('dock_rough.jpg'),roughness:.85,color:tint||0xffffff}); };
+const box=(w,h,d,m,x,y,z)=>{ const o=new T.Mesh(new T.BoxGeometry(w,h,d),m); o.position.set(x,y,z); scene.add(o); return o; };
+const plane=(w,h,m,x,y,z,ry,rx)=>{ const o=new T.Mesh(new T.PlaneGeometry(w,h),m); o.position.set(x,y,z); o.rotation.set(rx||0,ry||0,0); scene.add(o); return o; };
+const RW=ROOM.x*2, RD=ROOM.zf-ROOM.zb, H=ROOM.h, cz=(ROOM.zf+ROOM.zb)/2;
+// 地板、牆、天花板
+plane(RW,RD,wood(3,4,0,0xd8c0a0),0,0,cz,0,-Math.PI/2);
+const wallM=wood(2,6,Math.PI/2,0xc8a888);
+plane(RW,H,wallM,0,H/2,ROOM.zb,0); plane(RW,H,wallM,0,H/2,ROOM.zf,Math.PI);
+plane(RD,H,wallM,ROOM.x,H/2,cz,-Math.PI/2);   // 左牆有窗，在下面分段做
+plane(RW,RD,wood(2,3,0,0x9a7a5a),0,H,cz,0,Math.PI/2);
+// 屋樑、牆角柱、踢腳板
+const beamM=wood(.5,3,Math.PI/2,0x8a6040);
+for(let z=ROOM.zb+.6;z<ROOM.zf;z+=1.3) box(RW,.18,.16,beamM,0,H-.09,z);
+for(const x of [-ROOM.x+.08,ROOM.x-.08]) for(const z of [ROOM.zb+.08,ROOM.zf-.08]) box(.16,H,.16,beamM,x,H/2,z);
+const trimM=new T.MeshStandardMaterial({color:0x5a3e28,roughness:.7});
+box(RW,.12,.03,trimM,0,.06,ROOM.zb+.015); box(.03,.12,RD,trimM,-ROOM.x+.015,.06,cz); box(.03,.12,RD,trimM,ROOM.x-.015,.06,cz);
+// 窗戶（左牆）：窗外是真實湖景全景，依時段換成白天／黃昏／夜晚
+const WIN={w:1.6,h:1.1,y:1.55,z:.5}, winTex={}; ['day','dawn','night'].forEach(k=>{ const x=TL.load('env_'+k+'_band.jpg'); x.encoding=T.sRGBEncoding; winTex[k]=x; });
+const viewM=new T.MeshBasicMaterial({map:winTex.day}); const view=plane(WIN.w*1.6,WIN.h*1.6,viewM,-ROOM.x-.6,WIN.y,WIN.z,Math.PI/2);
+{ // 左牆分成窗戶上、下、前、後四塊，窗戶位置真的留空，才看得到窗外
+  const yb=WIN.y-WIN.h/2, yt=WIN.y+WIN.h/2, z0=WIN.z-WIN.w/2, z1=WIN.z+WIN.w/2, X=-ROOM.x, r=Math.PI/2;
+  plane(RD,yb,wallM,X,yb/2,cz,r); plane(RD,H-yt,wallM,X,(yt+H)/2,cz,r);
+  plane(z0-ROOM.zb,WIN.h,wallM,X,WIN.y,(ROOM.zb+z0)/2,r); plane(ROOM.zf-z1,WIN.h,wallM,X,WIN.y,(z1+ROOM.zf)/2,r);
+  plane(.3,WIN.h,wallM,X-.15,WIN.y,z0,0); plane(.3,WIN.h,wallM,X-.15,WIN.y,z1,Math.PI); }   // 窗框兩側的牆厚
+const frameM=new T.MeshStandardMaterial({color:0xe8dcc8,roughness:.6});
+box(.08,.08,WIN.w+.16,frameM,-ROOM.x+.04,WIN.y+WIN.h/2+.04,WIN.z); box(.12,.06,WIN.w+.24,frameM,-ROOM.x+.06,WIN.y-WIN.h/2-.03,WIN.z);
+box(.08,WIN.h,.08,frameM,-ROOM.x+.04,WIN.y,WIN.z-WIN.w/2-.04); box(.08,WIN.h,.08,frameM,-ROOM.x+.04,WIN.y,WIN.z+WIN.w/2+.04);
+box(.04,WIN.h,.04,frameM,-ROOM.x+.03,WIN.y,WIN.z); box(.04,.04,WIN.w,frameM,-ROOM.x+.03,WIN.y,WIN.z);
+// 壁爐（右牆）：石砌、爐火會閃爍
+// 石頭貼圖：用畫布畫出大小不一的石塊與灰縫
+const stoneTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#3a3632'; g.fillRect(0,0,256,256);
+  let y=0; while(y<256){ const h=22+Math.random()*18; let x=-Math.random()*30; while(x<256){ const w=30+Math.random()*40, v=90+Math.random()*60|0;
+    g.fillStyle=`rgb(${v+8},${v},${v-10})`; g.beginPath(); g.roundRect?g.roundRect(x+2,y+2,w-4,h-4,6):g.rect(x+2,y+2,w-4,h-4); g.fill(); x+=w; } y+=h; }
+  const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; t.encoding=T.sRGBEncoding; return t; })();
+const stoneM=new T.MeshStandardMaterial({map:stoneTex,roughness:.95});
+// 壁爐（右牆）：左右石柱＋上方石樑，中間是真的爐口，爐火會閃爍
+const FP={z:.5}, FX=ROOM.x-.28;
+box(.55,1.3,.32,stoneM,FX,.65,FP.z-.66); box(.55,1.3,.32,stoneM,FX,.65,FP.z+.66);
+box(.55,.5,1.0,stoneM,FX,1.05,FP.z); box(.45,1.6,1.0,stoneM,ROOM.x-.22,2.1,FP.z);
+box(.75,.08,1.9,new T.MeshStandardMaterial({color:0x5a4030,roughness:.8}),ROOM.x-.36,1.34,FP.z);
+box(.06,.8,1.0,new T.MeshBasicMaterial({color:0x0a0604}),ROOM.x-.04,.4,FP.z);   // 爐口後壁燻黑，不受光
+box(.9,.06,1.8,stoneM,ROOM.x-.45,.03,FP.z);
+// 火焰貼圖：底部亮黃、往上變橘紅再透明，兩片交叉擺放
+const flameTex=(()=>{ const cv=document.createElement('canvas'); cv.width=128; cv.height=128; const g=cv.getContext('2d');
+  for(let i=0;i<5;i++){ const x=20+i*22, gr=g.createRadialGradient(x,118,2,x,80,46); gr.addColorStop(0,'rgba(255,240,170,1)'); gr.addColorStop(.35,'rgba(255,150,40,.9)'); gr.addColorStop(.7,'rgba(200,50,10,.5)'); gr.addColorStop(1,'rgba(120,20,0,0)');
+    g.fillStyle=gr; g.beginPath(); g.ellipse(x,85,20,44,0,0,Math.PI*2); g.fill(); }
+  const t=new T.CanvasTexture(cv); t.encoding=T.sRGBEncoding; return t; })();
+const fireM=new T.MeshBasicMaterial({map:flameTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false});
+const fire=plane(.8,.55,fireM,ROOM.x-.3,.42,FP.z,-Math.PI/2); plane(.7,.5,fireM,ROOM.x-.3,.4,FP.z,-Math.PI/2+.6);
+for(let i=0;i<3;i++){ const lg=new T.Mesh(new T.CylinderGeometry(.06,.06,.7,8),new T.MeshStandardMaterial({color:0x3a2416,roughness:.9})); lg.rotation.x=Math.PI/2; lg.position.set(ROOM.x-.3,.13+(i===2?.1:0),FP.z+(i-1)*.12); scene.add(lg); }
+const fireL=new T.PointLight(0xff8a40,2.2,9,1.3); fireL.position.set(ROOM.x-1.1,.6,FP.z); scene.add(fireL);
+// 地毯、沙發、茶几、手記、落地燈
+const LV={x:-.9,z:-1.9};   // 客廳區：在水族箱前面
+plane(2.6,1.8,new T.MeshStandardMaterial({color:0x6a2018,roughness:1}),LV.x+.6,.005,LV.z,0,-Math.PI/2);
+const sofaM=new T.MeshStandardMaterial({color:0x4a5a3a,roughness:.95});
+box(.9,.42,2.0,sofaM,LV.x-.7,.21,LV.z); box(.22,.85,2.0,sofaM,LV.x-1.16,.42,LV.z); box(.9,.6,.2,sofaM,LV.x-.7,.3,LV.z-1.05); box(.9,.6,.2,sofaM,LV.x-.7,.3,LV.z+1.05);
+const tableM=wood(1,1,0,0xb08860); box(.7,.05,1.1,tableM,LV.x+.5,.45,LV.z); for(const dx of [-.3,.3]) for(const dz of [-.5,.5]) box(.05,.45,.05,tableM,LV.x+.5+dx,.225,LV.z+dz);
+box(.22,.04,.3,new T.MeshStandardMaterial({color:0x6a4a2a,roughness:.8}),LV.x+.5,.495,LV.z-.1);   // 老漁人的手記
+const mug=new T.Mesh(new T.CylinderGeometry(.04,.035,.09,12),new T.MeshStandardMaterial({color:0xe8e0d0,roughness:.4})); mug.position.set(LV.x+.65,.52,LV.z+.2); scene.add(mug);
+const lampM=new T.MeshStandardMaterial({color:0x2a2420,roughness:.5,metalness:.4}); const LP={x:2.5,z:-3.3}; box(.04,1.5,.04,lampM,LP.x,.75,LP.z); box(.3,.03,.3,lampM,LP.x,.015,LP.z);
+const shade=new T.Mesh(new T.CylinderGeometry(.14,.22,.25,16,1,true),new T.MeshStandardMaterial({color:0xf0e0c0,emissive:0xffd8a0,emissiveIntensity:.6,side:T.DoubleSide})); shade.position.set(LP.x,1.55,LP.z); scene.add(shade);
+const lampL=new T.PointLight(0xffd8a0,2,8,1.2); lampL.position.set(LP.x,1.45,LP.z); scene.add(lampL);
+// 書架（左牆後方）
+const shelfM=wood(1,1,0,0x8a6040); box(.35,2.0,1.2,shelfM,-ROOM.x+.18,1.0,ROOM.zb+1.0);
+const bookC=[0x6a2a20,0x2a4a6a,0x3a5a2a,0x8a6a2a,0x4a2a4a,0x2a2a2a];
+for(let r=0;r<4;r++) for(let i=0;i<9;i++){ if(Math.random()<.15) continue; const h=.22+Math.random()*.08; box(.24,h,.08,new T.MeshStandardMaterial({color:bookC[(i+r)%6],roughness:.8}),-ROOM.x+.2,.12+r*.48+h/2,ROOM.zb+.55+i*.1); }
+// 水族箱（後牆中央）：第 3 段會放魚和觀賞模式，這裡先做櫃子、玻璃、水、砂、燈
+const TK={w:1.8,h:.75,d:.5,y:.85,z:ROOM.zb+.3};
+box(TK.w+.1,TK.y,TK.d+.08,wood(1,1,0,0x6a4630),0,TK.y/2,TK.z);
+const water=box(TK.w-.02,TK.h-.08,TK.d-.02,new T.MeshStandardMaterial({color:0x3a8aa0,transparent:true,opacity:.35,roughness:.1,depthWrite:false}),0,TK.y+(TK.h-.08)/2,TK.z);
+box(TK.w-.02,.06,TK.d-.02,new T.MeshStandardMaterial({color:0xb8a888,roughness:1}),0,TK.y+.03,TK.z);
+const glassM=new T.MeshStandardMaterial({color:0xdff4ff,transparent:true,opacity:.12,roughness:.05,metalness:.1,depthWrite:false});
+box(TK.w,TK.h,TK.d,glassM,0,TK.y+TK.h/2,TK.z).renderOrder=2;
+box(TK.w+.04,.04,TK.d+.04,new T.MeshStandardMaterial({color:0x1a1a1a,roughness:.5}),0,TK.y+TK.h+.02,TK.z);
+const tankL=new T.PointLight(0x9ad8ff,1.2,3,1.4); tankL.position.set(0,TK.y+TK.h-.05,TK.z); scene.add(tankL);
+for(let i=0;i<7;i++){ const pl=new T.Mesh(new T.ConeGeometry(.03,.25+Math.random()*.25,5),new T.MeshStandardMaterial({color:0x2a7a3a,roughness:.8})); pl.position.set(-TK.w/2+.15+i*.25,TK.y+.2,TK.z-.12+Math.random()*.15); scene.add(pl); }
+// 環境光：白天從窗戶進來的光多、夜裡靠爐火和檯燈
+const hemi=new T.HemisphereLight(0xfff0dd,0x3a2a1a,.5); scene.add(hemi);
+const sun=new T.DirectionalLight(0xfff4e0,.8); sun.position.set(-6,4,-1); sun.target.position.set(0,0,-1); scene.add(sun,sun.target);
+function daylight(){ const h=((c.hour()%24)+24)%24; return Math.max(0,Math.min(1,Math.min(h-5.5,19-h)/2)); }
+function syncTime(){ const dl=daylight(), h=((c.hour()%24)+24)%24;
+  viewM.map=dl>.6?winTex.day:dl>.05?winTex.dawn:winTex.night; viewM.needsUpdate=true; viewM.color.setScalar(.35+.65*dl);
+  hemi.intensity=.32+.45*dl; sun.intensity=.5*dl; lampL.intensity=2.2-.8*dl; shade.material.emissiveIntensity=.8-.4*dl; }
+function resize(){ const s=R.getSize(new T.Vector2()), a=s.x/s.y; cam.aspect=a;
+  cam.fov=Math.max(62,Math.min(80,2*Math.atan(Math.tan(23*Math.PI/180)/a)*180/Math.PI)); cam.updateProjectionMatrix(); }   // 直式手機水平視野很窄，垂直視角放大一點
+// 拖曳轉頭（只在小屋裡生效）
+const el=R.domElement;
+el.addEventListener('pointerdown',e=>{ if(!on) return; drag={x:e.clientX,y:e.clientY,yaw:yawT,pitch:pitchT}; });
+el.addEventListener('pointermove',e=>{ if(!on||!drag) return; yawT=Math.max(-1.9,Math.min(1.9,drag.yaw-(e.clientX-drag.x)*.006)); pitchT=Math.max(-.7,Math.min(.6,drag.pitch-(e.clientY-drag.y)*.005)); });
+window.addEventListener('pointerup',()=>{ drag=null; });
+function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; resize(); syncTime(); }
+function exit(){ on=false; drag=null; }
+function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8);
+  cam.rotation.set(0,0,0); cam.rotateY(yaw); cam.rotateX(pitch);
+  const fl=.85+.15*Math.sin(t*9)+.08*Math.sin(t*23); fireL.intensity=2.2*fl; fireM.opacity=.7+.3*fl; fire.scale.y=.9+.15*Math.sin(t*7);
+  if(Math.floor(t*2)!==Math.floor((t-dt)*2)) syncTime();
+  R.setRenderTarget(null); R.render(scene,cam); }
+window.addEventListener('resize',()=>{ if(on) resize(); });
+return {enter,exit,render,active:()=>on,scene,cam,TK};
+}
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
 'use strict';
@@ -4480,6 +4598,15 @@ function showCard(){
   ui.catch.classList.remove('hidden'); document.body.classList.add('catching'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden');
   Snd.fanfare(sp.rar); setTimeout(()=>$('bSell').focus({preventScroll:true}),50);
 }
+// 回家／出門：小屋是獨立場景，回家時改畫小屋，外面的湖照常運作；出門回到木碼頭
+function goHome(){ if(G.state==='home') return; if(G.state!=='idle'){ toast('先收線再回家','warn'); return; } if(!HOME.unlocked()){ toast('完成主線第一章後才能整理小屋','warn'); return; }
+  G.state='travel'; fadeEl.classList.add('on'); Snd.paddle();
+  setTimeout(()=>{ HOME3D.enter(); G.state='home'; document.body.classList.add('athome'); fadeEl.classList.remove('on'); toast('回到老漁人的小屋','good',1400); },650); }
+function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
+  setTimeout(()=>{ HOME3D.exit(); document.body.classList.remove('athome'); G.state='idle'; fadeEl.classList.remove('on'); if(then) then(); else if(G.spot!==0) goSpot(0); },650); }
+window.__goHome=goHome;
+$('bOut').addEventListener('click',()=>leaveHome());
+$('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
 function finishCatch(sell){
   const keep=sell==='keep'; if(keep) sell=false;   // 帶回家：不賣、也不算放生
   if(sell&&G.fd&&G.fd.sp&&(G.fd.sp.noSell||G.fd.sp.special==='mermaid')) sell=false;   // 保育類、美人魚：任何途徑都不能賣
@@ -4534,6 +4661,7 @@ $('bHome').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; c
     if(HOME.mount(G.fd,at)){ toast('做成標本，掛在小屋的牆上了','good',1800); finishCatch('keep'); } return; }
   toast(b.dataset.why||'現在不能帶回家','warn',2200); });
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
+const HOME3D=createHomeScene(W,{hour:()=>G.hour});
 window.__HOME=createHome({save,persist:()=>persist(),toast:(...a)=>toast(...a),setCoins:()=>setCoins()}); const HOME=window.__HOME;
 const META=createMeta({W,save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS,goSpot,curSpot:()=>G.spot,setHour:h=>{ G.hour=h; W.setTime(h,true); }});
 const UW=createUnderwater(W,P);
@@ -4566,7 +4694,8 @@ window.__MOON=createMoonBay(W,{G,save,persist,toast,Snd,vib,hour:()=>((G.hour%24
 window.__TAL=createTalents({save,persist,toast,Snd,vib,setCoins,addXP:x=>META.addXP(x),loc:()=>G.loc||'lake',zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour)}); window.__SEA=SEA;
 if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
 { const s=SPOTS[save.spot]; G.spot=save.spot; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; WL.setSpot(save.spot); SEA.setLoc(s.loc||'lake'); }
-function goSpot(i){ if(G.state!=='idle'){ toast('先收線再移動','warn'); return; } { const lk=window.__STORY&&window.__STORY.lock(i); if(lk){ toast('🔒 '+lk,'warn',2400); return; } }
+function goSpot(i){ if(G.state==='home'){ leaveHome(()=>goSpot(i)); return; }   // 在小屋裡選了釣點：先出門再過去
+  if(G.state!=='idle'){ toast('先收線再移動','warn'); return; } { const lk=window.__STORY&&window.__STORY.lock(i); if(lk){ toast('🔒 '+lk,'warn',2400); return; } }
   // 上一行：所有入口共用的開放檢查
   const s=SPOTS[i]; G.state='travel'; fadeEl.classList.add('on'); Snd.paddle(); setTimeout(()=>Snd.paddle(),380);
   setTimeout(()=>{ G.spot=i; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; G.yaw=G.yawT=0; save.spot=i; persist(); WL.setSpot(i); if((s.loc||'lake')!==SEA.loc()) SEA.setLoc(s.loc||'lake'); fadeEl.classList.remove('on'); G.state='idle'; toast('抵達'+s.name); },750); }
@@ -4799,7 +4928,7 @@ W.setTime(G.hour,true);
 let last=performance.now(), prAcc=0, prN=0, prChecks=0;
 function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
-  try{ update(dt); if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
+  try{ update(dt); if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
   if(prAcc>2){ const avg=prAcc/prN; if(prChecks<10&&avg>1/40&&W.getPR()>1.01) W.setPR(Math.max(1,W.getPR()-.25)); if(prChecks===9&&avg>1/30&&(save.gfx||'high')==='high'&&!G.gfxHint){ G.gfxHint=true; toast('畫面有點卡，可以到設定把畫質調成「中」或「低」','warn',3500); } prChecks++; prAcc=0; prN=0; }
   requestAnimationFrame(frame);
