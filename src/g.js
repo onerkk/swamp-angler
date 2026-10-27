@@ -185,7 +185,7 @@ function update(dt,t){
     if(s>=1){ g.visible=false; P.splash(g.position.x,0,g.position.z,14,.6); W.addRipple(g.position.x,g.position.z,.3); Snd.plip(); jf=null; } }
   // 美人魚尾巴
   // 月潮回來後美人魚更常出現
-  if(!tease){ teaseT-=dt; if(teaseT<=0){ const ended=window.__STORY&&window.__STORY.done('c7'); teaseT=ended?rand(30,70):rand(60,140); if(day<.3&&!uw&&Math.random()<(ended?.7:.45)){ fwd(head()+rand(-.6,.6),tv).multiplyScalar(rand(18,40)).add(b);
+  if(!tease){ teaseT-=dt; if(teaseT<=0&&!(window.__ENDON&&window.__ENDON())){ const ended=window.__STORY&&window.__STORY.done('c7'); teaseT=ended?rand(30,70):rand(60,140); if(day<.3&&!uw&&Math.random()<(ended?.7:.45)){ fwd(head()+rand(-.6,.6),tv).multiplyScalar(rand(18,40)).add(b);
       if(Math.hypot(tv.x,tv.z)<W.shoreR(Math.atan2(tv.x,-tv.z))-5){ tease={t:0,x:tv.x,z:tv.z,ry:rand(0,6.28),hit:false}; fluke.visible=true; } } } }
   else { tease.t+=dt; const tt=tease.t; let y,rx;
     if(tt<1.2){ const e=sstep(0,1,tt/1.2); y=-.9+1.2*e; rx=.5-.7*e; } else if(tt<1.8){ y=.3+Math.sin((tt-1.2)*8)*.03; rx=-.2+Math.sin((tt-1.2)*6)*.08; } else { const e=sstep(0,1,(tt-1.8)/.4); y=.3-1.3*e; rx=-.2+1.5*e; }

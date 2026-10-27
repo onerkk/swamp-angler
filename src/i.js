@@ -44,7 +44,7 @@ function medalBadge(fd){ const m=medalLv(fd), el=$('cMedal'); el.textContent=MED
 /* ---------- 魚群熱點 ---------- */
 const hot={on:false,x:0,z:0,t:0}; let hotT=rand(45,90), hotFx=0, hotRip=0;
 const hotEl=$('hotChip');
-function spawnHot(){ const b=c.G.base, a=G.head+rand(-.5,.5), d=rand(14,30);
+function spawnHot(){ if(window.__ENDON&&window.__ENDON()) return false; const b=c.G.base, a=G.head+rand(-.5,.5), d=rand(14,30);
   const x=b.x-Math.sin(a)*d, z=b.z-Math.cos(a)*d; if(Math.hypot(x,z)>W.shoreR(Math.atan2(x,-z))-5) return false;
   Object.assign(hot,{on:true,x,z,t:55}); c.toast('🐟 魚群出現了！快拋過去','good',2000); c.vib(30); return true; }
 const inHot=p=>hot.on&&Math.hypot(p.x-hot.x,p.z-hot.z)<5;
