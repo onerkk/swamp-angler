@@ -5647,10 +5647,10 @@ function endingShots(E,c){
   // 阿蘅：鬼魂模樣（ghost.glb，白衣長髮）與生前模樣（ghost_alive.glb）兩個模型疊在同一處，用透明度交錯，月光照到她時慢慢變回生前的樣子
   const heng=new T.Group(), hGhost=new T.Group(), hAlive=new T.Group(); heng.add(hGhost); heng.add(hAlive);
   const setOp=(o,a)=>o.traverse(m=>{ if(m.isMesh&&m.material){ m.material.transparent=true; m.material.opacity=a; m.visible=a>.01; } });
-  function loadHuman(url,dst,glow,key){ load(url,g=>{ const o=g.scene.clone(true); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ m.material=mt.clone(); if(mt.map){ m.material.emissive=new T.Color(glow); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.55; } } } });
-    o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(1.62/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
+  function loadHuman(url,dst,glow,key,hgt){ load(url,g=>{ const o=g.scene.clone(true); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ m.material=mt.clone(); if(mt.map){ m.material.emissive=new T.Color(glow); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.55; } } } });
+    o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar((hgt||1.62)/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); dst.add(o); dst.updateMatrixWorld(true); rigs.push({k:key||(dst===hGhost?'ghost':'heng'),rig:autoRig(o,'human')}); }); }
-  loadHuman('models/ghost.glb',hGhost,0xb8c8d8); loadHuman('models/ghost_alive.glb',hAlive,0xe8e2d8);
+  loadHuman('models/ghost.glb',hGhost,0xb8c8d8); loadHuman('models/girl.glb',hAlive,0xf0e8dc,'heng',1.35);   // 生前的阿蘅：十歲的小女孩
   // 老漁人（使用者提供設定圖生成）：只在最後的晨光裡出現
   const oldG=new T.Group(); loadHuman('models/oldman.glb',oldG,0xfff0d8,'old');
   // 阿蘅的舊髮簪：天亮時留在老漁人的椅子上
@@ -5759,7 +5759,7 @@ function endingShots(E,c){
         setOp(met?hAlive:hGhost,a); heng.position.y=.12+Math.sin(t*1.2)*.02; const rk=met?'heng':'ghost'; RP[rk].headPitch=t>4.5&&t<7?.32*Math.sin((t-4.5)/2.5*Math.PI):0; RP[rk].headYaw=t>8&&t<10?-.5*Math.sin((t-8)/2*Math.PI):0; RP[rk].skirt=.03;
         // 她轉身，朝月光灣的方向走去
         if(t>8){ heng.rotation.y=hengLook(-1.6,-8.5)+Math.min(1,(t-8)/2)*2.4; heng.position.z=-17.9-Math.max(0,t-9.5)*.35; }
-        if(met){ lamp2.position.set(heng.position.x+.25,1.05+heng.position.y-.12,heng.position.z+.2); lamp2L.intensity=1.4*a; lamp2.visible=a>.02; } },
+        if(met){ lamp2.position.set(heng.position.x+.25,.9+heng.position.y-.12,heng.position.z+.2); lamp2L.intensity=1.4*a; lamp2.visible=a>.02; } },
       subs:met?[[1,'浮萍灣的水面上，站著一個提燈的女孩（阿蘅）。','',4.4],[6.4,'她（阿蘅）朝你點點頭，提著燈，\n往月光灣的方向走去。','',4.8]]
               :[[1,'浮萍灣的水面上，站著一個白衣的女孩（阿蘅）。','',4.4],[6.2,'三十年來，她（阿蘅）一直在這裡，\n等一盞燈。','',4.6],[11.2,'她（阿蘅）轉過身，往月光灣的方向走去。','',4]]},
     // 第三幕一：月光灣——汐月坐在岩石上，等你
@@ -5776,7 +5776,7 @@ function endingShots(E,c){
       enter:()=>{ keep(heng); heng.position.set(BAY.x+3.4,.12,BAY.z+5.2); setOp(hGhost,met?0:0); setOp(hAlive,0); if(met){ keep(lamp2); } sc.ha=0; },
       tick:(t)=>{ merW.position.y=Math.sin(t*.9)*.015; const u=Math.min(1,Math.max(0,(t-6)/7)), a=Math.min(1,Math.max(0,(t-6)/2));
         heng.position.set(BAY.x+3.4-2.2*u,.12+Math.sin(t*1.2)*.02,BAY.z+5.2-3.6*u); heng.rotation.y=hengLook(BAY.x,BAY.z); setOp(met?hAlive:hGhost,a);
-        if(met){ lamp2.position.set(heng.position.x+.25,1.05,heng.position.z+.15); lamp2L.intensity=1.4*a; }
+        if(met){ lamp2.position.set(heng.position.x+.25,.9,heng.position.z+.15); lamp2L.intensity=1.4*a; }
         merW.rotation.y=merFace()+Math.min(1,Math.max(0,(t-7)/3))*.9; },
       subs:[[1,'汐月：「那個女孩叫阿蘅，是他（老漁人）的女兒。」','q',4.2],[5.4,'汐月：「三十年前的颱風夜，是她（阿蘅）的生日。\n他（老漁人）答應過，那天會早點回家。」','q',5.4],[11.2,'汐月：「可是那一夜，我被倒下的樹困住了。\n他（老漁人）冒著雨，划來救我……」','q',5.4]]},
     // 回憶一：三十年前，颱風夜。阿蘅提著燈站在浮萍灣的小棧橋上，等著湖上的船
@@ -5808,7 +5808,7 @@ function endingShots(E,c){
     // 第三幕二之二：月光照在阿蘅身上，她變回生前的樣子；她請你帶一句話給爸爸
     {d:17,hour:22.1,sea:false,from:[[-9.4,1.45,-39.2],[-10.4,1.25,-42.2]],to:[[-9.7,1.4,-40.1],[-10.5,1.3,-42.4]],
       enter:()=>{ fbFilter(false); flash.remove(); S.remove(rain); S.remove(boat); S.remove(pier); S.remove(pin); keep(merG);
-        heng.position.set(BAY.x+1.2,.12,BAY.z+1.6); heng.rotation.set(0,hengLook(BAY.x,BAY.z),0); setOp(met?hAlive:hGhost,1); setOp(met?hGhost:hAlive,0); if(met){ lamp2L.color.copy(warmC); lamp2.position.set(heng.position.x+.25,1.05,heng.position.z+.15); } else S.remove(lamp2); sc.tw=0; },
+        heng.position.set(BAY.x+1.2,.12,BAY.z+1.6); heng.rotation.set(0,hengLook(BAY.x,BAY.z),0); setOp(met?hAlive:hGhost,1); setOp(met?hGhost:hAlive,0); if(met){ lamp2L.color.copy(warmC); lamp2.position.set(heng.position.x+.25,.9,heng.position.z+.15); } else S.remove(lamp2); sc.tw=0; },
       tick:(t)=>{ merW.position.y=Math.sin(t*.9)*.015; heng.position.y=.12+Math.sin(t*1.2)*.02;
         if(!met){ const k=Math.min(1,Math.max(0,(t-3)/4)); setOp(hGhost,1-k); setOp(hAlive,k); }
         RP.heng.headPitch=RP.ghost.headPitch=t<11?.28:Math.max(-.1,.28-(t-11)*.25); RP.heng.headYaw=RP.ghost.headYaw=t>12?Math.min(.5,(t-12)*.3):0;
@@ -5835,7 +5835,7 @@ function endingShots(E,c){
         merW.rotation.y=Math.atan2(-13.6-BAY.x,-59-BAY.z); RP.mer.tail=t>1.5?.35:.12; RP.mer.tailF=t>1.5?3.2:1.6; RP.mer.headYaw=t>4.6&&t<6.6?2.2*Math.sin((t-4.6)/2*Math.PI)*.45:0; RP.heng.headYaw=RP.mer.headYaw;
         sc.tr-=1/60; if(sc.tr<=0&&t>1&&t<10.5){ sc.tr=.12; const wp=merW.getWorldPosition(new T.Vector3()); trailDot(wp.x+(Math.random()-.5)*.3,.3,wp.z+(Math.random()-.5)*.3); }
         { const hp=new T.Vector3(BAY.x+1.2,0,BAY.z+1.6).lerp(new T.Vector3(-13.2,0,-58.4),Math.min(1,Math.max(0,(t-.8)/9))); heng.position.set(hp.x,.12,hp.z); heng.rotation.y=Math.atan2(-13.2-hp.x,-58.4-hp.z);
- const fa=Math.max(0,1-Math.max(0,t-9)/2.2); setOp(hAlive,fa); setOp(hGhost,0); if(met){ lamp2.position.set(hp.x+.25,1.05,hp.z+.15); lamp2L.intensity=1.4*fa; } }
+ const fa=Math.max(0,1-Math.max(0,t-9)/2.2); setOp(hAlive,fa); setOp(hGhost,0); if(met){ lamp2.position.set(hp.x+.25,.9,hp.z+.15); lamp2L.intensity=1.4*fa; } }
         RP.king.headPitch=t<4?.45*Math.sin(Math.min(1,t/1.5)*Math.PI/2):Math.max(0,.45-(t-4)*.3);
         if(t>9){ king.position.y=-2.2-(t-9)*.9; kingEye.intensity=Math.max(0,1-(t-9)/3); } if(t>10&&t<11) spl(-13.8,-59.5,12,1.6); updTrail(1/60); },
       subs:[[.4,'海王朝著碼頭的方向，低下了頭：\n「人類……謝謝你。」','q',4.2],[5,'她們（汐月和阿蘅）回頭看了你一眼。','',3.6],[10.5,'月潮帶著汐月和阿蘅，回到了大海。','',4.4]]},
