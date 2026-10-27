@@ -156,7 +156,7 @@ const gradeOf=u=>GRADES.find(g=>u<g[0])[1];
 function prepFish(){ const wantPin=window.__STORY&&window.__STORY.wants('hairpin')&&WL.zoneId()==='lily'&&period(G.hour)==='night';
   if(wantPin&&Math.random()<.45){ const it=ITEMS_BY('hairpin'); if(it){ G.sp=FUN.ITEM_SP; G.fd={sp:FUN.ITEM_SP,item:it,L:it.size,w:it.w,lvl:1,value:0,xpMul:1}; return; } }
   if(Math.random()<.085*(window.__STORY&&window.__STORY.needs('item')?2:1)){ const it=FUN.rollItem(); G.sp=FUN.ITEM_SP; G.fd={sp:FUN.ITEM_SP,item:it,L:it.size,w:it.w*rand(.85,1.15),lvl:1,value:Math.round(it.val*rand(.8,1.25)),u:.5,xpMul:0}; return; }
-  G.depK=depKey(); const sp=pickSpecies(), pw=clamp((G.castDist-6)/30,0,1), u=Math.pow(Math.random(),(1.6-.5*pw)/WL.sizeB()*(1+(1-reachK())*1.2+.15*depNow(G.depK)));
+  G.depK=depKey(); const sp=pickSpecies(), pw=clamp((G.castDist-6)/30,0,1), seaK=(G.loc||'lake')==='sea'?.62:1, u=Math.pow(Math.random(),(1.6-.5*pw)/WL.sizeB()*(1+(1-reachK())*1.2+.15*depNow(G.depK))*seaK);   // 海裡的魚個頭普遍偏大
   const big=u>.96?1+(u-.96)/.04*.15:1, L=lerp(sp.len[0],sp.len[1],u)/100*big, w=sp.k*L*L*L*rand(.9,1.12);
   G.sp=sp; G.fd={sp,L,w,u,grade:gradeOf(u),lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*.4*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; if(window.__TAL) window.__TAL.applyBoss(G,SPECIES,RAR); }
 function bite(){ if(!G.fd) prepFish(); UW.bite(); G.state='bite'; G.biteT=0; FUN.hookStart(G.fd); W.addRipple(G.to.x,G.to.z,.75); P.splash(G.to.x,0,G.to.z,8,.5); Snd.bite(); vib([60,40,60]); }
