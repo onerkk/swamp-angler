@@ -15,7 +15,7 @@ async function init(){ if(inited) return inited; if(!window.FIREBASE_CFG) return
     try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
     try{ const r=await auth.getRedirectResult(); if(r&&r.user) c.toast('已登入 '+(r.user.displayName||''),'good',2000); }catch(e){ c.toast('登入失敗：'+(e.message||e),'bad',3000); }
     auth.onAuthStateChanged(u=>{ user=u; owner=isOwner(u); if(u) localStorage.setItem(KEY,'1');
-      if(TEST){ showGate(); if(owner) onLogin().then(()=>{ if(c.grant) c.grant(); }); }
+      if(TEST){ showGate(); if(owner){ if(!c.save().testSeeded) copyMain(true); else onLogin().then(()=>{ if(c.grant) c.grant(); }); } }
       else if(u) onLogin();
       c.refresh&&c.refresh(); }); return true; })();
   return inited; }
@@ -34,6 +34,15 @@ async function onLogin(){ try{ const d=await docRef().get(); const local=c.save(
     const sl=score(local), sc=score(cloud);
     if(sc>sl+1&&confirm(`雲端有進度較高的存檔（Lv ${cloud.lv||1}、金幣 ${(cloud.coins||0).toLocaleString()}）。\n要載入雲端存檔嗎？\n目前本機進度會先備份，不會消失。`)){ try{ localStorage.setItem(BK,JSON.stringify(local)); }catch(e){} c.apply(cloud); return; }
     await push(); }catch(e){ console.warn('cloud pull',e); c.toast('雲端存檔讀取失敗，使用本機進度','warn',2600); } }
+// 測試帳號：把正式版進度（本機或雲端，取進度較高的那份）複製過來，金幣維持 999,999
+async function copyMain(auto){ if(!TEST||!owner) return; let best=null;
+  try{ const l=JSON.parse(localStorage.getItem('swampAngler.v1')||'null'); if(l) best=l; }catch(e){}
+  try{ const d=await docRef().get(); const cs=d.exists&&d.data().save; if(cs&&score(cs)>score(best)) best=cs; }catch(e){ console.warn('copy main',e); }
+  if(!best){ const s=c.save(); s.testSeeded=1; if(auto){ await onLogin(); if(c.grant) c.grant(); } else c.toast('找不到正式版進度','warn',2000); return; }
+  const o=JSON.parse(JSON.stringify(best)); o.testSeeded=1; o.coins=Math.max(999999,o.coins||0);
+  c.toast(auto?'🧪 測試帳號：已複製正式版進度':'已複製正式版進度','good',1800);
+  try{ await docRef().set({[FIELD]:o,[TFIELD]:Date.now()},{merge:true}); }catch(e){}
+  setTimeout(()=>c.apply(o),auto?900:600); }
 function dirty(){ if(!user||(TEST&&!owner)) return; clearTimeout(dirtyT); dirtyT=setTimeout(push,6000); }
 function status(){ if(!window.FIREBASE_CFG) return {state:'nocfg'}; if(!user) return {state:'out'}; return {state:'in',name:(user.displayName||user.email||'')+(TEST?'（測試帳號）':'')}; }
 // 測試帳號的門：沒登入或不是擁有者就整個畫面擋住，驗證通過才放行
@@ -57,7 +66,7 @@ if(TEST){ const go=()=>{ showGate(); if(window.FIREBASE_CFG) init().catch(()=>{}
 // 之前登入過就自動接上
 if(!TEST&&localStorage.getItem(KEY)==='1'&&window.FIREBASE_CFG) init().catch(()=>{});
 window.addEventListener('beforeunload',()=>{ if(user&&dirtyT){ clearTimeout(dirtyT); push(); } });
-return {login,logout,dirty,status,isTest:()=>TEST,restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
+return {login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
 }
 /* ===== 安裝到桌面（PWA） ===== */
 const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;

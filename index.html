@@ -1967,6 +1967,7 @@ function render(){
       if(st.state==='in') h+=row('☁️ 雲端存檔','已登入 '+st.name+'，進度會自動同步到你的 Google 帳號',`<button class="sbtn" data-a="cloud" data-v="out">登出</button>`);
       else if(st.state==='out') h+=row('☁️ 雲端存檔','用 Google 帳號登入，換手機或清除瀏覽器也不會丟進度。目前的本機進度會先上傳，不會被洗掉',`<button class="sbtn pri" data-a="cloud" data-v="in">Google 登入</button>`);
       else h+=row('☁️ 雲端存檔','Google 登入尚未設定',`<span class="lk">尚未設定</span>`);
+      if(st.state==='in'&&window.__CLOUD.isTest&&window.__CLOUD.isTest()) h+=row('🧪 測試帳號','把正式版目前的進度複製過來覆蓋測試存檔（金幣維持 999,999）',`<button class="sbtn" data-a="cloud" data-v="copy">複製正式進度</button>`);
       h+=row('📲 安裝到桌面',PWA.installed()?'已安裝成 App，從桌面開啟時進度一樣保留':'像 App 一樣從手機桌面開啟，進度與瀏覽器共用',PWA.installed()?`<span class="lk">已安裝</span>`:`<button class="sbtn pri" data-a="pwa">安裝</button>`); }
     h+=row('💎 支持作者','遊戲完全免費。作者的水晶小店「靜月之光」，喜歡的話歡迎逛逛',`<button class="sbtn pri" data-a="shop">逛逛</button>`);
     h+=tg('uw','水下鏡頭','魚靠近餌時切到水下看牠咬餌',save.uw!==false);
@@ -2115,7 +2116,7 @@ shB.addEventListener('click',e=>{
   else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
   else if(a==='shop'){ if(window.__SHOP) window.__SHOP(); }
-  else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else window.__CLOUD.logout(); }
+  else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else if(v==='copy') window.__CLOUD.copyMain(); else window.__CLOUD.logout(); }
   else if(a==='pwa'){ PWA.install().then(r=>{ if(r==='ios') toast('iPhone：按 Safari 的「分享」→「加入主畫面」','',4200); else if(r==='manual') toast('瀏覽器選單 ⋮ →「加到主畫面」或「安裝應用程式」','',4200); else if(r==='installed') toast('已經安裝了','',1600); }); }
   else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem(window.__SAVE_KEY||'swampAngler.v1'); }catch(_){} location.reload(); return; } }
   render(); syncHUD();
@@ -5051,7 +5052,7 @@ async function init(){ if(inited) return inited; if(!window.FIREBASE_CFG) return
     try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
     try{ const r=await auth.getRedirectResult(); if(r&&r.user) c.toast('已登入 '+(r.user.displayName||''),'good',2000); }catch(e){ c.toast('登入失敗：'+(e.message||e),'bad',3000); }
     auth.onAuthStateChanged(u=>{ user=u; owner=isOwner(u); if(u) localStorage.setItem(KEY,'1');
-      if(TEST){ showGate(); if(owner) onLogin().then(()=>{ if(c.grant) c.grant(); }); }
+      if(TEST){ showGate(); if(owner){ if(!c.save().testSeeded) copyMain(true); else onLogin().then(()=>{ if(c.grant) c.grant(); }); } }
       else if(u) onLogin();
       c.refresh&&c.refresh(); }); return true; })();
   return inited; }
@@ -5070,6 +5071,15 @@ async function onLogin(){ try{ const d=await docRef().get(); const local=c.save(
     const sl=score(local), sc=score(cloud);
     if(sc>sl+1&&confirm(`雲端有進度較高的存檔（Lv ${cloud.lv||1}、金幣 ${(cloud.coins||0).toLocaleString()}）。\n要載入雲端存檔嗎？\n目前本機進度會先備份，不會消失。`)){ try{ localStorage.setItem(BK,JSON.stringify(local)); }catch(e){} c.apply(cloud); return; }
     await push(); }catch(e){ console.warn('cloud pull',e); c.toast('雲端存檔讀取失敗，使用本機進度','warn',2600); } }
+// 測試帳號：把正式版進度（本機或雲端，取進度較高的那份）複製過來，金幣維持 999,999
+async function copyMain(auto){ if(!TEST||!owner) return; let best=null;
+  try{ const l=JSON.parse(localStorage.getItem('swampAngler.v1')||'null'); if(l) best=l; }catch(e){}
+  try{ const d=await docRef().get(); const cs=d.exists&&d.data().save; if(cs&&score(cs)>score(best)) best=cs; }catch(e){ console.warn('copy main',e); }
+  if(!best){ const s=c.save(); s.testSeeded=1; if(auto){ await onLogin(); if(c.grant) c.grant(); } else c.toast('找不到正式版進度','warn',2000); return; }
+  const o=JSON.parse(JSON.stringify(best)); o.testSeeded=1; o.coins=Math.max(999999,o.coins||0);
+  c.toast(auto?'🧪 測試帳號：已複製正式版進度':'已複製正式版進度','good',1800);
+  try{ await docRef().set({[FIELD]:o,[TFIELD]:Date.now()},{merge:true}); }catch(e){}
+  setTimeout(()=>c.apply(o),auto?900:600); }
 function dirty(){ if(!user||(TEST&&!owner)) return; clearTimeout(dirtyT); dirtyT=setTimeout(push,6000); }
 function status(){ if(!window.FIREBASE_CFG) return {state:'nocfg'}; if(!user) return {state:'out'}; return {state:'in',name:(user.displayName||user.email||'')+(TEST?'（測試帳號）':'')}; }
 // 測試帳號的門：沒登入或不是擁有者就整個畫面擋住，驗證通過才放行
@@ -5093,7 +5103,7 @@ if(TEST){ const go=()=>{ showGate(); if(window.FIREBASE_CFG) init().catch(()=>{}
 // 之前登入過就自動接上
 if(!TEST&&localStorage.getItem(KEY)==='1'&&window.FIREBASE_CFG) init().catch(()=>{});
 window.addEventListener('beforeunload',()=>{ if(user&&dirtyT){ clearTimeout(dirtyT); push(); } });
-return {login,logout,dirty,status,isTest:()=>TEST,restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
+return {login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
 }
 /* ===== 安裝到桌面（PWA） ===== */
 const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
