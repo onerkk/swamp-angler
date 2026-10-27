@@ -504,7 +504,7 @@ shB.addEventListener('click',e=>{
   else if(a==='shop'){ if(window.__SHOP) window.__SHOP(); }
   else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else window.__CLOUD.logout(); }
   else if(a==='pwa'){ PWA.install().then(r=>{ if(r==='ios') toast('iPhone：按 Safari 的「分享」→「加入主畫面」','',4200); else if(r==='manual') toast('瀏覽器選單 ⋮ →「加到主畫面」或「安裝應用程式」','',4200); else if(r==='installed') toast('已經安裝了','',1600); }); }
-  else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem('swampAngler.v1'); }catch(_){} location.reload(); return; } }
+  else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem(window.__SAVE_KEY||'swampAngler.v1'); }catch(_){} location.reload(); return; } }
   render(); syncHUD();
 });
 fillQuests(); applyRod(); syncHUD(); document.body.classList.toggle('immersive',!!save.imm);

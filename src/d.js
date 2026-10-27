@@ -7,7 +7,10 @@ const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const RAR=P.RAR, SPECIES=P.SPECIES, MAX_LINE=80;
 
 /* ---------- 存檔 ---------- */
-const SAVE_KEY='swampAngler.v1';
+// 測試帳號：網址加 test 參數，存檔另開一份（只限擁有者 Google 帳號，驗證在 y.js）
+const TESTACC=/[?&]test=1(&|$)/.test(location.search);
+const SAVE_KEY=TESTACC?'swampAngler.test':'swampAngler.v1';
+window.__SAVE_KEY=SAVE_KEY;
 let save={coins:0,total:0,sound:true,dex:{}};
 try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); if(s) save=Object.assign(save,s); }catch(e){}
 function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} if(window.__CLOUD) window.__CLOUD.dirty(); }
@@ -314,7 +317,8 @@ function openShop(){ const ui=$('shopUI'); ui.innerHTML=`<div class="box"><h3>�
   <a class="go" href="${SHOP_URL}" target="_blank" rel="noopener">🛍 前往蝦皮賣場「靜月之光」</a><button class="x" data-x="1">關閉</button></div>`;
   ui.classList.remove('hidden'); ui.onclick=e=>{ if(e.target===ui||e.target.dataset.x) ui.classList.add('hidden'); }; }
 window.__SHOP=openShop;
-window.__CLOUD=createCloud({save:()=>save,toast,refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
+window.__CLOUD=createCloud({save:()=>save,toast,test:TESTACC,
+  grant:()=>{ if((save.coins||0)<999999){ save.coins=999999; setCoins(); META.syncHUD(); persist(); } toast('🧪 測試帳號：金幣 999,999','good',2600); },refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
   apply:obj=>{ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} location.reload(); }});
 const GHOST=createGhost(W,{splash:(x,z,n,s)=>P.splash(x,0,z,n,s),ripple:(x,z,r)=>W.addRipple(x,z,r),splashSnd:k=>Snd.splash&&Snd.splash(k),save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>G.state,base:()=>G.base,head:()=>G.head,yaw:()=>G.yaw,to:()=>G.to,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
 window.__GHOST=GHOST;
