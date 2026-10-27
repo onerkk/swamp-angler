@@ -41,3 +41,7 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 
 ## 快取
 - sw.js 的 VER 每次組裝自動蓋上時間戳（見組裝指令）；模型與貼圖是快取優先，不換 VER 的話手機會一直用舊模型
+
+## 組裝（新）
+- 一律用 `bash src/build.sh`：組 index.html，並把同一個版本號蓋進網頁（APP_VER）、version.json、sw.js 快取版本
+- 玩家端：網頁定時比對 version.json，有新版跳出「有新版本・立即更新」，按下清快取重載
