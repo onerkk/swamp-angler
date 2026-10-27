@@ -23,3 +23,11 @@ cutany.sh（自動分格→找魚塊）或 cutbox.py（手動指定範圍）→ 
 → 加入 c.js SPECIES（spots/loc/water/tide/noSell）、g.js SP_STY、e.js 餌 aff、m.js RFISH+BAKED → models/fish_<id>.glb
 x 阿蘅（夜裡的驚嚇事件與隱藏章節）
 y 雲端存檔（Firebase Google 登入）與 PWA 安裝
+
+## 2026-10-27 補充
+- 組裝順序：b c e f g h i j k l m stars n o p q r s t u v w x y d（x=阿蘅、y=雲端存檔與 PWA）
+- 根目錄素材：shop1–9.jpg（靜月之光展示櫃）、scream_main/scream_b/wail/gasp.mp3（CC0）、ice_*.jpg、ghost_face.jpg、manifest.webmanifest、sw.js、icon-*.png、item_hairpin.glb
+- models/：fish_*.glb、mermaid3d.glb、ghost.glb、ghost_alive.glb、lantern.glb；models/home/：Poly Haven 家具與貼圖（含 bark_brown_02、burned_ground_01）
+- 測試：本機 /tmp/simsite 放 index.html 並 symlink 素材；測試時可加 window.__T 等掛鉤，正式版 index.html 不得包含 window.__T=、__LURE、__WLT、__HOMESCENE、__GRILLSET
+- 阿蘅測試網址：?ghost=1（四種輪流）或 ?ghost=glide/peek/behind/jump
+- 人形模型烘焙用 fish6/bake_planar.py；魚用 bake4.py（BAKE_SIZE、BAKE_FACES、BAKE_SMOOTH 環境變數）
