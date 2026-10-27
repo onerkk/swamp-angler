@@ -3564,21 +3564,36 @@ function bendify(m,uni,K){ K=K||1; m.onBeforeCompile=s=>{ s.uniforms.uSwim=uni.u
   s.vertexShader='uniform float uSwim;\nuniform float uAmp;\n'+s.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nfloat bx_=clamp(0.5-position.x,0.0,1.6);\ntransformed.z+=sin(uSwim-position.x*5.5)*bx_*bx_*uAmp*'+K.toFixed(2)+';'); }; }
 /* 魚的骨架：沿身體（頭在 +X、身長 1）建 6 節骨頭，頂點依前後位置平滑分配權重；
    每格依 uSwim、uAmp 算出身體波形，換成每節骨頭的轉角。一般魚左右擺尾，扁平的魚（魟、比目魚）上下波動 */
-const FLAT=new Set(['stingray','halibut']), FRIGS=new Set();
+const FLAT=new Set(['halibut']), FRIGS=new Set();
+// 特殊游法：魟（左右胸鰭像翅膀上下拍動）、翻車魚（上下兩片大鰭左右划水，身體幾乎不擺）
+const SWIMK={stingray:'ray',sunfish:'mola'};
 const BX=[.46,.28,.1,-.08,-.25,-.4];
-function rigFish(grp,uni,K,flat){ const bones=BX.map(()=>new T.Bone()); bones[0].position.set(BX[0],0,0); for(let i=1;i<bones.length;i++){ bones[i].position.set(BX[i]-BX[i-1],0,0); bones[i-1].add(bones[i]); }
-  grp.add(bones[0]); const skel=new T.Skeleton(bones), band=.06;
+function rigFish(grp,uni,K,mode){ const bones=BX.map(()=>new T.Bone()); bones[0].position.set(BX[0],0,0); for(let i=1;i<bones.length;i++){ bones[i].position.set(BX[i]-BX[i-1],0,0); bones[i-1].add(bones[i]); }
+  grp.add(bones[0]); const all=[...bones], band=.06, extra={};
+  // 量出身體範圍：魟看左右寬度，翻車魚看上下高度
+  let wz=0, hy=0; grp.children.forEach(m=>{ if(!m.isMesh) return; const P=m.geometry.attributes.position; for(let i=0;i<P.count;i++){ wz=Math.max(wz,Math.abs(P.getZ(i))); hy=Math.max(hy,Math.abs(P.getY(i))); } });
+  const addB=(parent,x,y,z)=>{ const b=new T.Bone(); b.position.set(x,y,z); parent.add(b); all.push(b); return all.length-1; };
+  if(mode==='ray'){ const r0=wz*.28, r1=wz*.62; extra.L=[addB(bones[2],0,0,r0)]; extra.L.push(addB(all[extra.L[0]],0,0,r1-r0)); extra.R=[addB(bones[2],0,0,-r0)]; extra.R.push(addB(all[extra.R[0]],0,0,-(r1-r0))); extra.r0=r0; extra.r1=r1; }
+  if(mode==='mola'){ const y0=hy*.42; extra.D=addB(bones[2],0,y0,0); extra.A=addB(bones[2],0,-y0,0); extra.y0=y0; }
+  const skel=new T.Skeleton(all);
   grp.children.filter(o=>o.isMesh&&!o.isSkinnedMesh).forEach(m=>{ const g=m.geometry, P=g.attributes.position, n=P.count, si=new Uint16Array(n*4), sw=new Float32Array(n*4);
-    for(let i=0;i<n;i++){ const x=P.getX(i); let k=0; while(k<BX.length-1&&x<BX[k+1]) k++; let w=1, j=k; if(k>0&&x>BX[k]-band&&x<=BX[k]){ j=k-1; w=.5+.5*(BX[k]-x)/band; } else if(k>0&&x>BX[k]){ j=k-1; w=.5; }
-      si[i*4]=k; si[i*4+1]=j; sw[i*4]=w; sw[i*4+1]=1-w; }
+    for(let i=0;i<n;i++){ const x=P.getX(i), y=P.getY(i), z=P.getZ(i); let k=0; while(k<BX.length-1&&x<BX[k+1]) k++; let w=1, j=k; if(k>0&&x>BX[k]-band&&x<=BX[k]){ j=k-1; w=.5+.5*(BX[k]-x)/band; }
+      let f=0, fb=0;
+      if(mode==='ray'){ const az=Math.abs(z), side=z>0?extra.L:extra.R; if(az>extra.r0){ f=Math.min(1,(az-extra.r0)/(wz*.12)); fb=az>extra.r1?side[1]:side[0]; } }
+      if(mode==='mola'){ const ay=Math.abs(y); if(ay>extra.y0){ f=Math.min(1,(ay-extra.y0)/(hy*.1)); fb=y>0?extra.D:extra.A; } }
+      si[i*4]=k; si[i*4+1]=j; si[i*4+2]=fb; sw[i*4]=w*(1-f); sw[i*4+1]=(1-w)*(1-f); sw[i*4+2]=f; }
     g.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); g.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
     const mats=(Array.isArray(m.material)?m.material:[m.material]); mats.forEach(mm=>{ mm.onBeforeCompile=()=>{}; mm.skinning=true; mm.needsUpdate=true; });
     const sm=new T.SkinnedMesh(g,m.material); sm.frustumCulled=false; grp.remove(m); grp.add(sm); grp.updateMatrixWorld(true); sm.bind(skel,new T.Matrix4()); });
-  const r={grp,uni,K,flat,bones,idle:0}; FRIGS.add(r); return r; }
+  const r={grp,uni,K:mode==='mola'?K*.25:mode==='ray'?K*.35:K,flat:mode==='flat'||mode==='ray',mode,bones,all,extra,idle:0}; FRIGS.add(r); return r; }
 function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.delete(r); return; } r.idle=0;
   const u=r.uni.uSwim.value, A=r.uni.uAmp.value*r.K, off=x=>{ const bx=Math.max(0,Math.min(1.6,.5-x)); return Math.sin(u-x*5.5)*bx*bx*A; };
   let prev=0; for(let i=0;i<r.bones.length;i++){ const x0=BX[i], x1=i<BX.length-1?BX[i+1]:BX[i]-.12, sl=Math.atan2(off(x1)-off(x0),x0-x1), a=sl-prev; prev=sl;
-    if(r.flat) r.bones[i].rotation.set(0,0,a); else r.bones[i].rotation.set(0,-a,0); } }
+    if(r.flat) r.bones[i].rotation.set(0,0,a); else r.bones[i].rotation.set(0,-a,0); }
+  const amp=Math.min(1,.25+r.uni.uAmp.value*6), ph=u*.55, e=r.extra;
+  if(r.mode==='ray'){ const a0=Math.sin(ph)*.38*amp, a1=Math.sin(ph-.9)*.45*amp;   // 外側比內側慢半拍，翅膀呈波浪
+    r.all[e.L[0]].rotation.set(a0,0,0); r.all[e.L[1]].rotation.set(a1,0,0); r.all[e.R[0]].rotation.set(-a0,0,0); r.all[e.R[1]].rotation.set(-a1,0,0); }
+  if(r.mode==='mola'){ const a=Math.sin(u*.8)*.55*amp; r.all[e.D].rotation.set(a,0,0); r.all[e.A].rotation.set(a,0,0); } }
 const fishReady=id=>!!(RFISH[id]&&ready(RFISH[id][0]));
 function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0]); if(!g) return null; const opt=c[2]||{};
   const sc=g.scene; sc.updateMatrixWorld(true); let ms=[]; sc.traverse(o=>{ if(o.isMesh) ms.push(o); });
@@ -3611,7 +3626,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
     const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
   try{ if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });
         const rg=autoRig(grp,'tail'); FRIGS.add({grp,uni,up:rg,idle:0}); } }
-    else rigFish(grp,uni,opt.king||opt.mer?.15:1,FLAT.has(sp.id)); }catch(e){ console.warn('fish rig',sp.id,e); }
+    else rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); }catch(e){ console.warn('fish rig',sp.id,e); }
   return {group:grp,uni,sp,real:true}; }
 
 function measure(root){ root.updateMatrixWorld(true); const b=new T.Box3(), v=new T.Vector3();
@@ -5563,7 +5578,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261027224654'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261027225706'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
