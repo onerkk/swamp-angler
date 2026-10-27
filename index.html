@@ -4659,11 +4659,21 @@ function put(name,x,y,z,ry,sc,fn){ const place=g=>{ const o=g.scene.clone(true);
         if(/_artwork$/.test(mm.name)&&ART[name]){ const nm=mm.clone(); const tx=TL.load(ART[name]); tx.encoding=T.sRGBEncoding; tx.flipY=false; nm.map=tx; nm.color.set(0xffffff); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_glass$/.test(mm.name)){ const nm=new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.12,roughness:.05,metalness:0,depthWrite:false}); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_lamp$/.test(mm.name)){ const nm=mm.clone(); nm.emissive=new T.Color(0xffd080); nm.emissiveIntensity=1.2; if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; glowM.push(nm); } }); });
-    scene.add(o); if(fn) fn(o); };
+    scene.add(o); addObs(o); if(fn) fn(o); };
   if(mcache[name]) place(mcache[name]); else GL.load('models/home/'+name+'.glb',g=>{ mcache[name]=g; place(g); },undefined,()=>console.warn('home model',name)); }
 const LV={x:-.9,z:-1.9};
+// 碰撞：落地的家具用實際模型的外框當障礙（升級換模型也自動跟著變），走路時不能穿過去
+const OBS=[];
+function addObs(o){ o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o); if(b.isEmpty()||b.min.y>.25||b.max.y-b.min.y<.12) return;
+  OBS.push({o,x0:b.min.x,x1:b.max.x,z0:b.min.z,z1:b.max.z}); }
+function dropObs(o){ for(let i=OBS.length-1;i>=0;i--) if(OBS[i].o===o) OBS.splice(i,1); }
+function blocked(x,z){ const r=.28; return OBS.some(b=>x>b.x0-r&&x<b.x1+r&&z>b.z0-r&&z<b.z1+r); }
 // 地毯：真實織物貼圖
 plane(2.8,2.0,pbr('fabric_pattern_07',2.2,1.6,{color:0xb86a48}),LV.x+.5,.006,LV.z,0,-Math.PI/2);
+// 茶几與桌上的手記、煤油燈（不分等級，一直都在）
+put('coffee_table_round_01',LV.x+.5,0,LV.z,0,.85);
+put('book_encyclopedia_set_01',LV.x+.5,.42,LV.z+.15,.3,.8);
+put('vintage_oil_lamp',LV.x+.2,.42,LV.z-.3,0,.8);
 // 家具依等級擺放：每一項標明屬於哪件家具、在哪幾級出現；升級時換模型或加擺件
 const FITEMS=[
  {f:'sofa',lv:[0,1],m:'sofa_02',p:[LV.x-1.0,0,LV.z,Math.PI/2,1]},
@@ -4686,7 +4696,7 @@ const FITEMS=[
  {f:'fire',lv:[2,2],m:'brass_pan_01',p:[ROOM.x-.3,0,FP.z-1.05,.8,1.4]}];
 // 香草箱裡種真實的蕁麻草模型（Poly Haven nettle_plant），沿著木箱長邊排一排
 function plantHerbs(o,half){ const ld=g=>{ const names=['nettle_plant_tall_a_LOD0','nettle_plant_medium_a_LOD0','nettle_plant_tall_b_LOD0','nettle_plant_medium_b_LOD0'];
-    const n=Math.round(half*10); for(let i=0;i<n;i++){ const src=g.scene.getObjectByName(names[i%4]); if(!src) continue; const k=src.clone(true);
+    const n=Math.round(half*10); for(let i=0;i<n;i++){ const src=g.scene.getObjectByName(names[i%4]); if(!src) continue; const k=new T.Group(), sk=src.clone(true); sk.position.set(0,0,0); k.add(sk);
       k.position.set(-half+.08+(2*half-.16)*i/Math.max(1,n-1),.3,(i%2?.06:-.06)); k.rotation.set(0,i*1.7,0); k.scale.setScalar(1.9+(i%3)*.25); o.add(k); } };
   if(mcache.nettle_plant) ld(mcache.nettle_plant); else GL.load('models/home/nettle_plant.glb',g=>{ mcache.nettle_plant=g; ld(g); }); }
 function syncFurn(){ const H=c.home&&c.home(); if(!H) return;
@@ -4695,8 +4705,8 @@ function syncFurn(){ const H=c.home&&c.home(); if(!H) return;
       put(it.m,x,y,z,ry,sc,o=>{ it.loading=false; o.userData.furn=it.f; if(it.herbs) plantHerbs(o,it.herbs);
         // 新木色太亮的家具壓暗成老木屋的舊木色
         if(it.tint) o.traverse(m=>{ if(m.isMesh){ m.material=m.material.clone(); m.material.color.multiply(new T.Color(it.tint)); } });
-        if(!(H.furnLv(it.f)>=it.lv[0]&&H.furnLv(it.f)<=it.lv[1])){ scene.remove(o); return; } it.obj=o; }); }
-    else if(!want&&it.obj){ scene.remove(it.obj); it.obj=null; } } }
+        if(!(H.furnLv(it.f)>=it.lv[0]&&H.furnLv(it.f)<=it.lv[1])){ scene.remove(o); dropObs(o); return; } it.obj=o; }); }
+    else if(!want&&it.obj){ scene.remove(it.obj); dropObs(it.obj); it.obj=null; } } }
 put('mantel_clock_01',ROOM.x-.36,1.38,FP.z+.45,-Math.PI/2,1,o=>{ o.userData.furn='clock'; });  // 壁爐架上：時鐘與木燈籠
 put('wooden_lantern_01',ROOM.x-.36,1.38,FP.z-.5,0,.8);
 put('hanging_picture_frame_01',-ROOM.x+.02,1.95,-1.0,Math.PI/2,1);   // 掛畫：左牆、水族箱上方
@@ -4917,6 +4927,11 @@ furnUI.addEventListener('click',e=>{ const b=e.target.closest('[data-f]'); if(!b
 const furnTags=[['chest','🧰 補給可以領了',[2.4,1.35,ROOM.zb+.45]],['herb','🌿 可以採收了',[-2.75,1.05,.2]],['shelf','📚 可以讀手記',[-ROOM.x+.35,2.45,-2.2]]].map(([f,txt,pos])=>{ const tg=makeTag(txt); tg.position.set(...pos); scene.add(tg); const r={s:tg,y:pos[1],k:'f_'+f,f}; tags.push(r); return r; });
 function updFurnTags(){ const H=c.home&&c.home(); furnTags.forEach(t=>{ t.ready=!!(H&&H.furnInfo(t.f).st.ok); if(t.f==='herb'&&H&&H.furnLv('herb')===0) t.s.position.set(-2.5,1.6,ROOM.zb+.5); else if(t.f==='herb') t.s.position.set(-2.75,1.05,.2); }); }
 let furnTick=0;
+// 開遊戲時就把目前等級的家具載好；其他等級的模型等一下在背景預先載入，升級時立刻換好，不用等
+setTimeout(()=>{ try{ syncFurn(); }catch(e){ console.warn('furn init',e); } },1500);
+setTimeout(()=>{ const names=[...new Set(FITEMS.map(it=>it.m).concat(['nettle_plant']))].filter(n=>!mcache[n]);
+  const next=()=>{ const n=names.shift(); if(!n) return; if(mcache[n]){ next(); return; } GL.load('models/home/'+n+'.glb',g=>{ mcache[n]=g; setTimeout(next,400); },undefined,()=>setTimeout(next,400)); };
+  next(); },25000);
 window.__HOMEFURN=()=>{ syncFurn(); syncTime(); updFurnTags(); };
 window.__HOMETAP=id=>{ if(on) tapFurn(id); };
 /* ===== 壁爐烤魚：魚串在鐵叉上，靠火的那面會熟；魚皮依熟度從生色→金黃→焦黑，出現烤痕；冒煙、油滴竄火、滋滋聲 ===== */
@@ -5024,6 +5039,8 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
   // 在房間裡用搖桿走動：前進／後退、左右轉；不能走進水族箱、壁爐和牆
   if(mode==='room'&&c.joy){ const j=c.joy(); if(Math.abs(j.thr)>.05||Math.abs(j.turn)>.05){ yawT-=j.turn*dt*1.7; const sp=1.3*j.thr*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw); let nx=pRoom.x+fx*sp, nz=pRoom.z+fz*sp;
       nx=Math.max(-ROOM.x+.5,Math.min(ROOM.x-.5,nx)); nz=Math.max(ROOM.zb+1.6,Math.min(ROOM.zf-.5,nz)); if(nx>ROOM.x-1.3&&Math.abs(nz-FP.z)<1.2) nx=ROOM.x-1.3;
+      // 撞到家具：先試沿 x、再試沿 z 滑過去，都不行就停住
+      if(blocked(nx,nz)){ if(!blocked(nx,pRoom.z)) nz=pRoom.z; else if(!blocked(pRoom.x,nz)) nx=pRoom.x; else { nx=pRoom.x; nz=pRoom.z; } }
       pRoom.x=nx; pRoom.z=nz; bobT.v+=dt*7; } pRoom.y=EYE+Math.sin(bobT.v)*.012; }
   eul.set(pitch,yaw,0); qRoom.setFromEuler(eul);
   const tk=tanks[viewTank]||tanks.fresh;
