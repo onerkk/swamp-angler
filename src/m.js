@@ -35,6 +35,23 @@ function preload(set){ (RSETS[set]||[]).forEach(load); }
 /* 擺尾著色器：跟程序化魚同一套，頭在 +X、身長 1 */
 function bendify(m,uni,K){ K=K||1; m.onBeforeCompile=s=>{ s.uniforms.uSwim=uni.uSwim; s.uniforms.uAmp=uni.uAmp;
   s.vertexShader='uniform float uSwim;\nuniform float uAmp;\n'+s.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nfloat bx_=clamp(0.5-position.x,0.0,1.6);\ntransformed.z+=sin(uSwim-position.x*5.5)*bx_*bx_*uAmp*'+K.toFixed(2)+';'); }; }
+/* 魚的骨架：沿身體（頭在 +X、身長 1）建 6 節骨頭，頂點依前後位置平滑分配權重；
+   每格依 uSwim、uAmp 算出身體波形，換成每節骨頭的轉角。一般魚左右擺尾，扁平的魚（魟、比目魚）上下波動 */
+const FLAT=new Set(['stingray','halibut']), FRIGS=new Set();
+const BX=[.46,.28,.1,-.08,-.25,-.4];
+function rigFish(grp,uni,K,flat){ const bones=BX.map(()=>new T.Bone()); bones[0].position.set(BX[0],0,0); for(let i=1;i<bones.length;i++){ bones[i].position.set(BX[i]-BX[i-1],0,0); bones[i-1].add(bones[i]); }
+  grp.add(bones[0]); const skel=new T.Skeleton(bones), band=.06;
+  grp.children.filter(o=>o.isMesh&&!o.isSkinnedMesh).forEach(m=>{ const g=m.geometry, P=g.attributes.position, n=P.count, si=new Uint16Array(n*4), sw=new Float32Array(n*4);
+    for(let i=0;i<n;i++){ const x=P.getX(i); let k=0; while(k<BX.length-1&&x<BX[k+1]) k++; let w=1, j=k; if(k>0&&x>BX[k]-band&&x<=BX[k]){ j=k-1; w=.5+.5*(BX[k]-x)/band; } else if(k>0&&x>BX[k]){ j=k-1; w=.5; }
+      si[i*4]=k; si[i*4+1]=j; sw[i*4]=w; sw[i*4+1]=1-w; }
+    g.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); g.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
+    const mats=(Array.isArray(m.material)?m.material:[m.material]); mats.forEach(mm=>{ mm.onBeforeCompile=()=>{}; mm.skinning=true; mm.needsUpdate=true; });
+    const sm=new T.SkinnedMesh(g,m.material); sm.frustumCulled=false; grp.remove(m); grp.add(sm); grp.updateMatrixWorld(true); sm.bind(skel,new T.Matrix4()); });
+  const r={grp,uni,K,flat,bones,idle:0}; FRIGS.add(r); return r; }
+function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.delete(r); return; } r.idle=0;
+  const u=r.uni.uSwim.value, A=r.uni.uAmp.value*r.K, off=x=>{ const bx=Math.max(0,Math.min(1.6,.5-x)); return Math.sin(u-x*5.5)*bx*bx*A; };
+  let prev=0; for(let i=0;i<r.bones.length;i++){ const x0=BX[i], x1=i<BX.length-1?BX[i+1]:BX[i]-.12, sl=Math.atan2(off(x1)-off(x0),x0-x1), a=sl-prev; prev=sl;
+    if(r.flat) r.bones[i].rotation.set(0,0,a); else r.bones[i].rotation.set(0,-a,0); } }
 const fishReady=id=>!!(RFISH[id]&&ready(RFISH[id][0]));
 function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0]); if(!g) return null; const opt=c[2]||{};
   const sc=g.scene; sc.updateMatrixWorld(true); let ms=[]; sc.traverse(o=>{ if(o.isMesh) ms.push(o); });
@@ -65,6 +82,9 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
       if(opt.ghost){ n.color=new T.Color(0xcfeeff); n.transparent=true; n.opacity=.72; n.emissive=new T.Color(0x5fc8ff); n.emissiveIntensity=.85; n.depthWrite=false; }
       bendify(n,uni,opt.king||opt.mer?.15:1); return n; };
     const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
+  try{ if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });
+        const rg=autoRig(grp,'tail'); FRIGS.add({grp,uni,up:rg,idle:0}); } }
+    else rigFish(grp,uni,opt.king||opt.mer?.15:1,FLAT.has(sp.id)); }catch(e){ console.warn('fish rig',sp.id,e); }
   return {group:grp,uni,sp,real:true}; }
 
 function measure(root){ root.updateMatrixWorld(true); const b=new T.Box3(), v=new T.Vector3();
@@ -105,7 +125,8 @@ function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene
   const b3=new T.Box3().setFromObject(wrap); setHull(Math.max(Math.abs(b3.min.x),b3.max.x),b3.min.z,b3.max.z);
   spots.forEach(s=>{ if(s.yacht) s.eye=deck+1.62; }); }); }
 
-function update(dt){ for(const m of mixers) m.update(dt); }
+function update(dt){ for(const m of mixers) m.update(dt);
+  for(const r of FRIGS){ if(r.up){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.delete(r); continue; } r.idle=0; r.up.pose({t:r.uni.uSwim.value*.35,tail:.06+r.uni.uAmp.value*1.2,tailF:2.2}); } else poseFish(r,dt); } }
 function credits(){ return RCREDIT.map(r=>`${r[0]}：「${r[1]}」by ${r[2]}`).join('<br>'); }
 const want=id=>{ if(RFISH[id]) load(RFISH[id][0]); };   // 圖鑑詳細頁要看哪種魚，就只下載那一種
 function glowTick(){ const lt=W.info?W.info.light:1, k=Math.max(0,.6-lt); GLOW.forEach(n=>n.emissiveIntensity=.12+k*1.0); }
