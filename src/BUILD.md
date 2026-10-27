@@ -3,7 +3,7 @@
 ## 組裝（在放有 src 內容的目錄執行）
 JS="b.js c.js e.js f.js g.js h.js i.js j.js k.js l.js m.js stars.js n.js o.js p.js q.js r.js s.js t.js u.js v.js w.js x.js y.js z.js d.js"
 cat scan.js $JS > all.js && node --check all.js && python3 tools/lintc.py && \
-{ cat a.html; echo "<script>"; cat scan.js; echo "</script>"; echo "<script>"; cat $JS; echo "</script>"; echo "</body></html>"; } > ../index.html
+{ cat a.html; echo "<script>"; cat scan.js; echo "</script>"; echo "<script>"; cat $JS; echo "</script>"; echo "</body></html>"; } > ../index.html && sed -i "s/const VER='[^']*'/const VER='swamp-$(date +%Y%m%d%H%M%S)'/" ../sw.js
 
 ## 推送前必做
 1. node --check all.js
@@ -38,3 +38,6 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 ## 角色模型（2026-10-27）
 - 汐月 mermaid3d.glb、阿蘅 ghost_alive.glb、女鬼 ghost.glb、海王 seaking.glb：用使用者設定圖（src/fish6/chars）經 Hunyuan3D-2mv 生成、bake_planar 正背面投影烘焙
 - 骨架：z.js autoRig(root,kind) 載入時自動綁骨（tail＝人魚/海王，human＝人形），rig.pose({t,headYaw,headPitch,headRoll,bow,tail,tailF,skirt,breathe})；p.js、x.js、結局都使用
+
+## 快取
+- sw.js 的 VER 每次組裝自動蓋上時間戳（見組裝指令）；模型與貼圖是快取優先，不換 VER 的話手機會一直用舊模型
