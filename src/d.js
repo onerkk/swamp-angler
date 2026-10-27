@@ -180,7 +180,7 @@ function sizeWord(w){ return w<.6?'小傢伙':w<2.5?'中型魚':w<8?'大魚！':
 function endFightUI(){ ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); }
 function lose(reason){
   endFightUI(); WL.endChase(); SEA.endChase(); G.combo=0; FUN.combo(0); P.shadow.material.opacity=0; if(G.fish){ G.fish.group.visible=false; }
-  if(reason==='gator'||reason==='shark'){ fishPos(tv,0); P.splash(tv.x,0,tv.z,60,1.6); W.addRipple(tv.x,tv.z,1.2); Snd.splash(1.5); Snd.gator(); }
+  if(reason==='gator'||reason==='shark'){ fishPos(tv,0); P.splash(tv.x,0,tv.z,60,1.6); W.addRipple(tv.x,tv.z,1.2); Snd.splash(1.5); Snd.gator(); biteFX(reason); }
   const msg={snap:'啪！線斷了……',slack:'線太鬆，魚脫鉤了',spool:'線放光了，魚跑掉了',gator:'鱷魚把你的魚搶走了！',shark:'鯊魚把你的魚咬走了！'}[reason];
   if(reason==='snap'){ Snd.snap(); vib([80,40,120]); toast(msg,'bad',1800); G.state='lost'; G.stT=0; G.snapped=true; bob.visible=false; rod.bendT=0; rod.pitchT=.1; rod.end=null; }
   else { vib(60); startRetrieve(msg,'bad'); }
@@ -296,7 +296,9 @@ window.addEventListener('keyup',e=>{ keys[e.code]=false; if(e.code==='Space'){ e
 
 $('startBtn').addEventListener('click',()=>{ Snd.init(); $('intro').classList.add('hidden'); G.state='idle'; toast('按住按鈕蓄力，放開拋竿','',2200);
   // 預覽結局：網址帶 ending 參數時，開始後直接播放結局（測試與重看用）
-  if(/[?&]ending=[1-9]/.test(location.search)) setTimeout(()=>window.__playEnding(),1200); });
+  if(/[?&]ending=[1-9]/.test(location.search)) setTimeout(()=>window.__playEnding(),1200);
+  else if(!save.tutDone&&!(save.total>0)) setTimeout(()=>startTutorial(),2400);   // 新玩家：第一次開始遊戲時跑新手指引
+  else if(!save.tutDone){ save.tutDone=1; persist(); } });
 $('bSell').addEventListener('click',()=>{ if(G.state==='catch') finishCatch(true); });
 $('bRel').addEventListener('click',()=>{ if(G.state==='catch') finishCatch(false); });
 // 保冷箱：魚帶回小屋烤（最多 5 條；保冷類、寶物、美人魚與幻想生物不能烤）
@@ -366,7 +368,7 @@ window.__MDL=createModels(W); const MDL=window.__MDL; MDL.preload('lake');
 const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,
   state:()=>G.state, loc:()=>G.loc||'lake', kayak:()=>({on:!!SPOTS[G.spot].kayak,v:Math.abs(KY.v),yaw:G.head}),
   onBite:(pos)=>{ faceThreat(pos,{dur:2.6,pitch:-.25}); if(G.state==='wait'||G.state==='bite'){ G.state='lost'; G.stT=0; G.snapped=true; }   // 鱷魚咬船：斷線、連擊歸零、驚魂未定
-    G.combo=0; FUN.combo(0); G.scareT=6; G.gShake=1.6; vib([200,60,260,60,200]); Snd.splash(2); toast('🐊 ……！','bad',1600); },
+    G.combo=0; FUN.combo(0); G.scareT=6; G.gShake=1.6; vib([200,60,260,60,200]); biteFX('gator'); Snd.splash(2); toast('🐊 ……！','bad',1600); },
   onScare:why=>{ const ram=why==='ram', xp=Math.round(window.__LVINFO.xpNext(save.lv)*(ram?.04:.02)), cn=Math.round((ram?20:10)+save.lv*(ram?10:5));
     if(ram) save.gatorRam=(save.gatorRam||0)+1; else save.gatorScare=(save.gatorScare||0)+1; META.addXP(xp); save.coins+=cn; setCoins(); META.syncHUD(); persist(); G.gShake=ram?.9:.3;
     toast(`+${xp} 經驗　🪙${cn}`,'good',2200); } });
