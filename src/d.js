@@ -312,11 +312,13 @@ const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
 const ITEMS_BY=id=>(FUN.items||[]).find(x=>x.id===id);
 window.__GRILL=()=>HOME3D.grill();
 // 結局演出：接管主場景的鏡頭；演完回到原本的釣點
-const END=createEnding(W,{rig:()=>[P.rodGroup,bob],soundOn:()=>save.sound!==false,setSea:on=>W.setSea(on),setHour:h=>{ G.hour=h; W.setTime(h,true); },
-  begin:()=>{ G.preEnd=G.state; G.state='ending'; },
-  end:()=>{ G.state='idle'; W.player.rotation.set(0,0,0); const s2=SPOTS[G.spot]||SPOTS[0]; W.setSea((s2.loc||'lake')==='sea'); }});
+// 開始時：天氣改晴、月亮固定滿月、漁船停在原點；結束時全部恢復，並回到原本釣點的海或湖
+const ENDSV={};
+const END=createEnding(W,{rig:()=>[P.rodGroup,bob],soundOn:()=>save.sound!==false,setSea:on=>{ if((G.loc==='sea')!==on) SEA.setLoc(on?'sea':'lake'); },setHour:h=>{ G.hour=h; W.setTime(h,true); },
+  begin:()=>{ ENDSV.hour=G.hour; ENDSV.wx=save.wxMode; ENDSV.loc=G.loc||'lake'; ENDSV.base=G.base.clone(); G.state='ending'; save.wxMode='clear'; G.base.set(0,0,0); if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(.5); },
+  end:()=>{ G.state='idle'; W.player.rotation.set(0,0,0); save.wxMode=ENDSV.wx; if(ENDSV.wx===undefined) delete save.wxMode; G.base.copy(ENDSV.base); G.hour=ENDSV.hour; W.setTime(G.hour,true); if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(null); if((G.loc||'lake')!==ENDSV.loc) SEA.setLoc(ENDSV.loc); if(window.__applyGfx) window.__applyGfx(save.gfx||'high'); }});
 window.__END=END;
-window.__playEnding=done=>{ if(G.state==='home'){ leaveHome(()=>window.__playEnding(done)); return; } END.play(endingShots(END,{save}),done); };
+window.__playEnding=done=>{ if(G.state==='home'){ leaveHome(()=>window.__playEnding(done)); return; } END.play(endingShots(END,{save,W,P,G}),done); };
 // 靜月之光：作者的水晶小店（遊戲免費，喜歡的話可以支持作者）
 const SHOP_URL='https://tw.shp.ee/BcamsN2F';
 function openShop(){ const ui=$('shopUI'); ui.innerHTML=`<div class="box"><h3>💎 靜月之光・水晶手作</h3>

@@ -3774,9 +3774,11 @@ const moon=new T.Mesh(new T.SphereGeometry(1,32,24),new T.MeshBasicMaterial({map
 moon.rotation.y=-1.2; moon.renderOrder=-2; moon.frustumCulled=false; S.add(moon);
 /* 月相：依真實日期算月齡（朔望月 29.53 天），以陽光方向即時照亮球體 */
 const SYN=29.530588853, NEW0=Date.UTC(2000,0,6,18,14);
-const phase=()=>((((Date.now()-NEW0)/864e5)/SYN)%1+1)%1, illum=()=>(1-Math.cos(2*Math.PI*phase()))/2;
+// 結局演出時可以暫時指定月相（滿月），演完恢復真實月相
+let phaseFix=null;
+const phase=()=>phaseFix!=null?phaseFix:((((Date.now()-NEW0)/864e5)/SYN)%1+1)%1, illum=()=>(1-Math.cos(2*Math.PI*phase()))/2;
 const PH_EMO=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'], phEmo=()=>PH_EMO[Math.round(phase()*8)%8];
-window.__MOONPH={phase,illum,emo:phEmo};
+window.__MOONPH={phase,illum,emo:phEmo,fix:v=>{ phaseFix=v; },dir:(h,out)=>moonDir(h,out)};
 const uL={value:new T.Vector3(0,0,1)};
 moon.material.onBeforeCompile=sh=>{ sh.uniforms.uL=uL;
   sh.vertexShader='varying vec3 vNw;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvNw=normalize(mat3(modelMatrix)*normal);');
@@ -5461,7 +5463,8 @@ function tick(dt){ if(!on) return; st+=dt; const s=cur; if(!s) return; const k=e
   // 字幕依鏡頭時間觸發（畫面卡頓時字幕和畫面仍然對得上）
   const sl=s.subs||[]; while(s.subI<sl.length&&st>=sl[s.subI][0]){ const x=sl[s.subI++]; say(x[1],x[2],x[3]); }
   tA.fromArray(s.from[0]).lerp(tB.fromArray(s.to[0]),k); camP.copy(tA); camL.fromArray(s.from[1]).lerp(tB.fromArray(s.to[1]),k);
-  if(s.tick) try{ s.tick(st,k,camP,camL); }catch(e){ console.warn('ending tick',e); }
+  let hold=false; if(s.tick) try{ hold=s.tick(st,k,camP,camL)==='hold'; }catch(e){ console.warn('ending tick',e); }
+  if(hold) st=Math.min(st,s.d-1.4);
   place(camP,camL); if(s.hour!=null&&s.hourTo!=null) c.setHour(s.hour+(s.hourTo-s.hour)*k);
   if(s.fadeOut!==false&&st>s.d-1.3) blk.style.opacity=1;
   if(st>=s.d){ if(s.exit) try{ s.exit(); }catch(e){} startShot(si+1); } }
@@ -5478,23 +5481,110 @@ function credits(lines,dur){ roll.innerHTML=lines; roll.style.transition='none';
   const h=roll.offsetHeight+window.innerHeight; roll.style.transition=`transform ${dur}s linear`; roll.style.transform=`translateY(${-h}px)`; }
 return {play,tick,frame,on:()=>on,say,music,credits,fade:v=>{ blk.style.opacity=v; },finish};
 }
-/* ===== 結局分鏡（依劇本 src/ENDING.md 分段製作；目前完成：演出系統、片尾名單） ===== */
-function endingShots(E,c){
-  const CRED=`<h2>濕地垂釣</h2><div>Swamp Angler</div>
+const ENDING_CREDITS=`<h2>濕地垂釣</h2><div>Swamp Angler</div>
 <div class="r">製作</div><div class="n">歐那</div>
 <div class="r">故事</div><div class="n">老漁人的手記</div>
 <div class="r">音樂</div><div class="n">Emotional Piano — Centurion_of_war（CC0）</div>
-<div class="r">3D 模型與貼圖</div><div class="n">Poly Haven（CC0）</div><div class="n">ambientCG（CC0）</div>
+<div class="r">3D 模型與貼圖</div><div class="n">Poly Haven（CC0）</div><div class="n">ambientCG（CC0）</div><div class="n">NASA 月球影像（公有領域）</div>
 <div class="r">音效</div><div class="n">OpenGameArt（CC0）</div>
 <div class="r">特別感謝</div><div class="n">每一個在碼頭上等過魚的人</div>
 <div class="last">謝謝你，陪老漁人走完這一段。</div>`;
+/* ===== 結局分鏡（依劇本 src/ENDING.md 分段製作；已完成：演出系統、片尾名單、序幕、第一幕） ===== */
+function endingShots(E,c){
+  const T=THREE, W=c.W, S=W.scene, GL=new T.GLTFLoader(), cache={}, made=[];
+  let pending=0; const load=(u,f)=>{ if(cache[u]) return f(cache[u]); pending++; GL.load(u,g=>{ cache[u]=g; pending--; f(g); },undefined,()=>{ pending--; console.warn('ending model',u); }); };
+  const keep=o=>{ S.add(o); made.push(o); return o; };
+  const drop=()=>{ made.splice(0).forEach(o=>{ S.remove(o); o.traverse&&o.traverse(m=>{ if(m.material&&m.material.map&&m.material.map.isCanvasTexture) m.material.map.dispose(); }); }); };
+  const sw=(x,z,t)=>W.swell?W.swell(x,z,t):0;
+  let T0=0; const now=()=>performance.now()/1000-T0;
+  // 老漁人的提燈：掛在漁船船頭，暖黃色的燈火（之後幾幕也會用到）
+  const lampG=new T.Group(), lampL=new T.PointLight(0xffb866,0,9,1.6); lampG.add(lampL);
+  load('models/lantern.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene.clone(true); o.scale.setScalar(.26); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xffc070); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lampG.add(o); });
+  // 海王：深淵之王的模型（約 9 公尺高），面向漁船
+  const king=new T.Group(); // 海王模型有骨架（SkinnedMesh），要用 SkeletonUtils 複製，骨頭才會跟著搬到新位置
+  load('models/seaking.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material=m.material.clone(); m.material.emissive=new T.Color(0x0a2a3a); m.material.emissiveIntensity=.6; } } }); o.scale.setScalar(6); king.add(o); });
+  const kingEye=new T.PointLight(0x9fe8ff,0,14,2); kingEye.position.set(0,4.2,1.2); king.add(kingEye);
+  // 月光海路：從月亮正下方一路鋪到船邊的碎銀光，隨浪閃爍
+  const glitTex=(()=>{ const cv=document.createElement('canvas'); cv.width=256; cv.height=512; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,256,512);
+    for(let i=0;i<2600;i++){ const y=Math.random()*512, w=(1-y/512)*.7+.3, x=128+(Math.random()-.5)*256*Math.pow(Math.random(),.6)*w; g.fillStyle=`rgba(230,240,255,${.25+Math.random()*.75})`; g.fillRect(x,y,1+Math.random()*3*w,1); }
+    const fade=g.createLinearGradient(0,0,256,0); fade.addColorStop(0,'rgba(0,0,0,1)'); fade.addColorStop(.25,'rgba(0,0,0,0)'); fade.addColorStop(.75,'rgba(0,0,0,0)'); fade.addColorStop(1,'rgba(0,0,0,1)'); g.globalCompositeOperation='destination-out'; g.fillStyle=fade; g.fillRect(0,0,256,512);
+    const t=new T.CanvasTexture(cv); t.wrapT=T.RepeatWrapping; return t; })();
+  const glitM=new T.MeshBasicMaterial({map:glitTex,transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,color:0xdfe8ff,fog:false});
+  const glit=new T.Mesh(new T.PlaneGeometry(26,420).rotateX(-Math.PI/2).translate(0,0,-210),glitM); glit.renderOrder=3;
+  const md=new T.Vector3();
+  // 堤防：河口窄灣（湖的正南方約 100 公尺）橫著一道老石堤，三座鐵閘門；石材是真實的城堡石牆貼圖
+  const DY={x:12,z:-99,len:34,h:3.2,th:3}, dyke=new T.Group(), chunks=[], cracks=[];
+  { const TL=new T.TextureLoader(), mk=f=>{ const x=TL.load('models/home/castle_brick_07_'+f+'.jpg'); x.wrapS=x.wrapT=T.RepeatWrapping; x.repeat.set(2.2,1); x.anisotropy=4; return x; };
+    const d=mk('Diffuse'); d.encoding=T.sRGBEncoding; const stoneM=new T.MeshStandardMaterial({map:d,normalMap:mk('nor_gl'),roughnessMap:mk('Rough'),color:0x9a9284,roughness:1,emissive:0x8090b0,emissiveMap:d,emissiveIntensity:.35});   // 夜裡讓石面帶一點月光的冷色，才看得出石材
+    const ironM=new T.MeshStandardMaterial({color:0x2a2622,roughness:.55,metalness:.75});
+    const n=8, seg=DY.len/n;
+    for(let i=0;i<n;i++){ const b=new T.Mesh(new T.BoxGeometry(seg-.04,DY.h+1.2,DY.th),stoneM); b.position.set(-DY.len/2+seg*(i+.5),(DY.h+1.2)/2-1.2,0); dyke.add(b); chunks.push({o:b,mid:i===3||i===4,v:new T.Vector3(),w:new T.Vector3(),p0:b.position.clone()}); }
+    for(const gx of [-10,0,10]){ const gt=new T.Mesh(new T.BoxGeometry(2.6,2.2,.18),ironM); gt.position.set(gx,1.2,DY.th/2+.1); dyke.add(gt); chunks.push({o:gt,mid:gx===0,v:new T.Vector3(),w:new T.Vector3(),p0:gt.position.clone()}); }
+    const cap=new T.Mesh(new T.BoxGeometry(DY.len+.6,.35,DY.th+.5),stoneM); cap.position.y=DY.h+.18; dyke.add(cap); chunks.push({o:cap,mid:false,split:true,v:new T.Vector3(),w:new T.Vector3(),p0:cap.position.clone()});
+    // 裂縫：堤面上透出銀色月光的細線，慢慢往外長
+    const crM=new T.MeshBasicMaterial({color:0xcfe6ff,transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,fog:false});
+    for(let i=0;i<14;i++){ let x=(Math.random()-.5)*12, y=Math.random()*DY.h; const pts=[]; for(let k=0;k<6;k++){ pts.push(new T.Vector3(x,y,DY.th/2+.03)); x+=(Math.random()-.5)*1.4; y+=(Math.random()-.4)*.9; }
+      const l=new T.Line(new T.BufferGeometry().setFromPoints(pts),crM); dyke.add(l); cracks.push(l); }
+    cracks.mat=crM;
+    const dir=Math.atan2(DY.x,-DY.z); dyke.position.set(DY.x,0,DY.z); dyke.rotation.y=-dir; }
+  // 銀色潮水：從堤防缺口灌進來、往碼頭推進的發光水流
+  const floodTex=(()=>{ const cv=document.createElement('canvas'); cv.width=128; cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,128,256);
+    // 柔和的月光水紋（模糊的橢圓光斑）＋細碎的閃光
+    for(let i=0;i<160;i++){ const x=Math.random()*128, y=Math.random()*256, r=6+Math.random()*16, rg=g.createRadialGradient(x,y,0,x,y,r); rg.addColorStop(0,`rgba(190,215,255,${.06+Math.random()*.1})`); rg.addColorStop(1,'rgba(190,215,255,0)'); g.fillStyle=rg; g.save(); g.translate(x,y); g.scale(1,2.2); g.translate(-x,-y); g.fillRect(x-r,y-r,r*2,r*2); g.restore(); }
+    for(let i=0;i<420;i++){ g.fillStyle=`rgba(235,242,255,${.3+Math.random()*.6})`; g.fillRect(Math.random()*128,Math.random()*256,1+Math.random()*1.5,1); }
+    const e=g.createLinearGradient(0,0,128,0); e.addColorStop(0,'rgba(0,0,0,1)'); e.addColorStop(.35,'rgba(0,0,0,0)'); e.addColorStop(.65,'rgba(0,0,0,0)'); e.addColorStop(1,'rgba(0,0,0,1)'); g.globalCompositeOperation='destination-out'; g.fillStyle=e; g.fillRect(0,0,128,256);
+    const t=new T.CanvasTexture(cv); t.wrapT=T.RepeatWrapping; return t; })();
+  const floodM=new T.MeshBasicMaterial({map:floodTex,transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,color:0xd8e8ff,fog:false});
+  const flood=new T.Mesh(new T.PlaneGeometry(1,1).rotateX(-Math.PI/2),floodM); flood.renderOrder=3;
+  const fromD=new T.Vector3(DY.x,0,DY.z).multiplyScalar(.97), toD=new T.Vector3(0,0,-6);
+  function setFlood(k,t){ const head=fromD.clone().lerp(toD,k), mid=fromD.clone().add(head).multiplyScalar(.5), len=fromD.distanceTo(head)+.01;
+    flood.position.set(mid.x,.28,mid.z); flood.rotation.y=-Math.atan2(head.x-fromD.x,-(head.z-fromD.z)); flood.scale.set(8+6*k,1,len); floodM.map.repeat.set(1,len/14); floodM.map.offset.y=-t*.9;
+    return head; }
+  const spl=(x,z,n,s)=>{ if(c.P&&c.P.splash) c.P.splash(x,0,z,n,s); };
+  const sc={};
+  // 結局專用月光：冷藍色的平行光，讓夜景裡的石堤、海王、船看得清楚
+  const moonL=keep(new T.DirectionalLight(0xa9bfe8,1.5)), fillL=keep(new T.HemisphereLight(0x5a6c90,0x101418,.45)); moonL.position.set(-60,45,-20); moonL.target.position.set(0,0,-30); keep(moonL.target);
+  const title=document.createElement('div'); title.style.cssText='position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:41;pointer-events:none;color:#f2ecdf;font-family:serif;opacity:0;transition:opacity 1.6s ease';
+  title.innerHTML='<div style="font-size:13px;letter-spacing:.6em;opacity:.7">終章之後</div><div style="font-size:34px;letter-spacing:.5em;margin-top:14px;color:#ffe3a3">月潮</div>';
   return [
-    {d:9,hour:22.5,sea:false,music:'piano',from:[[0,7,12],[-6,0,-45]],to:[[-2,4.5,2],[-8,0,-42]],
-      subs:[[1.5,'月光順著河道流進湖裡。','',4],[6,'流過倒木，流過浮萍，一路回到碼頭前。','',3]]},
-    {d:9,hour:5.6,hourTo:6.4,music:'piano',from:[[3,1.9,6],[0,1.2,-12]],to:[[1.2,1.6,2.2],[0,1.1,-14]],
-      subs:[[2,'「月潮回來了。換我守著這片湖。」','q big',5.5]]},
-    {d:30,hour:6.6,hourTo:8,music:'theme',vol:.85,from:[[0,10,14],[0,0,-30]],to:[[0,28,26],[0,0,-40]],fadeOut:true,
-      enter:()=>E.credits(CRED,28)}
+    // 開場：黑底片名〈月潮〉；同時等模型載完（最多 12 秒），避免主角還沒出現就開演
+    {d:6,hour:20.4,sea:true,music:'piano',vol:.7,fadeOut:true,from:[[3.2,1.5,-3.5],[0,3.2,-28]],to:[[3.2,1.5,-3.5],[0,3.2,-28]],
+      enter:()=>{ document.body.appendChild(title); E.fade(1); setTimeout(()=>title.style.opacity=1,300); sc.wait=0; },
+      tick:(t)=>{ E.fade(1); if(t>4.2&&pending>0&&sc.wait<8){ sc.wait+=1/60; return 'hold'; } if(t>4.2) title.style.opacity=0; },
+      exit:()=>{ title.remove(); }, cleanup:()=>title.remove()},
+    // 序幕一：海王沉向深淵，沉到一半停住，抬頭看船頭的燈
+    {d:13,hour:20.4,sea:true,from:[[2.4,1.7,-6.5],[0,4.2,-18]],to:[[1.3,1.4,-9.5],[0,2.6,-18]],
+      enter:()=>{ T0=performance.now()/1000; keep(lampG); lampG.position.set(0,1.95,-5.6); lampL.intensity=1.6; keep(king); king.position.set(0,1.2,-18); king.rotation.set(0,0,0); kingEye.intensity=1.2; sc.rip=0; },
+      tick:(t)=>{ const sink=t<7?1.2-3.8*(t/7)*(t/7):t<9?-2.6+.3*Math.sin((t-7)/2*Math.PI/2):-2.3; king.position.y=sink+sw(0,-18,t)*.5; king.rotation.x=t>7?-.12*Math.min(1,(t-7)/2):0;
+        lampG.position.y=1.95+sw(0,-5.6,t)*.9; lampG.rotation.z=Math.sin(t*1.3)*.06;
+        sc.rip-=1/60; if(sc.rip<=0&&t<7.5){ sc.rip=.6; W.addRipple&&W.addRipple((Math.random()-.5)*5,-18+(Math.random()-.5)*4,3+Math.random()*3); if(Math.random()<.5) spl((Math.random()-.5)*4,-16.5,8,1.4); } },
+      subs:[[2.2,'海王沉回深淵之前，停了下來。','',4.2],[8,'他抬起頭，看著船頭那盞燈，看了很久。','',4.6]]},
+    // 序幕二：反打——從海王身後看向漁船上的燈
+    {d:11,hour:20.45,sea:true,from:[[-4.2,6.4,-27],[0,2.4,-5.6]],to:[[-3,5.6,-25],[0,2.2,-5.6]],
+      tick:(t)=>{ king.position.y=-2.3+sw(0,-18,t)*.4+Math.sin(t*.6)*.08; lampG.position.y=1.95+sw(0,-5.6,t)*.9; lampL.intensity=1.6+Math.sin(t*7)*.12; },
+      subs:[[1,'他以為，是人類偷走了月潮。','',4.4],[6,'月潮，\n是他女兒的名字。','q big',4.8]]},
+    // 第一幕一：月亮從雲後出來，月光在海面鋪成一條路
+    {d:12,hour:20.5,sea:true,from:[[0,3.4,-1],[0,2.2,-60]],to:[[0,3.6,-1],[0,0,0]],
+      enter:()=>{ window.__MOONPH&&window.__MOONPH.dir&&window.__MOONPH.dir(20.5,md); md.y=0; md.normalize(); keep(glit); glit.position.set(0,.08,-1); glit.rotation.y=Math.atan2(-md.x,-md.z); glitM.opacity=0; S.remove(king); },
+      tick:(t,k,P,L)=>{ window.__MOONPH.dir(20.5,md); L.set(P.x+md.x*100,P.y+Math.max(8,md.y*100)*Math.min(1,.25+t/9),P.z+md.z*100); const m2=new T.Vector3(md.x,0,md.z).normalize(); L.lerp(new T.Vector3(P.x+m2.x*100,P.y+24*Math.min(1,t/8),P.z+m2.z*100),.5);
+        glitM.opacity=Math.min(.85,t/6); glitM.map.offset.y=t*.05; lampG.position.y=1.95+sw(0,-5.6,t)*.9; },
+      subs:[[1.5,'那一夜，月亮從雲後出來。','',4.2],[6.4,'海面湧起銀色的大潮，\n一路往河口推過去。','',4.6]]},
+    // 第一幕二：河口的老石堤，在浪裡一道一道裂開，中間崩出缺口
+    {d:15,hour:21.2,sea:false,from:[[3.5,4.6,-83],[12,1.6,-99]],to:[[6.5,3.3,-88.5],[12,1.8,-99]],
+      enter:()=>{ S.remove(glit); S.remove(lampG); S.remove(king); if(W.setRefl) W.setRefl(false); keep(dyke); chunks.forEach(q=>{ q.o.position.copy(q.p0); q.o.rotation.set(0,0,0); q.v.set(0,0,0); q.w.set(0,0,0); }); cracks.mat.opacity=0; cracks.forEach(l=>l.scale.set(.2,.2,1)); keep(flood); floodM.opacity=0; sc.sp=0; sc.fell=false; },
+      tick:(t)=>{ sc.sp-=1/60; const back=new T.Vector3(); if(sc.sp<=0&&t<11){ sc.sp=t<5?.7:.35; const a=(Math.random()-.5)*DY.len*.8; const p=dyke.localToWorld(back.set(a,DY.h+.4,-DY.th/2)); spl(p.x,p.z,10+Math.floor(t),2+t*.2); }
+        if(t>4.5){ const g=Math.min(1,(t-4.5)/3.5); cracks.mat.opacity=.9*g; cracks.forEach((l,i)=>{ const s2=.2+.8*Math.min(1,g*1.4-(i%4)*.1); l.scale.set(s2,s2,1); }); }
+        if(t>8.6&&!sc.fell){ sc.fell=true; chunks.forEach(q=>{ if(q.mid){ q.v.set((Math.random()-.5)*1.5,1.5+Math.random()*1.5,2.5+Math.random()*2); q.w.set(Math.random()*1.5,Math.random(),Math.random()*1.5); } }); W.addRipple&&W.addRipple(DY.x,DY.z+2,8); }
+        if(sc.fell){ chunks.forEach(q=>{ if(!q.mid) return; q.v.y-=9.8/60; q.o.position.addScaledVector(q.v,1/60); q.o.rotation.x+=q.w.x/60; q.o.rotation.z+=q.w.z/60; if(q.o.position.y<-4){ q.v.set(0,0,0); q.w.set(0,0,0); } }); floodM.opacity=Math.min(.7,(t-8.6)/1.4); setFlood(Math.min(.35,(t-8.6)*.06),t); }
+        cracks.forEach(l=>{ l.material.opacity=cracks.mat.opacity*(.75+.25*Math.sin(t*9+l.id)); }); },
+      subs:[[1,'河口的堤防，在浪裡一道一道裂開。','',4.4],[9.6,'四十年來關住的門，終於開了。','q',4.6]]},
+    // 第一幕三：銀色的月潮順著窄灣灌進湖裡（接第二幕）
+    {d:11,hour:21.3,sea:false,from:[[4,8.5,-78],[8,0,-62]],to:[[2,7.5,-38],[0,0,-12]],
+      tick:(t,k)=>{ const head=setFlood(.35+.65*k,t); floodM.opacity=.7; if(Math.random()<.3) spl(head.x+(Math.random()-.5)*6,head.z,6,1); },
+      subs:[[1.5,'月光順著河道流進湖裡。','',4.5]]},
+    // 片尾名單（第二到第四幕完成後，會插在這之前）
+    {d:30,hour:6.6,hourTo:8,sea:false,music:'theme',vol:.85,from:[[0,10,14],[0,0,-30]],to:[[0,28,26],[0,0,-40]],
+      enter:()=>{ drop(); E.credits(ENDING_CREDITS,28); }, cleanup:drop}
   ];
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
@@ -5811,11 +5901,13 @@ const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
 const ITEMS_BY=id=>(FUN.items||[]).find(x=>x.id===id);
 window.__GRILL=()=>HOME3D.grill();
 // 結局演出：接管主場景的鏡頭；演完回到原本的釣點
-const END=createEnding(W,{rig:()=>[P.rodGroup,bob],soundOn:()=>save.sound!==false,setSea:on=>W.setSea(on),setHour:h=>{ G.hour=h; W.setTime(h,true); },
-  begin:()=>{ G.preEnd=G.state; G.state='ending'; },
-  end:()=>{ G.state='idle'; W.player.rotation.set(0,0,0); const s2=SPOTS[G.spot]||SPOTS[0]; W.setSea((s2.loc||'lake')==='sea'); }});
+// 開始時：天氣改晴、月亮固定滿月、漁船停在原點；結束時全部恢復，並回到原本釣點的海或湖
+const ENDSV={};
+const END=createEnding(W,{rig:()=>[P.rodGroup,bob],soundOn:()=>save.sound!==false,setSea:on=>{ if((G.loc==='sea')!==on) SEA.setLoc(on?'sea':'lake'); },setHour:h=>{ G.hour=h; W.setTime(h,true); },
+  begin:()=>{ ENDSV.hour=G.hour; ENDSV.wx=save.wxMode; ENDSV.loc=G.loc||'lake'; ENDSV.base=G.base.clone(); G.state='ending'; save.wxMode='clear'; G.base.set(0,0,0); if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(.5); },
+  end:()=>{ G.state='idle'; W.player.rotation.set(0,0,0); save.wxMode=ENDSV.wx; if(ENDSV.wx===undefined) delete save.wxMode; G.base.copy(ENDSV.base); G.hour=ENDSV.hour; W.setTime(G.hour,true); if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(null); if((G.loc||'lake')!==ENDSV.loc) SEA.setLoc(ENDSV.loc); if(window.__applyGfx) window.__applyGfx(save.gfx||'high'); }});
 window.__END=END;
-window.__playEnding=done=>{ if(G.state==='home'){ leaveHome(()=>window.__playEnding(done)); return; } END.play(endingShots(END,{save}),done); };
+window.__playEnding=done=>{ if(G.state==='home'){ leaveHome(()=>window.__playEnding(done)); return; } END.play(endingShots(END,{save,W,P,G}),done); };
 // 靜月之光：作者的水晶小店（遊戲免費，喜歡的話可以支持作者）
 const SHOP_URL='https://tw.shp.ee/BcamsN2F';
 function openShop(){ const ui=$('shopUI'); ui.innerHTML=`<div class="box"><h3>💎 靜月之光・水晶手作</h3>

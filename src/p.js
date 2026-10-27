@@ -20,9 +20,11 @@ const moon=new T.Mesh(new T.SphereGeometry(1,32,24),new T.MeshBasicMaterial({map
 moon.rotation.y=-1.2; moon.renderOrder=-2; moon.frustumCulled=false; S.add(moon);
 /* 月相：依真實日期算月齡（朔望月 29.53 天），以陽光方向即時照亮球體 */
 const SYN=29.530588853, NEW0=Date.UTC(2000,0,6,18,14);
-const phase=()=>((((Date.now()-NEW0)/864e5)/SYN)%1+1)%1, illum=()=>(1-Math.cos(2*Math.PI*phase()))/2;
+// 結局演出時可以暫時指定月相（滿月），演完恢復真實月相
+let phaseFix=null;
+const phase=()=>phaseFix!=null?phaseFix:((((Date.now()-NEW0)/864e5)/SYN)%1+1)%1, illum=()=>(1-Math.cos(2*Math.PI*phase()))/2;
 const PH_EMO=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'], phEmo=()=>PH_EMO[Math.round(phase()*8)%8];
-window.__MOONPH={phase,illum,emo:phEmo};
+window.__MOONPH={phase,illum,emo:phEmo,fix:v=>{ phaseFix=v; },dir:(h,out)=>moonDir(h,out)};
 const uL={value:new T.Vector3(0,0,1)};
 moon.material.onBeforeCompile=sh=>{ sh.uniforms.uL=uL;
   sh.vertexShader='varying vec3 vNw;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvNw=normalize(mat3(modelMatrix)*normal);');
