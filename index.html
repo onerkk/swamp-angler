@@ -5644,7 +5644,7 @@ function endingShots(E,c){
     if(u>=1){ spl(j.w.position.x,j.w.position.z,10,1.1); W.addRipple&&W.addRipple(j.w.position.x,j.w.position.z,2.5); S.remove(j.w); jumps.splice(i,1); } } }
   // 阿蘅（生前的模樣）與她提的燈；只有完成隱藏章節「湖裡還有人等燈」的玩家才會看到她
   const met=!!(c.save&&c.save.story&&c.save.story.done&&c.save.story.done.indexOf('lantern')>=0);
-  // 阿蘅：鬼魂模樣（ghost.glb，白衣長髮）與生前模樣（ghost_alive.glb）兩個模型疊在同一處，用透明度交錯，月光照到她時慢慢變回生前的樣子
+  // 阿蘅：鬼魂模樣（ghost.glb，白衣長髮）與生前模樣（girl.glb，十歲小女孩）兩個模型疊在同一處，用透明度交錯，月光照到她時慢慢變回生前的樣子
   const heng=new T.Group(), hGhost=new T.Group(), hAlive=new T.Group(); heng.add(hGhost); heng.add(hAlive);
   const setOp=(o,a)=>o.traverse(m=>{ if(m.isMesh&&m.material){ m.material.transparent=true; m.material.opacity=a; m.visible=a>.01; } });
   function loadHuman(url,dst,glow,key,hgt){ load(url,g=>{ const o=g.scene.clone(true); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ m.material=mt.clone(); if(mt.map){ m.material.emissive=new T.Color(glow); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.55; } } } });
