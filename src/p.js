@@ -109,6 +109,21 @@ function scaleFx(n){ fx.querySelector('b').textContent=`🌙 月鱗 ${Math.min(7
   if(n<7) setTimeout(()=>c.toast('找到新的月鱗！去聽汐月的故事','good',2600),2300); }
 let endGlow=0;
 const cam=new T.Vector3();
+// 靠近月光灣時，汐月會轉頭看你、輕輕擺尾，並依故事進度主動說話（頭上的對話泡泡）
+const say=document.createElement('div'); say.style.cssText='position:fixed;z-index:15;max-width:62vw;padding:9px 13px;border-radius:14px;background:rgba(14,22,40,.78);border:1px solid rgba(190,215,255,.35);color:#e9f1ff;font-size:14px;line-height:1.6;pointer-events:none;opacity:0;transition:opacity .6s;transform:translate(-50%,-100%);text-shadow:0 1px 3px #000;font-family:"Noto Serif TC",serif';
+document.body.appendChild(say);
+const SAYV=new T.Vector3(); let sayT=0, sayI=0, sayNear=false, sayLast='', sayOn=0;
+function sayLines(){ const S=window.__STORY, d=id=>!!(S&&S.done&&S.done(id)), end=c.save&&c.save.story&&c.save.story.ending;
+  if(end) return ['我回來看看你。海很好，爸爸（海王）也很好。','阿蘅說，她在海的那一邊，也看得見碼頭的燈。','今晚的月潮，是為你亮的。','老漁人的椅子……你一直替他擦得很乾淨呢。'];
+  const L=[]; if(d('lantern')) L.push('阿蘅最近常常坐在浮萍灣，望著碼頭的方向。','謝謝你，把那盞燈帶給她（阿蘅）。');
+  if(d('c5')) L.push('河口的門外面就是海。我已經四十年沒聞過海的味道了。','如果你在海上遇見很大很大的影子……別怕他。','他（海王）其實不兇。他只是一直在找人。');
+  else if(d('c3')) L.push('颱風那年倒下的樹，到現在還橫在湖裡。','他（老漁人）說過，總有一天會有人把手記找齊。','浮萍灣那邊……夜裡別划太近。');
+  else L.push('……你也是來看燈的嗎？','這座湖，以前每個滿月都會有一盞燈。','你身上，有老漁人手記的味道。');
+  return L; }
+function updSay(dt,dist,show){ const want=show&&dist<20; if(want&&!sayNear){ sayNear=true; sayT=.6; } if(!want&&sayNear){ sayNear=false; sayT=0; say.style.opacity=0; }
+  if(!sayNear) return; sayT-=dt; if(sayT<=0){ const L=sayLines(); let t=L[sayI%L.length]; if(t===sayLast&&L.length>1){ sayI++; t=L[sayI%L.length]; } sayI++; sayLast=t; say.textContent=t; say.style.opacity=1; sayOn=4.8; sayT=8.5; }
+  sayOn-=dt; if(sayOn<=0) say.style.opacity=0;
+  SAYV.set(NP.x,NP.y+2.55,NP.z).project(W.camera); const vis=SAYV.z<1; say.style.left=((SAYV.x+1)/2*innerWidth)+'px'; say.style.top=((1-SAYV.y)/2*innerHeight)+'px'; if(!vis) say.style.opacity=0; }
 function update(dt){ W.camera.getWorldPosition(cam); merNight();
   const nk=W.U.uNight?W.U.uNight.value:0, cl=W.U.uCloud?W.U.uCloud.value:0, vis=nk*(1-.8*Math.min(1,cl));
   moonDir(c.hour?c.hour():22,MD); const above=MD.y>-.02;
@@ -120,7 +135,10 @@ function update(dt){ W.camera.getWorldPosition(cam); merNight();
   act+=((active()?1:0)-act)*Math.min(1,dt*.8);
   { const ended=c.save&&c.save.story&&c.save.story.ending, nightK=Math.max(0,Math.min(1,(.25-W.info.day)*5)), want=ended&&c.G&&c.G.loc==='lake'?.35*nightK:0;   // 月潮回來後：湖上夜晚永遠帶著淡淡的生物螢光
     endGlow+=(want-endGlow)*Math.min(1,dt*.5); W.U.uBio.value=Math.max(act,endGlow); }
-  npc.visible=act>.05; if(npc.visible){ mer.material.opacity=act; mer.rotation.y=Math.atan2(cam.x-NP.x,cam.z-NP.z); if(mer3) mer3.rotation.y=mer.rotation.y; if(merRig) merRig.pose({t:performance.now()/1000,tail:.1,headPitch:.06+.04*Math.sin(performance.now()/2300),headYaw:.15*Math.sin(performance.now()/3100)}); glow.material.opacity=.5*act*(0.8+0.2*Math.sin(performance.now()*.002)); }
+  npc.visible=act>.05; if(npc.visible){ mer.material.opacity=act; mer.rotation.y=Math.atan2(cam.x-NP.x,cam.z-NP.z); if(mer3) mer3.rotation.y=mer.rotation.y; { const tt=performance.now()/1000, dd=Math.hypot(cam.x-NP.x,cam.z-NP.z), nearK=Math.max(0,Math.min(1,(22-dd)/10)), talk=sayOn>0?1:0;
+      if(mer3) mer3.position.y=Math.sin(tt*1.1)*.05*(1+nearK);   // 在水裡輕輕上下浮動
+      if(merRig) merRig.pose({t:tt,tail:.1+.12*nearK,tailF:1.6+.8*nearK,breathe:.012+.01*talk,headPitch:.06+.12*talk*Math.abs(Math.sin(tt*2.2))+.04*Math.sin(tt/2.3),headYaw:.15*Math.sin(tt/3.1)*(1-nearK),headRoll:.1*nearK*Math.sin(tt*.8)}); } glow.material.opacity=.5*act*(0.8+0.2*Math.sin(performance.now()*.002)); }
+  updSay(dt,Math.hypot(cam.x-NP.x,cam.z-NP.z),npc.visible&&act>.5&&!(window.__ENDON&&window.__ENDON())&&!(c.G&&c.G.state==='home'));
   const near=npc.visible&&Math.hypot(cam.x-NP.x,cam.z-NP.z)<35; tb.classList.toggle('hidden',!near||act<.5);
   if(near&&MS.read<unlocked()) tb.classList.add('dot'); }
 return {update,onCatch,koiK,active,scaleFx};
