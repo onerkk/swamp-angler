@@ -305,11 +305,11 @@ function endingShots(E,c){
       tick:(t)=>{ const sink=t<7?1.2-3.8*(t/7)*(t/7):t<9?-2.6+.3*Math.sin((t-7)/2*Math.PI/2):-2.3; king.position.y=sink+sw(0,-22,t)*.5; king.rotation.x=0; RP.king.headPitch=t>7?-.45*Math.min(1,(t-7)/2):0; RP.king.tail=.18;
         lampG.position.y=1.95+sw(0,-5.6,t)*.9; lampG.rotation.z=Math.sin(t*1.3)*.06;
         sc.rip-=1/60; if(sc.rip<=0&&t<7.5){ sc.rip=.6; W.addRipple&&W.addRipple((Math.random()-.5)*5,-22+(Math.random()-.5)*4,3+Math.random()*3); if(Math.random()<.5) spl((Math.random()-.5)*4,-20.5,8,1.4); } },
-      subs:[[2.2,'海王沉回深淵之前，停了下來。','',4.2],[8,'他抬起頭，看著船頭那盞燈，看了很久。','',4.6]]},
+      subs:[[2.2,'海王沉回深淵之前，停了下來。','',4.2],[8,'他（海王）抬起頭，看著船頭那盞燈（老漁人的提燈），\n看了很久。','',4.6]]},
     // 序幕二：反打——從海王身後看向漁船上的燈
     {d:11,hour:20.45,sea:true,from:[[-5.2,5.4,-32.5],[0,2.4,-5.6]],to:[[-4,4.8,-30.5],[0,2.2,-5.6]],
       tick:(t)=>{ king.position.y=-2.3+sw(0,-22,t)*.4+Math.sin(t*.6)*.08; lampG.position.y=1.95+sw(0,-5.6,t)*.9; lampL.intensity=1.6+Math.sin(t*7)*.12; },
-      subs:[[1,'他以為，是人類偷走了月潮。','',4.4],[6,'月潮，\n是他女兒的名字。','q big',4.8]]},
+      subs:[[1,'他（海王）以為，是人類偷走了月潮。','',4.4],[6,'他口中的「月潮」，\n是他的女兒——汐月。','q big',4.8]]},
     // 第一幕一：月亮從雲後出來，月光在海面鋪成一條路
     {d:12,hour:20.5,sea:true,from:[[0,3.4,-1],[0,2.2,-60]],to:[[0,3.6,-1],[0,0,0]],
       enter:()=>{ window.__MOONPH&&window.__MOONPH.dir&&window.__MOONPH.dir(20.5,md); md.y=0; md.normalize(); keep(glit); glit.position.set(0,.08,-1); glit.rotation.y=Math.atan2(-md.x,-md.z); glitM.opacity=0; S.remove(king); },
@@ -344,17 +344,17 @@ function endingShots(E,c){
         // 她轉身，朝月光灣的方向走去
         if(t>8){ heng.rotation.y=hengLook(-1.6,-8.5)+Math.min(1,(t-8)/2)*2.4; heng.position.z=-17.9-Math.max(0,t-9.5)*.35; }
         if(met){ lamp2.position.set(heng.position.x+.25,1.05+heng.position.y-.12,heng.position.z+.2); lamp2L.intensity=1.4*a; lamp2.visible=a>.02; } },
-      subs:met?[[1,'浮萍灣的水面上，站著一個提燈的女孩。','',4.4],[6.4,'她朝你點點頭，提著燈，\n往月光灣的方向走去。','',4.8]]
-              :[[1,'浮萍灣的水面上，站著一個白衣的女孩。','',4.4],[6.2,'三十年來，她一直在這裡，\n等一盞燈。','',4.6],[11.2,'她轉過身，往月光灣的方向走去。','',4]]},
+      subs:met?[[1,'浮萍灣的水面上，站著一個提燈的女孩（阿蘅）。','',4.4],[6.4,'她（阿蘅）朝你點點頭，提著燈，\n往月光灣的方向走去。','',4.8]]
+              :[[1,'浮萍灣的水面上，站著一個白衣的女孩（阿蘅）。','',4.4],[6.2,'三十年來，她（阿蘅）一直在這裡，\n等一盞燈。','',4.6],[11.2,'她（阿蘅）轉過身，往月光灣的方向走去。','',4]]},
     // 第三幕一：月光灣——汐月坐在岩石上，等你
     {d:15,hour:22,sea:false,music:'theme',vol:.7,from:[[-6.5,2.3,-31],[-12,1.6,-44]],to:[[-9.6,1.6,-36.6],[-12,1.7,-44]],
       enter:()=>{ S.remove(lake); S.remove(ff); S.remove(heng); S.remove(lamp2); keep(merG); merW.rotation.set(0,merFace(),0); merW.position.set(0,0,0); merL.intensity=1.6; keep(lampG); lampG.position.set(-8.95,.96,-37.75); lampL.intensity=1.4; lampL.color.copy(warmC); },
       tick:(t)=>{ merW.position.y=Math.sin(t*.9)*.015; lampG.rotation.z=Math.sin(t*1.1)*.04; },
-      subs:[[1.2,'「四十年前，堤防關上的那晚，我回不去了。」','q',5],[7.6,'「是他第一個發現我。他什麼也沒問，\n只說：『我會想辦法讓妳回家。』」','q',6]]},
+      subs:[[1.2,'汐月：「四十年前，堤防關上的那晚，\n我回不去了。」','q',5],[7.6,'汐月：「是他（老漁人）第一個發現我。他什麼也沒問，\n只說：『我會想辦法讓妳回家。』」','q',6]]},
     // 第三幕二：近一點——她說起老漁人
     {d:15,hour:22.05,sea:false,from:[[-10.2,1.5,-38.6],[-12,1.85,-44]],to:[[-10.6,1.5,-40],[-12,1.9,-44]],
       tick:(t)=>{ merW.position.y=Math.sin(t*.9)*.015; merW.rotation.y=merFace()+Math.sin(t*.4)*.05; },
-      subs:[[1,'「每個滿月他都提燈來。後來他走不動了，\n就坐在碼頭上，把燈舉得高高的，讓我看得見。」','q',6.4],[8.6,'「他說，他欠一個女孩一盞燈。」','q big',5.4]]},
+      subs:[[1,'汐月：「每個滿月，他（老漁人）都提燈來。後來他走不動了，\n就坐在碼頭上，把燈舉得高高的，讓我看得見。」','q',6.4],[8.6,'汐月：「他（老漁人）說，他欠一個女孩一盞燈。」','q big',5.4]]},
     // 第三幕二之一：汐月說出阿蘅的事；白衣的女孩沿著月光，從浮萍灣那頭走過水面來到灣裡
     {d:18,hour:22.08,sea:false,from:[[-10.4,1.5,-39.6],[-11.4,1.5,-43.4]],to:[[-9.8,1.6,-38.4],[-10.4,1.2,-42.2]],
       enter:()=>{ keep(heng); heng.position.set(BAY.x+3.4,.12,BAY.z+5.2); setOp(hGhost,met?0:0); setOp(hAlive,0); if(met){ keep(lamp2); } sc.ha=0; },
@@ -362,7 +362,7 @@ function endingShots(E,c){
         heng.position.set(BAY.x+3.4-2.2*u,.12+Math.sin(t*1.2)*.02,BAY.z+5.2-3.6*u); heng.rotation.y=hengLook(BAY.x,BAY.z); setOp(met?hAlive:hGhost,a);
         if(met){ lamp2.position.set(heng.position.x+.25,1.05,heng.position.z+.15); lamp2L.intensity=1.4*a; }
         merW.rotation.y=merFace()+Math.min(1,Math.max(0,(t-7)/3))*.9; },
-      subs:[[1,'「那個女孩叫阿蘅，是他的女兒。」','q',4.2],[5.4,'「三十年前的颱風夜，是她的生日。\n他答應過，那天會早點回家。」','q',5.4],[11.2,'「可是那一夜，我被倒下的樹困住了。\n他冒著雨，划來救我……」','q',5.4]]},
+      subs:[[1,'汐月：「那個女孩叫阿蘅，是他（老漁人）的女兒。」','q',4.2],[5.4,'汐月：「三十年前的颱風夜，是她（阿蘅）的生日。\n他（老漁人）答應過，那天會早點回家。」','q',5.4],[11.2,'汐月：「可是那一夜，我被倒下的樹困住了。\n他（老漁人）冒著雨，划來救我……」','q',5.4]]},
     // 回憶一：三十年前，颱風夜。阿蘅提著燈站在浮萍灣的小棧橋上，等著湖上的船
     {d:11,hour:18.9,sea:false,from:[[-3.4,1.5,-9.6],[-5.6,1.2,-14.6]],to:[[-3.9,1.4,-10.6],[-5.6,1.3,-15]],
       enter:()=>{ S.remove(merG); S.remove(king); S.remove(lampG); fbFilter(true); E.layer().appendChild(flash); keep(rain); keep(pier); keep(heng); keep(lamp2);
@@ -370,7 +370,7 @@ function endingShots(E,c){
       tick:(t,k,P)=>{ rainTick(P,1/60); RP.heng.headYaw=.35*Math.sin(t*.5); RP.heng.skirt=.08; lamp2.position.set(-5.15,1.28,-14.05); lamp2.rotation.z=Math.sin(t*2.3)*.15;
         flash.style.opacity=(t>6.2&&t<6.35)||(t>6.5&&t<6.6)?.7:0; },
       cleanup:()=>{ fbFilter(false); flash.remove(); },
-      subs:[[.6,'三十年前。','big',3],[4.2,'汐月：「她提著燈，在浮萍灣等。」','q',5]]},
+      subs:[[.6,'三十年前。','big',3],[4.2,'汐月：「她（阿蘅）提著燈，在浮萍灣等。」','q',5]]},
     // 回憶二：天黑了，等不到。她划著小船出去找，浪越來越大
     {d:11,hour:20.2,sea:false,from:[[-2.5,1.6,-15],[-7,.7,-21]],to:[[-3.2,1.8,-18],[-8.5,.8,-25]],
       enter:()=>{ keep(boat); S.remove(pier); sc.bx=0; },
@@ -378,7 +378,7 @@ function endingShots(E,c){
         boat.position.set(-6.8,sw2,z); boat.rotation.set(Math.sin(t*1.1)*.08,.2,roll); heng.position.set(-6.8,.15+sw2,z+.2); heng.rotation.set(0,Math.PI+.2,roll*.6);
         lamp2.position.set(-6.55,1.05+sw2,z-.35); lamp2.rotation.z=roll*1.8; RP.heng.headYaw=.5*Math.sin(t*.7);
         if(Math.random()<.08) spl(-6.8+(Math.random()-.5)*2,z,6,1); flash.style.opacity=(t>3&&t<3.12)||(t>8.1&&t<8.2)?.75:0; },
-      subs:[[1,'汐月：「等不到，她就自己划了出去。」','q',5]]},
+      subs:[[1,'汐月：「等不到爸爸，她（阿蘅）就自己划了出去。」','q',5]]},
     // 回憶三：小船翻覆，燈落進水裡熄滅；水面上只剩漂著的髮簪
     {d:12,hour:20.4,sea:false,from:[[-4.4,1.3,-21.5],[-6.8,.4,-24.5]],to:[[-4.8,1.1,-22.2],[-6.8,.2,-24.6]],
       enter:()=>{ keep(pin); pin.position.set(-6.5,.2,-24); pin.visible=false; sc.cap=0; },
@@ -388,7 +388,7 @@ function endingShots(E,c){
         lamp2.position.set(-6.5+cap*.9,1.05-cap*.9-sink*.25,z-.35); lamp2L.intensity=t<3.4?1.8:Math.max(0,1.8-(t-3.4)*1.2)*(Math.random()>.3?1:.4); lamp2.visible=t<6;
         if(t>2.4&&!sc.cap){ sc.cap=1; spl(-6.6,z,40,2.2); W.addRipple&&W.addRipple(-6.6,z,3); } if(t>6){ pin.visible=true; pin.position.y=.12+Math.sin(t*1.4)*.03; }
         flash.style.opacity=(t>2.3&&t<2.42)?.8:0; },
-      subs:[[4.2,'汐月：「我聽見她的聲音，\n卻游不過那些倒木。」','q',5.4],[9.6,'燈，熄了。','big',2.4]]},
+      subs:[[4.2,'汐月：「我聽見她（阿蘅）的聲音，\n卻游不過那些倒木。」','q',5.4],[9.6,'燈，熄了。','big',2.4]]},
     // 第三幕二之二：月光照在阿蘅身上，她變回生前的樣子；她請你帶一句話給爸爸
     {d:17,hour:22.1,sea:false,from:[[-9.4,1.45,-39.2],[-10.4,1.25,-42.2]],to:[[-9.7,1.4,-40.1],[-10.5,1.3,-42.4]],
       enter:()=>{ fbFilter(false); flash.remove(); S.remove(rain); S.remove(boat); S.remove(pier); S.remove(pin); keep(merG);
@@ -397,12 +397,12 @@ function endingShots(E,c){
         if(!met){ const k=Math.min(1,Math.max(0,(t-3)/4)); setOp(hGhost,1-k); setOp(hAlive,k); }
         RP.heng.headPitch=RP.ghost.headPitch=t<11?.28:Math.max(-.1,.28-(t-11)*.25); RP.heng.headYaw=RP.ghost.headYaw=t>12?Math.min(.5,(t-12)*.3):0;
         sc.tw-=1/60; if(sc.tw<=0&&t>2.5&&t<8){ sc.tw=.08; trailDot(heng.position.x+(Math.random()-.5)*.6,.2+Math.random()*1.6,heng.position.z+(Math.random()-.5)*.6); } updTrail(1/60); },
-      subs:[[.8,'「我趕到的時候，只撈起了她的髮簪。」','q',5.2],[7,'「堤防關著，月潮進不來。\n困在湖裡的，不只我一個。」','q',4.8],[12.4,'阿蘅：「……幫我跟爸爸說，我不怪他。」','q big',4.6]]},
+      subs:[[.8,'汐月：「我趕到的時候，\n只撈起了她（阿蘅）的髮簪。」','q',5.2],[7,'汐月：「堤防關著，月潮進不來。\n困在湖裡的，不只我一個。」','q',4.8],[12.4,'阿蘅：「……幫我跟爸爸（老漁人）說，\n我不怪他。」','q big',4.6]]},
     // 第三幕三：水道口，海王浮了起來——眼裡的光不再兇狠
     {d:25,hour:22.1,sea:false,from:[[-9,1.9,-37],[-13,3,-58]],to:[[-9.4,1.7,-38],[-13.5,3.6,-60]],
       enter:()=>{ keep(king); king.position.set(-14,-6,-62); king.rotation.set(0,Math.atan2(BAY.x+14,BAY.z+62),0); kingEye.intensity=0; kingEye.color.set(0xcfe8ff); },
       tick:(t)=>{ king.position.y=Math.min(-2.2,-6+t*.9)+Math.sin(t*.7)*.08; kingEye.intensity=Math.min(1,Math.max(0,(t-3)/3)); if(t<5&&Math.random()<.25) spl(-14+(Math.random()-.5)*4,-60,8,1.3); merW.rotation.y=merFace()+Math.min(1,t/3)*1.1; RP.mer.headYaw=Math.min(1,t/3)*.75; RP.king.headPitch=.15; },
-      subs:[[5.2,'汐月：「……爸爸。」','q',3.4],[9,'汐月：「對不起。我只是想看看人類的燈。」','q',4.8],[14.4,'海王：「是我不好。四十年，\n我把整片海都翻了過來……」','q',5],[19.8,'海王：「卻沒想過，妳只是在等一盞燈，\n帶妳回家。」','q big',5.4]]},
+      subs:[[5.2,'汐月：「……爸爸。」','q',3.4],[9,'汐月：「對不起。我只是想看看人類的燈。」','q',4.8],[14.4,'海王：「是我不好。四十年，\n我把整片海都翻了過來……」','q',5],[19.8,'海王：「卻沒想過，妳（汐月）只是在等一盞燈，\n帶妳回家。」','q big',5.4]]},
     // 第三幕四：她把最亮的一片月鱗放進你的燈
     {d:12,hour:22.15,sea:false,from:[[-10.3,1.42,-38.3],[-11.4,1.4,-42.6]],to:[[-10.5,1.36,-38.9],[-11.2,1.3,-41.6]],
       enter:()=>{ merW.rotation.y=merFace(); RP.mer.headYaw=0; keep(moonScale); moonScale.visible=false; lampG.position.set(-10.22,1.06,-39.7); sc.ms=0; },
@@ -410,7 +410,7 @@ function endingShots(E,c){
         const a=new T.Vector3(BAY.x+.25,1.75,BAY.z+.45), b2=lampG.position.clone().add(new T.Vector3(0,.12,0)); moonScale.position.copy(a.lerp(b2,u)); moonScale.position.y+=Math.sin(u*Math.PI)*.35;
         moonScale.material.rotation=t*2; RP.mer.headPitch=t>6&&t<8.5?.25*Math.sin((t-6)/2.5*Math.PI):0; const g2=Math.min(1,Math.max(0,(t-5)/1.5)); lampL.color.copy(warmC).lerp(silverC,g2); lampL.intensity=1.4+1.4*g2*(1+.15*Math.sin(t*6));
         lampG.traverse(m=>{ if(m.isMesh&&m.material&&m.material.emissive) m.material.emissive.copy(new T.Color(0xffc070).lerp(silverC,g2)); }); },
-      subs:[[6.2,'「謝謝你，替他把路走完。」','q big',5]]},
+      subs:[[6.2,'汐月：「謝謝你，替他（老漁人）把路走完。」','q big',5]]},
     // 第三幕五：汐月滑進水裡，游向水道口，回頭看你一次，和海王一起沉回大海
     {d:15,hour:22.2,sea:false,from:[[-9.2,2.4,-36],[-12.5,.5,-50]],to:[[-8.6,2.9,-35],[-13.6,.4,-58]],
       enter:()=>{ S.remove(moonScale); sc.tr=0; },
@@ -422,7 +422,7 @@ function endingShots(E,c){
  const fa=Math.max(0,1-Math.max(0,t-9)/2.2); setOp(hAlive,fa); setOp(hGhost,0); if(met){ lamp2.position.set(hp.x+.25,1.05,hp.z+.15); lamp2L.intensity=1.4*fa; } }
         RP.king.headPitch=t<4?.45*Math.sin(Math.min(1,t/1.5)*Math.PI/2):Math.max(0,.45-(t-4)*.3);
         if(t>9){ king.position.y=-2.2-(t-9)*.9; kingEye.intensity=Math.max(0,1-(t-9)/3); } if(t>10&&t<11) spl(-13.8,-59.5,12,1.6); updTrail(1/60); },
-      subs:[[.4,'海王朝著碼頭的方向，低下了頭：\n「人類……謝謝你。」','q',4.2],[5,'她們回頭看了你一眼。','',3.6],[10.5,'月潮，帶著兩個女兒，回到了大海。','',4.4]]},
+      subs:[[.4,'海王朝著碼頭的方向，低下了頭：\n「人類……謝謝你。」','q',4.2],[5,'她們（汐月和阿蘅）回頭看了你一眼。','',3.6],[10.5,'月潮帶著汐月和阿蘅，回到了大海。','',4.4]]},
     // 第四幕一：天快亮了，划回碼頭。碼頭盡頭，老漁人的舊椅子和竹竿
     {d:14,hour:5.3,hourTo:5.8,sea:false,music:'piano',vol:.72,from:[[3.4,2.1,-15],[.3,1.1,-2.4]],to:[[1.6,1.7,-8.5],[.4,1.05,-2.6]],
       enter:()=>{ S.remove(merG); S.remove(king); S.remove(lampG); S.remove(heng); S.remove(lamp2); S.remove(oldG); trail.splice(0).forEach(d=>S.remove(d.sp)); keep(chair); keep(pole); document.head.appendChild(fl); },
@@ -451,9 +451,34 @@ function endingShots(E,c){
         if(t>5.5&&t<9){ const u=Math.sin((t-5.5)/3.5*Math.PI); RP.heng.headYaw=-.55*u; RP.old.headYaw=.45*u; RP.old.headPitch=.15*u; }
         const w=Math.max(0,t-9.5)*.32; oldG.position.set(.15,.83+w*.12,-2.95-w); heng.position.set(-.3+Math.min(.12,w*.4),.83+w*.12,-3.0-w);
         lamp2.position.set(heng.position.x-.22,heng.position.y+.72,heng.position.z+.05); lamp2L.intensity=1.6*a; lamp2.visible=a>.02; },
-      subs:[[2,'晨光裡，碼頭盡頭站著兩個人。','',4.2],[7,'阿蘅：「爸，我們回家了。」','q big',4.6],[12.6,'月潮回來了。','',3.8]]},
+      subs:[[2,'晨光裡，碼頭盡頭站著兩個人——\n老漁人，和阿蘅。','',4.2],[7,'阿蘅：「爸，我們回家了。」','q big',4.6],[12.6,'月潮回來了。','',3.8]]},
     // 片尾名單（第二到第四幕完成後，會插在這之前）
     {d:30,hour:6.6,hourTo:8,sea:false,music:'theme',vol:.85,from:[[0,10,14],[0,0,-30]],to:[[0,28,26],[0,0,-40]],
       enter:()=>{ drop(); E.credits(ENDING_CREDITS,28); }, cleanup:drop}
   ];
 }
+/* ===== 破關後：小屋書架上的《月潮》完整故事（紙張貼圖、手寫字體、分章翻頁） ===== */
+const STORY_BOOK=[
+ ['序　月潮','河口外的海，住著海王。\n他只有一個女兒，叫汐月。母后生下她的那天就走了，海王把她看得比整片海還重，從不讓她靠近人類。\n汐月從小聽海龜說，每年夏天，河口那頭的湖上會漂滿人類放的燈，一盞一盞，像掉進水裡的星星。\n她一直想看一次。'],
+ ['一　關上的門','四十年前的一個大潮夜，月亮又圓又低。汐月偷偷順著月潮，游過河口，第一次看見了湖上的燈。\n她看得太入迷，沒發現鎮上的人正在河口關上新築好的堤防閘門。\n月潮退了。門再也沒有打開。\n汐月被困在了湖裡。\n海王找遍整片海，最後只知道一件事：人類關上了門，他的月潮再也沒有回來。\n從那天起，深藍的海不再平靜。'],
+ ['二　提燈的人','三十歲的林老伯（老漁人）在月光灣發現了受傷的汐月。\n他沒有問她是什麼，只蹲在岸邊說：「我會想辦法讓妳回家。」\n他去鎮上求人打開閘門，沒有人相信一個漁夫說的人魚。\n他能做的，只有每個滿月提著燈划到灣裡，陪她說話，唱歌給她聽，告訴她：海還在等妳。'],
+ ['三　小女孩和燈','林老伯有一個女兒，叫阿蘅。\n她十歲那年的生日，剛好是滿月。爸爸摸著她的頭說：「今天爸爸早點回來，陪妳吃麵線。」\n那天下午，颱風來了。東岸的林子被吹倒，一棵一棵倒進湖裡，把月光灣的水道堵住，汐月被困在倒木中間。\n林老伯穿上雨衣，划著船衝進了風雨裡。'],
+ ['四　颱風夜','阿蘅提著家裡那盞燈，坐在浮萍灣的小木棧橋上等。\n天黑了，雨越下越大，湖上一艘船也沒有。\n她想，爸爸一定是迷路了，看不到燈。\n於是她解開小船，提著燈，自己划了出去。\n汐月在倒木後面聽見了她的聲音，拚命往那裡游，卻怎麼也游不過去。\n等她趕到的時候，湖面上只剩下一支漂著的髮簪。\n燈，熄了。'],
+ ['五　欠一盞燈','林老伯天亮才回到家。\n他再也沒有原諒自己。\n之後的每個滿月，他還是提著燈出門。一盞給汐月，讓她知道回家的路還在；一盞給阿蘅——\n「我欠一個女孩一盞燈。」\n他把這些都寫進了手記裡，寫到字一年比一年淡，寫到再也划不動船。\n最後幾年，他只能坐在碼頭盡頭的舊搖椅上，把燈舉得高高的，讓湖裡的人看得見。'],
+ ['六　湖裡的白衣女孩','阿蘅沒有離開那座湖。\n她一夜一夜地在浮萍灣等，在湖上找，找每一盞燈、每一艘船，看看是不是爸爸終於來接她了。\n三十年過去，湖上的人換了一批又一批，沒有一個是爸爸。\n她以為，那天晚上爸爸選了別人，不要她了。'],
+ ['七　你','後來，碼頭來了一個新的釣客——就是你。\n你撿到了老漁人的手記，一頁一頁把它找回來；你在浮萍灣釣起了那支髮簪；你在滿月的夜裡，提著老漁人的燈，走到了阿蘅面前。\n她第一次看見爸爸的燈火。\n你修好了老漁人的船，開出河口，一路到了他一輩子沒能抵達的深藍。'],
+ ['八　月潮回來了','海王沉回深淵前，看見了你船頭的燈——那正是汐月小時候一直說想看的，人類的燈。\n那一夜大潮，堤防在浪裡裂開了。月光順著河道流回湖裡。\n汐月終於見到了爸爸：「對不起，我只是想看看人類的燈。」\n海王低下頭：「是我不好。我把整片海都翻過來，卻沒想過，妳只是在等一盞燈帶妳回家。」\n月光照在阿蘅身上，她變回了那個十歲的小女孩。\n「幫我跟爸爸說，我不怪他。」'],
+ ['終　換我守著這片湖','天亮的時候，你把燈放在老漁人的舊搖椅旁。\n椅子上，多了一支髮簪。\n晨光裡，碼頭盡頭站著兩個人。小女孩提著燈，牽起爸爸的手：「爸，我們回家了。」\n手記的最後一頁，是你寫下的字：\n「月潮回來了。換我守著這片湖。」']
+];
+function showStoryBook(){ let i=0; const el=document.createElement('div');
+  el.style.cssText="position:fixed;inset:0;z-index:60;background:rgba(10,8,6,.82);display:flex;align-items:center;justify-content:center;padding:16px";
+  const fl=document.createElement('link'); fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap'; document.head.appendChild(fl);
+  const pg=document.createElement('div'); pg.style.cssText="position:relative;width:min(380px,92vw);height:min(640px,82vh);display:flex;flex-direction:column;padding:28px 24px 18px;box-sizing:border-box;border-radius:4px;"+
+    "background:linear-gradient(rgba(214,180,120,.42),rgba(150,110,60,.32)),url(end_paper.jpg) center/cover;box-shadow:0 18px 50px rgba(0,0,0,.7),inset 0 0 60px rgba(90,60,20,.45);color:#2c1e0e;font-family:'LXGW WenKai TC','Kaiti TC','STKaiti','BiauKai',serif";
+  el.appendChild(pg); document.body.appendChild(el);
+  const draw=()=>{ const [t,b]=STORY_BOOK[i]; pg.innerHTML=`<div style="font-size:12px;letter-spacing:.3em;opacity:.6;text-align:center">月潮・老漁人的手記</div><h3 style="margin:10px 0 12px;text-align:center;font-weight:400;font-size:22px;letter-spacing:.12em">${t}</h3>`+
+    `<div style="flex:1;overflow:auto;font-size:17px;line-height:2.05;white-space:pre-line">${b}</div>`+
+    `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-family:sans-serif"><button data-b="p" style="border:0;background:rgba(60,40,20,.15);padding:8px 14px;border-radius:999px;color:#2c1e0e;${i?'':'visibility:hidden'}">‹ 上一章</button><span style="font-size:12px;opacity:.6">${i+1} / ${STORY_BOOK.length}</span><button data-b="${i<STORY_BOOK.length-1?'n':'x'}" style="border:0;background:rgba(60,40,20,.25);padding:8px 14px;border-radius:999px;color:#2c1e0e">${i<STORY_BOOK.length-1?'下一章 ›':'闔上'}</button></div>`+
+    `<button data-b="x" style="position:absolute;right:10px;top:8px;border:0;background:none;font-size:20px;color:#5a4028">✕</button>`; };
+  el.addEventListener('click',e=>{ const b=e.target.closest('[data-b]'); if(!b){ if(e.target===el) el.remove(); return; } const a=b.dataset.b; if(a==='x') el.remove(); else { i=Math.max(0,Math.min(STORY_BOOK.length-1,i+(a==='n'?1:-1))); draw(); } });
+  draw(); }

@@ -584,6 +584,7 @@ function renderFurn(){ const H=c.home(), F=H.furnInfo(furnId), d=F.def, nx=F.nex
   if(furnId==='fire') h+=`<div class="it"><span>點壁爐就能烤魚</span><button class="sbtn pri" data-f="grill">🔥 烤魚</button></div>`;
   else if(furnId==='rock'&&F.cur.pick) h+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">`+['清晨','正午','黃昏','夜晚'].map((n,i)=>`<button class="sbtn pri" data-f="use" data-o="${i}" style="flex:1">睡到${n}</button>`).join('')+`</div>`;
   else h+=`<div style="margin:8px 0"><button class="btn pri" data-f="use" style="width:100%;padding:10px${F.st.ok?'':';opacity:.45'}">${d.act}</button></div>`;
+  if(furnId==='shelf'&&window.__STORY&&window.__STORY.done&&window.__STORY.done('c7')) h+=`<div style="margin:8px 0"><button class="btn" data-f="book" style="width:100%;padding:10px;background:#f3e2bf;color:#3a2610">📖 月潮・完整的故事</button></div>`;
   if(nx){ const can=lvS>=nx.need&&coins>=nx.p;
     h+=`<div style="font-weight:700;margin-top:6px">升級：${nx.n}</div><div class="it"><span>${nx.d}<br><small style="opacity:.75">需要 Lv ${nx.need}${lvS<nx.need?'（目前 Lv '+lvS+'）':''}</small></span><button class="sbtn${can?' pri':''}" data-f="up">🪙 ${nx.p.toLocaleString()}</button></div>`; }
   else h+=`<div style="font-size:12px;opacity:.7;margin-top:6px">已經升到最高級</div>`;
@@ -591,6 +592,7 @@ function renderFurn(){ const H=c.home(), F=H.furnInfo(furnId), d=F.def, nx=F.nex
 furnUI.addEventListener('click',e=>{ const b=e.target.closest('[data-f]'); if(!b||!furnId) return; const H=c.home(), a=b.dataset.f;
   if(a==='x'){ closeFurn(); return; }
   if(a==='grill'){ closeFurn(); pickFish(); return; }
+  if(a==='book'){ closeFurn(); if(typeof showStoryBook==='function') showStoryBook(); return; }
   if(a==='up'){ const m=H.furnUp(furnId); if(m){ c.toast&&c.toast(m,'warn',1600); return; } syncFurn(); c.toast&&c.toast('升級好了：'+H.furnInfo(furnId).cur.n,'good',1800); c.coin&&c.coin(); renderFurn(); return; }
   if(a==='use'){ const id=furnId, st=H.furnInfo(id).st; if(!st.ok&&id!=='rock'){ c.toast&&c.toast(st.txt,'warn',1800); return; }
     ACT_OPT=b.dataset.o!=null?+b.dataset.o:null; actFor(id); } });
