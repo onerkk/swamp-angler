@@ -1,7 +1,7 @@
 # 濕地垂釣 原始碼與組裝
 
 ## 組裝（在放有 src 內容的目錄執行）
-JS="b.js c.js e.js f.js g.js h.js i.js j.js k.js l.js m.js stars.js n.js o.js p.js q.js r.js s.js t.js u.js v.js w.js x.js y.js d.js"
+JS="b.js c.js e.js f.js g.js h.js i.js j.js k.js l.js m.js stars.js n.js o.js p.js q.js r.js s.js t.js u.js v.js w.js x.js y.js z.js d.js"
 cat scan.js $JS > all.js && node --check all.js && python3 tools/lintc.py && \
 { cat a.html; echo "<script>"; cat scan.js; echo "</script>"; echo "<script>"; cat $JS; echo "</script>"; echo "</body></html>"; } > ../index.html
 
@@ -31,3 +31,6 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 測試：本機 /tmp/simsite 放 index.html 並 symlink 素材；測試時可加 window.__T 等掛鉤，正式版 index.html 不得包含 window.__T=、__LURE、__WLT、__HOMESCENE、__GRILLSET
 - 阿蘅測試網址：?ghost=1（四種輪流）或 ?ghost=glide/peek/behind/jump
 - 人形模型烘焙用 fish6/bake_planar.py；魚用 bake4.py（BAKE_SIZE、BAKE_FACES、BAKE_SMOOTH 環境變數）
+
+## 結局
+- z.js：結局演出系統（createEnding、endingShots）；劇本與分段見 src/ENDING.md；預覽網址 ?ending=1；配樂 end_piano.mp3、end_theme.mp3（CC0）
