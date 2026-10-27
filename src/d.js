@@ -657,8 +657,17 @@ requestAnimationFrame(frame);
 (function boot(){
   if(!window.THREE){ boot.n=(boot.n||0)+1; if(boot.n>240){ showErr('3D 引擎載入失敗。請確認網路連線後重新整理頁面。'); return; } setTimeout(boot,50); return; }
   try{ const W=createWorld({canvas:document.getElementById('c')}); window.__DIAG=createDiag(W,{get G(){ return window.__G||{}; },get save(){ return (window.__G&&window.__G.saveRef)||{}; }}); const P=createProps(W);
-    const ln=document.getElementById('loadNote');
-    try{ window.__REAL=createReal(W,P,(p,done,err)=>{ if(!ln) return; if(done) ln.textContent='真實場景已載入'; else if(err&&p===0) ln.textContent='部分場景檔案載入失敗，暫用簡化畫面（'+err+'）'; else ln.textContent='正在載入真實場景… '+Math.round(p*100)+'%'; }); }catch(e){ console.warn(e); }
+    // 主畫面的載入提示：進度條、第一次進入的說明、網路慢時的提醒（避免玩家以為當機）
+    const ln=document.getElementById('loadNote'), lbox=document.getElementById('loadBox'), lbar=document.querySelector('#loadBar i'), ltip=document.getElementById('loadTip'), sb=document.getElementById('startBtn');
+    const first=!localStorage.getItem('swampAngler.loaded'); let lastP=-1, lastT=performance.now();
+    if(ltip) ltip.textContent=first?'第一次進入需要下載真實的湖景、模型與貼圖（約 60MB），視網路速度約 1～3 分鐘。下載完會存在裝置裡，下次幾秒就好。':'正在從裝置讀取場景，請稍候…';
+    if(sb&&first){ sb.dataset.t=sb.textContent; sb.textContent='場景下載中，請稍候…'; sb.style.opacity=.7; }
+    const slow=setInterval(()=>{ if(lbox&&lbox.classList.contains('done')){ clearInterval(slow); return; } if(performance.now()-lastT>15000&&ltip) ltip.textContent='網路比較慢，仍在下載中，請不要關閉畫面…（也可以先按「開始釣魚」，畫面會在下載完後自動變成真實場景）'; },3000);
+    try{ window.__REAL=createReal(W,P,(p,done,err)=>{ if(!ln) return; if(p!==lastP){ lastP=p; lastT=performance.now(); }
+      if(lbar) lbar.style.width=Math.max(3,Math.round((done?1:p)*100))+'%';
+      if(done||Math.round(p*100)>=100){ ln.textContent='✅ 真實場景已載入'; if(lbox) lbox.classList.add('done'); try{ localStorage.setItem('swampAngler.loaded','1'); }catch(e){} if(sb&&sb.dataset.t){ sb.textContent=sb.dataset.t; sb.style.opacity=''; } }
+      else if(err&&p===0) ln.textContent='部分場景檔案載入失敗，暫用簡化畫面（'+err+'）';
+      else ln.textContent='正在載入真實場景… '+Math.round(p*100)+'%'; }); }catch(e){ console.warn(e); }
     startGame(W,P); }
   catch(e){ console.error(e); showErr('這個瀏覽器無法啟動 WebGL 3D 畫面。<br><small>'+String(e&&e.message||e)+'</small>'); }
 })();

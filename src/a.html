@@ -347,7 +347,9 @@ body.grilling #homeUI,body.grilling #joy{display:none!important}
   <div class="en">SWAMP ANGLER</div>
   <p><b>按住</b>按鈕蓄力，在力道最滿時放開拋竿。浮標被拉進水裡時<b>立刻點擊</b>提竿。拉扯時<b>按住收線</b>；魚衝刺就放手，並往魚游走的<b>反方向滑動</b>拉竿，別讓張力爆表。拖曳畫面可以轉向瞄準。</p>
   <button id="startBtn">開始釣魚</button>
-  <div id="loadNote">正在載入真實場景…</div>
+  <div id="loadBox"><div id="loadNote">正在載入真實場景…</div><div id="loadBar"><i></i></div><div id="loadTip"></div></div>
+<style>#loadBox{margin-top:14px;width:min(320px,84vw)}#loadBar{height:6px;border-radius:99px;background:rgba(255,255,255,.15);overflow:hidden;margin-top:6px}#loadBar i{display:block;height:100%;width:3%;background:linear-gradient(90deg,#ffcf66,#ffe9b0);border-radius:99px;transition:width .4s}
+#loadTip{font-size:12px;line-height:1.6;opacity:.75;margin-top:8px}#loadBox.done #loadBar{display:none}#loadBox.done #loadTip{display:none}</style>
 </div>
 <div id="err" class="hidden"></div>
 <script>
