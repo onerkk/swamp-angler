@@ -277,6 +277,20 @@ function endingShots(E,c){
   function writePage(dt){ if(pn<FULL.length){ pn=Math.min(FULL.length,pn+dt*7.5); } else if(pm<MINE.length){ pm=Math.min(MINE.length,pm+dt*5); }
     const a=FULL.slice(0,Math.floor(pn)); pageTxt.innerHTML=a.replace(/\n/g,'<br>')+(pn<FULL.length?'<span style="opacity:.35">▍</span>':'');
     pageMine.textContent=pn>=FULL.length?MINE.slice(0,Math.floor(pm)):''; pageMine.style.display=pn>=FULL.length?'block':'none'; return pn>=FULL.length&&pm>=MINE.length; }
+  // 回憶：三十年前的颱風夜。畫面褪色、暴雨、閃電；浮萍灣的小木棧橋、阿蘅划出去的小船
+  const fbCan=W.renderer.domElement, fbFilter=on=>{ fbCan.style.filter=on?'grayscale(.65) sepia(.3) contrast(1.08) brightness(.82)':''; };
+  const flash=document.createElement('div'); flash.style.cssText='position:absolute;inset:0;background:#dfe8ff;opacity:0;pointer-events:none;transition:opacity .08s';
+  const RN=1100, rainP=new Float32Array(RN*6), rainG=new T.BufferGeometry(); rainG.setAttribute('position',new T.BufferAttribute(rainP,3));
+  const rainS=[]; for(let i=0;i<RN;i++) rainS.push([(Math.random()-.5)*24,Math.random()*14,(Math.random()-.5)*24]);
+  const rain=new T.LineSegments(rainG,new T.LineBasicMaterial({color:0xaab4c0,transparent:true,opacity:.55,fog:false})); rain.frustumCulled=false;
+  function rainTick(P,dt){ for(let i=0;i<RN;i++){ const r=rainS[i]; r[1]-=dt*16; r[0]+=dt*2.5; if(r[1]<-1){ r[1]=13; r[0]=(Math.random()-.5)*24; r[2]=(Math.random()-.5)*24; }
+      const x=P.x+r[0], y=r[1], z=P.z+r[2]; rainP.set([x,y,z,x-.06,y+.55,z],i*6); } rainG.attributes.position.needsUpdate=true; if(Math.random()<.04) W.addRipple&&W.addRipple(P.x+(Math.random()-.5)*10,P.z-3-Math.random()*8,1); }
+  const pier=new T.Group(); { const wm=new T.MeshStandardMaterial({color:0x4a3a2a,roughness:.9});
+    for(let i=0;i<9;i++){ const b=new T.Mesh(new T.BoxGeometry(1.3,.05,.22),wm); b.position.set(0,.55,-i*.25); b.rotation.y=(Math.random()-.5)*.04; pier.add(b); }
+    for(const x of [-.6,.6]) for(const z of [0,-1.9]){ const p2=new T.Mesh(new T.CylinderGeometry(.06,.07,1.4,8),wm); p2.position.set(x,.1,z); pier.add(p2); } }
+  pier.position.set(-5.4,0,-12.4);
+  const boat=new T.Group(); load('models/canoe.glb',g=>{ const o=g.scene.clone(true); o.traverse(m=>{ m.frustumCulled=false; }); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3());
+    const L=Math.max(sz.x,sz.z); o.scale.setScalar(2.8/L); if(sz.x>sz.z) o.rotation.y=Math.PI/2; const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y-.12,-c2.z); boat.add(o); });
   const title=document.createElement('div'); title.style.cssText='position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:41;pointer-events:none;color:#f2ecdf;font-family:serif;opacity:0;transition:opacity 1.6s ease';
   title.innerHTML='<div style="font-size:13px;letter-spacing:.6em;opacity:.7">終章之後</div><div style="font-size:34px;letter-spacing:.5em;margin-top:14px;color:#ffe3a3">月潮</div>';
   return [
@@ -349,14 +363,41 @@ function endingShots(E,c){
         if(met){ lamp2.position.set(heng.position.x+.25,1.05,heng.position.z+.15); lamp2L.intensity=1.4*a; }
         merW.rotation.y=merFace()+Math.min(1,Math.max(0,(t-7)/3))*.9; },
       subs:[[1,'「那個女孩叫阿蘅，是他的女兒。」','q',4.2],[5.4,'「三十年前的颱風夜，是她的生日。\n他答應過，那天會早點回家。」','q',5.4],[11.2,'「可是那一夜，我被倒下的樹困住了。\n他冒著雨，划來救我……」','q',5.4]]},
+    // 回憶一：三十年前，颱風夜。阿蘅提著燈站在浮萍灣的小棧橋上，等著湖上的船
+    {d:11,hour:18.9,sea:false,from:[[-3.4,1.5,-9.6],[-5.6,1.2,-14.6]],to:[[-3.9,1.4,-10.6],[-5.6,1.3,-15]],
+      enter:()=>{ S.remove(merG); S.remove(king); S.remove(lampG); fbFilter(true); E.layer().appendChild(flash); keep(rain); keep(pier); keep(heng); keep(lamp2);
+        heng.position.set(-5.4,.58,-14.2); heng.rotation.set(0,Math.PI,0); setOp(hGhost,0); setOp(hAlive,1); lamp2L.color.copy(warmC); lamp2L.intensity=1.8; RP.heng={}; },
+      tick:(t,k,P)=>{ rainTick(P,1/60); RP.heng.headYaw=.35*Math.sin(t*.5); RP.heng.skirt=.08; lamp2.position.set(-5.15,1.28,-14.05); lamp2.rotation.z=Math.sin(t*2.3)*.15;
+        flash.style.opacity=(t>6.2&&t<6.35)||(t>6.5&&t<6.6)?.7:0; },
+      cleanup:()=>{ fbFilter(false); flash.remove(); },
+      subs:[[.6,'三十年前。','big',3],[4.2,'汐月：「她提著燈，在浮萍灣等。」','q',5]]},
+    // 回憶二：天黑了，等不到。她划著小船出去找，浪越來越大
+    {d:11,hour:20.2,sea:false,from:[[-2.5,1.6,-15],[-7,.7,-21]],to:[[-3.2,1.8,-18],[-8.5,.8,-25]],
+      enter:()=>{ keep(boat); S.remove(pier); sc.bx=0; },
+      tick:(t,k,P)=>{ rainTick(P,1/60); const z=-17.5-t*.6, roll=Math.sin(t*1.7)*.18+Math.sin(t*3.1)*.08, sw2=Math.sin(t*1.3)*.15;
+        boat.position.set(-6.8,sw2,z); boat.rotation.set(Math.sin(t*1.1)*.08,.2,roll); heng.position.set(-6.8,.15+sw2,z+.2); heng.rotation.set(0,Math.PI+.2,roll*.6);
+        lamp2.position.set(-6.55,1.05+sw2,z-.35); lamp2.rotation.z=roll*1.8; RP.heng.headYaw=.5*Math.sin(t*.7);
+        if(Math.random()<.08) spl(-6.8+(Math.random()-.5)*2,z,6,1); flash.style.opacity=(t>3&&t<3.12)||(t>8.1&&t<8.2)?.75:0; },
+      subs:[[1,'汐月：「等不到，她就自己划了出去。」','q',5]]},
+    // 回憶三：小船翻覆，燈落進水裡熄滅；水面上只剩漂著的髮簪
+    {d:12,hour:20.4,sea:false,from:[[-4.4,1.3,-21.5],[-6.8,.4,-24.5]],to:[[-4.8,1.1,-22.2],[-6.8,.2,-24.6]],
+      enter:()=>{ keep(pin); pin.position.set(-6.5,.2,-24); pin.visible=false; sc.cap=0; },
+      tick:(t,k,P)=>{ rainTick(P,1/60); const z=-24.1, cap=Math.min(1,Math.max(0,(t-2.2)/1.2));
+        boat.position.set(-6.8,Math.sin(t*1.5)*.18-cap*.25,z); boat.rotation.set(0,.2,Math.sin(t*1.9)*.25*(1-cap)+cap*2.6);
+        const sink=Math.max(0,t-2.6); heng.position.set(-6.8+cap*.7,.15-sink*.55,z+.2); heng.rotation.set(cap*.4,Math.PI+.2,cap*1.1); setOp(hAlive,Math.max(0,1-sink/2.5));
+        lamp2.position.set(-6.5+cap*.9,1.05-cap*.9-sink*.25,z-.35); lamp2L.intensity=t<3.4?1.8:Math.max(0,1.8-(t-3.4)*1.2)*(Math.random()>.3?1:.4); lamp2.visible=t<6;
+        if(t>2.4&&!sc.cap){ sc.cap=1; spl(-6.6,z,40,2.2); W.addRipple&&W.addRipple(-6.6,z,3); } if(t>6){ pin.visible=true; pin.position.y=.12+Math.sin(t*1.4)*.03; }
+        flash.style.opacity=(t>2.3&&t<2.42)?.8:0; },
+      subs:[[4.2,'汐月：「我聽見她的聲音，\n卻游不過那些倒木。」','q',5.4],[9.6,'燈，熄了。','big',2.4]]},
     // 第三幕二之二：月光照在阿蘅身上，她變回生前的樣子；她請你帶一句話給爸爸
     {d:17,hour:22.1,sea:false,from:[[-9.4,1.45,-39.2],[-10.4,1.25,-42.2]],to:[[-9.7,1.4,-40.1],[-10.5,1.3,-42.4]],
-      enter:()=>{ sc.tw=0; },
+      enter:()=>{ fbFilter(false); flash.remove(); S.remove(rain); S.remove(boat); S.remove(pier); S.remove(pin); keep(merG);
+        heng.position.set(BAY.x+1.2,.12,BAY.z+1.6); heng.rotation.set(0,hengLook(BAY.x,BAY.z),0); setOp(met?hAlive:hGhost,1); setOp(met?hGhost:hAlive,0); if(met){ lamp2L.color.copy(warmC); lamp2.position.set(heng.position.x+.25,1.05,heng.position.z+.15); } else S.remove(lamp2); sc.tw=0; },
       tick:(t)=>{ merW.position.y=Math.sin(t*.9)*.015; heng.position.y=.12+Math.sin(t*1.2)*.02;
         if(!met){ const k=Math.min(1,Math.max(0,(t-3)/4)); setOp(hGhost,1-k); setOp(hAlive,k); }
         RP.heng.headPitch=RP.ghost.headPitch=t<11?.28:Math.max(-.1,.28-(t-11)*.25); RP.heng.headYaw=RP.ghost.headYaw=t>12?Math.min(.5,(t-12)*.3):0;
         sc.tw-=1/60; if(sc.tw<=0&&t>2.5&&t<8){ sc.tw=.08; trailDot(heng.position.x+(Math.random()-.5)*.6,.2+Math.random()*1.6,heng.position.z+(Math.random()-.5)*.6); } updTrail(1/60); },
-      subs:[[.8,'「她提著燈在浮萍灣等，等不到，就自己划了出去。\n我聽見她的聲音，卻游不過那些倒木。」','q',5.6],[7,'「堤防關著，月潮進不來。\n困在湖裡的，不只我一個。」','q',4.8],[12.4,'阿蘅：「……幫我跟爸爸說，我不怪他。」','q big',4.6]]},
+      subs:[[.8,'「我趕到的時候，只撈起了她的髮簪。」','q',5.2],[7,'「堤防關著，月潮進不來。\n困在湖裡的，不只我一個。」','q',4.8],[12.4,'阿蘅：「……幫我跟爸爸說，我不怪他。」','q big',4.6]]},
     // 第三幕三：水道口，海王浮了起來——眼裡的光不再兇狠
     {d:25,hour:22.1,sea:false,from:[[-9,1.9,-37],[-13,3,-58]],to:[[-9.4,1.7,-38],[-13.5,3.6,-60]],
       enter:()=>{ keep(king); king.position.set(-14,-6,-62); king.rotation.set(0,Math.atan2(BAY.x+14,BAY.z+62),0); kingEye.intensity=0; kingEye.color.set(0xcfe8ff); },
