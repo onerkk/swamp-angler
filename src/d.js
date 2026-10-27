@@ -306,6 +306,14 @@ $('bHome').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; c
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
 const ITEMS_BY=id=>(FUN.items||[]).find(x=>x.id===id);
 window.__GRILL=()=>HOME3D.grill();
+// 靜月之光：作者的水晶小店（遊戲免費，喜歡的話可以支持作者）
+const SHOP_URL='https://tw.shp.ee/BcamsN2F';
+function openShop(){ const ui=$('shopUI'); ui.innerHTML=`<div class="box"><h3>💎 靜月之光・水晶手作</h3>
+  <div class="sub">《濕地垂釣》完全免費。做這個遊戲的人，平常也親手挑選、串製天然水晶。<br>老漁人說：「月光灣的石頭會發光，這些也是。」喜歡的話，歡迎逛逛。</div>
+  <div class="grid">${[1,2,3,4,5,6,7,8,9].map(i=>`<img src="shop${i}.jpg" alt="水晶作品" loading="lazy">`).join('')}</div>
+  <a class="go" href="${SHOP_URL}" target="_blank" rel="noopener">🛍 前往蝦皮賣場「靜月之光」</a><button class="x" data-x="1">關閉</button></div>`;
+  ui.classList.remove('hidden'); ui.onclick=e=>{ if(e.target===ui||e.target.dataset.x) ui.classList.add('hidden'); }; }
+window.__SHOP=openShop;
 window.__CLOUD=createCloud({save:()=>save,toast,refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
   apply:obj=>{ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} location.reload(); }});
 const GHOST=createGhost(W,{splash:(x,z,n,s)=>P.splash(x,0,z,n,s),ripple:(x,z,r)=>W.addRipple(x,z,r),splashSnd:k=>Snd.splash&&Snd.splash(k),save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>G.state,base:()=>G.base,head:()=>G.head,yaw:()=>G.yaw,to:()=>G.to,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
@@ -327,7 +335,7 @@ function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id);
   if(legend){ const other=fx.id==='luck'?'meal_str':'luck'; save.fx[other]=Math.max(save.fx[other]||0,Date.now())+min*60000; }
   persist(); if(window.__ECO&&window.__ECO.render) window.__ECO.render();
   toast((legend?'👑 傳說料理！':'🍽 ')+sp.name+'：'+name+'！'+fx.i+' '+fx.n+' '+min+' 分鐘'+(q>=3&&season==='herb'?'・♨️ 咬餌更快':'')+(legend?'・雙重效果':''),'good',3200); Snd.coin&&Snd.coin(); }
-const HOME3D=createHomeScene(W,{save,toast:(...a)=>toast(...a),persist:()=>persist(),onGrilled,buy:(id,p)=>{ if(save.coins<p){ toast('金幣不夠','warn',1400); return false; } save.coins-=p; setCoins(); persist(); return true; },sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
+const HOME3D=createHomeScene(W,{openShop:()=>openShop(),save,toast:(...a)=>toast(...a),persist:()=>persist(),onGrilled,buy:(id,p)=>{ if(save.coins<p){ toast('金幣不夠','warn',1400); return false; } save.coins-=p; setCoins(); persist(); return true; },sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
   crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(),
   showFish:(rec,card)=>{ const sp=SPECIES.find(s=>s.id===rec.id)||{name:rec.id,rar:0}, r=RAR[sp.rar]; card.style.setProperty('--rc',r.col);

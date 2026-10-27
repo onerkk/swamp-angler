@@ -242,6 +242,12 @@ body.athome #drops,body.athome #flare,body.athome #act,body.athome #fight,body.a
 #grillPick{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:22;background:rgba(20,14,10,.85);border:1px solid rgba(255,200,140,.3);border-radius:16px;padding:12px;color:#f3e6d2;max-height:55vh;overflow:auto}
 #grillPick .it{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08)}
 body.grilling #homeUI,body.grilling #joy{display:none!important}
+#shopUI{position:fixed;inset:0;z-index:70;background:rgba(10,8,14,.88);display:flex;align-items:center;justify-content:center;padding:16px}
+#shopUI.hidden{display:none}#shopUI .box{max-width:420px;width:100%;max-height:90vh;overflow:auto;background:#1b1622;border:1px solid rgba(200,170,255,.35);border-radius:18px;padding:16px;color:#efe8f7}
+#shopUI h3{margin:0 0 4px;font-size:19px}#shopUI .sub{font-size:13px;opacity:.8;line-height:1.6;margin-bottom:10px}
+#shopUI .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}#shopUI .grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px}
+#shopUI .go{display:block;text-align:center;background:linear-gradient(135deg,#ee4d2d,#ff7337);color:#fff;font-weight:700;padding:13px;border-radius:12px;text-decoration:none;font-size:16px}
+#shopUI .x{display:block;margin:10px auto 0;background:none;border:0;color:#cbbfe0;font-size:14px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -277,6 +283,7 @@ body.grilling #homeUI,body.grilling #joy{display:none!important}
 <div class="gh" id="gHint">等魚皮慢慢變金黃…</div>
 <div class="gbtns"><button class="btn" id="gQuit">放棄</button><button class="btn pri" id="gFlip">翻面</button><button class="btn" id="gDone">起鍋</button></div></div>
 <div id="grillPick" class="hidden"></div>
+<div id="shopUI" class="hidden"></div>
 <div id="homeView" class="hidden"><button class="btn" id="bViewBack">← 返回客廳</button><button class="btn" id="bDive">🤿 潛入缸內</button></div><div id="fishCard" class="hidden"></div>
 <div id="homeUI"><div class="hh">點水族箱可以靠近觀賞・拖曳畫面轉頭</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn" id="bGrillH">🔥 烤魚</button><button class="btn pri" id="bTankM">🐠 水族箱</button></div></div>
 <div id="toast"></div>

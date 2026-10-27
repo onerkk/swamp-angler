@@ -92,6 +92,17 @@ function makeTag(text){ const cv=document.createElement('canvas'); cv.width=512;
   g.fillStyle='#ffe9c8'; g.font='bold 54px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(text,256,66);
   const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; const sp=new T.Sprite(new T.SpriteMaterial({map:tx,transparent:true,depthTest:false,depthWrite:false})); sp.scale.set(.62,.155,1); sp.renderOrder=20; return sp; }
 const tags=[];
+// 靜月之光水晶展示櫃：入口牆上的木框玻璃櫃，陳列作者的水晶作品，點擊可前往作者的蝦皮小店
+const shopParts=[];
+{ const cab=new T.Group(); cab.position.set(0,1.55,ROOM.zf-.12); cab.rotation.y=Math.PI; scene.add(cab);
+  const woodM=new T.MeshStandardMaterial({color:0x4a2e1c,roughness:.6,metalness:.05});
+  const back=new T.Mesh(new T.BoxGeometry(1.56,1.2,.06),new T.MeshStandardMaterial({color:0x1a1412,roughness:.9})); back.position.z=-.08; cab.add(back);
+  for(const [w,h,x,y] of [[1.66,.07,0,.63],[1.66,.07,0,-.63],[.07,1.3,-.8,0],[.07,1.3,.8,0],[1.56,.03,0,.2],[1.56,.03,0,-.2]]){ const b=new T.Mesh(new T.BoxGeometry(w,h,.2),woodM); b.position.set(x,y,0); cab.add(b); }
+  for(let i=0;i<9;i++){ const tx=TL.load('shop'+(i+1)+'.jpg'); tx.encoding=T.sRGBEncoding; const r=Math.floor(i/3), cI=i%3;
+    const ph=new T.Mesh(new T.PlaneGeometry(.42,.34),new T.MeshStandardMaterial({map:tx,roughness:.5,emissive:0xffffff,emissiveMap:tx,emissiveIntensity:.25})); ph.position.set((cI-1)*.5,(1-r)*.4,-.045); cab.add(ph); shopParts.push(ph); }
+  const glass=new T.Mesh(new T.PlaneGeometry(1.56,1.2),new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.08,roughness:.05,metalness:.3,depthWrite:false})); glass.position.z=.1; cab.add(glass); shopParts.push(glass);
+  const lamp=new T.SpotLight(0xfff0d8,1.4,3.2,.7,.5,1.2); lamp.position.set(0,1.0,.6); lamp.target=back; cab.add(lamp);
+  const tg=makeTag('💎 靜月之光 水晶'); tg.position.set(0,2.32,ROOM.zf-.2); scene.add(tg); tags.push({s:tg,y:2.32,k:'shop'}); }
 box(.55,1.3,.32,stoneM,FX,.65,FP.z-.66); box(.55,1.3,.32,stoneM,FX,.65,FP.z+.66);
 box(.55,.5,1.0,stoneM,FX,1.05,FP.z); box(.45,1.6,1.0,stoneM,ROOM.x-.22,2.1,FP.z);
 box(.75,.08,1.9,new T.MeshStandardMaterial({color:0x5a4030,roughness:.8}),ROOM.x-.36,1.34,FP.z);
@@ -299,7 +310,8 @@ function hit(e){ const r=el.getBoundingClientRect(); ndc.set((e.clientX-r.left)/
 function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>tanks[k].glass), h=ray.intersectObjects(gl,false)[0], hm=ray.intersectObjects(mountG.children,true)[0];
   if(hm&&(!h||hm.distance<h.distance)){ let o=hm.object; while(o&&!o.userData.rec) o=o.parent; if(o){ c.showFish(o.userData.rec,ui.card); return; } }
   ui.card.classList.add('hidden'); if(h){ enterView(h.object.userData.tank); return; }
-  const hf=ray.intersectObjects(fpParts,true)[0]; if(hf) pickFish(); }
+  const hf=ray.intersectObjects(fpParts,true)[0]; if(hf){ pickFish(); return; }
+  const hs=ray.intersectObjects(shopParts,false)[0]; if(hs&&c.openShop) c.openShop(); }
 function tapView(){ const tk=tanks[viewTank]; if(!tk) return; const h=ray.intersectObjects(tk.fish.map(f=>f.o),true)[0];
   if(!h){ ui.card.classList.add('hidden'); return; } let o=h.object; while(o&&!o.userData.rec) o=o.parent; if(o) c.showFish(o.userData.rec,ui.card); }
 function enterView(w){ mode='view'; viewTank=w; pan=panT=0; ui.view.classList.remove('hidden'); ui.btns.classList.add('hidden'); ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }

@@ -242,6 +242,12 @@ body.athome #drops,body.athome #flare,body.athome #act,body.athome #fight,body.a
 #grillPick{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:22;background:rgba(20,14,10,.85);border:1px solid rgba(255,200,140,.3);border-radius:16px;padding:12px;color:#f3e6d2;max-height:55vh;overflow:auto}
 #grillPick .it{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08)}
 body.grilling #homeUI,body.grilling #joy{display:none!important}
+#shopUI{position:fixed;inset:0;z-index:70;background:rgba(10,8,14,.88);display:flex;align-items:center;justify-content:center;padding:16px}
+#shopUI.hidden{display:none}#shopUI .box{max-width:420px;width:100%;max-height:90vh;overflow:auto;background:#1b1622;border:1px solid rgba(200,170,255,.35);border-radius:18px;padding:16px;color:#efe8f7}
+#shopUI h3{margin:0 0 4px;font-size:19px}#shopUI .sub{font-size:13px;opacity:.8;line-height:1.6;margin-bottom:10px}
+#shopUI .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}#shopUI .grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px}
+#shopUI .go{display:block;text-align:center;background:linear-gradient(135deg,#ee4d2d,#ff7337);color:#fff;font-weight:700;padding:13px;border-radius:12px;text-decoration:none;font-size:16px}
+#shopUI .x{display:block;margin:10px auto 0;background:none;border:0;color:#cbbfe0;font-size:14px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -277,6 +283,7 @@ body.grilling #homeUI,body.grilling #joy{display:none!important}
 <div class="gh" id="gHint">等魚皮慢慢變金黃…</div>
 <div class="gbtns"><button class="btn" id="gQuit">放棄</button><button class="btn pri" id="gFlip">翻面</button><button class="btn" id="gDone">起鍋</button></div></div>
 <div id="grillPick" class="hidden"></div>
+<div id="shopUI" class="hidden"></div>
 <div id="homeView" class="hidden"><button class="btn" id="bViewBack">← 返回客廳</button><button class="btn" id="bDive">🤿 潛入缸內</button></div><div id="fishCard" class="hidden"></div>
 <div id="homeUI"><div class="hh">點水族箱可以靠近觀賞・拖曳畫面轉頭</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn" id="bGrillH">🔥 烤魚</button><button class="btn pri" id="bTankM">🐠 水族箱</button></div></div>
 <div id="toast"></div>
@@ -1961,6 +1968,7 @@ function render(){
       else if(st.state==='out') h+=row('☁️ 雲端存檔','用 Google 帳號登入，換手機或清除瀏覽器也不會丟進度。目前的本機進度會先上傳，不會被洗掉',`<button class="sbtn pri" data-a="cloud" data-v="in">Google 登入</button>`);
       else h+=row('☁️ 雲端存檔','Google 登入尚未設定',`<span class="lk">尚未設定</span>`);
       h+=row('📲 安裝到桌面',PWA.installed()?'已安裝成 App，從桌面開啟時進度一樣保留':'像 App 一樣從手機桌面開啟，進度與瀏覽器共用',PWA.installed()?`<span class="lk">已安裝</span>`:`<button class="sbtn pri" data-a="pwa">安裝</button>`); }
+    h+=row('💎 支持作者','遊戲完全免費。作者的水晶小店「靜月之光」，喜歡的話歡迎逛逛',`<button class="sbtn pri" data-a="shop">逛逛</button>`);
     h+=tg('uw','水下鏡頭','魚靠近餌時切到水下看牠咬餌',save.uw!==false);
     h+=tg('scare','驚嚇效果','夜裡偶爾會有嚇人的事……心臟不好或小朋友玩請關閉',!save.noScare);
     h+=tg('imm','沉浸模式','隱藏上方大部分介面，只留設定和動作按鈕',!!save.imm);
@@ -2106,6 +2114,7 @@ shB.addEventListener('click',e=>{
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
   else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
+  else if(a==='shop'){ if(window.__SHOP) window.__SHOP(); }
   else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else window.__CLOUD.logout(); }
   else if(a==='pwa'){ PWA.install().then(r=>{ if(r==='ios') toast('iPhone：按 Safari 的「分享」→「加入主畫面」','',4200); else if(r==='manual') toast('瀏覽器選單 ⋮ →「加到主畫面」或「安裝應用程式」','',4200); else if(r==='installed') toast('已經安裝了','',1600); }); }
   else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem('swampAngler.v1'); }catch(_){} location.reload(); return; } }
@@ -4503,6 +4512,17 @@ function makeTag(text){ const cv=document.createElement('canvas'); cv.width=512;
   g.fillStyle='#ffe9c8'; g.font='bold 54px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(text,256,66);
   const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; const sp=new T.Sprite(new T.SpriteMaterial({map:tx,transparent:true,depthTest:false,depthWrite:false})); sp.scale.set(.62,.155,1); sp.renderOrder=20; return sp; }
 const tags=[];
+// 靜月之光水晶展示櫃：入口牆上的木框玻璃櫃，陳列作者的水晶作品，點擊可前往作者的蝦皮小店
+const shopParts=[];
+{ const cab=new T.Group(); cab.position.set(0,1.55,ROOM.zf-.12); cab.rotation.y=Math.PI; scene.add(cab);
+  const woodM=new T.MeshStandardMaterial({color:0x4a2e1c,roughness:.6,metalness:.05});
+  const back=new T.Mesh(new T.BoxGeometry(1.56,1.2,.06),new T.MeshStandardMaterial({color:0x1a1412,roughness:.9})); back.position.z=-.08; cab.add(back);
+  for(const [w,h,x,y] of [[1.66,.07,0,.63],[1.66,.07,0,-.63],[.07,1.3,-.8,0],[.07,1.3,.8,0],[1.56,.03,0,.2],[1.56,.03,0,-.2]]){ const b=new T.Mesh(new T.BoxGeometry(w,h,.2),woodM); b.position.set(x,y,0); cab.add(b); }
+  for(let i=0;i<9;i++){ const tx=TL.load('shop'+(i+1)+'.jpg'); tx.encoding=T.sRGBEncoding; const r=Math.floor(i/3), cI=i%3;
+    const ph=new T.Mesh(new T.PlaneGeometry(.42,.34),new T.MeshStandardMaterial({map:tx,roughness:.5,emissive:0xffffff,emissiveMap:tx,emissiveIntensity:.25})); ph.position.set((cI-1)*.5,(1-r)*.4,-.045); cab.add(ph); shopParts.push(ph); }
+  const glass=new T.Mesh(new T.PlaneGeometry(1.56,1.2),new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.08,roughness:.05,metalness:.3,depthWrite:false})); glass.position.z=.1; cab.add(glass); shopParts.push(glass);
+  const lamp=new T.SpotLight(0xfff0d8,1.4,3.2,.7,.5,1.2); lamp.position.set(0,1.0,.6); lamp.target=back; cab.add(lamp);
+  const tg=makeTag('💎 靜月之光 水晶'); tg.position.set(0,2.32,ROOM.zf-.2); scene.add(tg); tags.push({s:tg,y:2.32,k:'shop'}); }
 box(.55,1.3,.32,stoneM,FX,.65,FP.z-.66); box(.55,1.3,.32,stoneM,FX,.65,FP.z+.66);
 box(.55,.5,1.0,stoneM,FX,1.05,FP.z); box(.45,1.6,1.0,stoneM,ROOM.x-.22,2.1,FP.z);
 box(.75,.08,1.9,new T.MeshStandardMaterial({color:0x5a4030,roughness:.8}),ROOM.x-.36,1.34,FP.z);
@@ -4710,7 +4730,8 @@ function hit(e){ const r=el.getBoundingClientRect(); ndc.set((e.clientX-r.left)/
 function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>tanks[k].glass), h=ray.intersectObjects(gl,false)[0], hm=ray.intersectObjects(mountG.children,true)[0];
   if(hm&&(!h||hm.distance<h.distance)){ let o=hm.object; while(o&&!o.userData.rec) o=o.parent; if(o){ c.showFish(o.userData.rec,ui.card); return; } }
   ui.card.classList.add('hidden'); if(h){ enterView(h.object.userData.tank); return; }
-  const hf=ray.intersectObjects(fpParts,true)[0]; if(hf) pickFish(); }
+  const hf=ray.intersectObjects(fpParts,true)[0]; if(hf){ pickFish(); return; }
+  const hs=ray.intersectObjects(shopParts,false)[0]; if(hs&&c.openShop) c.openShop(); }
 function tapView(){ const tk=tanks[viewTank]; if(!tk) return; const h=ray.intersectObjects(tk.fish.map(f=>f.o),true)[0];
   if(!h){ ui.card.classList.add('hidden'); return; } let o=h.object; while(o&&!o.userData.rec) o=o.parent; if(o) c.showFish(o.userData.rec,ui.card); }
 function enterView(w){ mode='view'; viewTank=w; pan=panT=0; ui.view.classList.remove('hidden'); ui.btns.classList.add('hidden'); ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
@@ -5341,6 +5362,14 @@ $('bHome').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; c
 const PRESETS=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']];
 const ITEMS_BY=id=>(FUN.items||[]).find(x=>x.id===id);
 window.__GRILL=()=>HOME3D.grill();
+// 靜月之光：作者的水晶小店（遊戲免費，喜歡的話可以支持作者）
+const SHOP_URL='https://tw.shp.ee/BcamsN2F';
+function openShop(){ const ui=$('shopUI'); ui.innerHTML=`<div class="box"><h3>💎 靜月之光・水晶手作</h3>
+  <div class="sub">《濕地垂釣》完全免費。做這個遊戲的人，平常也親手挑選、串製天然水晶。<br>老漁人說：「月光灣的石頭會發光，這些也是。」喜歡的話，歡迎逛逛。</div>
+  <div class="grid">${[1,2,3,4,5,6,7,8,9].map(i=>`<img src="shop${i}.jpg" alt="水晶作品" loading="lazy">`).join('')}</div>
+  <a class="go" href="${SHOP_URL}" target="_blank" rel="noopener">🛍 前往蝦皮賣場「靜月之光」</a><button class="x" data-x="1">關閉</button></div>`;
+  ui.classList.remove('hidden'); ui.onclick=e=>{ if(e.target===ui||e.target.dataset.x) ui.classList.add('hidden'); }; }
+window.__SHOP=openShop;
 window.__CLOUD=createCloud({save:()=>save,toast,refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
   apply:obj=>{ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} location.reload(); }});
 const GHOST=createGhost(W,{splash:(x,z,n,s)=>P.splash(x,0,z,n,s),ripple:(x,z,r)=>W.addRipple(x,z,r),splashSnd:k=>Snd.splash&&Snd.splash(k),save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>G.state,base:()=>G.base,head:()=>G.head,yaw:()=>G.yaw,to:()=>G.to,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
@@ -5362,7 +5391,7 @@ function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id);
   if(legend){ const other=fx.id==='luck'?'meal_str':'luck'; save.fx[other]=Math.max(save.fx[other]||0,Date.now())+min*60000; }
   persist(); if(window.__ECO&&window.__ECO.render) window.__ECO.render();
   toast((legend?'👑 傳說料理！':'🍽 ')+sp.name+'：'+name+'！'+fx.i+' '+fx.n+' '+min+' 分鐘'+(q>=3&&season==='herb'?'・♨️ 咬餌更快':'')+(legend?'・雙重效果':''),'good',3200); Snd.coin&&Snd.coin(); }
-const HOME3D=createHomeScene(W,{save,toast:(...a)=>toast(...a),persist:()=>persist(),onGrilled,buy:(id,p)=>{ if(save.coins<p){ toast('金幣不夠','warn',1400); return false; } save.coins-=p; setCoins(); persist(); return true; },sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
+const HOME3D=createHomeScene(W,{openShop:()=>openShop(),save,toast:(...a)=>toast(...a),persist:()=>persist(),onGrilled,buy:(id,p)=>{ if(save.coins<p){ toast('金幣不夠','warn',1400); return false; } save.coins-=p; setCoins(); persist(); return true; },sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
   crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(),
   showFish:(rec,card)=>{ const sp=SPECIES.find(s=>s.id===rec.id)||{name:rec.id,rar:0}, r=RAR[sp.rar]; card.style.setProperty('--rc',r.col);

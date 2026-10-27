@@ -355,6 +355,7 @@ function render(){
       else if(st.state==='out') h+=row('☁️ 雲端存檔','用 Google 帳號登入，換手機或清除瀏覽器也不會丟進度。目前的本機進度會先上傳，不會被洗掉',`<button class="sbtn pri" data-a="cloud" data-v="in">Google 登入</button>`);
       else h+=row('☁️ 雲端存檔','Google 登入尚未設定',`<span class="lk">尚未設定</span>`);
       h+=row('📲 安裝到桌面',PWA.installed()?'已安裝成 App，從桌面開啟時進度一樣保留':'像 App 一樣從手機桌面開啟，進度與瀏覽器共用',PWA.installed()?`<span class="lk">已安裝</span>`:`<button class="sbtn pri" data-a="pwa">安裝</button>`); }
+    h+=row('💎 支持作者','遊戲完全免費。作者的水晶小店「靜月之光」，喜歡的話歡迎逛逛',`<button class="sbtn pri" data-a="shop">逛逛</button>`);
     h+=tg('uw','水下鏡頭','魚靠近餌時切到水下看牠咬餌',save.uw!==false);
     h+=tg('scare','驚嚇效果','夜裡偶爾會有嚇人的事……心臟不好或小朋友玩請關閉',!save.noScare);
     h+=tg('imm','沉浸模式','隱藏上方大部分介面，只留設定和動作按鈕',!!save.imm);
@@ -500,6 +501,7 @@ shB.addEventListener('click',e=>{
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
   else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
+  else if(a==='shop'){ if(window.__SHOP) window.__SHOP(); }
   else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else window.__CLOUD.logout(); }
   else if(a==='pwa'){ PWA.install().then(r=>{ if(r==='ios') toast('iPhone：按 Safari 的「分享」→「加入主畫面」','',4200); else if(r==='manual') toast('瀏覽器選單 ⋮ →「加到主畫面」或「安裝應用程式」','',4200); else if(r==='installed') toast('已經安裝了','',1600); }); }
   else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem('swampAngler.v1'); }catch(_){} location.reload(); return; } }
