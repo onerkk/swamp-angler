@@ -112,9 +112,9 @@ function autoRig(root,kind){ const T=THREE; root.updateMatrixWorld(true);
   // 動作：呼吸、轉頭、點頭、尾巴擺動、裙擺飄動；每格呼叫 rig.pose({...})
   const R=(n,x,y,z)=>(rig.bones[n]||[]).forEach(b=>b.rotation.set(x||0,y||0,z||0));
   rig.pose=o=>{ const t=o.t||0, br=Math.sin(t*1.6)*(o.breathe==null?.012:o.breathe);
-    R('chest',br,0,0); R('waist',(o.bow||0)*.5,(o.headYaw||0)*.15,0); R('neck',(o.headPitch||0)*.4,(o.headYaw||0)*.35,(o.headRoll||0)*.5); R('head',(o.headPitch||0)*.6,(o.headYaw||0)*.5,(o.headRoll||0)*.5);
+    R('chest',br+(o.arch||0)*.5,0,0); R('waist',(o.bow||0)*.5+(o.arch||0)*.5,(o.headYaw||0)*.15,0); R('neck',(o.headPitch||0)*.4,(o.headYaw||0)*.35,(o.headRoll||0)*.5); R('head',(o.headPitch||0)*.6,(o.headYaw||0)*.5,(o.headRoll||0)*.5);
     R('hips',0,0,(o.sway||0)*Math.sin(t*1.1)*.03);
-    const ta=o.tail==null?.12:o.tail, tf=o.tailF||1.6; ['t1','t2','t3','t4'].forEach((n,i)=>R(n,0,0,Math.sin(t*tf-i*.7)*ta*(.4+.3*i)));
+    const ta=o.tail==null?.12:o.tail, tf=o.tailF||1.6; ['t1','t2','t3','t4'].forEach((n,i)=>{ const a2=Math.sin(t*tf-i*.7)*ta*(.4+.3*i)+(o.tailBend||0)*(.5+.25*i); if(o.tailX) R(n,a2,0,0); else R(n,0,0,a2); });
     const sk=o.skirt==null?.02:o.skirt; R('skirt',Math.sin(t*.9)*sk,0,Math.sin(t*1.3)*sk*.6); R('hem',Math.sin(t*1.2+1)*sk*1.4,0,Math.sin(t*1.5)*sk); };
   return rig; }
 /* ===== 結局共用：月潮水光貼圖、碼頭盡頭的紀念（舊搖椅＋竹竿），結局動畫與結局後的湖都用同一份 ===== */

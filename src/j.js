@@ -62,6 +62,14 @@ const wMat=new T.MeshPhysicalMaterial({map:wTex,roughness:.55,clearcoat:.4,side:
 const whale=new T.Group(); whale.visible=false; whale.rotation.order='YXZ'; S.add(whale);
 { const b=new T.Mesh(new T.SphereGeometry(1,32,20),wMat); b.scale.set(1.6,1.5,7); whale.add(b);
   for(const s of [1,-1]){ const f=new T.Mesh(new T.SphereGeometry(1,12,8),wMat); f.scale.set(2.6,.12,.5); f.position.set(s*2.4,-.6,2.5); f.rotation.set(0,s*.5,s*-.3); whale.add(f); } }
+// 座頭鯨（使用者提供側面、俯視設定圖生成）：模型原本頭朝上，載入後自動綁骨，再轉成水平、頭朝 +z
+let whaleRig=null; const WP={tail:.18,tailF:1.2,bend:0,arch:0};
+if(T.GLTFLoader) new T.GLTFLoader().load('models/whale2.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material.roughness=.42; m.material.metalness=.05; } } });
+  o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(13/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
+  const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-c2.y,-c2.z);
+  const holder=new T.Group(); holder.add(o); holder.updateMatrixWorld(true); try{ whaleRig=autoRig(o,'tail'); }catch(e){ console.warn('whale rig',e); }
+  const turn=new T.Group(); turn.rotation.set(-Math.PI/2,Math.PI,0,'YXZ'); turn.add(holder);
+  whale.children.forEach(ch=>{ ch.visible=false; }); whale.add(turn); whale.userData.real=true; },undefined,()=>{ if(window.__MDL) window.__MDL.attach(whale,'whale',{len:13,target:'+z'}); });
 const fluke=new T.Group(); fluke.visible=false; S.add(fluke);
 { const sh=new T.Shape(); sh.moveTo(0,.25); sh.quadraticCurveTo(-1.2,.5,-2.6,1.6); sh.quadraticCurveTo(-1.7,.6,-1.5,0); sh.quadraticCurveTo(-1.7,-.6,-2.6,-1.6); sh.quadraticCurveTo(-1.2,-.5,0,-.25); sh.lineTo(0,.25);
   const f=new T.Mesh(new T.ShapeGeometry(sh,14),wMat); f.rotation.z=-Math.PI/2; f.position.y=2.6; fluke.add(f);
@@ -98,7 +106,7 @@ function crash(x,z,big){ SPRAY.emit(x,.5,z,big?520:260,big?9:6,big?13:9,big?4:2.
 const sfMat=new T.MeshStandardMaterial({color:0x40464e,roughness:.45,side:T.DoubleSide});
 const sfin=new T.Group(); sfin.visible=false; S.add(sfin);
 { const s=new T.Shape(); s.moveTo(.35,0); s.quadraticCurveTo(.2,.45,-.15,.75); s.quadraticCurveTo(-.12,.35,-.4,0); s.lineTo(.35,0);
-if(window.__MDL){ window.__MDL.attach(whale,'whale',{len:13,target:'+z'}); window.__MDL.attach(fluke,'whale',{len:13,target:'+z',pitch:1.25,off:[0,-3.4,2.05]}); window.__MDL.attach(sfin,'gwhite',{len:4.2,target:'+x',top:.34,clip:'Swim'}); }
+if(window.__MDL){  window.__MDL.attach(fluke,'whale',{len:13,target:'+z',pitch:1.25,off:[0,-3.4,2.05]}); window.__MDL.attach(sfin,'gwhite',{len:4.2,target:'+x',top:.34,clip:'Swim'}); }
   const m=new T.Mesh(new T.ExtrudeGeometry(s,{depth:.04,bevelEnabled:true,bevelThickness:.02,bevelSize:.02,bevelSegments:2}),sfMat); m.rotation.y=Math.PI/2; m.position.y=-.1; sfin.add(m); sfin.scale.setScalar(1.3); }
 
 /* ---------- 飛魚 ---------- */
@@ -173,6 +181,10 @@ function updEv(dt,t,wx,day){
         if(s>.96&&o.inA){ o.inA=false; P.splash(g.position.x,0,g.position.z,22,1); W.addRipple(g.position.x,g.position.z,.5); } }
       else g.visible=false; } }
   else if(ev.id==='whale'){ const p=d.p, tt=ev.t, dx=Math.sin(d.dir), dz=Math.cos(d.dir), at=(k)=>tv2.set(p.x+dx*k,0,p.z+dz*k);
+    // 骨架動作：平常緩緩擺尾；躍出時尾巴猛力上下拍、身體弓起；空中扭身；落水前身體反弓
+    if(whaleRig){ const br=tt>16&&tt<20.2, q=(tt-16)/3.6;
+      const tail=br?(q<.45?.55:.28):.16, tf=br?(q<.45?3.4:1.6):1.1, arch=br?(q<.45?-.18:q<.75?.12:.3):0, bend=br?(q<.45?0:.18*Math.sin(q*8)):0;
+      whaleRig.pose({t:tt,tail,tailF:tf,tailX:true,tailBend:bend,arch,breathe:0}); }
     // 1. 兩次換氣：背脊浮出水面、噴起高高的白霧柱
     if(tt>1.2&&d.stage===0){ d.stage=1; const q=at(-8); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
     if(tt>7.5&&d.stage===1){ d.stage=2; const q=at(-2); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
