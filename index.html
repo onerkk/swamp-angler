@@ -2960,7 +2960,7 @@ function createSea(W,P,AT,c){
 'use strict';
 const T=THREE, S=W.scene, G=c.G, $=id=>document.getElementById(id);
 const clamp=(x,a,b)=>x<a?a:x>b?b:x, rand=(a,b)=>a+Math.random()*(b-a), sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
-const tv=new T.Vector3(), tv2=new T.Vector3(), cw=new T.Vector3();
+const tv=new T.Vector3(), tv2=new T.Vector3(), tv3=new T.Vector3(), cw=new T.Vector3();
 const fwd=(a,o)=>o.set(-Math.sin(a),0,-Math.cos(a));
 const base=()=>G.base;
 function gradTex(top,bot,mid){ const d=new Uint8Array(4*64); for(let i=0;i<64;i++){ const t=i/63, k=sstep(mid-.12,mid+.12,t); for(let j=0;j<3;j++) d[i*4+j]=bot[j]+(top[j]-bot[j])*k; d[i*4+3]=255; }
@@ -3015,13 +3015,40 @@ if(window.__MDL) dolphins.forEach(o=>window.__MDL.attach(o.g,'dolphin',{len:2.4,
 /* ---------- 鯨魚（座頭鯨） ---------- */
 const wTex=gradTex([34,40,48],[180,186,190],.35);
 const wMat=new T.MeshPhysicalMaterial({map:wTex,roughness:.55,clearcoat:.4,side:T.DoubleSide});
-const whale=new T.Group(); whale.visible=false; S.add(whale);
+const whale=new T.Group(); whale.visible=false; whale.rotation.order='YXZ'; S.add(whale);
 { const b=new T.Mesh(new T.SphereGeometry(1,32,20),wMat); b.scale.set(1.6,1.5,7); whale.add(b);
   for(const s of [1,-1]){ const f=new T.Mesh(new T.SphereGeometry(1,12,8),wMat); f.scale.set(2.6,.12,.5); f.position.set(s*2.4,-.6,2.5); f.rotation.set(0,s*.5,s*-.3); whale.add(f); } }
 const fluke=new T.Group(); fluke.visible=false; S.add(fluke);
 { const sh=new T.Shape(); sh.moveTo(0,.25); sh.quadraticCurveTo(-1.2,.5,-2.6,1.6); sh.quadraticCurveTo(-1.7,.6,-1.5,0); sh.quadraticCurveTo(-1.7,-.6,-2.6,-1.6); sh.quadraticCurveTo(-1.2,-.5,0,-.25); sh.lineTo(0,.25);
   const f=new T.Mesh(new T.ShapeGeometry(sh,14),wMat); f.rotation.z=-Math.PI/2; f.position.y=2.6; fluke.add(f);
   const st=new T.Mesh(new T.CylinderGeometry(.35,.9,2.8,14),wMat); st.position.y=1.3; fluke.add(st); }
+
+/* 鯨魚的水花系統：水滴（受重力落回海面）、水霧（噴氣與落水後的白霧，飄散變淡）、海面泡沫圈（往外擴散） */
+const dropTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=32; const g=cv.getContext('2d'), rg=g.createRadialGradient(16,16,0,16,16,16); rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(.45,'rgba(240,248,255,.75)'); rg.addColorStop(1,'rgba(230,240,250,0)'); g.fillStyle=rg; g.fillRect(0,0,32,32); return new T.CanvasTexture(cv); })();
+function partSys(N,size,opacity,grav,drag){ const pos=new Float32Array(N*3), vel=new Float32Array(N*3), life=new Float32Array(N); const g=new T.BufferGeometry(); g.setAttribute('position',new T.BufferAttribute(pos,3));
+  const m=new T.PointsMaterial({map:dropTex,size,transparent:true,opacity,depthWrite:false,color:0xf2f8ff}); const pts=new T.Points(g,m); pts.frustumCulled=false; S.add(pts); let head=0;
+  for(let i=0;i<N;i++) pos[i*3+1]=-999;
+  return {emit(x,y,z,n,spd,up,spread,lf){ for(let k=0;k<n;k++){ const i=head; head=(head+1)%N; const a=Math.random()*6.283, r=Math.random()*spread;
+      pos[i*3]=x+Math.cos(a)*r; pos[i*3+1]=y+Math.random()*.5; pos[i*3+2]=z+Math.sin(a)*r;
+      const hs=spd*(.3+Math.random()*.7); vel[i*3]=Math.cos(a)*hs; vel[i*3+1]=up*(.55+Math.random()*.6); vel[i*3+2]=Math.sin(a)*hs; life[i]=lf*(.6+Math.random()*.6); } },
+    tick(dt,wind){ let any=false; for(let i=0;i<N;i++){ if(life[i]<=0) continue; any=true; life[i]-=dt; vel[i*3+1]-=grav*dt; const dk=Math.exp(-drag*dt); vel[i*3]=vel[i*3]*dk+(wind||0)*dt; vel[i*3+2]*=dk; vel[i*3+1]*=grav>3?1:dk;
+        pos[i*3]+=vel[i*3]*dt; pos[i*3+1]+=vel[i*3+1]*dt; pos[i*3+2]+=vel[i*3+2]*dt; if(life[i]<=0||pos[i*3+1]<-.3) { life[i]=0; pos[i*3+1]=-999; } }
+      if(any) g.attributes.position.needsUpdate=true; pts.visible=any; } }; }
+const SPRAY=partSys(1600,1.15,.92,9.8,.15), MIST=partSys(700,6.5,.28,.6,.6);
+const foamTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=256; const g=cv.getContext('2d');
+  for(let i=0;i<900;i++){ const a=Math.random()*6.283, r=70+Math.random()*55*Math.random()+Math.random()*40, x=128+Math.cos(a)*r*.95, y=128+Math.sin(a)*r*.95, s2=1+Math.random()*4; g.fillStyle=`rgba(255,255,255,${.15+Math.random()*.5})`; g.beginPath(); g.arc(x,y,s2,0,7); g.fill(); }
+  const rg=g.createRadialGradient(128,128,10,128,128,128); rg.addColorStop(0,'rgba(255,255,255,.35)'); rg.addColorStop(.6,'rgba(255,255,255,.12)'); rg.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=rg; g.fillRect(0,0,256,256); return new T.CanvasTexture(cv); })();
+const foams=[]; for(let i=0;i<4;i++){ const m=new T.Mesh(new T.PlaneGeometry(1,1).rotateX(-Math.PI/2),new T.MeshBasicMaterial({map:foamTex,transparent:true,opacity:0,depthWrite:false,color:0xf4fbff})); m.visible=false; m.renderOrder=2; S.add(m); foams.push({m,t:9,dur:1,r0:1,r1:1}); }
+function foam(x,z,r0,r1,dur){ const f=foams.find(q=>q.t>=q.dur)||foams[0]; Object.assign(f,{t:0,dur,r0,r1}); f.m.position.set(x,.06,z); f.m.rotation.y=Math.random()*6.28; f.m.visible=true; }
+function updFoam(dt){ for(const f of foams){ if(f.t>=f.dur){ f.m.visible=false; continue; } f.t+=dt; const k=f.t/f.dur, r=f.r0+(f.r1-f.r0)*(1-Math.pow(1-k,2)); f.m.scale.set(r*2,1,r*2); f.m.material.opacity=.9*(1-k); } }
+// 噴氣：一道往上衝、被風吹斜、慢慢散開的白霧柱
+function blow(x,z){ MIST.emit(x,1,z,90,1.2,11,.6,3.2); SPRAY.emit(x,1,z,60,1.5,10,.4,1.6); c.Snd.splash&&c.Snd.splash(.5); }
+// 巨大落水：放射狀水牆、四散水滴、白霧、泡沫圈、海面漣漪、船身震動
+function crash(x,z,big){ SPRAY.emit(x,.5,z,big?520:260,big?9:6,big?13:9,big?4:2.5,2.4); SPRAY.emit(x,.5,z,big?200:90,3,big?20:13,1.5,2.8);
+  MIST.emit(x,.8,z,big?220:110,4,big?5:3,big?5:3,4.5); foam(x,z,big?3:2,big?22:12,big?9:6); foam(x,z,1,big?12:7,big?6:4);
+  for(let i=0;i<3;i++) setTimeout(()=>W.addRipple(x,z,big?2.5:1.5),i*250);
+  if(c.Snd.splash){ c.Snd.splash(big?2.6:1.6); if(big) setTimeout(()=>c.Snd.splash(1.8),180); }
+  const d=Math.hypot(x-cw.x,z-cw.z); if(big&&d<80){ G.gShake=Math.max(G.gShake||0,1.6*(1-d/90)); if(navigator.vibrate) try{ navigator.vibrate([90,40,140]); }catch(e){} } }
 
 /* ---------- 鯊魚背鰭 ---------- */
 const sfMat=new T.MeshStandardMaterial({color:0x40464e,roughness:.45,side:T.DoubleSide});
@@ -3079,14 +3106,14 @@ function startEv(id){ Object.assign(ev,{id,t:0,shot:false,data:{}}); const b=bas
   else if(id==='dolphin'){ ev.dur=26; const side=Math.random()<.5?1:-1, d=rand(18,32);
     ev.data={p:fwd(hd+side*.9,new T.Vector3()).multiplyScalar(d).add(b),v:fwd(hd-side*Math.PI/2,new T.Vector3()).multiplyScalar(-6)};
     dolphins.forEach((o,i)=>{ o.on=i<rand(3,6.9); o.off=new T.Vector3(rand(-4,4),0,rand(-4,4)); o.t=rand(0,2); o.cyc=rand(1.6,2.8); }); c.Snd.bird(); }
-  else if(id==='whale'){ ev.dur=30; ev.data={p:fwd(hd+rand(-.5,.5),new T.Vector3()).multiplyScalar(rand(90,160)).add(b),breach:Math.random()<.4,stage:0}; }
+  else if(id==='whale'){ ev.dur=34; const a=hd+rand(-.35,.35), p=fwd(a,new T.Vector3()).multiplyScalar(rand(28,38)).add(b), dir=a+Math.PI/2*(Math.random()<.5?1:-1); ev.data={p,dir,stage:0}; }
   else if(id==='shark'){ ev.dur=22; ev.data={a:rand(0,6.28),r:rand(9,15)}; sfin.visible=true; }
   else if(id==='flyfish'){ ev.dur=8; flyers.forEach(f=>{ f.on=true; f.t=-rand(0,4); f.p=fwd(G.head+rand(-.6,.6),new T.Vector3()).multiplyScalar(rand(8,20)).add(b); f.a=G.head+rand(-1.5,1.5); }); }
   banner.innerHTML='✨ '+SCENES[id]+'<small>按 📷 拍下來</small>'; banner.classList.remove('hidden','mini'); clearTimeout(banner._t); banner._t=setTimeout(()=>banner.classList.add('mini'),3500); $('bCam').classList.add('pulse'); }
 function endAll(){ ev.id=null; banner.classList.add('hidden'); $('bCam').classList.remove('pulse'); rainbow.visible=false; flock.forEach(m=>m.visible=false); dolphins.forEach(o=>{ o.on=false; o.g.visible=false; });
   whale.visible=false; fluke.visible=false; if(!chase) sfin.visible=false; flyers.forEach(f=>{ f.on=false; f.g.visible=false; }); mets.forEach(m=>m.m.visible=false); }
 function updEv(dt,t,wx,day){
-  W.camera.getWorldPosition(cw);
+  W.camera.getWorldPosition(cw); SPRAY.tick(dt,0); MIST.tick(dt,1.2); updFoam(dt);
   if(!ev.id){ evT-=dt; if(evT<=0){ evT=loc==='sea'?rand(30,60):rand(45,90); if(c.underwater()) return;
       if(forced&&canEv(forced,day,wx)){ startEv(forced); forced=null; return; } forced=null;
       const ids=Object.keys(SCENES).filter(id=>canEv(id,day,wx)); if(ids.length) startEv(ids[Math.floor(Math.random()*ids.length)]); } return; }
@@ -3101,13 +3128,28 @@ function updEv(dt,t,wx,day){
         if(!o.inA&&s>.02){ o.inA=true; P.splash(g.position.x,0,g.position.z,14,.8); AT.ring(g.position.x,g.position.z,.8); }
         if(s>.96&&o.inA){ o.inA=false; P.splash(g.position.x,0,g.position.z,22,1); W.addRipple(g.position.x,g.position.z,.5); } }
       else g.visible=false; } }
-  else if(ev.id==='whale'){ const p=d.p, tt=ev.t;
-    if(tt<2&&d.stage===0){ d.stage=1; for(let i=0;i<3;i++) P.splash(p.x,1.5,p.z,40,4.5); c.Snd.splash(.6); }
-    whale.position.set(p.x,-1.2+1.0*Math.sin(clamp((tt-3)/8,0,1)*Math.PI),p.z); hullClear(whale.position,8); whale.rotation.set(-.05,G.head+1.2,0); whale.visible=tt>3&&tt<11;
-    if(tt>11&&tt<13&&d.stage===1){ d.stage=2; P.splash(p.x,1.5,p.z,40,4.5); }
-    if(tt>14&&tt<20){ fluke.visible=true; const q=(tt-14)/6; fluke.position.set(p.x+4,(q<.45?-3+6.5*sstep(0,.45,q):3.5-7*sstep(.45,1,q)),p.z); hullClear(fluke.position,3); fluke.rotation.set(.25*(1-q),G.head+1.2,0); fluke.scale.setScalar(1.3); } else fluke.visible=false;
-    if(d.breach&&tt>21&&tt<25){ const q=(tt-21)/4; whale.visible=true; whale.position.set(p.x-15,-6+15*Math.sin(q*Math.PI),p.z+10); hullClear(whale.position,8); whale.rotation.set(-1.1+2.2*q,G.head+1.2,.3);
-      if(q>.95&&d.stage<3){ d.stage=3; for(let i=0;i<5;i++) P.splash(p.x-15+rand(-4,4),0,p.z+10+rand(-4,4),60,3); W.addRipple(p.x-15,p.z+10,1.5); c.Snd.splash(2); } } }
+  else if(ev.id==='whale'){ const p=d.p, tt=ev.t, dx=Math.sin(d.dir), dz=Math.cos(d.dir), at=(k)=>tv2.set(p.x+dx*k,0,p.z+dz*k);
+    // 1. 兩次換氣：背脊浮出水面、噴起高高的白霧柱
+    if(tt>1.2&&d.stage===0){ d.stage=1; const q=at(-8); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
+    if(tt>7.5&&d.stage===1){ d.stage=2; const q=at(-2); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
+    if(tt<13){ const seg=tt<6.5?(tt-.8)/5.7:(tt-6.8)/5.7, q=at(tt<6.5?-10+tt*1.1:-4+(tt-6.8)*1.1), up=Math.sin(Math.max(0,Math.min(1,seg))*Math.PI);
+      whale.visible=seg>0&&seg<1; whale.position.set(q.x,-2.6+2.1*up,q.z); whale.rotation.set(.08-.16*seg,d.dir,0); if(whale.visible&&Math.random()<.2) SPRAY.emit(q.x,.2,q.z,6,1.5,1.2,3,1); }
+    // 2. 海面下翻起白浪：要躍出水面了（鏡頭自動轉過去）
+    const bp=at(8);
+    if(tt>13.5&&d.stage===2){ d.stage=3; whale.visible=false; if(window.__FACE) window.__FACE(new T.Vector3(bp.x,3,bp.z),{dur:6,pitch:.12}); foam(bp.x,bp.z,1,7,5); if(c.toast) c.toast('🐋 鯨魚要躍出水面了！','good',2200); }
+    if(tt>13.5&&tt<16) { if(Math.random()<.5) SPRAY.emit(bp.x,.2,bp.z,8,2,2.5,3,1); }
+    // 3. 躍身擊浪：幾乎整隻衝出海面、在空中翻身、側身重重砸回海裡
+    if(tt>16&&tt<20.2){ const q=(tt-16)/3.6, qq=Math.min(1,q), y=-9+4*12*qq*(1-qq)+ (q>1?-(q-1)*20:0), fw=6*qq;
+      whale.visible=true; whale.position.set(bp.x+dx*fw,y,bp.z+dz*fw); whale.rotation.order='YXZ'; whale.rotation.set(-1.45+1.9*qq,d.dir,1.5*sstep(.2,1,qq));
+      if(d.stage===3){ d.stage=4; crash(bp.x,bp.z,false); }
+      if(qq<.6&&Math.random()<.9) SPRAY.emit(whale.position.x+(Math.random()-.5)*2,Math.max(.5,whale.position.y+(Math.random()-.5)*8),whale.position.z+(Math.random()-.5)*2,10,1.6,1,1.6,1.6);
+      if(q>.93&&d.stage===4){ d.stage=5; const cp=tv3.set(bp.x+dx*6.5,0,bp.z+dz*6.5); crash(cp.x,cp.z,true); } }
+    else if(tt>=20.2&&tt<23) whale.visible=false;
+    // 4. 最後一次換氣，舉起尾鰭慢慢潛下去
+    if(tt>23&&d.stage===5){ d.stage=6; const q=at(16); blow(q.x,q.z); }
+    if(tt>25&&tt<31){ fluke.visible=true; const q=(tt-25)/6, fp=at(18); fluke.position.set(fp.x,(q<.45?-3+6.5*sstep(0,.45,q):3.5-7*sstep(.45,1,q)),fp.z); hullClear(fluke.position,3); fluke.rotation.set(.25*(1-q),d.dir,0); fluke.scale.setScalar(1.4);
+      if(q<.5&&Math.random()<.6) SPRAY.emit(fp.x,fluke.position.y+1.5,fp.z,6,.6,.5,1.6,1.4);
+      if(q>.8&&d.stage===6){ d.stage=7; crash(fp.x,fp.z,false); } } else fluke.visible=false; }
   else if(ev.id==='shark'&&!chase){ d.a+=dt*.22; const b=base(); sfin.position.set(b.x+Math.cos(d.a)*d.r,0,b.z+Math.sin(d.a)*d.r); hullClear(sfin.position,.6); sfin.rotation.y=-d.a; sfin.visible=true;
     if(Math.random()<dt*3) AT.ring(sfin.position.x,sfin.position.z,.35); }
   else if(ev.id==='flyfish'){ for(const f of flyers){ if(!f.on) continue; f.t+=dt; if(f.t<0){ f.g.visible=false; continue; } const q=f.t/1.4;
@@ -5456,7 +5498,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261027153642'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261027160603'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
