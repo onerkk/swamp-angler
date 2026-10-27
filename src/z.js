@@ -69,17 +69,18 @@ function finish(skipped){ if(!on) return; on=false; const cb=onDone; onDone=null
 // 片尾名單：由下往上慢慢捲動
 function credits(lines,dur){ roll.innerHTML=lines; roll.style.transition='none'; roll.style.transform='translateY(0)'; void roll.offsetWidth;
   const h=roll.offsetHeight+window.innerHeight; roll.style.transition=`transform ${dur}s linear`; roll.style.transform=`translateY(${-h}px)`; }
-return {play,tick,frame,on:()=>on,say,music,credits,fade:v=>{ blk.style.opacity=v; },finish};
+// 結局裡的片名、手記等畫面元素要放進演出層，才不會被「演出時隱藏其他介面」的規則一起藏掉
+return {layer:()=>fx,play,tick,frame,on:()=>on,say,music,credits,fade:v=>{ blk.style.opacity=v; },finish};
 }
 const ENDING_CREDITS=`<h2>濕地垂釣</h2><div>Swamp Angler</div>
 <div class="r">製作</div><div class="n">歐那</div>
 <div class="r">故事</div><div class="n">老漁人的手記</div>
 <div class="r">音樂</div><div class="n">Emotional Piano — Centurion_of_war（CC0）</div>
-<div class="r">3D 模型與貼圖</div><div class="n">Poly Haven（CC0）</div><div class="n">ambientCG（CC0）</div><div class="n">NASA 月球影像（公有領域）</div>
+<div class="r">3D 模型與貼圖</div><div class="n">Poly Haven（CC0）</div><div class="n">ambientCG（CC0）</div><div class="r">手寫字體</div><div class="n">霞鶩文楷 LXGW WenKai（SIL OFL）</div><div class="n">NASA 月球影像（公有領域）</div>
 <div class="r">音效</div><div class="n">OpenGameArt（CC0）</div>
 <div class="r">特別感謝</div><div class="n">每一個在碼頭上等過魚的人</div>
 <div class="last">謝謝你，陪老漁人走完這一段。</div>`;
-/* ===== 結局分鏡（依劇本 src/ENDING.md 分段製作；已完成：演出系統、片尾名單、序幕、第一幕、第二幕、第三幕） ===== */
+/* ===== 結局分鏡（依劇本 src/ENDING.md 分段製作；已完成：演出系統、片尾名單、序幕、第一幕、第二幕、第三幕、第四幕） ===== */
 function endingShots(E,c){
   const T=THREE, W=c.W, S=W.scene, GL=new T.GLTFLoader(), cache={}, made=[];
   let pending=0; const load=(u,f)=>{ if(cache[u]) return f(cache[u]); pending++; GL.load(u,g=>{ cache[u]=g; pending--; f(g); },undefined,()=>{ pending--; console.warn('ending model',u); }); };
@@ -183,12 +184,34 @@ function endingShots(E,c){
   const trail=[]; function trailDot(x,y,z){ const sp=new T.Sprite(new T.SpriteMaterial({map:scaleTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,fog:false,opacity:.9})); sp.scale.set(.5,.5,1); sp.position.set(x,y,z); keep(sp); trail.push({sp,t:0}); }
   function updTrail(dt){ for(let i=trail.length-1;i>=0;i--){ const d=trail[i]; d.t+=dt; d.sp.material.opacity=Math.max(0,.9-d.t/3); d.sp.position.y+=dt*.08; if(d.t>3){ S.remove(d.sp); trail.splice(i,1); } } }
   const merFace=()=>Math.atan2(CAMB.x-BAY.x,CAMB.z-BAY.z), CAMB=new T.Vector3(-10,1.45,-37.2);
+  // 第四幕：碼頭盡頭（碼頭木板高 0.8 公尺、湖那一端在 z=-3.2）老漁人的舊椅子（Poly Haven WoodenChair_01）與靠在椅邊的竹竿
+  // 老漁人的椅子：和小屋裡同款的舊搖椅（Poly Haven Rockingchair_01），面向湖
+  const chair=new T.Group(); load('models/home/Rockingchair_01.glb',g=>{ const o=g.scene.clone(true); o.traverse(m=>{ m.frustumCulled=false; }); chair.add(o); });
+  chair.position.set(.42,.72,-2.55); chair.rotation.y=Math.PI;
+  const poleM=new T.MeshStandardMaterial({color:0xb8975a,roughness:.55}), pole=new T.Group();
+  { const m=new T.Mesh(new T.CylinderGeometry(.009,.02,3.2,10),poleM); m.position.y=1.6; pole.add(m);
+    for(let i=1;i<9;i++){ const r=new T.Mesh(new T.TorusGeometry(.02-.0011*i,.004,6,14),poleM); r.rotation.x=Math.PI/2; r.position.y=i*.36; pole.add(r); } }
+  pole.position.set(.82,.83,-2.45); pole.rotation.set(-.32,0,.12);
+  // 手記：真實紙張貼圖（ambientCG Paper001，CC0），老漁人的字一個字一個字浮現；最後一行是你自己的字
+  const fl=document.createElement('link'); fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap';
+  const LETTER=['孩子：','如果你讀到這一頁，代表月潮回來了。','我這輩子沒能把阿蘅帶回家，','所以想讓另一個孩子回家。','這件事我做了四十年，最後還是交給了你。','對不起，也謝謝你。','湖就交給你了。記得——','湖會告訴你很多事，只要你願意等。'];
+  const MINE='月潮回來了。換我守著這片湖。';
+  const page=document.createElement('div');
+  page.style.cssText="position:fixed;left:50%;top:50%;transform:translate(-50%,-52%) rotate(-1.2deg);width:min(330px,84vw);padding:30px 26px 26px;z-index:41;pointer-events:none;opacity:0;transition:opacity 1.4s ease;"+
+    "background:linear-gradient(rgba(214,180,120,.42),rgba(150,110,60,.32)),url(end_paper.jpg) center/cover;min-height:58vh;box-sizing:border-box;box-shadow:0 18px 50px rgba(0,0,0,.65),inset 0 0 60px rgba(90,60,20,.45);border-radius:3px;"+
+    "font-family:'LXGW WenKai TC','Kaiti TC','STKaiti','BiauKai',serif;color:#2c1e0e;font-size:18px;line-height:2.05;letter-spacing:.04em";
+  const pageTxt=document.createElement('div'), pageMine=document.createElement('div'); pageMine.style.cssText='margin-top:14px;color:#1d3150;font-size:19px;border-top:1px dashed rgba(60,40,20,.35);padding-top:10px';
+  page.appendChild(pageTxt); page.appendChild(pageMine);
+  const FULL=LETTER.join('\n'); let pn=0, pm=0;
+  function writePage(dt){ if(pn<FULL.length){ pn=Math.min(FULL.length,pn+dt*7.5); } else if(pm<MINE.length){ pm=Math.min(MINE.length,pm+dt*5); }
+    const a=FULL.slice(0,Math.floor(pn)); pageTxt.innerHTML=a.replace(/\n/g,'<br>')+(pn<FULL.length?'<span style="opacity:.35">▍</span>':'');
+    pageMine.textContent=pn>=FULL.length?MINE.slice(0,Math.floor(pm)):''; pageMine.style.display=pn>=FULL.length?'block':'none'; return pn>=FULL.length&&pm>=MINE.length; }
   const title=document.createElement('div'); title.style.cssText='position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:41;pointer-events:none;color:#f2ecdf;font-family:serif;opacity:0;transition:opacity 1.6s ease';
   title.innerHTML='<div style="font-size:13px;letter-spacing:.6em;opacity:.7">終章之後</div><div style="font-size:34px;letter-spacing:.5em;margin-top:14px;color:#ffe3a3">月潮</div>';
   return [
     // 開場：黑底片名〈月潮〉；同時等模型載完（最多 12 秒），避免主角還沒出現就開演
     {d:6,hour:20.4,sea:true,music:'piano',vol:.7,fadeOut:true,from:[[3.2,1.5,-3.5],[0,3.2,-28]],to:[[3.2,1.5,-3.5],[0,3.2,-28]],
-      enter:()=>{ document.body.appendChild(title); E.fade(1); setTimeout(()=>title.style.opacity=1,300); sc.wait=0; },
+      enter:()=>{ E.layer().appendChild(title); E.fade(1); setTimeout(()=>title.style.opacity=1,300); sc.wait=0; },
       tick:(t)=>{ E.fade(1); if(t>4.2&&pending>0&&sc.wait<8){ sc.wait+=1/60; return 'hold'; } if(t>4.2) title.style.opacity=0; },
       exit:()=>{ title.remove(); }, cleanup:()=>title.remove()},
     // 序幕一：海王沉向深淵，沉到一半停住，抬頭看船頭的燈
@@ -268,6 +291,26 @@ function endingShots(E,c){
         sc.tr-=1/60; if(sc.tr<=0&&t>1&&t<10.5){ sc.tr=.12; const wp=merW.getWorldPosition(new T.Vector3()); trailDot(wp.x+(Math.random()-.5)*.3,.3,wp.z+(Math.random()-.5)*.3); }
         if(t>9){ king.position.y=-2.2-(t-9)*.9; kingEye.intensity=Math.max(0,1-(t-9)/3); } if(t>10&&t<11) spl(-13.8,-59.5,12,1.6); updTrail(1/60); },
       subs:[[5,'她回頭看了你一眼。','',3.6],[10.5,'月潮回到了大海。','',4]]},
+    // 第四幕一：天快亮了，划回碼頭。碼頭盡頭，老漁人的舊椅子和竹竿
+    {d:14,hour:5.3,hourTo:5.8,sea:false,music:'piano',vol:.72,from:[[3.4,2.1,-15],[.3,1.1,-2.4]],to:[[1.6,1.7,-8.5],[.4,1.05,-2.6]],
+      enter:()=>{ S.remove(merG); S.remove(king); S.remove(lampG); trail.splice(0).forEach(d=>S.remove(d.sp)); keep(chair); keep(pole); document.head.appendChild(fl); },
+      subs:[[1.4,'天快亮的時候，你划回了碼頭。','',4.4],[7.2,'碼頭盡頭，老漁人的舊椅子還在。\n椅邊靠著他的竹竿。','',5.4]]},
+    // 第四幕二：你把那盞月光色的燈，放在椅子旁邊
+    {d:9,hour:5.85,sea:false,from:[[-1.05,1.62,-.9],[.35,.95,-2.75]],to:[[-.8,1.48,-1.35],[.3,.95,-2.75]],
+      enter:()=>{ keep(lampG); lampG.position.set(-.05,1.35,-2.5); lampL.color.copy(silverC); lampL.intensity=2; },
+      tick:(t)=>{ const u=Math.min(1,t/2.6); lampG.position.set(-.05,1.35-(1.35-.86)*(u*u*(3-2*u)),-2.5-.25*u); lampG.rotation.z=(1-u)*Math.sin(t*3)*.06; },
+      subs:[[1,'你把燈，放在椅子旁邊。','',4.2]]},
+    // 第四幕三：手記自己翻到最後，出現一頁從沒看過的字
+    {d:12,hour:5.95,sea:false,from:[[-.6,1.45,-1.6],[.25,.9,-2.75]],to:[[-.5,1.4,-1.75],[.25,.9,-2.75]],fadeOut:true,
+      enter:()=>{ E.layer().appendChild(page); pn=0; pm=0; pageTxt.innerHTML=''; pageMine.textContent=''; setTimeout(()=>page.style.opacity=1,200); sc.pageEnd=0; },
+      tick:(t)=>{ if(t<1.2) return; const done=writePage(1/60); if(!done) return 'hold'; sc.pageEnd+=1/60; if(sc.pageEnd<4) return 'hold'; page.style.opacity=0; },
+      exit:()=>{ page.remove(); }, cleanup:()=>page.remove()},
+    // 第四幕四：太陽升起，一條藍鰓太陽魚躍出水面——就是你在這座碼頭釣到的第一種魚
+    {d:12,hour:6.25,hourTo:6.9,sea:false,from:[[1.6,1.05,-4.6],[-.4,.9,-2.4]],to:[[2.2,1.25,-5.6],[-1.5,1.2,-1.8]],
+      enter:()=>{ sc.jf=0; },
+      tick:(t)=>{ if(t>3.2&&!sc.jf){ sc.jf=1; const u='models/bluegill.glb'; if(cache[u]){ const o=cache[u].scene.clone(true); o.traverse(m=>{ m.frustumCulled=false; }); const bb=new T.Box3().setFromObject(o), sz=bb.getSize(new T.Vector3()); o.scale.setScalar(.32/Math.max(sz.x,sz.y,sz.z)); const w=new T.Group(); w.add(o); keep(w); jumps.push({w,x:.2,z:-4.3,dx:-.7,dz:.7,t:0,h:1.1}); spl(.2,-4.3,10,1); } }
+        updJumps(1/60); },
+      subs:[[5.6,'陽光照上了碼頭。','',4.2]]},
     // 片尾名單（第二到第四幕完成後，會插在這之前）
     {d:30,hour:6.6,hourTo:8,sea:false,music:'theme',vol:.85,from:[[0,10,14],[0,0,-30]],to:[[0,28,26],[0,0,-40]],
       enter:()=>{ drop(); E.credits(ENDING_CREDITS,28); }, cleanup:drop}
