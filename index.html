@@ -240,6 +240,7 @@ body.athome #drops,body.athome #flare,body.athome #act,body.athome #fight,body.a
 #furnPick .it{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08)}
 body.furnOn #homeUI,body.furnOn #joy{display:none!important}
 body.athome #moonTalk{display:none!important}
+body.tankview #joy{display:none!important}
 body.acting #joy{display:none!important}
 body.athome.acting #homeUI{left:10px}
 body.acting #homeUI .hh{font-size:15px;opacity:.9}
@@ -4727,7 +4728,8 @@ const lampL=new T.PointLight(0xffd8a0,1.2,5,1.4); lampL.position.set(LV.x+.2,.9,
 
 // 水族箱：尺寸跟著等級變；淡水缸在後牆中央，有海水缸時放在右側
 const TSPEC=[{w:1.2,h:.6,d:.45,st:.85},{w:1.8,h:.75,d:.55,st:.85},{w:2.6,h:1.0,d:.7,st:.7},{w:3.4,h:1.2,d:.8,st:.55}], SEA_SPEC={w:1.25,h:.62,d:.5,st:.85};
-const sandTex={fresh:pbr('clean_pebbles',2,1),sea:pbr('coral_gravel',2,1)};
+// 底砂壓暗成自然溪砂的灰褐色（原本在缸燈下太白、像雪）
+const sandTex={fresh:pbr('clean_pebbles',2,1,{color:0x9c8f78}),sea:pbr('coral_gravel',2,1,{color:0xc8bca6})};
 const rockM=new T.MeshStandardMaterial({color:0x6a665e,roughness:.95});
 // 缸背景：像真正造景缸貼的霧面背景板——上亮下暗的柔和漸層，中間一團淡淡的光，沒有生硬的線條
 const bgTex=(sea)=>{ const cv=document.createElement('canvas'); cv.width=512; cv.height=256; const g=cv.getContext('2d'), gr=g.createLinearGradient(0,0,0,256);
@@ -4781,16 +4783,18 @@ function buildTank(water,spec,x){
   const rocks=[['rock04',-.19,-.14,.5,0],['rock02',.13,-.18,.3,1.3],['rock05',-.02,.02,.2,2.4],['rock06',.34,-.06,.22,4.1],['rock03',-.38,.06,.18,.7]].slice(0,W>2.5?5:W>1.5?4:3);
   rocks.forEach(([nm,fx,fz,hk,ry])=>GL.load('rock_moss_set_01.glb',gg=>{ const src=gg.scene.getObjectByName('rock_moss_set_01_'+nm); if(!src) return; const k=src.clone(true); k.position.set(0,0,0);
     const b=new T.Box3().setFromObject(k), ctr=b.getCenter(new T.Vector3()); k.position.set(-ctr.x,0,-ctr.z); const o=new T.Group(); o.add(k);
-    const px=W*fx, pz=D*fz, sz=b.getSize(new T.Vector3()), sc=Math.min(Hh*hk/Math.max(.2,b.max.y),W*hk*.42/Math.max(sz.x,sz.z)); o.position.set(px,y+hAt(px,pz)-.01,pz); o.rotation.y=ry; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); }));
+    const px=W*fx, pz=D*fz, sz=b.getSize(new T.Vector3()), sc=Math.min(Hh*hk/Math.max(.2,b.max.y),W*hk*.7/Math.max(sz.x,sz.z)); o.position.set(px,y+hAt(px,pz)-.01,pz); o.rotation.y=ry; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); }));
   const woods=W>2.5?[[-.3,-.1,.6,.3],[.28,.05,2.6,.26]]:W>1.1?[[-.22,-.1,.6,.28]]:[];
   woods.forEach(([fx,fz,ry,sc])=>GL.load('dry_branches_medium_01.glb',gg=>{ const o=gg.scene.clone(true); const px=W*fx, pz=D*fz; o.position.set(px,y+hAt(px,pz),pz); o.rotation.set(0,ry,0); o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); }));
   const plants=[];
   // 水草分三層：後景高的有莖草（真實蕁麻草模型）、中景蕨類、前景低矮的草皮
   const putP=(file,pick,px,pz,sc,ry)=>GL.load(file,gg=>{ let o; if(pick){ const src=gg.scene.getObjectByName(pick); if(!src) return; o=new T.Group(); const k=src.clone(true); k.position.set(0,0,0); k.updateMatrixWorld(true); const c2=new T.Box3().setFromObject(k).getCenter(new T.Vector3()); k.position.set(-c2.x,0,-c2.z); o.add(k); } else o=gg.scene.clone(true);
     o.position.set(px,y+hAt(px,pz)-.005,pz); o.rotation.y=ry; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); plants.push({o,ph:Math.random()*6}); });
-  const NB2=Math.round(W*7), stems=['nettle_plant_tall_a_LOD0','nettle_plant_tall_b_LOD0','nettle_plant_medium_a_LOD0'];
-  for(let i=0;i<NB2;i++){ const px=-W/2+.08+(W-.16)*(i+Math.random()*.6)/NB2, pz=-D/2+.05+Math.random()*D*.16; if(Math.abs(px-W*-.19)<.12&&Math.random()<.6) continue;
-    putP('models/home/nettle_plant.glb',stems[i%3],px,pz,(Hh*.55/.21)*(.7+Math.random()*.45),Math.random()*6); }
+  // 後景有莖草一叢一叢種：每叢 4～7 株擠在一起、高矮不齊，兩側最高、往中間漸低（造景常用的凹形構圖）
+  const stems=['nettle_plant_tall_a_LOD0','nettle_plant_tall_b_LOD0','nettle_plant_medium_a_LOD0','nettle_plant_medium_b_LOD0'], NC=Math.max(3,Math.round(W*2.6));
+  for(let c2=0;c2<NC;c2++){ const cx=-W/2+.1+(W-.2)*(c2+.5)/NC+(Math.random()-.5)*.08, edge=Math.abs(cx)/(W/2), hk=.42+.38*edge*edge, n=4+Math.floor(Math.random()*4);
+    for(let k=0;k<n;k++){ const px=cx+(Math.random()-.5)*.13, pz=-D/2+.045+Math.random()*D*.2;
+      putP('models/home/nettle_plant.glb',stems[(c2+k)%4],px,pz,(Hh*hk/.21)*(.65+Math.random()*.5),Math.random()*6); } }
   for(let i=0;i<Math.round(W*3.2);i++){ const side=i%3===0, px=side?(Math.random()<.5?-1:1)*(W/2-.12-Math.random()*.15):(Math.random()-.5)*(W-.3), pz=-D/2+.08+Math.random()*D*(side?.6:.35);
     putP('fern_02.glb',null,px,pz,(side?.2:.13)+Math.random()*.12,Math.random()*6); }
   for(let i=0;i<Math.round(W*6);i++){ const px=(Math.random()-.5)*(W-.12), pz=D*(.05+Math.random()*.3); putP('grass_medium_01.glb',['grass_medium_01_small_a_LOD0','grass_medium_01_small_b_LOD0','grass_medium_01_mid_c_LOD0'][i%3],px,pz,.5+Math.random()*.3,Math.random()*6); }
@@ -4935,8 +4939,8 @@ function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>ta
   const hs=ray.intersectObjects(shopParts,false)[0]; if(hs&&c.openShop) c.openShop(); }
 function tapView(){ const tk=tanks[viewTank]; if(!tk) return; const h=ray.intersectObjects(tk.fish.map(f=>f.o),true)[0];
   if(!h){ ui.card.classList.add('hidden'); return; } let o=h.object; while(o&&!o.userData.rec) o=o.parent; if(o) c.showFish(o.userData.rec,ui.card); }
-function enterView(w){ mode='view'; viewTank=w; pan=panT=0; ui.view.classList.remove('hidden'); ui.btns.classList.add('hidden'); ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
-function exitView(){ mode='room'; ui.view.classList.add('hidden'); ui.card.classList.add('hidden'); ui.btns.classList.remove('hidden'); ui.hint.textContent=HINT; }
+function enterView(w){ mode='view'; document.body.classList.add('tankview'); viewTank=w; pan=panT=0; ui.view.classList.remove('hidden'); ui.btns.classList.add('hidden'); ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
+function exitView(){ mode='room'; document.body.classList.remove('tankview'); ui.view.classList.add('hidden'); ui.card.classList.add('hidden'); ui.btns.classList.remove('hidden'); ui.hint.textContent=HINT; }
 document.getElementById('bViewBack').addEventListener('click',()=>{ if(mode==='dive') exitDive(); exitView(); });
 // 潛入缸內：鏡頭進到水裡，像人在缸中，可以四處轉頭近看魚；水裡有藍綠色的霧
 const diveB=document.getElementById('bDive'), fogDive=new T.FogExp2(0x15565c,.9);
@@ -5166,7 +5170,9 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
   eul.set(pitch,yaw,0); qRoom.setFromEuler(eul);
   const tk=tanks[viewTank]||tanks.fresh;
   if(tk){ const s=tk.spec, hf=Math.atan(Math.tan(cam.fov*Math.PI/360)*cam.aspect), dist=Math.max(s.h*.75/Math.tan(cam.fov*Math.PI/360),(s.w*.42)/Math.tan(hf))+s.d/2;
-    pView.set(tk.x+pan,tk.y+s.h/2,tk.z+dist); lookM.lookAt(pView,tv.set(tk.x+pan,tk.y+s.h/2,tk.z),cam.up); qView.setFromRotationMatrix(lookM); }
+    pView.set(tk.x+pan,tk.y+s.h/2,tk.z+dist);
+    // 觀賞模式：把鏡頭和魚缸之間的家具（茶几等）裁掉，畫面只留魚缸
+    { const nr=mode==='view'?Math.max(.05,(dist-s.d/2-.35)*vb):.05; if(Math.abs(cam.near-nr)>.01){ cam.near=nr; cam.updateProjectionMatrix(); } } lookM.lookAt(pView,tv.set(tk.x+pan,tk.y+s.h/2,tk.z),cam.up); qView.setFromRotationMatrix(lookM); }
   if(mode==='grill'){ pDive.set(ROOM.x-1.45,1.0,FP.z-.15); lookM.lookAt(pDive,tv.set(GP.x,GP.y-.05,GP.z),cam.up); qDive.setFromRotationMatrix(lookM); cam.position.lerp(pDive,Math.min(1,dt*3)); cam.quaternion.slerp(qDive,Math.min(1,dt*4)); }
   else if(mode==='dive'&&tk){ const s2=tk.spec; pDive.set(tk.x+Math.sin(t*.25)*s2.w*.12,tk.y+s2.h*.5+Math.sin(t*.4)*.02,tk.z+s2.d*.32); eul.set(dPitch,dYaw,0); qDive.setFromEuler(eul);
     cam.position.lerp(pDive,Math.min(1,dt*3)); cam.quaternion.slerp(qDive,Math.min(1,dt*4)); }
