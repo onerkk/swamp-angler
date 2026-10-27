@@ -340,6 +340,12 @@ function render(){
     if(nx) h+=row('換成'+nx.n,`容量 ${nx.cap} 條、最大可放 ${Math.round(nx.maxL*100)} 公分`,`<button class="sbtn pri" data-a="hbuy" data-v="tier">🪙 ${nx.price.toLocaleString()}</button>`);
     if(!hd.chiller) h+=row('冷水機','裝了才能養冰湖的魚',`<button class="sbtn pri" data-a="hbuy" data-v="chiller">🪙 ${HM.CHILLER.price.toLocaleString()}</button>`);
     if(!hd.seaTank) h+=row('海水缸','另一個水族箱，專門養海水魚',!save.yacht?'<span class="lk">需要漁船</span>':`<button class="sbtn pri" data-a="hbuy" data-v="sea">🪙 ${HM.SEA_TANK.price.toLocaleString()}</button>`);
+    // 家具：每件顯示目前效果、能不能用、下一級；在小屋裡才能使用，升級哪裡都可以
+    h+='<div class="note">家具（在小屋裡點家具也能使用與升級）</div>'; const home=document.body.classList.contains('athome');
+    HM.FURN.forEach(d=>{ const F=HM.furnInfo(d.id), nx=F.next, st='★'.repeat(F.lv+1)+'☆'.repeat(d.lv.length-1-F.lv);
+      const useB=d.id==='fire'?'':home?`<button class="sbtn${F.st.ok?' pri':''}" data-a="fuse" data-v="${d.id}">${d.act}</button>`:'';
+      const upB=nx?`<button class="sbtn${(save.lv||1)>=nx.need&&save.coins>=nx.p?' pri':''}" data-a="fup" data-v="${d.id}">升級 🪙${nx.p.toLocaleString()}</button>`:'<span class="lk">最高級</span>';
+      h+=row(`${d.i} ${d.n} <small style="color:#e8b84a">${st}</small>`,`${F.cur.d}${d.id!=='fire'&&d.id!=='rock'?'・'+F.st.txt:''}${nx?'<br>下一級「'+nx.n+'」：'+nx.d+'（Lv '+nx.need+'）':''}`,`<div class="bb">${useB}${upB}</div>`); });
   } else if(cur==='set'){
     shT.textContent='設定';
     h+='<div class="note">切換時段</div><div class="tabs">'+PRESETS.map((p,i)=>`<button class="tab" data-a="time" data-v="${i}">${p[1]}</button>`).join('')+'</div>';
@@ -489,6 +495,8 @@ shB.addEventListener('click',e=>{
   else if(a==='homeGo'){ close(); if(window.__goHome) window.__goHome(); return; }
   else if(a==='mapBack'){ cur='spot'; render(); return; }
   else if(a==='hrel'){ const [wt,i]=v.split(':'), f=window.__HOME.release(wt,+i); if(f) toast(wt==='mounts'?'取下了標本，牆上空出一個位置':'把'+((SPECIES.find(s=>s.id===f.id)||{}).name||'魚')+'放回湖裡了','good'); render(); return; }
+  else if(a==='fup'){ const m=window.__HOME.furnUp(v); if(m) toast(m,'bad'); else { toast('升級好了：'+window.__HOME.furnInfo(v).cur.n,'good'); if(window.__HOMEFURN) window.__HOMEFURN(); } render(); syncHUD(); return; }
+  else if(a==='fuse'){ if(v==='rock'&&window.__HOME.furnInfo('rock').cur.pick){ close(); if(window.__HOMETAP) window.__HOMETAP('rock'); return; } const r=window.__HOME.furnUse(v); if(r.msg) toast(r.msg,r.kind||'good',r.kind?1800:3200); if(v==='rock'&&window.__HOMEFURN) window.__HOMEFURN(); render(); syncHUD(); return; }
   else if(a==='hbuy'){ const m=window.__HOME.buy(v); toast(m||'買好了，已經裝進小屋',m?'bad':'good'); render(); syncHUD(); return; }
   else if(a==='dex'){ dexSel=v; render(); shB.scrollTop=0; return; }
   else if(a==='dexback'){ dexSel=null; render(); return; }

@@ -37,7 +37,72 @@ function buy(what){ const h=H();
   else if(what==='sea'){ if(h.seaTank) return '已經有海水缸了'; if(!S.yacht) return '有漁船、能出海之後才需要海水缸'; if(S.coins<SEA_TANK.price) return '金幣不夠'; S.coins-=SEA_TANK.price; h.seaTank=true; }
   else if(what==='chiller'){ if(h.chiller) return '已經裝了冷水機'; if(S.coins<CHILLER.price) return '金幣不夠'; S.coins-=CHILLER.price; h.chiller=true; }
   c.persist(); c.setCoins(); return ''; }
-return {TANKS,SEA_TANK,CHILLER,MOUNT_MAX,unlocked,check,keep,mount,release,buy,data:H,tank};
+/* 家具：每件都能升級（換真實模型或加擺件），也都真的能用；冷卻與累積都用真實時間 */
+const BAITN={shrimp:'活蝦',live:'活魚餌',moon:'月光餌'};
+const FURN=[
+ {id:'sofa',n:'沙發',i:'🛋️',use:'坐下來看水族箱，心情放鬆',act:'坐下休息',lv:[
+   {d:'🍀 好運 8 分鐘（稀有魚機率提升）・冷卻 30 分鐘',min:8,cd:30},
+   {n:'加真皮腳凳',p:3000,need:6,d:'🍀 好運 15 分鐘・冷卻 25 分鐘',min:15,cd:25},
+   {n:'換雕花古董沙發',p:9000,need:12,d:'🍀 好運 25 分鐘・冷卻 20 分鐘',min:25,cd:20}]},
+ {id:'rock',n:'搖椅',i:'🪑',use:'在爐火邊打個盹',act:'打個盹',lv:[
+   {d:'時間跳到下一個時段（清晨／正午／黃昏／夜晚）',fx:0},
+   {n:'加邊桌',p:2000,need:5,d:'跳到下一個時段，睡醒 💪 力氣 10 分鐘',fx:10},
+   {n:'加毛毯籃',p:6000,need:10,d:'可以選要睡到哪個時段，睡醒 💪 力氣 20 分鐘',fx:20,pick:true}]},
+ {id:'shelf',n:'書架',i:'📚',use:'翻翻老漁人留下的釣魚手記',act:'讀手記',lv:[
+   {d:'經驗 +等級×20・冷卻 20 分鐘',k:20,cd:20},
+   {n:'擺滿手記',p:2500,need:6,d:'經驗 +等級×35・冷卻 20 分鐘',k:35,cd:20},
+   {n:'換玻璃古董書櫃',p:8000,need:12,d:'經驗 +等級×55・冷卻 15 分鐘',k:55,cd:15}]},
+ {id:'chest',n:'漁具箱',i:'🧰',use:'老漁人的漁具箱，每天補一次魚餌',act:'領補給',lv:[
+   {d:'每天：活蝦 ×3',g:{shrimp:3}},
+   {n:'疊上木箱',p:4000,need:8,d:'每天：活蝦 ×5、活魚餌 ×2',g:{shrimp:5,live:2}},
+   {n:'再添長木箱',p:12000,need:14,d:'每天：活蝦 ×5、活魚餌 ×4、月光餌 ×1',g:{shrimp:5,live:4,moon:1}}]},
+ {id:'herb',n:'窗邊香草',i:'🌿',use:'窗邊曬得到太陽，香草和檸檬會慢慢長出來（烤魚調味用）',act:'採收',lv:[
+   {d:'每 60 分鐘長 1 份香草（最多存 2 份）',hb:60,hc:2},
+   {n:'加香草木箱',p:1500,need:4,d:'每 30 分鐘 1 份香草（最多存 4 份）',hb:30,hc:4},
+   {n:'加檸檬木箱',p:5000,need:9,d:'每 25 分鐘 1 份香草、每 40 分鐘 1 顆檸檬（各存 5 份）',hb:25,hc:5,lm:40,lc:5}]},
+ {id:'fire',n:'壁爐',i:'🔥',use:'烤魚用的壁爐，點它就能烤魚',act:'烤魚',lv:[
+   {d:'一般火力'},
+   {n:'掛上鑄鐵燉鍋',p:3500,need:7,d:'火力更旺，烤熟速度 ×1.25',heat:1.25},
+   {n:'加銅鍋',p:10000,need:13,d:'烤熟速度 ×1.25，吃下去的效果時間 ×1.3',heat:1.25,fxK:1.3}]}];
+function FD(){ const h=H(); h.furn=h.furn||{}; FURN.forEach(d=>{ h.furn[d.id]=h.furn[d.id]||{lv:0}; }); return h.furn; }
+const fdef=id=>FURN.find(d=>d.id===id);
+const flv=id=>{ const f=FD()[id]; return f?f.lv:0; };
+const now=()=>Date.now();
+// 香草／檸檬：從上次採收起算累積了幾份
+function grown(st,k,every,cap){ if(!every) return 0; const t=st[k]||(st[k]=now()); return Math.min(cap,Math.floor((now()-t)/(every*60000))); }
+// 某件家具現在能不能用：ok、還要等幾分鐘、說明
+function state(id){ const d=fdef(id), st=FD()[id], L=d.lv[st.lv];
+  if(id==='sofa'||id==='shelf'){ const w=st.t?Math.ceil((st.t+L.cd*60000-now())/60000):0; return w>0?{ok:false,wait:w,txt:'還要 '+w+' 分鐘'}:{ok:true,txt:'可以使用'}; }
+  if(id==='chest'){ const day=new Date().toDateString(); return st.day===day?{ok:false,txt:'今天領過了，明天再來'}:{ok:true,txt:'今天的補給還沒領'}; }
+  if(id==='herb'){ const h=grown(st,'th',L.hb,L.hc), l=grown(st,'tl',L.lm,L.lc||0);
+    return h+l>0?{ok:true,h,l,txt:'可以採收：香草 '+h+(L.lm?'、檸檬 '+l:'')}:{ok:false,txt:'還在長，'+Math.ceil(((st.th||now())+L.hb*60000-now())/60000)+' 分鐘後可以採'}; }
+  return {ok:true,txt:''}; }
+function info(id){ const d=fdef(id), lv=flv(id); return {def:d,lv,cur:d.lv[lv],next:d.lv[lv+1]||null,st:state(id)}; }
+function upgrade(id){ const d=fdef(id), st=FD()[id], nx=d.lv[st.lv+1]; if(!nx) return '已經升到最高級了';
+  if((S.lv||1)<nx.need) return '需要等級 Lv '+nx.need; if(S.coins<nx.p) return '金幣不夠';
+  // 升級香草時，先把已經長好的收進去，免得換箱子後重新計時吃掉進度
+  if(id==='herb'&&state('herb').ok) use('herb');
+  S.coins-=nx.p; st.lv++; c.persist(); c.setCoins(); return ''; }
+// 使用：回傳訊息與種類；種類有值時表示沒用成功
+function use(id,opt){ const d=fdef(id), st=FD()[id], L=d.lv[st.lv], s=state(id), fx=S.fx=S.fx||{}, add=(k,m)=>{ fx[k]=Math.max(fx[k]||0,now())+m*60000; };
+  if(id==='sofa'){ if(!s.ok) return {msg:'剛休息過，'+s.txt,kind:'warn'}; st.t=now(); add('luck',L.min); c.persist(); c.fxChanged&&c.fxChanged(); return {msg:'🛋️ 窩在沙發上看魚游來游去……🍀 好運 '+L.min+' 分鐘'}; }
+  if(id==='shelf'){ if(!s.ok) return {msg:'剛讀過，'+s.txt,kind:'warn'}; st.t=now(); const xp=Math.round((S.lv||1)*L.k); c.persist(); c.addXP&&c.addXP(xp);
+    const tips=['「霧天的清晨，大魚會游到淺水邊。」','「月亮越圓，月光灣的海水魚越多。」','「魚衝的時候放手，牠累了自然會回來。」','「冰洞底下的鱒魚，喜歡活蝦。」','「倒木區的鯰魚，入夜才肯開口。」'];
+    return {msg:'📚 '+tips[Math.floor(Math.random()*tips.length)]+'　經驗 +'+xp}; }
+  if(id==='chest'){ if(!s.ok) return {msg:s.txt,kind:'warn'}; st.day=new Date().toDateString(); S.baits=S.baits||{}; const got=[];
+    for(const [b,n] of Object.entries(L.g)){ S.baits[b]=(S.baits[b]||0)+n; got.push((BAITN[b]||b)+' ×'+n); } c.persist(); c.syncHUD&&c.syncHUD(); return {msg:'🧰 打開漁具箱：'+got.join('、')}; }
+  if(id==='herb'){ if(!s.ok) return {msg:s.txt,kind:'warn'}; const inv=S.inv=S.inv||{}, ev=L.hb*60000, el=(L.lm||0)*60000;
+    if(s.h){ inv.herb=(inv.herb||0)+s.h; st.th=s.h>=L.hc?now():st.th+s.h*ev; }
+    if(s.l){ inv.lemon=(inv.lemon||0)+s.l; st.tl=s.l>=L.lc?now():st.tl+s.l*el; }
+    c.persist(); return {msg:'🌿 採收了'+[s.h?'香草 ×'+s.h:'',s.l?'檸檬 ×'+s.l:''].filter(Boolean).join('、')+'（烤魚調味用）'}; }
+  if(id==='rock'){ const P=[[6.3,'清晨'],[11.5,'正午'],[17.6,'黃昏'],[21,'夜晚']], h=((c.hour()%24)+24)%24;
+    let tg; if(L.pick&&opt!=null) tg=P[opt]; else { tg=P.find(p=>p[0]>h+.25)||P[0]; }
+    c.setHour(tg[0]); if(L.fx) add('meal_str',L.fx); c.persist(); c.fxChanged&&c.fxChanged();
+    return {msg:'🪑 搖著搖著睡著了……醒來已經是'+tg[1]+(L.fx?'・💪 力氣 '+L.fx+' 分鐘':'')}; }
+  return {msg:''}; }
+const grillHeat=()=>fdef('fire').lv[flv('fire')].heat||1;
+const grillFxK=()=>fdef('fire').lv[flv('fire')].fxK||1;
+return {TANKS,SEA_TANK,CHILLER,MOUNT_MAX,unlocked,check,keep,mount,release,buy,data:H,tank,FURN,furnInfo:info,furnUp:upgrade,furnUse:use,furnLv:flv,grillHeat,grillFxK};
 }
 
 /* ===== 小屋內部：第一人稱木屋場景（獨立場景，回家時改畫這裡，外面的湖照常運作） ===== */
@@ -163,21 +228,45 @@ function put(name,x,y,z,ry,sc,fn){ const place=g=>{ const o=g.scene.clone(true);
 const LV={x:-.9,z:-1.9};
 // 地毯：真實織物貼圖
 plane(2.8,2.0,pbr('fabric_pattern_07',2.2,1.6,{color:0xb86a48}),LV.x+.5,.006,LV.z,0,-Math.PI/2);
-put('sofa_02',LV.x-1.0,0,LV.z,Math.PI/2,1);                 // 沙發靠左、面向房間中央
-put('throw_pillows_01',LV.x-1.0,.42,LV.z+.1,Math.PI/2,.9);
-put('coffee_table_round_01',LV.x+.5,0,LV.z,0,.85);
-put('book_encyclopedia_set_01',LV.x+.5,.42,LV.z+.15,.3,.8);   // 老漁人的手記那一疊書
-put('vintage_oil_lamp',LV.x+.2,.42,LV.z-.3,0,.8);
-put('Rockingchair_01',1.7,-.1,-1.6,-Math.PI/2+.4,1);        // 搖椅在右側、斜對壁爐
-put('wooden_bookshelf_worn',-ROOM.x+.32,0,-2.2,Math.PI/2,1); // 書架靠左牆
-put('potted_plant_01',-2.5,0,ROOM.zb+.5,0,.9);               // 盆栽在左後角落
-put('treasure_chest',2.4,0,ROOM.zb+.45,-.5,.8);              // 寶箱在右後角落（老漁人的漁具箱）
-put('mantel_clock_01',ROOM.x-.36,1.38,FP.z+.45,-Math.PI/2,1);  // 壁爐架上：時鐘與木燈籠
+// 家具依等級擺放：每一項標明屬於哪件家具、在哪幾級出現；升級時換模型或加擺件
+const FITEMS=[
+ {f:'sofa',lv:[0,1],m:'sofa_02',p:[LV.x-1.0,0,LV.z,Math.PI/2,1]},
+ {f:'sofa',lv:[0,1],m:'throw_pillows_01',p:[LV.x-1.0,.42,LV.z+.1,Math.PI/2,.9]},
+ {f:'sofa',lv:[1,2],m:'Ottoman_01',p:[LV.x-.65,0,LV.z+1.15,Math.PI/2,.8]},
+ {f:'sofa',lv:[2,2],m:'sofa_03',p:[LV.x-1.05,0,LV.z,Math.PI/2,.72]},
+ {f:'shelf',lv:[0,1],m:'wooden_bookshelf_worn',p:[-ROOM.x+.32,0,-2.2,Math.PI/2,1]},
+ {f:'shelf',lv:[1,1],m:'book_encyclopedia_set_01',p:[-ROOM.x+.32,2.06,-2.2,Math.PI/2,.8]},
+ {f:'shelf',lv:[2,2],m:'vintage_cabinet_01',p:[-ROOM.x+.3,0,-2.25,Math.PI/2,.8]},
+ {f:'rock',lv:[0,2],m:'Rockingchair_01',p:[1.7,-.1,-1.6,-Math.PI/2+.4,1]},
+ {f:'rock',lv:[1,2],m:'side_table_01',p:[2.35,0,-1.0,-.3,.85],tint:0x8a6448},
+ {f:'rock',lv:[2,2],m:'wicker_basket_01',p:[2.3,0,-2.3,.4,1.7]},
+ {f:'herb',lv:[0,2],m:'potted_plant_01',p:[-2.5,0,ROOM.zb+.5,0,.9]},
+ {f:'herb',lv:[1,2],m:'planter_box_01',p:[-ROOM.x+.24,0,-.15,Math.PI/2,1],herbs:.46},
+ {f:'herb',lv:[2,2],m:'planter_box_02',p:[-ROOM.x+.25,0,1.0,Math.PI/2,1],herbs:.62},
+ {f:'chest',lv:[0,2],m:'treasure_chest',p:[2.4,0,ROOM.zb+.45,-.5,.8]},
+ {f:'chest',lv:[1,2],m:'wooden_crate_01',p:[2.4,.5,ROOM.zb+.45,-.5,.75]},
+ {f:'chest',lv:[2,2],m:'wooden_crate_02',p:[ROOM.x-.32,0,-2.7,0,1]},
+ {f:'fire',lv:[1,2],m:'pot_enamel_01',p:[ROOM.x-.35,0,FP.z+1.55,0,1.4]},
+ {f:'fire',lv:[2,2],m:'brass_pan_01',p:[ROOM.x-.3,0,FP.z-1.05,.8,1.4]}];
+// 香草箱裡種真實的蕁麻草模型（Poly Haven nettle_plant），沿著木箱長邊排一排
+function plantHerbs(o,half){ const ld=g=>{ const names=['nettle_plant_tall_a_LOD0','nettle_plant_medium_a_LOD0','nettle_plant_tall_b_LOD0','nettle_plant_medium_b_LOD0'];
+    const n=Math.round(half*10); for(let i=0;i<n;i++){ const src=g.scene.getObjectByName(names[i%4]); if(!src) continue; const k=src.clone(true);
+      k.position.set(-half+.08+(2*half-.16)*i/Math.max(1,n-1),.3,(i%2?.06:-.06)); k.rotation.set(0,i*1.7,0); k.scale.setScalar(1.9+(i%3)*.25); o.add(k); } };
+  if(mcache.nettle_plant) ld(mcache.nettle_plant); else GL.load('models/home/nettle_plant.glb',g=>{ mcache.nettle_plant=g; ld(g); }); }
+function syncFurn(){ const H=c.home&&c.home(); if(!H) return;
+  for(const it of FITEMS){ const lv=H.furnLv(it.f), want=lv>=it.lv[0]&&lv<=it.lv[1];
+    if(want&&!it.obj&&!it.loading){ it.loading=true; const [x,y,z,ry,sc]=it.p;
+      put(it.m,x,y,z,ry,sc,o=>{ it.loading=false; o.userData.furn=it.f; if(it.herbs) plantHerbs(o,it.herbs);
+        // 新木色太亮的家具壓暗成老木屋的舊木色
+        if(it.tint) o.traverse(m=>{ if(m.isMesh){ m.material=m.material.clone(); m.material.color.multiply(new T.Color(it.tint)); } });
+        if(!(H.furnLv(it.f)>=it.lv[0]&&H.furnLv(it.f)<=it.lv[1])){ scene.remove(o); return; } it.obj=o; }); }
+    else if(!want&&it.obj){ scene.remove(it.obj); it.obj=null; } } }
+put('mantel_clock_01',ROOM.x-.36,1.38,FP.z+.45,-Math.PI/2,1,o=>{ o.userData.furn='clock'; });  // 壁爐架上：時鐘與木燈籠
 put('wooden_lantern_01',ROOM.x-.36,1.38,FP.z-.5,0,.8);
 put('hanging_picture_frame_01',-ROOM.x+.02,1.95,-1.0,Math.PI/2,1);   // 掛畫：左牆、水族箱上方
 put('hanging_picture_frame_02',0,2.5,ROOM.zb+.02,0,1);
 // 燈光：天花板鐵藝吊燈、水族箱兩側壁燈，夜裡全部點亮
-put('lantern_chandelier_01',0,H-.02,-1.6,0,1);
+put('lantern_chandelier_01',0,H-.02,-1.6,0,1,o=>{ o.userData.furn='light'; });
 const ceilL=new T.PointLight(0xffd9a8,2.4,14,1.0); ceilL.position.set(0,H-.95,-1.6); scene.add(ceilL);
 const wallLs=[];
 for(const x of [-2.85,2.85]){ put('industrial_wall_lamp',x,2.05,ROOM.zb+.06,0,1); const wl=new T.PointLight(0xffe2b8,1.3,7,1.2); wl.position.set(x,1.9,ROOM.zb+.4); scene.add(wl); wallLs.push(wl); }
@@ -323,15 +412,23 @@ const sun=new T.DirectionalLight(0xfff4e0,.8); sun.position.set(-6,4,-1); sun.ta
 function daylight(){ const h=((c.hour()%24)+24)%24; return Math.max(0,Math.min(1,Math.min(h-5.5,19-h)/2)); }
 function syncTime(){ const dl=daylight(), h=((c.hour()%24)+24)%24;
   viewM.map=dl>.6?winTex.day:dl>.05?winTex.dawn:winTex.night; viewM.needsUpdate=true; viewM.color.setScalar(.35+.65*dl);
-  hemi.intensity=.75+.15*dl; sun.intensity=.5*dl; ceilL.intensity=5.0-2.4*dl; wallLs.forEach(w=>w.intensity=2.6-1.3*dl); lampL.intensity=1.6-.8*dl; glowM.forEach(m=>m.emissiveIntensity=1.6-1.2*dl); }
+  const lk=lightsOff()?0:1;
+  hemi.intensity=(.75+.15*dl)*(lk?1:.45+.55*dl); sun.intensity=.5*dl; ceilL.intensity=(5.0-2.4*dl)*lk; wallLs.forEach(w=>w.intensity=(2.6-1.3*dl)*lk); lampL.intensity=(1.6-.8*dl)*lk; glowM.forEach(m=>m.emissiveIntensity=(1.6-1.2*dl)*lk); }
+// 吊燈：點它開關燈（關燈時只剩爐火和窗外的光）
+function lightsOff(){ const H=c.home&&c.home(); return !!(H&&H.data().lightOff); }
 function resize(){ const s=R.getSize(new T.Vector2()), a=s.x/s.y; cam.aspect=a;
   cam.fov=Math.max(62,Math.min(80,2*Math.atan(Math.tan(23*Math.PI/180)/a)*180/Math.PI)); cam.updateProjectionMatrix(); }   // 直式手機水平視野很窄，垂直視角放大一點
+const HINT='點水族箱、壁爐、家具就能使用';
 // 輸入：拖曳轉頭；輕點水族箱進入觀賞模式；觀賞模式裡點魚看資料
 const el=R.domElement, ray=new T.Raycaster(), ndc=new T.Vector2();
 let mode='room', viewTank=null, vb=0, pan=0, panT=0, down=null, dYaw=0, dPitch=0, dYawT=0, dPitchT=0;
 const ui={view:document.getElementById('homeView'),card:document.getElementById('fishCard'),hint:document.querySelector('#homeUI .hh'),btns:document.querySelector('#homeUI .hb')};
 function hit(e){ const r=el.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(ndc,cam); }
+function furnOf(o){ while(o&&!(o.userData&&o.userData.furn)) o=o.parent; return o?o.userData.furn:null; }
 function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>tanks[k].glass), h=ray.intersectObjects(gl,false)[0], hm=ray.intersectObjects(mountG.children,true)[0];
+  // 家具：取最靠近鏡頭、看得見的那個物體；它屬於某件家具才算點到
+  const near=ray.intersectObjects(scene.children,true).find(x=>!x.object.isSprite&&x.object.visible&&!(x.object.material&&x.object.material.visible===false)), fu=near&&furnOf(near.object);
+  if(fu&&(!h||near.distance<h.distance)&&(!hm||near.distance<hm.distance)){ ui.card.classList.add('hidden'); tapFurn(fu); return; }
   if(hm&&(!h||hm.distance<h.distance)){ let o=hm.object; while(o&&!o.userData.rec) o=o.parent; if(o){ c.showFish(o.userData.rec,ui.card); return; } }
   ui.card.classList.add('hidden'); if(h){ enterView(h.object.userData.tank); return; }
   const hf=ray.intersectObjects(fpParts,true)[0]; if(hf){ pickFish(); return; }
@@ -339,7 +436,7 @@ function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>ta
 function tapView(){ const tk=tanks[viewTank]; if(!tk) return; const h=ray.intersectObjects(tk.fish.map(f=>f.o),true)[0];
   if(!h){ ui.card.classList.add('hidden'); return; } let o=h.object; while(o&&!o.userData.rec) o=o.parent; if(o) c.showFish(o.userData.rec,ui.card); }
 function enterView(w){ mode='view'; viewTank=w; pan=panT=0; ui.view.classList.remove('hidden'); ui.btns.classList.add('hidden'); ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
-function exitView(){ mode='room'; ui.view.classList.add('hidden'); ui.card.classList.add('hidden'); ui.btns.classList.remove('hidden'); ui.hint.textContent='搖桿走動・拖曳轉頭・點水族箱觀賞・點壁爐烤魚'; }
+function exitView(){ mode='room'; ui.view.classList.add('hidden'); ui.card.classList.add('hidden'); ui.btns.classList.remove('hidden'); ui.hint.textContent=HINT; }
 document.getElementById('bViewBack').addEventListener('click',()=>{ if(mode==='dive') exitDive(); exitView(); });
 // 潛入缸內：鏡頭進到水裡，像人在缸中，可以四處轉頭近看魚；水裡有藍綠色的霧
 const diveB=document.getElementById('bDive'), fogDive=new T.FogExp2(0x15565c,.9);
@@ -352,6 +449,40 @@ el.addEventListener('pointermove',e=>{ if(!on||!drag) return; const dx=e.clientX
   if(mode==='view'){ const w=tanks[viewTank]?tanks[viewTank].spec.w:1; panT=Math.max(-w*.35,Math.min(w*.35,drag.pan-dx*.003)); return; }
   yawT=drag.yaw-dx*.006; pitchT=Math.max(-.7,Math.min(.6,drag.pitch-dy*.005)); });
 window.addEventListener('pointerup',e=>{ if(on&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<10&&performance.now()-down.t<450){ hit(e); if(mode==='room') tapRoom(); else tapView(); } drag=null; down=null; });   // 移動很少、時間很短才算點擊
+/* ===== 家具面板：點家具跳出來，可以使用、看效果、升級 ===== */
+const furnUI=document.createElement('div'); furnUI.id='furnPick'; furnUI.className='hidden'; document.body.appendChild(furnUI);
+let furnId=null;
+function closeFurn(){ furnUI.classList.add('hidden'); document.body.classList.remove('furnOn'); furnId=null; }
+function tapFurn(id){ const H=c.home&&c.home(); if(!H) return;
+  if(id==='light'){ const d=H.data(); d.lightOff=!d.lightOff; c.persist&&c.persist(); syncTime(); c.toast&&c.toast(d.lightOff?'💡 關燈了，只剩爐火和窗外的光':'💡 開燈','',1400); return; }
+  if(id==='clock'){ const h=((c.hour()%24)+24)%24, hh=Math.floor(h), mm=Math.floor((h-hh)*60), per=h>=4.8&&h<8.5?'清晨':h>=8.5&&h<16.5?'白天':h>=16.5&&h<19.8?'黃昏':'夜晚';
+    const mi=window.__MOONPH&&window.__MOONPH.illum?Math.round(window.__MOONPH.illum()*100):null;
+    c.toast&&c.toast(`🕰 ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}・${per}${mi!=null?'・今晚月亮 '+mi+'% 圓'+(mi>=85?'（滿月前後，月光灣的潮最旺）':''):''}`,'',3200); return; }
+  furnId=id; renderFurn(); furnUI.classList.remove('hidden'); document.body.classList.add('furnOn'); }
+function renderFurn(){ const H=c.home(), F=H.furnInfo(furnId), d=F.def, nx=F.next, lvS=c.save.lv||1, coins=c.save.coins||0;
+  const stars='★'.repeat(F.lv+1)+'☆'.repeat(d.lv.length-1-F.lv);
+  let h=`<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:800;font-size:16px">${d.i} ${d.n} <span style="color:#e8b84a">${stars}</span></div><button class="sbtn" data-f="x">關閉</button></div>
+    <div style="font-size:13px;opacity:.8;margin:4px 0 8px">${d.use}${F.cur.n?'・目前：'+F.cur.n:''}</div>
+    <div class="it"><span>${F.cur.d}<br><small style="opacity:.75">${F.st.txt}</small></span></div>`;
+  if(furnId==='fire') h+=`<div class="it"><span>點壁爐就能烤魚</span><button class="sbtn pri" data-f="grill">🔥 烤魚</button></div>`;
+  else if(furnId==='rock'&&F.cur.pick) h+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">`+['清晨','正午','黃昏','夜晚'].map((n,i)=>`<button class="sbtn pri" data-f="use" data-o="${i}" style="flex:1">睡到${n}</button>`).join('')+`</div>`;
+  else h+=`<div style="margin:8px 0"><button class="btn pri" data-f="use" style="width:100%;padding:10px${F.st.ok?'':';opacity:.45'}">${d.act}</button></div>`;
+  if(nx){ const can=lvS>=nx.need&&coins>=nx.p;
+    h+=`<div style="font-weight:700;margin-top:6px">升級：${nx.n}</div><div class="it"><span>${nx.d}<br><small style="opacity:.75">需要 Lv ${nx.need}${lvS<nx.need?'（目前 Lv '+lvS+'）':''}</small></span><button class="sbtn${can?' pri':''}" data-f="up">🪙 ${nx.p.toLocaleString()}</button></div>`; }
+  else h+=`<div style="font-size:12px;opacity:.7;margin-top:6px">已經升到最高級</div>`;
+  furnUI.innerHTML=h; }
+furnUI.addEventListener('click',e=>{ const b=e.target.closest('[data-f]'); if(!b||!furnId) return; const H=c.home(), a=b.dataset.f;
+  if(a==='x'){ closeFurn(); return; }
+  if(a==='grill'){ closeFurn(); pickFish(); return; }
+  if(a==='up'){ const m=H.furnUp(furnId); if(m){ c.toast&&c.toast(m,'warn',1600); return; } syncFurn(); c.toast&&c.toast('升級好了：'+H.furnInfo(furnId).cur.n,'good',1800); c.coin&&c.coin(); renderFurn(); return; }
+  if(a==='use'){ const r=H.furnUse(furnId,b.dataset.o!=null?+b.dataset.o:null); if(r.msg) c.toast&&c.toast(r.msg,r.kind||'good',r.kind?1800:3200);
+    if(furnId==='rock'&&!r.kind){ syncTime(); closeFurn(); return; } renderFurn(); updFurnTags(); } });
+// 有東西可以領、可以採的家具，上方浮出提示標籤
+const furnTags=[['chest','🧰 補給可以領了',[2.4,1.35,ROOM.zb+.45]],['herb','🌿 可以採收了',[-2.75,1.05,.2]],['shelf','📚 可以讀手記',[-ROOM.x+.35,2.45,-2.2]]].map(([f,txt,pos])=>{ const tg=makeTag(txt); tg.position.set(...pos); scene.add(tg); const r={s:tg,y:pos[1],k:'f_'+f,f}; tags.push(r); return r; });
+function updFurnTags(){ const H=c.home&&c.home(); furnTags.forEach(t=>{ t.ready=!!(H&&H.furnInfo(t.f).st.ok); if(t.f==='herb'&&H&&H.furnLv('herb')===0) t.s.position.set(-2.5,1.6,ROOM.zb+.5); else if(t.f==='herb') t.s.position.set(-2.75,1.05,.2); }); }
+let furnTick=0;
+window.__HOMEFURN=()=>{ syncFurn(); syncTime(); updFurnTags(); };
+window.__HOMETAP=id=>{ if(on) tapFurn(id); };
 /* ===== 壁爐烤魚：魚串在鐵叉上，靠火的那面會熟；魚皮依熟度從生色→金黃→焦黑，出現烤痕；冒煙、油滴竄火、滋滋聲 ===== */
 const GR={on:false, drops:[]};
 { const dt_=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=16; const g=cv.getContext('2d'), rg=g.createRadialGradient(8,8,0,8,8,8); rg.addColorStop(0,'rgba(255,236,170,1)'); rg.addColorStop(.6,'rgba(230,170,60,.8)'); rg.addColorStop(1,'rgba(200,120,20,0)'); g.fillStyle=rg; g.fillRect(0,0,16,16); return new T.CanvasTexture(cv); })();
@@ -431,7 +562,7 @@ const grade=x=>x<.55?'生':x<.78?'半熟':x<.92?'完美':'焦';
 function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
   // 翻面：整支鐵叉轉 180 度
   if(GR.flipT>0){ GR.flipT-=dt; const p=1-Math.max(0,GR.flipT)/.6; spin.rotation.z=(GR.face+p)*Math.PI; if(GR.flipT<=0){ GR.face=(GR.face+1)%2; spin.rotation.z=GR.face*Math.PI; } }
-  const heat=(1/GR.need)*(fireM.opacity+.3)/1.15;
+  const heat=(1/GR.need)*(fireM.opacity+.3)/1.15*(c.grillHeat?c.grillHeat():1);
   GR.uCurl.value=Math.min(1,(GR.a+GR.b)*.5);
   if(GR.flipT<=0){ if(GR.face===0) GR.a+=heat*dt; else GR.b+=heat*dt; }
   GR.uA.value=GR.a; GR.uB.value=GR.b;
@@ -448,8 +579,8 @@ function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
     if(D.s.position.y<.3){ D.s.visible=false; flare.visible=true; flare.position.set(D.s.position.x+.05,.36,D.s.position.z); sparkM.opacity=.95; fireL.intensity*=1.5; c.sizzle&&c.sizzle(.3+Math.random()*.35); } });
   if(flare.visible){ sparkM.opacity-=dt*2.2; flare.scale.setScalar(.35+(.9-sparkM.opacity)*.3); if(sparkM.opacity<=0) flare.visible=false; }
   spin.position.y=Math.sin(GR.t*1.3)*.003; }
-function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; pRoom.set(0,EYE,.9); resize(); for(const f of [syncTime,syncFish,syncMounts,exitView]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
-function exit(){ on=false; drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
+function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; pRoom.set(0,EYE,.9); resize(); for(const f of [syncTime,syncFish,syncMounts,exitView,syncFurn,updFurnTags,closeFurn]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
+function exit(){ on=false; drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); document.body.classList.remove('grilling'); exitDive(); exitView(); }
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
 function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
@@ -472,7 +603,8 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
   sparks.forEach(S=>{ if(!S.s.visible) return; S.t+=dt; if(S.t>S.life){ S.s.visible=false; return; } S.v.x+=Math.sin(t*5+S.life*9)*dt*.3; S.s.position.addScaledVector(S.v,dt); S.s.material.opacity=(1-S.t/S.life)*(.6+.4*Math.sin(t*30+S.life*50)); });
   if((syncT+=dt)>1){ syncT=0; try{ syncTime(); syncFish(); syncMounts(); }catch(err){ console.error('home sync',err); } }   // 每秒同步一次：剛帶回的魚、升級的缸、晚一步載好的真實模型
   if(c.crackle&&Math.random()<dt*2.2) c.crackle();
-  tags.forEach((g,j)=>{ g.s.position.y=g.y+Math.sin(t*2+j)*.03; g.s.visible=mode==='room'&&!GR.on&&pickUI.classList.contains('hidden'); });
+  tags.forEach((g,j)=>{ g.s.position.y=(g.f==='herb'&&c.home&&c.home().furnLv('herb')===0?1.6:g.y)+Math.sin(t*2+j)*.03; g.s.visible=mode==='room'&&!GR.on&&pickUI.classList.contains('hidden')&&furnUI.classList.contains('hidden')&&(!g.f||g.ready); });
+  furnTick-=dt; if(furnTick<=0){ furnTick=3; updFurnTags(); syncTime(); }
   updGrill(dt);   // 爐火劈啪聲，隨機間隔
   updTanks(dt); R.setRenderTarget(null); R.render(scene,cam); }
 window.addEventListener('resize',()=>{ if(on) resize(); });
