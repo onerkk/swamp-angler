@@ -177,7 +177,7 @@ function hook(q){
 }
 function fishPos(out,y){ const az=G.f.az0+G.f.theta; out.set(G.base.x-Math.sin(az)*G.f.d,y,G.base.z-Math.cos(az)*G.f.d); if(G.loc==='sea') SEA.hullClear(out,.35); else if(G.loc==='ice'&&window.__ICE){ const hp=window.__ICE.holePos(); out.x=hp.x; out.z=hp.z; } return out; }
 function sizeWord(w){ return w<.6?'小傢伙':w<2.5?'中型魚':w<8?'大魚！':'巨物！！'; }
-function endFightUI(){ ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); }
+function endFightUI(){ ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); }
 function lose(reason){
   endFightUI(); WL.endChase(); SEA.endChase(); G.combo=0; FUN.combo(0); P.shadow.material.opacity=0; if(G.fish){ G.fish.group.visible=false; }
   if(reason==='gator'||reason==='shark'){ fishPos(tv,0); P.splash(tv.x,0,tv.z,60,1.6); W.addRipple(tv.x,tv.z,1.2); Snd.splash(1.5); Snd.gator(); biteFX(reason); }
@@ -513,7 +513,8 @@ function updateFight(dt){
   ui.fDist.textContent=f.d.toFixed(1)+' m'; ui.fName.textContent=(fd.boss?'👑 '+fd.boss.name+'　':'')+stars(fd)+' '+sizeWord(fd.w)+(dive?'，往深處鑽':shake?'，甩頭中':f.run?'，正在衝刺':'')+WL.chaseTxt();
   if(f.latDir!==0){ ui.steer.classList.remove('hidden'); ui.steer.textContent=f.latDir>0?'◀ 往左拉竿':'往右拉竿 ▶'; ui.steer.classList.toggle('ok',good>.4); }
   else ui.steer.classList.add('hidden');
-  setAct(G.held?'收線中':'按住<br>收線', f.run&&G.held&&f.T>.8?'魚在衝刺，先放手！':!f.run&&!G.held?'魚停了，快按住收線':'魚往哪游，就往反方向滑動拉竿', false);
+  if(f.slk>.3&&!f.slkW){ f.slkW=1; vib([40,40,40]); } if(f.slk<.1) f.slkW=0; ui.tBar.classList.toggle('slack',f.slk>.3);
+  setAct(G.held?'收線中':'按住<br>收線', f.slk>.3?'⚠️ 線太鬆了，快按住收線！':f.run&&G.held&&f.T>.8?'魚在衝刺，先放手！':!f.run&&!G.held?'魚停了，快按住收線':'魚往哪游，就往反方向滑動拉竿', false);
   if(WL.stolen()) return lose('gator');
   if(SEA.stolen()) return lose('shark');
   if(f.brk>=1){ if(window.__ECO&&window.__ECO.useLeader()){ f.brk=.35; toast('⛓️ 鋼絲前導線撐住了！','good',1600); vib(60); } else return lose('snap'); }
