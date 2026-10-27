@@ -479,7 +479,9 @@ function updateFight(dt){
   Tt+=(Math.sin(G.t*13.1)+Math.sin(G.t*7.3))*.015*(f.run?2:1)*DF.jit;
   f.T+=(Tt-f.T)*Math.min(1,dt*5);
   if(f.T>.9) f.brk+=dt*(f.T-.9)*14*META.gear().reel.drag*(1-.05*TR('power')); else f.brk=Math.max(0,f.brk-dt*.8);
-  if(f.T<.1) f.slk+=dt/(2.8*DF.slack); else f.slk=Math.max(0,f.slk-dt*1.5);
+  // 線太鬆：只有「沒在收線」而且張力過低時才累積——按住收線時線一定是繃的；小魚、漂流物本來就拉不出張力，不能因此判脫鉤
+  const lightCatch=!!(fd.item||fs.pow<.7||fd.w<.25);   // 漂流物、遺物（fd.item）、力氣很小或很輕的魚
+  if(f.T<.1&&!G.held&&!lightCatch) f.slk+=dt/(2.8*DF.slack); else f.slk=Math.max(0,f.slk-dt*(G.held?3:1.5));
   const zone=f.T>.4&&f.T<.8;
   const drain=(3+18*f.T)*(1+.8*clamp(good,0,1))*(zone?1.2:1)/(fs.stam*DF.stam*(.7+.25*Math.sqrt(fd.w)));
   f.stam=clamp(f.stam-drain*(window.__ECO&&window.__ECO.fxOn('meal_str')?1.3:1)*dt+(f.T<.2?2.5*dt:0),0,100);
