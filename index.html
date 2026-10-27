@@ -4425,11 +4425,13 @@ const ed=document.createElement('div'); ed.id='endBox'; ed.className='hidden'; d
 const ecss=document.createElement('style'); ecss.textContent=`#endBox{position:fixed;inset:0;z-index:27;background:radial-gradient(ellipse at 50% 30%,#1b2c4a,#05080f 75%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 26px;text-align:center;color:#e9f0ff}#endBox.hidden{display:none}
 #endBox p{margin:9px 0;font-size:17px;line-height:1.7;font-family:serif;opacity:0;animation:endIn 1.6s ease forwards}#endBox p.last{font-size:20px;color:#ffe3a3;margin-top:18px}
 #endBox .tt{opacity:0;animation:endIn 1.4s ease forwards;margin-top:26px;font-size:15px;color:#ffd56a}#endBox button{opacity:0;animation:endIn 1s ease forwards;margin-top:22px;padding:10px 26px;border-radius:999px;border:0;background:#ffd56a;color:#2a1a00;font-weight:800;font-size:15px}
+#endBox#endBox#endBox{visibility:visible!important}
 @keyframes endIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`; document.head.appendChild(ecss);
-function showEnding(ch){ const step=2.4;
-  ed.innerHTML=END.map((t,i)=>`<p class="${i===END.length-1?'last':''}" style="animation-delay:${(i*step).toFixed(1)}s">${t}</p>`).join('')+
-    `<div class="tt" style="animation-delay:${(END.length*step+.5).toFixed(1)}s">🏆 獲得稱號「守湖人」<br><small>經驗 ${ch.xp.toLocaleString()}・金幣 ${ch.coins.toLocaleString()}</small></div><button data-e="ok" style="animation-delay:${(END.length*step+1.5).toFixed(1)}s">回到碼頭</button>`;
-  ed.classList.remove('hidden'); st.ending=1; if(st.read.indexOf(ch.id)<0) st.read.push(ch.id); c.persist(); dot(); }
+// 終章結局：播放結局動畫〈月潮〉（z.js）；播完或略過後顯示稱號與獎勵。沒有 3D 結局可播時才退回逐段文字
+function showEnding(ch){ st.ending=1; if(st.read.indexOf(ch.id)<0) st.read.push(ch.id); c.persist(); dot();
+  const reward=()=>{ ed.innerHTML=`<p class="last" style="animation-delay:.2s">「月潮回來了。換我守著這片湖。」</p><div class="tt" style="animation-delay:1s">🏆 獲得稱號「守湖人」<br><small>經驗 ${ch.xp.toLocaleString()}・金幣 ${ch.coins.toLocaleString()}</small><br><small style="opacity:.75">之後的滿月夜，湖面會亮起月潮；碼頭盡頭留著老漁人的椅子和燈。<br>想再看一次結局：📖 手記 →「終章」→ 閱讀</small></div><button data-e="ok" style="animation-delay:2s">回到碼頭</button>`; ed.classList.remove('hidden'); };
+  if(window.__playEnding){ try{ window.__playEnding(reward); return; }catch(e){ console.warn('ending',e); } }
+  const step=2.4; ed.innerHTML=END.map((t,i)=>`<p class="${i===END.length-1?'last':''}" style="animation-delay:${(i*step).toFixed(1)}s">${t}</p>`).join('')+`<button data-e="ok" style="animation-delay:${(END.length*step+1).toFixed(1)}s">回到碼頭</button>`; ed.classList.remove('hidden'); }
 ed.addEventListener('click',e=>{ if(e.target.closest('[data-e=ok]')) ed.classList.add('hidden'); });
 function showPage(ch,isNew){ box.innerHTML=`<div class="pn"><button class="x" data-s="back">✕</button><h3>${isNew?'📖 找回了一頁手記':'📖 '+ch.name}</h3><div class="page">${ch.page}</div>${isNew?`<div class="rw">獲得經驗 ${ch.xp.toLocaleString()}、金幣 ${ch.coins.toLocaleString()}<br>開放：${ch.unlock}</div>`:''}</div>`;
   box.classList.remove('hidden'); if(st.read.indexOf(ch.id)<0){ st.read.push(ch.id); c.persist(); } dot(); }
@@ -5490,6 +5492,37 @@ const ENDING_CREDITS=`<h2>濕地垂釣</h2><div>Swamp Angler</div>
 <div class="r">音效</div><div class="n">OpenGameArt（CC0）</div>
 <div class="r">特別感謝</div><div class="n">每一個在碼頭上等過魚的人</div>
 <div class="last">謝謝你，陪老漁人走完這一段。</div>`;
+/* ===== 結局共用：月潮水光貼圖、碼頭盡頭的紀念（舊搖椅＋竹竿），結局動畫與結局後的湖都用同一份 ===== */
+function makeTideTex(){ const T=THREE, cv=document.createElement('canvas'); cv.width=cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,256,256);
+  for(let i=0;i<220;i++){ const x=Math.random()*256, y=Math.random()*256, r=8+Math.random()*26, rg=g.createRadialGradient(x,y,0,x,y,r); rg.addColorStop(0,`rgba(200,222,255,${.05+Math.random()*.09})`); rg.addColorStop(1,'rgba(200,222,255,0)'); g.fillStyle=rg; g.fillRect(x-r,y-r,r*2,r*2); }
+  for(let i=0;i<700;i++){ const r=.6+Math.random()*1.4; g.fillStyle=`rgba(240,246,255,${.3+Math.random()*.7})`; g.beginPath(); g.arc(Math.random()*256,Math.random()*256,r,0,7); g.fill(); }
+  const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; return t; }
+// 碼頭木板高 0.8 公尺、湖那一端在 z=-3.2；椅子面向湖
+function makeMemorial(load){ const T=THREE, g=new T.Group();
+  const chair=new T.Group(); load('models/home/Rockingchair_01.glb',m=>{ const o=m.scene.clone(true); o.traverse(x=>{ x.frustumCulled=false; }); chair.add(o); });
+  chair.position.set(.42,.72,-2.55); chair.rotation.y=Math.PI; g.add(chair);
+  const poleM=new T.MeshStandardMaterial({color:0xb8975a,roughness:.55}), pole=new T.Group();
+  { const m=new T.Mesh(new T.CylinderGeometry(.009,.02,3.2,10),poleM); m.position.y=1.6; pole.add(m);
+    for(let i=1;i<9;i++){ const r=new T.Mesh(new T.TorusGeometry(.02-.0011*i,.004,6,14),poleM); r.rotation.x=Math.PI/2; r.position.y=i*.36; pole.add(r); } }
+  pole.position.set(.82,.83,-2.45); pole.rotation.set(-.32,0,.12); g.add(pole);
+  return {g,chair,pole}; }
+/* ===== 結局之後的湖：碼頭盡頭常駐老漁人的椅子、竹竿與月光色的燈；滿月前後的夜晚，湖面亮起月潮 ===== */
+function createEndingWorld(W,c){
+  const T=THREE, S=W.scene, GL=new T.GLTFLoader(), load=(u,f)=>GL.load(u,f,undefined,()=>console.warn('afterglow model',u));
+  let built=false, mem=null, lamp=null, lampL=null, tide=null, tideM=null, t=0;
+  // 平常釣魚時椅子往碼頭右側挪一點，不要擋在正前方的拋竿視線上
+  function build(){ built=true; mem=makeMemorial(load); mem.g.position.x=.45; S.add(mem.g);
+    lamp=new T.Group(); lampL=new T.PointLight(0xcfe0ff,1.6,7,1.6); lampL.position.y=.22; lamp.add(lampL); lamp.position.set(-.05,.86,-2.75); mem.g.add(lamp);
+    load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.26); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xcfe0ff); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp.add(o); });
+    tideM=new T.MeshBasicMaterial({map:makeTideTex(),transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,color:0xcfe0ff,fog:false}); tideM.map.repeat.set(7,7);
+    tide=new T.Mesh(new T.PlaneGeometry(80,80).rotateX(-Math.PI/2),tideM); tide.position.set(-8,.27,-28); tide.renderOrder=3; S.add(tide); }
+  function update(dt){ const done=c.done(); if(!done&&!built) return; if(!built) build(); t+=dt;
+    const show=done&&c.lake()&&!c.ending(); mem.g.visible=show;
+    const h=((c.hour()%24)+24)%24, night=h>=19.8||h<4.8, moon=window.__MOONPH?window.__MOONPH.illum():0;
+    lampL.intensity=show?(night?1.8:.6)*(1+.08*Math.sin(t*5)):0;
+    const want=show&&night&&moon>.85?.55:0; tideM.opacity+=(want-tideM.opacity)*Math.min(1,dt*.5); tide.visible=tideM.opacity>.01; if(tide.visible) tideM.map.offset.set(t*.004,-t*.006); }
+  return {update};
+}
 /* ===== 結局分鏡（依劇本 src/ENDING.md 分段製作；已完成：演出系統、片尾名單、序幕、第一幕、第二幕、第三幕、第四幕） ===== */
 function endingShots(E,c){
   const T=THREE, W=c.W, S=W.scene, GL=new T.GLTFLoader(), cache={}, made=[];
@@ -5536,10 +5569,7 @@ function endingShots(E,c){
     const e=g.createLinearGradient(0,0,128,0); e.addColorStop(0,'rgba(0,0,0,1)'); e.addColorStop(.35,'rgba(0,0,0,0)'); e.addColorStop(.65,'rgba(0,0,0,0)'); e.addColorStop(1,'rgba(0,0,0,1)'); g.globalCompositeOperation='destination-out'; g.fillStyle=e; g.fillRect(0,0,128,256);
     const t=new T.CanvasTexture(cv); t.wrapT=T.RepeatWrapping; return t; })();
   // 月潮水光：只用柔和的光斑與零星亮點，不畫成一條條直線（避免看起來像下雨）
-  const tideTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,256,256);
-    for(let i=0;i<220;i++){ const x=Math.random()*256, y=Math.random()*256, r=8+Math.random()*26, rg=g.createRadialGradient(x,y,0,x,y,r); rg.addColorStop(0,`rgba(200,222,255,${.05+Math.random()*.09})`); rg.addColorStop(1,'rgba(200,222,255,0)'); g.fillStyle=rg; g.fillRect(x-r,y-r,r*2,r*2); }
-    for(let i=0;i<700;i++){ const r=.6+Math.random()*1.4; g.fillStyle=`rgba(240,246,255,${.3+Math.random()*.7})`; g.beginPath(); g.arc(Math.random()*256,Math.random()*256,r,0,7); g.fill(); }
-    const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; return t; })();
+  const tideTex=makeTideTex();
   const floodM=new T.MeshBasicMaterial({map:tideTex,transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,color:0xd8e8ff,fog:false});
   const flood=new T.Mesh(new T.PlaneGeometry(1,1).rotateX(-Math.PI/2),floodM); flood.renderOrder=3;
   const fromD=new T.Vector3(DY.x,0,DY.z).multiplyScalar(.97), toD=new T.Vector3(0,0,-6);
@@ -5596,12 +5626,7 @@ function endingShots(E,c){
   const merFace=()=>Math.atan2(CAMB.x-BAY.x,CAMB.z-BAY.z), CAMB=new T.Vector3(-10,1.45,-37.2);
   // 第四幕：碼頭盡頭（碼頭木板高 0.8 公尺、湖那一端在 z=-3.2）老漁人的舊椅子（Poly Haven WoodenChair_01）與靠在椅邊的竹竿
   // 老漁人的椅子：和小屋裡同款的舊搖椅（Poly Haven Rockingchair_01），面向湖
-  const chair=new T.Group(); load('models/home/Rockingchair_01.glb',g=>{ const o=g.scene.clone(true); o.traverse(m=>{ m.frustumCulled=false; }); chair.add(o); });
-  chair.position.set(.42,.72,-2.55); chair.rotation.y=Math.PI;
-  const poleM=new T.MeshStandardMaterial({color:0xb8975a,roughness:.55}), pole=new T.Group();
-  { const m=new T.Mesh(new T.CylinderGeometry(.009,.02,3.2,10),poleM); m.position.y=1.6; pole.add(m);
-    for(let i=1;i<9;i++){ const r=new T.Mesh(new T.TorusGeometry(.02-.0011*i,.004,6,14),poleM); r.rotation.x=Math.PI/2; r.position.y=i*.36; pole.add(r); } }
-  pole.position.set(.82,.83,-2.45); pole.rotation.set(-.32,0,.12);
+  const memo=makeMemorial(load), chair=memo.chair, pole=memo.pole;
   // 手記：真實紙張貼圖（ambientCG Paper001，CC0），老漁人的字一個字一個字浮現；最後一行是你自己的字
   const fl=document.createElement('link'); fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap';
   const LETTER=['孩子：','如果你讀到這一頁，代表月潮回來了。','我這輩子沒能把阿蘅帶回家，','所以想讓另一個孩子回家。','這件事我做了四十年，最後還是交給了你。','對不起，也謝謝你。','湖就交給你了。記得——','湖會告訴你很多事，只要你願意等。'];
@@ -6046,6 +6071,8 @@ const END=createEnding(W,{rig:()=>[P.rodGroup,bob],soundOn:()=>save.sound!==fals
   begin:()=>{ ENDSV.hour=G.hour; ENDSV.wx=save.wxMode; ENDSV.loc=G.loc||'lake'; ENDSV.base=G.base.clone(); G.state='ending'; save.wxMode='clear'; G.base.set(0,0,0); if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(.5); },
   end:()=>{ G.state='idle'; W.player.rotation.set(0,0,0); save.wxMode=ENDSV.wx; if(ENDSV.wx===undefined) delete save.wxMode; G.base.copy(ENDSV.base); G.hour=ENDSV.hour; W.setTime(G.hour,true); if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(null); if((G.loc||'lake')!==ENDSV.loc) SEA.setLoc(ENDSV.loc); if(window.__applyGfx) window.__applyGfx(save.gfx||'high'); }});
 window.__END=END;
+// 結局之後的湖：碼頭盡頭的紀念與滿月夜的月潮
+const AFTER=createEndingWorld(W,{done:()=>!!(save.story&&save.story.ending),lake:()=>(G.loc||'lake')==='lake'&&G.state!=='home',ending:()=>END.on(),hour:()=>G.hour});
 window.__playEnding=done=>{ if(G.state==='home'){ leaveHome(()=>window.__playEnding(done)); return; } END.play(endingShots(END,{save,W,P,G}),done); };
 // 靜月之光：作者的水晶小店（遊戲免費，喜歡的話可以支持作者）
 const SHOP_URL='https://tw.shp.ee/BcamsN2F';
@@ -6371,7 +6398,7 @@ W.setTime(G.hour,true);
 let last=performance.now(), prAcc=0, prN=0, prChecks=0;
 function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
-  try{ update(dt); if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()) GHOST.update(dt); if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
+  try{ update(dt); if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()) GHOST.update(dt); if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
   if(prAcc>2){ const avg=prAcc/prN; if(prChecks<10&&avg>1/40&&W.getPR()>1.01) W.setPR(Math.max(1,W.getPR()-.25)); if(prChecks===9&&avg>1/30&&(save.gfx||'high')==='high'&&!G.gfxHint){ G.gfxHint=true; toast('畫面有點卡，可以到設定把畫質調成「中」或「低」','warn',3500); } prChecks++; prAcc=0; prN=0; }
   requestAnimationFrame(frame);

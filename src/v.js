@@ -141,11 +141,13 @@ const ed=document.createElement('div'); ed.id='endBox'; ed.className='hidden'; d
 const ecss=document.createElement('style'); ecss.textContent=`#endBox{position:fixed;inset:0;z-index:27;background:radial-gradient(ellipse at 50% 30%,#1b2c4a,#05080f 75%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 26px;text-align:center;color:#e9f0ff}#endBox.hidden{display:none}
 #endBox p{margin:9px 0;font-size:17px;line-height:1.7;font-family:serif;opacity:0;animation:endIn 1.6s ease forwards}#endBox p.last{font-size:20px;color:#ffe3a3;margin-top:18px}
 #endBox .tt{opacity:0;animation:endIn 1.4s ease forwards;margin-top:26px;font-size:15px;color:#ffd56a}#endBox button{opacity:0;animation:endIn 1s ease forwards;margin-top:22px;padding:10px 26px;border-radius:999px;border:0;background:#ffd56a;color:#2a1a00;font-weight:800;font-size:15px}
+#endBox#endBox#endBox{visibility:visible!important}
 @keyframes endIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`; document.head.appendChild(ecss);
-function showEnding(ch){ const step=2.4;
-  ed.innerHTML=END.map((t,i)=>`<p class="${i===END.length-1?'last':''}" style="animation-delay:${(i*step).toFixed(1)}s">${t}</p>`).join('')+
-    `<div class="tt" style="animation-delay:${(END.length*step+.5).toFixed(1)}s">🏆 獲得稱號「守湖人」<br><small>經驗 ${ch.xp.toLocaleString()}・金幣 ${ch.coins.toLocaleString()}</small></div><button data-e="ok" style="animation-delay:${(END.length*step+1.5).toFixed(1)}s">回到碼頭</button>`;
-  ed.classList.remove('hidden'); st.ending=1; if(st.read.indexOf(ch.id)<0) st.read.push(ch.id); c.persist(); dot(); }
+// 終章結局：播放結局動畫〈月潮〉（z.js）；播完或略過後顯示稱號與獎勵。沒有 3D 結局可播時才退回逐段文字
+function showEnding(ch){ st.ending=1; if(st.read.indexOf(ch.id)<0) st.read.push(ch.id); c.persist(); dot();
+  const reward=()=>{ ed.innerHTML=`<p class="last" style="animation-delay:.2s">「月潮回來了。換我守著這片湖。」</p><div class="tt" style="animation-delay:1s">🏆 獲得稱號「守湖人」<br><small>經驗 ${ch.xp.toLocaleString()}・金幣 ${ch.coins.toLocaleString()}</small><br><small style="opacity:.75">之後的滿月夜，湖面會亮起月潮；碼頭盡頭留著老漁人的椅子和燈。<br>想再看一次結局：📖 手記 →「終章」→ 閱讀</small></div><button data-e="ok" style="animation-delay:2s">回到碼頭</button>`; ed.classList.remove('hidden'); };
+  if(window.__playEnding){ try{ window.__playEnding(reward); return; }catch(e){ console.warn('ending',e); } }
+  const step=2.4; ed.innerHTML=END.map((t,i)=>`<p class="${i===END.length-1?'last':''}" style="animation-delay:${(i*step).toFixed(1)}s">${t}</p>`).join('')+`<button data-e="ok" style="animation-delay:${(END.length*step+1).toFixed(1)}s">回到碼頭</button>`; ed.classList.remove('hidden'); }
 ed.addEventListener('click',e=>{ if(e.target.closest('[data-e=ok]')) ed.classList.add('hidden'); });
 function showPage(ch,isNew){ box.innerHTML=`<div class="pn"><button class="x" data-s="back">✕</button><h3>${isNew?'📖 找回了一頁手記':'📖 '+ch.name}</h3><div class="page">${ch.page}</div>${isNew?`<div class="rw">獲得經驗 ${ch.xp.toLocaleString()}、金幣 ${ch.coins.toLocaleString()}<br>開放：${ch.unlock}</div>`:''}</div>`;
   box.classList.remove('hidden'); if(st.read.indexOf(ch.id)<0){ st.read.push(ch.id); c.persist(); } dot(); }

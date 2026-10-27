@@ -80,6 +80,37 @@ const ENDING_CREDITS=`<h2>濕地垂釣</h2><div>Swamp Angler</div>
 <div class="r">音效</div><div class="n">OpenGameArt（CC0）</div>
 <div class="r">特別感謝</div><div class="n">每一個在碼頭上等過魚的人</div>
 <div class="last">謝謝你，陪老漁人走完這一段。</div>`;
+/* ===== 結局共用：月潮水光貼圖、碼頭盡頭的紀念（舊搖椅＋竹竿），結局動畫與結局後的湖都用同一份 ===== */
+function makeTideTex(){ const T=THREE, cv=document.createElement('canvas'); cv.width=cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,256,256);
+  for(let i=0;i<220;i++){ const x=Math.random()*256, y=Math.random()*256, r=8+Math.random()*26, rg=g.createRadialGradient(x,y,0,x,y,r); rg.addColorStop(0,`rgba(200,222,255,${.05+Math.random()*.09})`); rg.addColorStop(1,'rgba(200,222,255,0)'); g.fillStyle=rg; g.fillRect(x-r,y-r,r*2,r*2); }
+  for(let i=0;i<700;i++){ const r=.6+Math.random()*1.4; g.fillStyle=`rgba(240,246,255,${.3+Math.random()*.7})`; g.beginPath(); g.arc(Math.random()*256,Math.random()*256,r,0,7); g.fill(); }
+  const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; return t; }
+// 碼頭木板高 0.8 公尺、湖那一端在 z=-3.2；椅子面向湖
+function makeMemorial(load){ const T=THREE, g=new T.Group();
+  const chair=new T.Group(); load('models/home/Rockingchair_01.glb',m=>{ const o=m.scene.clone(true); o.traverse(x=>{ x.frustumCulled=false; }); chair.add(o); });
+  chair.position.set(.42,.72,-2.55); chair.rotation.y=Math.PI; g.add(chair);
+  const poleM=new T.MeshStandardMaterial({color:0xb8975a,roughness:.55}), pole=new T.Group();
+  { const m=new T.Mesh(new T.CylinderGeometry(.009,.02,3.2,10),poleM); m.position.y=1.6; pole.add(m);
+    for(let i=1;i<9;i++){ const r=new T.Mesh(new T.TorusGeometry(.02-.0011*i,.004,6,14),poleM); r.rotation.x=Math.PI/2; r.position.y=i*.36; pole.add(r); } }
+  pole.position.set(.82,.83,-2.45); pole.rotation.set(-.32,0,.12); g.add(pole);
+  return {g,chair,pole}; }
+/* ===== 結局之後的湖：碼頭盡頭常駐老漁人的椅子、竹竿與月光色的燈；滿月前後的夜晚，湖面亮起月潮 ===== */
+function createEndingWorld(W,c){
+  const T=THREE, S=W.scene, GL=new T.GLTFLoader(), load=(u,f)=>GL.load(u,f,undefined,()=>console.warn('afterglow model',u));
+  let built=false, mem=null, lamp=null, lampL=null, tide=null, tideM=null, t=0;
+  // 平常釣魚時椅子往碼頭右側挪一點，不要擋在正前方的拋竿視線上
+  function build(){ built=true; mem=makeMemorial(load); mem.g.position.x=.45; S.add(mem.g);
+    lamp=new T.Group(); lampL=new T.PointLight(0xcfe0ff,1.6,7,1.6); lampL.position.y=.22; lamp.add(lampL); lamp.position.set(-.05,.86,-2.75); mem.g.add(lamp);
+    load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.26); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xcfe0ff); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp.add(o); });
+    tideM=new T.MeshBasicMaterial({map:makeTideTex(),transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,color:0xcfe0ff,fog:false}); tideM.map.repeat.set(7,7);
+    tide=new T.Mesh(new T.PlaneGeometry(80,80).rotateX(-Math.PI/2),tideM); tide.position.set(-8,.27,-28); tide.renderOrder=3; S.add(tide); }
+  function update(dt){ const done=c.done(); if(!done&&!built) return; if(!built) build(); t+=dt;
+    const show=done&&c.lake()&&!c.ending(); mem.g.visible=show;
+    const h=((c.hour()%24)+24)%24, night=h>=19.8||h<4.8, moon=window.__MOONPH?window.__MOONPH.illum():0;
+    lampL.intensity=show?(night?1.8:.6)*(1+.08*Math.sin(t*5)):0;
+    const want=show&&night&&moon>.85?.55:0; tideM.opacity+=(want-tideM.opacity)*Math.min(1,dt*.5); tide.visible=tideM.opacity>.01; if(tide.visible) tideM.map.offset.set(t*.004,-t*.006); }
+  return {update};
+}
 /* ===== 結局分鏡（依劇本 src/ENDING.md 分段製作；已完成：演出系統、片尾名單、序幕、第一幕、第二幕、第三幕、第四幕） ===== */
 function endingShots(E,c){
   const T=THREE, W=c.W, S=W.scene, GL=new T.GLTFLoader(), cache={}, made=[];
@@ -126,10 +157,7 @@ function endingShots(E,c){
     const e=g.createLinearGradient(0,0,128,0); e.addColorStop(0,'rgba(0,0,0,1)'); e.addColorStop(.35,'rgba(0,0,0,0)'); e.addColorStop(.65,'rgba(0,0,0,0)'); e.addColorStop(1,'rgba(0,0,0,1)'); g.globalCompositeOperation='destination-out'; g.fillStyle=e; g.fillRect(0,0,128,256);
     const t=new T.CanvasTexture(cv); t.wrapT=T.RepeatWrapping; return t; })();
   // 月潮水光：只用柔和的光斑與零星亮點，不畫成一條條直線（避免看起來像下雨）
-  const tideTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,256,256);
-    for(let i=0;i<220;i++){ const x=Math.random()*256, y=Math.random()*256, r=8+Math.random()*26, rg=g.createRadialGradient(x,y,0,x,y,r); rg.addColorStop(0,`rgba(200,222,255,${.05+Math.random()*.09})`); rg.addColorStop(1,'rgba(200,222,255,0)'); g.fillStyle=rg; g.fillRect(x-r,y-r,r*2,r*2); }
-    for(let i=0;i<700;i++){ const r=.6+Math.random()*1.4; g.fillStyle=`rgba(240,246,255,${.3+Math.random()*.7})`; g.beginPath(); g.arc(Math.random()*256,Math.random()*256,r,0,7); g.fill(); }
-    const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; return t; })();
+  const tideTex=makeTideTex();
   const floodM=new T.MeshBasicMaterial({map:tideTex,transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,color:0xd8e8ff,fog:false});
   const flood=new T.Mesh(new T.PlaneGeometry(1,1).rotateX(-Math.PI/2),floodM); flood.renderOrder=3;
   const fromD=new T.Vector3(DY.x,0,DY.z).multiplyScalar(.97), toD=new T.Vector3(0,0,-6);
@@ -186,12 +214,7 @@ function endingShots(E,c){
   const merFace=()=>Math.atan2(CAMB.x-BAY.x,CAMB.z-BAY.z), CAMB=new T.Vector3(-10,1.45,-37.2);
   // 第四幕：碼頭盡頭（碼頭木板高 0.8 公尺、湖那一端在 z=-3.2）老漁人的舊椅子（Poly Haven WoodenChair_01）與靠在椅邊的竹竿
   // 老漁人的椅子：和小屋裡同款的舊搖椅（Poly Haven Rockingchair_01），面向湖
-  const chair=new T.Group(); load('models/home/Rockingchair_01.glb',g=>{ const o=g.scene.clone(true); o.traverse(m=>{ m.frustumCulled=false; }); chair.add(o); });
-  chair.position.set(.42,.72,-2.55); chair.rotation.y=Math.PI;
-  const poleM=new T.MeshStandardMaterial({color:0xb8975a,roughness:.55}), pole=new T.Group();
-  { const m=new T.Mesh(new T.CylinderGeometry(.009,.02,3.2,10),poleM); m.position.y=1.6; pole.add(m);
-    for(let i=1;i<9;i++){ const r=new T.Mesh(new T.TorusGeometry(.02-.0011*i,.004,6,14),poleM); r.rotation.x=Math.PI/2; r.position.y=i*.36; pole.add(r); } }
-  pole.position.set(.82,.83,-2.45); pole.rotation.set(-.32,0,.12);
+  const memo=makeMemorial(load), chair=memo.chair, pole=memo.pole;
   // 手記：真實紙張貼圖（ambientCG Paper001，CC0），老漁人的字一個字一個字浮現；最後一行是你自己的字
   const fl=document.createElement('link'); fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap';
   const LETTER=['孩子：','如果你讀到這一頁，代表月潮回來了。','我這輩子沒能把阿蘅帶回家，','所以想讓另一個孩子回家。','這件事我做了四十年，最後還是交給了你。','對不起，也謝謝你。','湖就交給你了。記得——','湖會告訴你很多事，只要你願意等。'];
