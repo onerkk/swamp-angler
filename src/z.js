@@ -79,7 +79,7 @@ const ENDING_CREDITS=`<h2>濕地垂釣</h2><div>Swamp Angler</div>
 <div class="r">音效</div><div class="n">OpenGameArt（CC0）</div>
 <div class="r">特別感謝</div><div class="n">每一個在碼頭上等過魚的人</div>
 <div class="last">謝謝你，陪老漁人走完這一段。</div>`;
-/* ===== 結局分鏡（依劇本 src/ENDING.md 分段製作；已完成：演出系統、片尾名單、序幕、第一幕、第二幕） ===== */
+/* ===== 結局分鏡（依劇本 src/ENDING.md 分段製作；已完成：演出系統、片尾名單、序幕、第一幕、第二幕、第三幕） ===== */
 function endingShots(E,c){
   const T=THREE, W=c.W, S=W.scene, GL=new T.GLTFLoader(), cache={}, made=[];
   let pending=0; const load=(u,f)=>{ if(cache[u]) return f(cache[u]); pending++; GL.load(u,g=>{ cache[u]=g; pending--; f(g); },undefined,()=>{ pending--; console.warn('ending model',u); }); };
@@ -165,6 +165,24 @@ function endingShots(E,c){
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), k2=1.62/Math.max(sz.y,1e-6); o.scale.setScalar(k2); o.updateMatrixWorld(true); const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); const w=new T.Group(); w.add(o); heng.add(w); });
   const lamp2=new T.Group(), lamp2L=new T.PointLight(0xffb866,0,8,1.6); lamp2.add(lamp2L);
   load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.24); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xffc070); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp2.add(o); });
+  // 第三幕：月光灣的岩石與汐月（玩家設定圖生成的 3D 模型），夜裡用自己的貼圖微微發光
+  const BAY=new T.Vector3(-12,0,-44), merG=new T.Group(), merW=new T.Group(); merG.add(merW); merG.position.copy(BAY);
+  // 只取石組裡的一顆石頭，半露出水面放在她身後，不要整組散在鏡頭前
+  load('rock_moss_set_01.glb',g=>{ const src=g.scene.getObjectByName('rock_moss_set_01_rock02'); if(!src) return; const r=src.clone(true); r.position.set(0,0,0); r.updateMatrixWorld(true);
+    const bb=new T.Box3().setFromObject(r), cc=bb.getCenter(new T.Vector3()); const w=new T.Group(); r.position.set(-cc.x,-.75,-cc.z); w.add(r); w.scale.setScalar(.75); w.position.set(-.55,0,-.65); r.traverse(m=>{ m.frustumCulled=false; }); merG.add(w); });
+  load('models/mermaid3d.glb',g=>{ const o=g.scene.clone(true); o.traverse(x=>{ if(x.isMesh){ const mp=x.material&&x.material.map; x.frustumCulled=false;
+      x.material=new T.MeshStandardMaterial({map:mp||null,roughness:.55,metalness:.05,emissive:new T.Color(0xffffff),emissiveMap:mp||null,emissiveIntensity:.32}); } });
+    o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(1.9/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
+    const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-.38-b2.min.y,-c2.z); merW.add(o); });   // 尾巴沒在淺水裡，像從水裡探出半身
+  const merL=new T.PointLight(0xcfe0ff,0,7,1.5); merL.position.set(.8,2.2,1.4); merG.add(merL);
+  // 最亮的那片月鱗：從汐月手上飄進提燈，燈火由暖黃變成月光色
+  const scaleTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=64; const g=cv.getContext('2d'), rg=g.createRadialGradient(32,32,0,32,32,32); rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(.25,'rgba(210,230,255,.85)'); rg.addColorStop(1,'rgba(160,200,255,0)'); g.fillStyle=rg; g.fillRect(0,0,64,64); return new T.CanvasTexture(cv); })();
+  const moonScale=new T.Sprite(new T.SpriteMaterial({map:scaleTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,fog:false})); moonScale.scale.set(.32,.32,1);
+  const silverC=new T.Color(0xcfe0ff), warmC=new T.Color(0xffb866);
+  // 汐月游走時留下的銀光尾跡
+  const trail=[]; function trailDot(x,y,z){ const sp=new T.Sprite(new T.SpriteMaterial({map:scaleTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,fog:false,opacity:.9})); sp.scale.set(.5,.5,1); sp.position.set(x,y,z); keep(sp); trail.push({sp,t:0}); }
+  function updTrail(dt){ for(let i=trail.length-1;i>=0;i--){ const d=trail[i]; d.t+=dt; d.sp.material.opacity=Math.max(0,.9-d.t/3); d.sp.position.y+=dt*.08; if(d.t>3){ S.remove(d.sp); trail.splice(i,1); } } }
+  const merFace=()=>Math.atan2(CAMB.x-BAY.x,CAMB.z-BAY.z), CAMB=new T.Vector3(-10,1.45,-37.2);
   const title=document.createElement('div'); title.style.cssText='position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:41;pointer-events:none;color:#f2ecdf;font-family:serif;opacity:0;transition:opacity 1.6s ease';
   title.innerHTML='<div style="font-size:13px;letter-spacing:.6em;opacity:.7">終章之後</div><div style="font-size:34px;letter-spacing:.5em;margin-top:14px;color:#ffe3a3">月潮</div>';
   return [
@@ -219,6 +237,37 @@ function endingShots(E,c){
         else { lamp2.position.set(-9,1.0,-27); lamp2L.intensity=t<6?1.4:Math.max(0,1.4*(1-(t-6)/5)); lamp2.visible=t<11.5; } },
       subs:met?[[1,'浮萍灣的水面上，站著一個提燈的女孩。','',4.4],[6.2,'她朝你點點頭，把燈放在荷葉上——','',3.6],[10.6,'轉身，走進了光裡。','q',4.2]]
               :[[1,'浮萍灣深處，有一盞燈亮著。','',4.4],[7,'等你回頭再看，它已經慢慢熄了。','',4.6]]},
+    // 第三幕一：月光灣——汐月坐在岩石上，等你
+    {d:15,hour:22,sea:false,music:'theme',vol:.7,from:[[-6.5,2.3,-31],[-12,1.6,-44]],to:[[-9.6,1.6,-36.6],[-12,1.7,-44]],
+      enter:()=>{ S.remove(lake); S.remove(ff); S.remove(heng); S.remove(lamp2); keep(merG); merW.rotation.set(0,merFace(),0); merW.position.set(0,0,0); merL.intensity=1.6; keep(lampG); lampG.position.set(-8.95,.96,-37.75); lampL.intensity=1.4; lampL.color.copy(warmC); },
+      tick:(t)=>{ merW.position.y=Math.sin(t*.9)*.015; lampG.rotation.z=Math.sin(t*1.1)*.04; },
+      subs:[[1.2,'「四十年前，堤防關上的那晚，我回不去了。」','q',5],[7.6,'「是他第一個發現我。他什麼也沒問，\n只說：『我會想辦法讓妳回家。』」','q',6]]},
+    // 第三幕二：近一點——她說起老漁人
+    {d:15,hour:22.05,sea:false,from:[[-10.2,1.5,-38.6],[-12,1.85,-44]],to:[[-10.6,1.5,-40],[-12,1.9,-44]],
+      tick:(t)=>{ merW.position.y=Math.sin(t*.9)*.015; merW.rotation.y=merFace()+Math.sin(t*.4)*.05; },
+      subs:[[1,'「每個滿月他都提燈來。後來他走不動了，\n就坐在碼頭上，把燈舉得高高的，讓我看得見。」','q',6.4],[8.6,'「他說，他欠一個女孩一盞燈。」','q big',5.4]]},
+    // 第三幕三：水道口，海王浮了起來——眼裡的光不再兇狠
+    {d:12,hour:22.1,sea:false,from:[[-9,1.9,-37],[-13,3,-58]],to:[[-9.4,1.7,-38],[-13.5,3.6,-60]],
+      enter:()=>{ keep(king); king.position.set(-14,-6,-62); king.rotation.set(0,Math.atan2(BAY.x+14,BAY.z+62),0); kingEye.intensity=0; kingEye.color.set(0xcfe8ff); },
+      tick:(t)=>{ king.position.y=Math.min(-2.2,-6+t*.9)+Math.sin(t*.7)*.08; kingEye.intensity=Math.min(1,Math.max(0,(t-3)/3)); if(t<5&&Math.random()<.25) spl(-14+(Math.random()-.5)*4,-60,8,1.3); merW.rotation.y=merFace()+Math.min(1,t/3)*1.9; },
+      subs:[[5.5,'「……爸爸在外面等我。」','q',5]]},
+    // 第三幕四：她把最亮的一片月鱗放進你的燈
+    {d:12,hour:22.15,sea:false,from:[[-10.3,1.42,-38.3],[-11.4,1.4,-42.6]],to:[[-10.5,1.36,-38.9],[-11.2,1.3,-41.6]],
+      enter:()=>{ merW.rotation.y=merFace(); keep(moonScale); moonScale.visible=false; lampG.position.set(-10.22,1.06,-39.7); sc.ms=0; },
+      tick:(t)=>{ merW.position.y=Math.sin(t*.9)*.015; const u=Math.min(1,Math.max(0,(t-2)/3)); moonScale.visible=t>2&&u<1;
+        const a=new T.Vector3(BAY.x+.25,1.75,BAY.z+.45), b2=lampG.position.clone().add(new T.Vector3(0,.12,0)); moonScale.position.copy(a.lerp(b2,u)); moonScale.position.y+=Math.sin(u*Math.PI)*.35;
+        moonScale.material.rotation=t*2; const g2=Math.min(1,Math.max(0,(t-5)/1.5)); lampL.color.copy(warmC).lerp(silverC,g2); lampL.intensity=1.4+1.4*g2*(1+.15*Math.sin(t*6));
+        lampG.traverse(m=>{ if(m.isMesh&&m.material&&m.material.emissive) m.material.emissive.copy(new T.Color(0xffc070).lerp(silverC,g2)); }); },
+      subs:[[6.2,'「謝謝你，替他把路走完。」','q big',5]]},
+    // 第三幕五：汐月滑進水裡，游向水道口，回頭看你一次，和海王一起沉回大海
+    {d:15,hour:22.2,sea:false,from:[[-9.2,2.4,-36],[-12.5,.5,-50]],to:[[-8.6,2.9,-35],[-13.6,.4,-58]],
+      enter:()=>{ S.remove(moonScale); sc.tr=0; },
+      tick:(t)=>{ const u=Math.min(1,t/9), path=new T.Vector3(BAY.x,0,BAY.z).lerp(new T.Vector3(-13.6,0,-59),u);
+        merW.position.set(path.x-BAY.x,(t<1.5?-.4*t/1.5:-.4-.5*Math.min(1,Math.max(0,(t-9)/2)))+(t>4.6&&t<6.6?.35*Math.sin((t-4.6)/2*Math.PI):0),path.z-BAY.z);
+        merW.rotation.y=t>4.6&&t<6.6?merFace():Math.atan2(-13.6-BAY.x,-59-BAY.z);
+        sc.tr-=1/60; if(sc.tr<=0&&t>1&&t<10.5){ sc.tr=.12; const wp=merW.getWorldPosition(new T.Vector3()); trailDot(wp.x+(Math.random()-.5)*.3,.3,wp.z+(Math.random()-.5)*.3); }
+        if(t>9){ king.position.y=-2.2-(t-9)*.9; kingEye.intensity=Math.max(0,1-(t-9)/3); } if(t>10&&t<11) spl(-13.8,-59.5,12,1.6); updTrail(1/60); },
+      subs:[[5,'她回頭看了你一眼。','',3.6],[10.5,'月潮回到了大海。','',4]]},
     // 片尾名單（第二到第四幕完成後，會插在這之前）
     {d:30,hour:6.6,hourTo:8,sea:false,music:'theme',vol:.85,from:[[0,10,14],[0,0,-30]],to:[[0,28,26],[0,0,-40]],
       enter:()=>{ drop(); E.credits(ENDING_CREDITS,28); }, cleanup:drop}
