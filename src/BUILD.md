@@ -34,3 +34,7 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 
 ## 結局
 - z.js：結局演出系統（createEnding、endingShots）；劇本與分段見 src/ENDING.md；預覽網址 ?ending=1；配樂 end_piano.mp3、end_theme.mp3（CC0）
+
+## 角色模型（2026-10-27）
+- 汐月 mermaid3d.glb、阿蘅 ghost_alive.glb、女鬼 ghost.glb、海王 seaking.glb：用使用者設定圖（src/fish6/chars）經 Hunyuan3D-2mv 生成、bake_planar 正背面投影烘焙
+- 骨架：z.js autoRig(root,kind) 載入時自動綁骨（tail＝人魚/海王，human＝人形），rig.pose({t,headYaw,headPitch,headRoll,bow,tail,tailF,skirt,breathe})；p.js、x.js、結局都使用

@@ -1,6 +1,7 @@
 /* ===== 湖裡還有人等燈：阿蘅（夜裡偶爾出現的驚嚇事件，之後接隱藏章節） ===== */
 function createGhost(W,c){
 'use strict';
+let ghostRig=null, aliveRig=null;
 const T=THREE, S=c.save, GL=T.GLTFLoader?new T.GLTFLoader():null;
 let model=null, loading=false, mats=[], ev=null, lastTry=0, sessionStart=performance.now();
 let alive=null, aliveLoading=false, fin=null, calm=null, calmTry=0;
@@ -30,7 +31,7 @@ function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wa
 function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=true;
   GL.load('models/ghost.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ mt.fog=true; mt.transparent=true; mt.opacity=.88; mt.depthWrite=true; mt.roughness=1; mt.metalness=0; if(mt.map){ mt.emissive=new T.Color(0x8fa0b8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.12; } mats.push(mt); } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
-    const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z);
+    const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); o.updateMatrixWorld(true); try{ ghostRig=autoRig(o,'human'); }catch(e){ console.warn('ghost rig',e); }
     model=new T.Group(); model.add(o); model.visible=false; W.scene.add(model); loading=false; fn(model); },undefined,()=>{ loading=false; }); }
 // 真人尖叫與哀鳴（OpenGameArt CC0）
 const tv=new T.Vector3();
@@ -79,7 +80,7 @@ function endEv(){ if(model) model.visible=false; if(ov) ov.classList.remove('on'
 let ripT=0;
 function blend(dt){ if(!model||!model.visible) return; const lt=W.info?W.info.light:1; mats.forEach(m=>{ if(m.emissiveIntensity!==undefined) m.emissiveIntensity=.1+Math.max(0,.5-lt)*.7; });
   ripT-=dt; if(ripT<=0&&model.position.y>-1.9){ ripT=.9+Math.random()*.6; if(W.addRipple) W.addRipple(model.position.x,model.position.z,.35); } }
-function update(dt){ blend(dt);
+function update(dt){ { const tt=performance.now()/1000; if(ghostRig) ghostRig.pose({t:tt,breathe:.004,headRoll:.14+.05*Math.sin(tt*.7),headPitch:.12,skirt:.05}); if(aliveRig) aliveRig.pose({t:tt,headPitch:.08,skirt:.025}); } blend(dt);
   if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0;
       if(!model&&!loading&&(TEST||!S.noScare&&c.period()==='night'&&c.loc()==='lake')) load(()=>{});
       if(eligible()&&(TEST||Math.random()<1/2400)){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }
@@ -109,7 +110,7 @@ function onPhoto(){ if(!ev||ev.mode!=='glide'||ev.phase==='sink') return false; 
 function loadAlive(fn){ if(alive) return fn(alive); if(aliveLoading||!GL) return; aliveLoading=true;
   GL.load('models/ghost_alive.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ mt.emissive=new T.Color(0xe8e2d8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.7; mt.transparent=true; } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), sc=1.66/Math.max(sz.y,1e-6); o.scale.setScalar(sc); o.updateMatrixWorld(true);
-    const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z);
+    const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); o.updateMatrixWorld(true); try{ aliveRig=autoRig(o,'human'); }catch(e){ console.warn('alive rig',e); }
     alive=new T.Group(); alive.add(o); alive.visible=false; W.scene.add(alive); aliveLoading=false; fn(alive); },undefined,()=>{ aliveLoading=false; }); }
 function placeAhead(m,dist,side){ const b=c.base(), h=c.head(), fw=new T.Vector3(-Math.sin(h),0,-Math.cos(h)), rt=new T.Vector3(Math.cos(h),0,-Math.sin(h));
   const p=new T.Vector3(b.x,0,b.z).addScaledVector(fw,dist).addScaledVector(rt,side||0); m.position.set(p.x,0,p.z); m.rotation.y=Math.atan2(b.x-p.x,b.z-p.z); return p; }

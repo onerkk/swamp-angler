@@ -59,7 +59,8 @@ let mer3=null;
 if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid3d.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.42,metalness:.08,emissive:new T.Color(0xe4ecff),emissiveMap:mp||null,emissiveIntensity:.15}); merMats.push(x.material); x.frustumCulled=false; } });
   o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.9/Math.max(sz.y,1e-6); o.scale.setScalar(s);
   o.updateMatrixWorld(true); const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,.15-b2.min.y,-c2.z);
-  mer3=new T.Group(); mer3.add(o); npc.add(mer3); mer.visible=false; });
+  mer3=new T.Group(); mer3.add(o); npc.add(mer3); mer.visible=false; mer3.updateMatrixWorld(true); try{ merRig=autoRig(o,'tail'); }catch(e){ console.warn('mer rig',e); } });
+let merRig=null;
 const glow=new T.Sprite(new T.SpriteMaterial({map:halo.material.map,color:0x66ccff,blending:T.AdditiveBlending,depthWrite:false,transparent:true})); glow.scale.set(4,4,1); glow.position.y=1.2; npc.add(glow);
 /* 對話介面 */
 const st=document.createElement('style'); st.textContent=`
@@ -119,7 +120,7 @@ function update(dt){ W.camera.getWorldPosition(cam); merNight();
   act+=((active()?1:0)-act)*Math.min(1,dt*.8);
   { const ended=c.save&&c.save.story&&c.save.story.ending, nightK=Math.max(0,Math.min(1,(.25-W.info.day)*5)), want=ended&&c.G&&c.G.loc==='lake'?.35*nightK:0;   // 月潮回來後：湖上夜晚永遠帶著淡淡的生物螢光
     endGlow+=(want-endGlow)*Math.min(1,dt*.5); W.U.uBio.value=Math.max(act,endGlow); }
-  npc.visible=act>.05; if(npc.visible){ mer.material.opacity=act; mer.rotation.y=Math.atan2(cam.x-NP.x,cam.z-NP.z); if(mer3) mer3.rotation.y=mer.rotation.y; glow.material.opacity=.5*act*(0.8+0.2*Math.sin(performance.now()*.002)); }
+  npc.visible=act>.05; if(npc.visible){ mer.material.opacity=act; mer.rotation.y=Math.atan2(cam.x-NP.x,cam.z-NP.z); if(mer3) mer3.rotation.y=mer.rotation.y; if(merRig) merRig.pose({t:performance.now()/1000,tail:.1,headPitch:.06+.04*Math.sin(performance.now()/2300),headYaw:.15*Math.sin(performance.now()/3100)}); glow.material.opacity=.5*act*(0.8+0.2*Math.sin(performance.now()*.002)); }
   const near=npc.visible&&Math.hypot(cam.x-NP.x,cam.z-NP.z)<35; tb.classList.toggle('hidden',!near||act<.5);
   if(near&&MS.read<unlocked()) tb.classList.add('dot'); }
 return {update,onCatch,koiK,active,scaleFx};
