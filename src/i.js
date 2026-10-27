@@ -166,16 +166,31 @@ const ACH=[
  ['scene3','美景獵人','拍下 3 種美景',()=>[Object.keys(S.scenes||{}).length,3],1200],
  ['sceneAll','美景收藏家','拍下全部 8 種美景',()=>[Object.keys(S.scenes||{}).length,8],8000]];
 ACH.push(...spotAch());
-const MER_NEXT=['第 1 次相遇：她會告訴你一個秘密地點','第 2 次相遇：她會送你月光餌','第 3 次相遇：人魚之竿','第 4 次相遇：人魚的祝福','第 5 次相遇：月下之歌'];
+const MER_NEXT=['第 1 次相遇：她會告訴你一個秘密地點','第 2 次相遇：她會送你月光餌','第 3 次相遇：人魚之竿','第 4 次相遇：人魚的祝福','第 5 次相遇：月下之歌',
+  '第 6 次相遇：月光餌 ×5','第 7 次相遇：潮汐之語（傳說魚 +15%）','第 8 次相遇：人魚的鱗片（賣魚收入 +10%）','第 9 次相遇：沉船裡的金幣','第 10 次相遇：人魚的祝福・貳（稀有魚再提升）',
+  '第 11 次相遇：月光餌 ×10','第 12 次相遇：海王的回禮','第 13 次相遇：月潮之歌（傳說魚再 +15%）','第 14 次相遇：月光餌 ×15','第 15 次相遇：月潮的守護者（賣魚收入 +20%）'];
+// 第 6 次以後的禮物（加成本身在釣魚與賣魚時依相遇次數判斷）
+const MER_GIFT={6:{moon:5},9:{coins:20000},11:{moon:10},12:{coins:50000},14:{moon:15},15:{coins:100000}};
 const STORY=[
  ['她把一片發光的鱗片放在你掌心，用指尖在水面畫出一個位置。「月光灣……只告訴你。」','解鎖秘境：月光灣（獨木舟可前往，夜裡傳說生物最多）'],
  ['她記得你了。這次她從水底撈起一串散發微光的餌，輕輕掛在你的釣竿上。','月光餌 ×3'],
  ['她送你一根像月光般潔白的釣竿，竿身刻著看不懂的古老文字。','人魚之竿（到釣具店免費裝備）'],
  ['她握住你的手，低聲唱了一段旋律。從今以後，濕地的魚似乎都對你特別友善。','人魚的祝福：稀有魚機率永久提升'],
- ['滿月的夜裡，她在月光灣為你唱完整首歌。整片濕地的螢火蟲同時亮了起來。','成就「人魚的知己」可以領取 🪙15000']];
+ ['滿月的夜裡，她在月光灣為你唱完整首歌。整片濕地的螢火蟲同時亮了起來。','成就「人魚的知己」可以領取 🪙15000'],
+ ['她從水底捧起一把發光的餌，像撒星星一樣撒進你的餌盒。','月光餌 ×5'],
+ ['她教你聽水的聲音。「潮水會告訴你，傳說在哪裡呼吸。」','潮汐之語：傳說魚上鉤機率永久 +15%'],
+ ['她拔下一片最亮的鱗片，繫在你的釣竿上。「魚市的人會知道，這是被人魚祝福過的魚。」','人魚的鱗片：賣魚收入永久 +10%'],
+ ['她帶你看湖底一艘很老很老的沉船，從船艙裡推出一只生鏽的錢箱。','金幣 🪙20000'],
+ ['她又握住你的手，這次唱得更久。湖面上的月光，一路鋪到你的船邊。','人魚的祝福・貳：稀有魚機率再提升'],
+ ['「這些給你，滿月的晚上用。」她把餌一顆一顆排在你的船舷上。','月光餌 ×10'],
+ ['她說：「爸爸（海王）要我把這個交給你。」是一袋被海水磨亮的古老金幣。','海王的回禮 🪙50000'],
+ ['她在月光灣唱起一首你從沒聽過的歌，遠方的海也跟著輕輕應和。','月潮之歌：傳說魚上鉤機率再 +15%'],
+ ['她把一整串發光的餌掛在你的燈下。「這樣，湖裡的大家都知道你來了。」','月光餌 ×15'],
+ ['滿月正圓。她在你面前低下頭，像當年老漁人對她那樣，輕聲說：「謝謝你，一直守著這片湖。」','稱號「月潮的守護者」・賣魚收入 +20%・🪙100000']];
 const fmt=v=>v%1?v.toFixed(1):v;
+function merHearts(m){ return '💗'.repeat(Math.min(m,5))+'🤍'.repeat(Math.max(0,5-m))+(m>=5?' '+'🌕'.repeat(Math.min(m-5,10))+'🌑'.repeat(Math.max(0,10-(m-5))):''); }
 function goalsRender(){ const m=merN();
-  let h=`<div class="merbox"><b>🧜 人魚之約</b><span>${'💗'.repeat(Math.min(m,5))}${'🤍'.repeat(Math.max(0,5-m))}</span><small>${m<5?'下一步：'+MER_NEXT[m]:'你已是她最信任的人，她仍會在夜裡來看你'}</small>${m===0?'<small>提示：夜晚、起霧或深水中央，用月光餌最容易遇見她。</small>':''}</div>`;
+  let h=`<div class="merbox"><b>🧜 人魚之約</b><span>${merHearts(m)}</span><small>${m<15?'下一步：'+MER_NEXT[m]:'你已是月潮的守護者，她仍會在夜裡來看你'}</small><small style="opacity:.7">每次相遇後，她要過一段時間才會再出現</small>${m===0?'<small>提示：夜晚、起霧或深水中央，用月光餌最容易遇見她。</small>':''}</div>`;
   h+=ACH.map(a=>{ const [cur,g]=a[3](), done=cur>=g, cl=S.ach&&S.ach[a[0]];
     return `<div class="row"><div class="nm"><b>${a[1]}</b><small>${a[2]}（${fmt(Math.min(cur,g))}/${g}）</small><span class="pbar"><i style="width:${Math.min(100,cur/g*100)}%"></i></span></div><div class="rt">${cl?'<span class="eqd">已領取</span>':done?`<button class="sbtn pri" data-ach="${a[0]}">領 🪙${Math.round(a[4]*.5)}</button>`:`<small>🪙${Math.round(a[4]*.5)}</small>`}</div></div>`; }).join('');
   $('goalB').innerHTML=h; }
@@ -185,11 +200,12 @@ $('goalX').addEventListener('click',()=>$('goal').classList.add('hidden'));
 $('goal').addEventListener('click',e=>{ if(e.target.id==='goal') $('goal').classList.add('hidden'); const b=e.target.closest('[data-ach]'); if(!b) return;
   const a=ACH.find(x=>x[0]===b.dataset.ach); if(!a) return; S.ach=S.ach||{}; if(S.ach[a[0]]) return;
   const ac=Math.round(a[4]*.5); S.ach[a[0]]=1; S.coins+=ac; c.persist(); c.setCoins(); c.Snd.coin(); c.toast('成就達成：'+a[1]+'　🪙'+ac,'good',2200); goalsRender(); goalsDot(); });
-function merMeet(){ S.mer=S.mer||{n:0}; S.mer.n++; const n=S.mer.n;
+function merMeet(){ S.mer=S.mer||{n:0}; S.mer.n++; S.mer.last=Date.now(); const n=S.mer.n;
   if(n===2){ S.baits=S.baits||{}; S.baits.moon=(S.baits.moon||0)+3; }
+  const gf=MER_GIFT[n]; if(gf){ if(gf.moon){ S.baits=S.baits||{}; S.baits.moon=(S.baits.moon||0)+gf.moon; } if(gf.coins){ S.coins+=gf.coins; if(c.setCoins) c.setCoins(); } }
   G.luck=.25; c.persist(); goalsDot();
   const st=STORY[n-1]||['她又來看你了，在你的浮標旁繞了一圈才離開。','好運加滿'];
-  $('stT').textContent='人魚之約　'+'💗'.repeat(Math.min(n,5)); $('stB').textContent=st[0]; $('stR').textContent='獲得：'+st[1];
+  $('stT').textContent='人魚之約　'+merHearts(n); $('stB').textContent=st[0]; $('stR').textContent='獲得：'+st[1];
   $('story').classList.remove('hidden'); c.Snd.fanfare(4); }
 $('stX').addEventListener('click',()=>$('story').classList.add('hidden'));
 setTimeout(goalsDot,500);

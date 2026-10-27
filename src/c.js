@@ -445,7 +445,7 @@ const SPECIES=[
  {id:'mermaid',loc:'both',name:'美人魚',sci:'Sirena paludis（幻想）',rar:5,lvl:[88,99],len:[150,185],k:4.5,price:120,special:'mermaid',
   sh:{H:.075,W:.06,prof:4.2,eyeT:.9,eye:.02,tail:.26,fork:.9,dorsal:[[0,0],[.01,0]],anal:[[0,0],[.01,0]]},
   col:{back:'#1f6f78',flank:'#3fb8b0',belly:'#bff0e0',fin:'#5fe0d0',eye:'#2a1a1a'},pat:{t:'plain'},scale:1.6,metal:.6,
-  f:{pow:2.2,spd:1.7,agi:1.5,jump:.2,stam:2.0,win:1.4},time:{dawn:.2,day:0,dusk:.4,night:1.5},desc:'濕地最古老的傳說。她不能被賣掉；送她回家，她會留下一份謝禮。'},
+  f:{pow:2.8,spd:2.0,agi:1.9,jump:.2,stam:2.7,win:1.15},time:{dawn:.2,day:0,dusk:.4,night:1.5},desc:'濕地最古老的傳說。她不能被賣掉；送她回家，她會留下一份謝禮。'},
  {id:'amber',name:'紅甘',sci:'Seriola dumerili',loc:'sea',rar:0,lvl:[20,32],len:[45,110],k:11,price:40,
   sh:{H:.12,W:.06,prof:1.4,eyeT:.88,eye:.026,tail:.26,fork:.9,dorsal:[[-.2,0],[-.15,.08],[.05,.05],[.1,0]],anal:[[-.25,0],[-.2,.06],[-.05,0]]},
   col:{back:'#5a5e46',flank:'#c8c2b0',belly:'#f2f0ea',fin:'#8a7a50',eye:'#b09040'},pat:{t:'band',k:.5,c:'#b08a3a'},scale:.4,metal:.6,

@@ -1426,7 +1426,7 @@ const SPECIES=[
  {id:'mermaid',loc:'both',name:'美人魚',sci:'Sirena paludis（幻想）',rar:5,lvl:[88,99],len:[150,185],k:4.5,price:120,special:'mermaid',
   sh:{H:.075,W:.06,prof:4.2,eyeT:.9,eye:.02,tail:.26,fork:.9,dorsal:[[0,0],[.01,0]],anal:[[0,0],[.01,0]]},
   col:{back:'#1f6f78',flank:'#3fb8b0',belly:'#bff0e0',fin:'#5fe0d0',eye:'#2a1a1a'},pat:{t:'plain'},scale:1.6,metal:.6,
-  f:{pow:2.2,spd:1.7,agi:1.5,jump:.2,stam:2.0,win:1.4},time:{dawn:.2,day:0,dusk:.4,night:1.5},desc:'濕地最古老的傳說。她不能被賣掉；送她回家，她會留下一份謝禮。'},
+  f:{pow:2.8,spd:2.0,agi:1.9,jump:.2,stam:2.7,win:1.15},time:{dawn:.2,day:0,dusk:.4,night:1.5},desc:'濕地最古老的傳說。她不能被賣掉；送她回家，她會留下一份謝禮。'},
  {id:'amber',name:'紅甘',sci:'Seriola dumerili',loc:'sea',rar:0,lvl:[20,32],len:[45,110],k:11,price:40,
   sh:{H:.12,W:.06,prof:1.4,eyeT:.88,eye:.026,tail:.26,fork:.9,dorsal:[[-.2,0],[-.15,.08],[.05,.05],[.1,0]],anal:[[-.25,0],[-.2,.06],[-.05,0]]},
   col:{back:'#5a5e46',flank:'#c8c2b0',belly:'#f2f0ea',fin:'#8a7a50',eye:'#b09040'},pat:{t:'band',k:.5,c:'#b08a3a'},scale:.4,metal:.6,
@@ -1844,7 +1844,7 @@ const BAITS=[
  {id:'spoon',lure:'spoon',name:'金屬亮片',icon:'🥄',price:900,pack:15,lv:4,desc:'中速穩定收線，閃光吸引掠食魚（路亞：自己收線操作）',aff:{perch:2,lmbass:1.8,smbass:1.8,amber:1.6,ribbon:2,peacock:1.8,snakehead:1.2,spgar:1.2,sawara:2.2,skipjack:2,yellowfin:1.2,char:1.4,laketrout:1.8,taimen:1.6,yperch:1.2,gt:1.2,threadfin:1.4},rare:.4,wait:1},
  {id:'crank',lure:'crank',name:'曲柄硬餌',icon:'🐠',price:1400,pack:15,lv:6,desc:'快速收線會下潛，黑鱸、金目鱸最愛（需要好捲線器）',aff:{lmbass:2.5,smbass:2.2,barra:2,gar:1.5,grouper:1.5,mahi:1.4,peacock:2.2,spgar:1.2,arapaima:1.2,emperor:1.2,cobia:1.4,gt:1.6,taimen:1.4},rare:.5,wait:1},
  {id:'minnow',lure:'minnow',name:'米諾',icon:'🐟',price:1800,pack:15,lv:8,desc:'抽一下、停一下，模仿受傷小魚，大型掠食魚無法抗拒',aff:{smbass:2.2,barra:2.2,lmbass:1.6,tuna:1.6,mahi:1.8,marlin:1.4,peacock:2.6,snakehead:1.6,spgar:1.6,arapaima:1.5,yellowfin:1.8,sawara:1.6,skipjack:1.4,cobia:1.5,gt:2.4,taimen:2,laketrout:1.6,swordfish:1.2,threadfin:1.6},rare:.6,wait:1},
- {id:'moon',name:'月光餌',icon:'🌙',price:1500,pack:3,lv:3,desc:'散發微光的神秘餌，傳說中的生物會被吸引',aff:{mermaid:25,ghost:12,golden:12,seabeast:10},rare:.6,wait:1.3}];
+ {id:'moon',name:'月光餌',icon:'🌙',price:1500,pack:3,lv:3,desc:'散發微光的神秘餌，傳說中的生物會被吸引',aff:{mermaid:7,ghost:12,golden:12,seabeast:10},rare:.6,wait:1.3}];
 const BOAT_COST={coins:25000,scale:30,bone:10,pearl:2};   // 修復老漁人的漁船
 const xpNext=lv=>Math.round(120*Math.pow(lv,1.75));   // 升級曲線：Lv 10 約 6,700、Lv 20 約 22,600
 /* 等級里程碑：每級解鎖什麼（升級提示與 ⭐ 面板共用） */
@@ -2898,16 +2898,31 @@ const ACH=[
  ['scene3','美景獵人','拍下 3 種美景',()=>[Object.keys(S.scenes||{}).length,3],1200],
  ['sceneAll','美景收藏家','拍下全部 8 種美景',()=>[Object.keys(S.scenes||{}).length,8],8000]];
 ACH.push(...spotAch());
-const MER_NEXT=['第 1 次相遇：她會告訴你一個秘密地點','第 2 次相遇：她會送你月光餌','第 3 次相遇：人魚之竿','第 4 次相遇：人魚的祝福','第 5 次相遇：月下之歌'];
+const MER_NEXT=['第 1 次相遇：她會告訴你一個秘密地點','第 2 次相遇：她會送你月光餌','第 3 次相遇：人魚之竿','第 4 次相遇：人魚的祝福','第 5 次相遇：月下之歌',
+  '第 6 次相遇：月光餌 ×5','第 7 次相遇：潮汐之語（傳說魚 +15%）','第 8 次相遇：人魚的鱗片（賣魚收入 +10%）','第 9 次相遇：沉船裡的金幣','第 10 次相遇：人魚的祝福・貳（稀有魚再提升）',
+  '第 11 次相遇：月光餌 ×10','第 12 次相遇：海王的回禮','第 13 次相遇：月潮之歌（傳說魚再 +15%）','第 14 次相遇：月光餌 ×15','第 15 次相遇：月潮的守護者（賣魚收入 +20%）'];
+// 第 6 次以後的禮物（加成本身在釣魚與賣魚時依相遇次數判斷）
+const MER_GIFT={6:{moon:5},9:{coins:20000},11:{moon:10},12:{coins:50000},14:{moon:15},15:{coins:100000}};
 const STORY=[
  ['她把一片發光的鱗片放在你掌心，用指尖在水面畫出一個位置。「月光灣……只告訴你。」','解鎖秘境：月光灣（獨木舟可前往，夜裡傳說生物最多）'],
  ['她記得你了。這次她從水底撈起一串散發微光的餌，輕輕掛在你的釣竿上。','月光餌 ×3'],
  ['她送你一根像月光般潔白的釣竿，竿身刻著看不懂的古老文字。','人魚之竿（到釣具店免費裝備）'],
  ['她握住你的手，低聲唱了一段旋律。從今以後，濕地的魚似乎都對你特別友善。','人魚的祝福：稀有魚機率永久提升'],
- ['滿月的夜裡，她在月光灣為你唱完整首歌。整片濕地的螢火蟲同時亮了起來。','成就「人魚的知己」可以領取 🪙15000']];
+ ['滿月的夜裡，她在月光灣為你唱完整首歌。整片濕地的螢火蟲同時亮了起來。','成就「人魚的知己」可以領取 🪙15000'],
+ ['她從水底捧起一把發光的餌，像撒星星一樣撒進你的餌盒。','月光餌 ×5'],
+ ['她教你聽水的聲音。「潮水會告訴你，傳說在哪裡呼吸。」','潮汐之語：傳說魚上鉤機率永久 +15%'],
+ ['她拔下一片最亮的鱗片，繫在你的釣竿上。「魚市的人會知道，這是被人魚祝福過的魚。」','人魚的鱗片：賣魚收入永久 +10%'],
+ ['她帶你看湖底一艘很老很老的沉船，從船艙裡推出一只生鏽的錢箱。','金幣 🪙20000'],
+ ['她又握住你的手，這次唱得更久。湖面上的月光，一路鋪到你的船邊。','人魚的祝福・貳：稀有魚機率再提升'],
+ ['「這些給你，滿月的晚上用。」她把餌一顆一顆排在你的船舷上。','月光餌 ×10'],
+ ['她說：「爸爸（海王）要我把這個交給你。」是一袋被海水磨亮的古老金幣。','海王的回禮 🪙50000'],
+ ['她在月光灣唱起一首你從沒聽過的歌，遠方的海也跟著輕輕應和。','月潮之歌：傳說魚上鉤機率再 +15%'],
+ ['她把一整串發光的餌掛在你的燈下。「這樣，湖裡的大家都知道你來了。」','月光餌 ×15'],
+ ['滿月正圓。她在你面前低下頭，像當年老漁人對她那樣，輕聲說：「謝謝你，一直守著這片湖。」','稱號「月潮的守護者」・賣魚收入 +20%・🪙100000']];
 const fmt=v=>v%1?v.toFixed(1):v;
+function merHearts(m){ return '💗'.repeat(Math.min(m,5))+'🤍'.repeat(Math.max(0,5-m))+(m>=5?' '+'🌕'.repeat(Math.min(m-5,10))+'🌑'.repeat(Math.max(0,10-(m-5))):''); }
 function goalsRender(){ const m=merN();
-  let h=`<div class="merbox"><b>🧜 人魚之約</b><span>${'💗'.repeat(Math.min(m,5))}${'🤍'.repeat(Math.max(0,5-m))}</span><small>${m<5?'下一步：'+MER_NEXT[m]:'你已是她最信任的人，她仍會在夜裡來看你'}</small>${m===0?'<small>提示：夜晚、起霧或深水中央，用月光餌最容易遇見她。</small>':''}</div>`;
+  let h=`<div class="merbox"><b>🧜 人魚之約</b><span>${merHearts(m)}</span><small>${m<15?'下一步：'+MER_NEXT[m]:'你已是月潮的守護者，她仍會在夜裡來看你'}</small><small style="opacity:.7">每次相遇後，她要過一段時間才會再出現</small>${m===0?'<small>提示：夜晚、起霧或深水中央，用月光餌最容易遇見她。</small>':''}</div>`;
   h+=ACH.map(a=>{ const [cur,g]=a[3](), done=cur>=g, cl=S.ach&&S.ach[a[0]];
     return `<div class="row"><div class="nm"><b>${a[1]}</b><small>${a[2]}（${fmt(Math.min(cur,g))}/${g}）</small><span class="pbar"><i style="width:${Math.min(100,cur/g*100)}%"></i></span></div><div class="rt">${cl?'<span class="eqd">已領取</span>':done?`<button class="sbtn pri" data-ach="${a[0]}">領 🪙${Math.round(a[4]*.5)}</button>`:`<small>🪙${Math.round(a[4]*.5)}</small>`}</div></div>`; }).join('');
   $('goalB').innerHTML=h; }
@@ -2917,11 +2932,12 @@ $('goalX').addEventListener('click',()=>$('goal').classList.add('hidden'));
 $('goal').addEventListener('click',e=>{ if(e.target.id==='goal') $('goal').classList.add('hidden'); const b=e.target.closest('[data-ach]'); if(!b) return;
   const a=ACH.find(x=>x[0]===b.dataset.ach); if(!a) return; S.ach=S.ach||{}; if(S.ach[a[0]]) return;
   const ac=Math.round(a[4]*.5); S.ach[a[0]]=1; S.coins+=ac; c.persist(); c.setCoins(); c.Snd.coin(); c.toast('成就達成：'+a[1]+'　🪙'+ac,'good',2200); goalsRender(); goalsDot(); });
-function merMeet(){ S.mer=S.mer||{n:0}; S.mer.n++; const n=S.mer.n;
+function merMeet(){ S.mer=S.mer||{n:0}; S.mer.n++; S.mer.last=Date.now(); const n=S.mer.n;
   if(n===2){ S.baits=S.baits||{}; S.baits.moon=(S.baits.moon||0)+3; }
+  const gf=MER_GIFT[n]; if(gf){ if(gf.moon){ S.baits=S.baits||{}; S.baits.moon=(S.baits.moon||0)+gf.moon; } if(gf.coins){ S.coins+=gf.coins; if(c.setCoins) c.setCoins(); } }
   G.luck=.25; c.persist(); goalsDot();
   const st=STORY[n-1]||['她又來看你了，在你的浮標旁繞了一圈才離開。','好運加滿'];
-  $('stT').textContent='人魚之約　'+'💗'.repeat(Math.min(n,5)); $('stB').textContent=st[0]; $('stR').textContent='獲得：'+st[1];
+  $('stT').textContent='人魚之約　'+merHearts(n); $('stB').textContent=st[0]; $('stR').textContent='獲得：'+st[1];
   $('story').classList.remove('hidden'); c.Snd.fanfare(4); }
 $('stX').addEventListener('click',()=>$('story').classList.add('hidden'));
 setTimeout(goalsDot,500);
@@ -5429,7 +5445,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261027140622'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261027141913'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6042,7 +6058,7 @@ function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.
 function specialK(sp){ if(!sp.special) return 1;
   // 神話海馬獸只在月亮八成五以上、深夜出現
   if(sp.special==='seabeast') return (period(G.hour)==='night'&&window.__MOONPH&&window.__MOONPH.illum()>.85)?1:0;
-  const wx=WL.wx(); if(sp.special==='mermaid') return (KY.zone>=3||G.spot>=3||wx.f>.5)?1:.12; if(sp.special==='golden') return wx.c<.4?1:.3; if(sp.special==='king') return 0; if(sp.special==='moonkoi') return window.__MOON?window.__MOON.koiK():0; return 1; }
+  const wx=WL.wx(); if(sp.special==='mermaid'){ if(save.mer&&save.mer.last&&Date.now()-save.mer.last<30*60*1000) return 0; return (KY.zone>=3||G.spot>=3||wx.f>.5)?.5:.05; } if(sp.special==='golden') return wx.c<.4?1:.3; if(sp.special==='king') return 0; if(sp.special==='moonkoi') return window.__MOON?window.__MOON.koiK():0; return 1; }
 /* 魚群警覺：同一個方向一直釣，魚會變少、變小、變慢咬；換方向或換釣點就恢復（每分鐘消退 1） */
 /* 透水：水下物體在水面之後繪製，越深越透明、越帶水色（湖底沒有地形，所以讓物體透出來，而不是讓水變透明） */
 const SEE_U={value:new THREE.Vector3(.04,.13,.15)}, SEE_K={value:1}; window.__SEE_K=SEE_K;
@@ -6061,7 +6077,7 @@ function depAdd(k,n){ const v=depNow(k)+n, w=v>=2&&DEPL[k]&&DEPL[k].warned; DEPL
 const reachK=()=>G.loc==='ice'?.78:clamp((G.castDist-4)/(24*(1-.05*TR('cast'))),0,1);
 function pickSpecies(){
   const per=period(G.hour), pw=clamp((G.castDist-6)/30,0,1); let tot=0;
-  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(window.__ECO&&window.__ECO.fxOn('luck')?.4:0)+(save.mer&&save.mer.n>=4?.1:0)))*(1+sp.rar*G.luck*2)*(sp.tide&&window.__MOONPH?(.25+1.5*window.__MOONPH.illum()):1)*WL.spotAff(sp.id)*(sp.spots?(sp.spots.includes(WL.zoneId())?1:0):1)*WL.wxAff(sp.id)*(((sp.loc==='both'&&G.loc!=='ice')||(sp.loc||'lake')===(G.loc||'lake')||(G.loc==='ice'&&sp.ice))?1:0)*(G.loc==='sea'?1+sp.rar*.08*TR('sea'):1)*Math.pow(.12+.88*reachK(),sp.rar)/(1+.3*depNow(G.depK||'')*sp.rar)*(bt.aff[sp.id]||(bt.lure&&G.loc!=='ice'?0:1))*(window.__STORY?window.__STORY.boost(sp.id,(SPOTS[G.spot]||{}).id):1)*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
+  const ws=SPECIES.map(sp=>{ const bt=G.baitUsed||BAITS[0]; const w=RAR[sp.rar].w*(sp.time[per]??1)*specialK(sp)*(1+sp.rar*(.35*pw+WL.rareB()+(G.hot?.3:0)+(window.__ECO&&window.__ECO.fxOn('luck')?.4:0)+(save.mer&&save.mer.n>=4?.1:0)+(save.mer&&save.mer.n>=10?.1:0)))*(1+sp.rar*G.luck*2)*(sp.rar>=5&&sp.special!=='mermaid'?1+(save.mer&&save.mer.n>=7?.15:0)+(save.mer&&save.mer.n>=13?.15:0):1)*(sp.tide&&window.__MOONPH?(.25+1.5*window.__MOONPH.illum()):1)*WL.spotAff(sp.id)*(sp.spots?(sp.spots.includes(WL.zoneId())?1:0):1)*WL.wxAff(sp.id)*(((sp.loc==='both'&&G.loc!=='ice')||(sp.loc||'lake')===(G.loc||'lake')||(G.loc==='ice'&&sp.ice))?1:0)*(G.loc==='sea'?1+sp.rar*.08*TR('sea'):1)*Math.pow(.12+.88*reachK(),sp.rar)/(1+.3*depNow(G.depK||'')*sp.rar)*(bt.aff[sp.id]||(bt.lure&&G.loc!=='ice'?0:1))*(window.__STORY?window.__STORY.boost(sp.id,(SPOTS[G.spot]||{}).id):1)*Math.max(.2,1+sp.rar*bt.rare*.5); tot+=w; return w; });
   let x=Math.random()*tot; for(let i=0;i<ws.length;i++){ x-=ws[i]; if(x<=0) return SPECIES[i]; } return SPECIES[0];
 }
 
@@ -6182,7 +6198,7 @@ function finishCatch(sell){
   ui.catch.classList.add('hidden'); document.body.classList.remove('catching'); ui.actWrap.classList.remove('hidden'); ui.sub.classList.remove('hidden');
   const g=G.fish.group;
   if(G.fd.item) FUN.itemEffect(G.fd.item);
-  if(sell){ const v=G.fd.value; save.coins+=v; persist(); Snd.coin(); coinFly(v); }
+  if(sell){ const v=Math.round(G.fd.value*(1+(save.mer&&save.mer.n>=15?.2:save.mer&&save.mer.n>=8?.1:0))); save.coins+=v; persist(); Snd.coin(); coinFly(v); }
   else if(keep){ Snd.coin(); }
   else { META.onRelease(); if(G.fd.sp.special==='mermaid'){ const v=G.fd.value; save.coins+=v; persist(); Snd.coin(); coinFly(v); G.luck=.25; FUN.merMeet(); } else { G.luck=Math.min(.25,G.luck+.08); toast('放生了，下一竿稀有魚機率提高','good',1800); } }
   W.scene.attach(g); G.state='post'; G.stT=0; G.postSell=sell||keep; G.from.copy(g.position);

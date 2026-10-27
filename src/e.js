@@ -219,7 +219,7 @@ const BAITS=[
  {id:'spoon',lure:'spoon',name:'金屬亮片',icon:'🥄',price:900,pack:15,lv:4,desc:'中速穩定收線，閃光吸引掠食魚（路亞：自己收線操作）',aff:{perch:2,lmbass:1.8,smbass:1.8,amber:1.6,ribbon:2,peacock:1.8,snakehead:1.2,spgar:1.2,sawara:2.2,skipjack:2,yellowfin:1.2,char:1.4,laketrout:1.8,taimen:1.6,yperch:1.2,gt:1.2,threadfin:1.4},rare:.4,wait:1},
  {id:'crank',lure:'crank',name:'曲柄硬餌',icon:'🐠',price:1400,pack:15,lv:6,desc:'快速收線會下潛，黑鱸、金目鱸最愛（需要好捲線器）',aff:{lmbass:2.5,smbass:2.2,barra:2,gar:1.5,grouper:1.5,mahi:1.4,peacock:2.2,spgar:1.2,arapaima:1.2,emperor:1.2,cobia:1.4,gt:1.6,taimen:1.4},rare:.5,wait:1},
  {id:'minnow',lure:'minnow',name:'米諾',icon:'🐟',price:1800,pack:15,lv:8,desc:'抽一下、停一下，模仿受傷小魚，大型掠食魚無法抗拒',aff:{smbass:2.2,barra:2.2,lmbass:1.6,tuna:1.6,mahi:1.8,marlin:1.4,peacock:2.6,snakehead:1.6,spgar:1.6,arapaima:1.5,yellowfin:1.8,sawara:1.6,skipjack:1.4,cobia:1.5,gt:2.4,taimen:2,laketrout:1.6,swordfish:1.2,threadfin:1.6},rare:.6,wait:1},
- {id:'moon',name:'月光餌',icon:'🌙',price:1500,pack:3,lv:3,desc:'散發微光的神秘餌，傳說中的生物會被吸引',aff:{mermaid:25,ghost:12,golden:12,seabeast:10},rare:.6,wait:1.3}];
+ {id:'moon',name:'月光餌',icon:'🌙',price:1500,pack:3,lv:3,desc:'散發微光的神秘餌，傳說中的生物會被吸引',aff:{mermaid:7,ghost:12,golden:12,seabeast:10},rare:.6,wait:1.3}];
 const BOAT_COST={coins:25000,scale:30,bone:10,pearl:2};   // 修復老漁人的漁船
 const xpNext=lv=>Math.round(120*Math.pow(lv,1.75));   // 升級曲線：Lv 10 約 6,700、Lv 20 約 22,600
 /* 等級里程碑：每級解鎖什麼（升級提示與 ⭐ 面板共用） */
