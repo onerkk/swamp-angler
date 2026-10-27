@@ -87,7 +87,9 @@ function blend(dt){ if(!model||!model.visible) return; const lt=W.info?W.info.li
 function update(dt){ { const tt=performance.now()/1000; if(ghostRig) ghostRig.pose({t:tt,breathe:.004,headRoll:.14+.05*Math.sin(tt*.7),headPitch:.12,skirt:.05}); if(aliveRig) aliveRig.pose({t:tt,headPitch:.08,skirt:.025}); } blend(dt);
   if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0;
       if(!model&&!loading&&(TEST||!S.noScare&&c.period()==='night'&&c.loc()==='lake')) load(()=>{});
-      if(eligible()&&(TEST||Math.random()<1/2400)){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }
+      // 每秒擲一次：平常約 40 分鐘可出現的時間才遇到一次；隱藏章節要遇見她時約 1～2 分鐘
+      const hp=c.storyActive&&c.storyActive('lantern')&&c.progOf?c.progOf('lantern'):null, hunt=!!hp&&hp[1]<3;
+      if(eligible()&&(TEST||Math.random()<(hunt?1/75:1/2400))){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }
   ev.t+=dt; const t=ev.t, m=model; if(!m) return;
   if(ev.mode==='jump'){ m.position.y=Math.min(-.28,-1.9+t*2.1); faceMe(m); m.rotation.y+=Math.sin(t*9)*.04;
     if(t>.9&&!ev.face){ ev.face=true; if(ov) ov.classList.add('on'); sfx('scream_main',1); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
