@@ -38,7 +38,11 @@ planks.userData.lake=true; scene.add(planks);
 const postTex=dataTex(64,128,(u,v,o)=>{ const n=fbm(u*8,v*30,3), g=sstep(.58,.66,v), w=[34,38,24], dr=[96,80,62];
   for(let k=0;k<3;k++) o[k]=(w[k]+(dr[k]-w[k])*g)*(.7+.6*n); });
 const postMat=new T.MeshStandardMaterial({map:postTex, roughness:.85});
-for(const x of [-1.18,1.18]) for(const z of [-3.1,-.4,2.3,5.0]){ const m=new T.Mesh(new T.CylinderGeometry(.11,.12,2.6,10),postMat); m.position.set(x,-.3,z); m.userData.lake=true; scene.add(m); }
+// 樁頂：鋸開的木頭斷面（深褐年輪、龜裂），不是會反光的白色圓盤
+const endTex=dataTex(64,64,(u,v,o)=>{ const x=u*2-1, y=v*2-1, r=Math.hypot(x,y), ring=.5+.5*Math.sin(r*38+fbm(u*6,v*6,2)*6), crack=Math.pow(Math.abs(Math.sin(Math.atan2(y,x)*3+fbm(u*3,v*3,2)*4)),40)*.6;
+  const k=(.55+.25*ring)*(1-crack)*(1-.35*sstep(.8,1,r)); o[0]=78*k; o[1]=62*k; o[2]=46*k; });
+const endMat=new T.MeshStandardMaterial({map:endTex, roughness:.97, metalness:0});
+for(const x of [-1.18,1.18]) for(const z of [-3.1,-.4,2.3,5.0]){ const m=new T.Mesh(new T.CylinderGeometry(.11,.12,2.6,10),[postMat,endMat,endMat]); m.position.set(x,-.3,z); m.rotation.y=Math.random()*6.28; m.userData.lake=true; scene.add(m); }
 const beamMat=new T.MeshStandardMaterial({map:woodTex, color:0x8a7a68, roughness:.9});
 for(const x of [-1.0,1.0]){ const m=new T.Mesh(new T.BoxGeometry(.12,.16,9.5),beamMat); m.position.set(x,.7,1.4); m.userData.lake=true; scene.add(m); }
 
