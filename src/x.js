@@ -1,11 +1,11 @@
-/* ===== 湖裡還有人等燈：阿蘅（夜裡偶爾出現的驚嚇事件，之後接隱藏章節） ===== */
+/* ===== 湖裡還有人等燈：林秋月（夜裡偶爾出現的驚嚇事件，之後接隱藏章節） ===== */
 function createGhost(W,c){
 'use strict';
 let ghostRig=null, aliveRig=null;
 const T=THREE, S=c.save, GL=T.GLTFLoader?new T.GLTFLoader():null;
 let model=null, loading=false, mats=[], ev=null, lastTry=0, sessionStart=performance.now();
 let alive=null, aliveLoading=false, fin=null, calm=null, calmTry=0;
-// 老漁人的提燈：髮簪與三次相遇完成後的夜裡提在手邊，結局時阿蘅看的就是它
+// 老漁人的提燈：髮簪與三次相遇完成後的夜裡提在手邊，結局時林秋月看的就是它
 let lamp=null, lampLoading=false; const lampL=new T.PointLight(0xffb866,0,7,1.4); W.scene.add(lampL);
 function loadLamp(fn){ if(lamp) return fn(lamp); if(lampLoading||!GL) return; lampLoading=true;
   GL.load('models/lantern.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ mt.emissive=new T.Color(0xffc070); mt.emissiveMap=mt.map; mt.emissiveIntensity=.35; } } });

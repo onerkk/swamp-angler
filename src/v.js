@@ -22,32 +22,32 @@ const CH=[
  {id:'ice',spot:'ice',name:'第五章　冰下的歌聲',open:{after:'c4',lv:10},
   intro:'湖心的手記斷在一句「她在等一條回海的路」。剩下的答案，老漁人帶去了上游——他最後一個冬天，在冰湖上度過。',
   tasks:[{t:'catch',loc:'ice',n:3,txt:'在冰湖釣到 3 尾魚'},{t:'catch',sp:'trout',n:1,txt:'釣到一尾虹鱒'},{t:'catch',sp:'char',n:1,txt:'釣到一尾北極紅點鮭（老漁人說牠只在最冷的水裡）'}],
-  page:'手記・冰湖（最後一個冬天）\n「冰洞裡傳上來歌聲。冰底下的水是活的，一路流向湖，再從灣底的石縫流進海——那就是汐月回家的路。\n我老了，划不動了。你帶著這盞提燈，在月圓的晚上去灣裡找她。她會認得這盞燈。」',
+  page:'手記・冰湖（最後一個冬天）\n「冰洞裡傳上來歌聲。冰底下的水是活的，一路流向湖，再從灣底的石縫流進海——那就是霜汐回家的路。\n我老了，划不動了。你帶著這盞提燈，在月圓的晚上去灣裡找她。她會認得這盞燈。」',
   xp:3500,coins:1500,baits:{moon:3},unlock:'月光灣（並得到老漁人的提燈與月光餌 ×3）'},
  {id:'c4',spot:'deep',name:'第四章　湖心的秘密',open:{after:'c3',lv:8},
   intro:'深水中央沒有遮蔽，風浪最大，也最安靜。老漁人說，這裡住著湖的主人。',
   tasks:[{t:'catch',zone:'deep',rar:1,n:3,txt:'在深水中央釣到稀有以上的魚 3 尾'},{t:'catch',loc:'lake',per:'night',n:3,txt:'在湖上夜晚釣到 3 尾魚'},{t:'catch',sp:'gar',n:1,txt:'釣到一尾鱷雀鱔'}],
-  page:'手記第四頁\n「月亮很圓的晚上，我照著魚皮上的圖划過去。灣裡的水是銀色的，岩石上坐著一個人——\n不，是一條人魚。她說她叫汐月，在等一條回海的路。我答應她，每個滿月都提燈來陪她。」',
+  page:'手記第四頁\n「月亮很圓的晚上，我照著魚皮上的圖划過去。灣裡的水是銀色的，岩石上坐著一個人——\n不，是一條人魚。她說她叫霜汐，在等一條回海的路。我答應她，每個滿月都提燈來陪她。」',
   xp:5000,coins:2000,unlock:'冰湖（Lv 10）'},
  {id:'c5',spot:'moon',name:'第六章　月潮',open:{after:'ice'},
-  intro:'月光灣只在夜裡發光。汐月還在這裡，等著那個提燈的人。\n提示：晚上（約 19:48～04:48）划獨木舟到月光灣釣魚，有機會在魚肚裡找到月鱗；月亮越圓，找到的機會越高。',
-  tasks:[{t:'moon',n:1,txt:'集滿 7 片月鱗，聽完汐月的故事'}],
-  page:'手記第五頁\n「我老了，提不動燈了。汐月說，等堤防打開、月潮回來，她就能回家。\n可是河口外的海不平靜——深海裡有什麼東西，從堤防築起那年就一直在發怒。\n我的舊漁船還停在河口的船塢裡。修好它，替我出海看看吧。」\n\n——汐月游進水道前回頭說：「湖裡還有一個人在等燈。」',
+  intro:'月光灣只在夜裡發光。霜汐還在這裡，等著那個提燈的人。\n提示：晚上（約 19:48～04:48）划獨木舟到月光灣釣魚，有機會在魚肚裡找到月鱗；月亮越圓，找到的機會越高。',
+  tasks:[{t:'moon',n:1,txt:'集滿 7 片月鱗，聽完霜汐的故事'}],
+  page:'手記第五頁\n「我老了，提不動燈了。霜汐說，等堤防打開、月潮回來，她就能回家。\n可是河口外的海不平靜——深海裡有什麼東西，從堤防築起那年就一直在發怒。\n我的舊漁船還停在河口的船塢裡。修好它，替我出海看看吧。」\n\n——霜汐游進水道前回頭說：「湖裡還有一個人在等燈。」',
   xp:8000,coins:3000,unlock:'近海礁岩（需修復老漁人的漁船，在 🗺️ 釣點清單）'},
  {id:'lantern',spot:'lily',hidden:1,name:'隱藏章節　湖裡還有人等燈',open:{after:'c5'},
-  intro:'汐月走之前回頭說了一句：「湖裡還有一個人在等燈。」她沒說是誰。浮萍灣的夜晚，好像有什麼在看你。',
+  intro:'霜汐走之前回頭說了一句：「湖裡還有一個人在等燈。」她沒說是誰。浮萍灣的夜晚，好像有什麼在看你。',
   tasks:[{t:'item',id:'hairpin',n:1,txt:'夜裡在浮萍灣釣起一件遺物'},{t:'meet',n:3,txt:'在夜裡遇見「她」3 次'},{t:'scene',id:'lantern',n:1,txt:'滿月的夜晚（或掛上月光餌），提著老漁人的燈到浮萍灣——前兩項完成後，夜裡在湖上，燈會自動提在你手邊'}],
-  page:'手記・最後一頁（夾在封底）\n「阿蘅，三十年前那個雨夜，妳提著燈在浮萍灣等我，我卻遲了一步。\n我每個滿月提燈去灣裡，不是為了汐月，是想讓妳看見燈，知道回家的路。\n如果有人替我把燈提到妳面前——阿蘅，妳可以走了。爸爸不怪妳，妳也別怪自己。」',
+  page:'手記・最後一頁（夾在封底）\n「秋月，三十年前那個雨夜，妳提著燈在浮萍灣等我，我卻遲了一步。\n我每個滿月提燈去灣裡，不是為了霜汐，是想讓妳看見燈，知道回家的路。\n如果有人替我把燈提到妳面前——秋月，妳可以走了。爸爸不怪妳，妳也別怪自己。」',
   title:'守燈人',xp:6000,coins:3000,unlock:'稱號「守燈人」；她不會再嚇你，偶爾會在遠處安靜地看著燈'},
  {id:'c6',spot:'reef',name:'第七章　河口之外',open:{after:'c5',yacht:1},
-  intro:'第一次把船開出河口。汐月回到了大海，海卻變得不安：魚群躁動，鯊魚出現得比以前頻繁。',
+  intro:'第一次把船開出河口。霜汐回到了大海，海卻變得不安：魚群躁動，鯊魚出現得比以前頻繁。',
   tasks:[{t:'catch',zone:'reef',sp:'amber',n:1,txt:'在近海礁岩釣到一尾紅甘'},{t:'catch',sp:'grouper',n:1,txt:'釣到一尾石斑'},{t:'scene',id:'dolphin',n:1,txt:'拍下一次海豚群（白天出海，海豚出現時按 📷）'}],
-  page:'手記最後幾頁（字跡很淡）\n「海王守著深藍的海溝。他以為是人類偷走了月潮。\n只有親手證明人與海可以共處，月潮才會回來。這件事，我沒能做到。」',
+  page:'手記最後幾頁（字跡很淡）\n「滄淵守著深藍的海溝。他以為是人類偷走了月潮。\n只有親手證明人與海可以共處，月潮才會回來。這件事，我沒能做到。」',
   xp:12000,coins:4500,unlock:'遠洋深藍（Lv 18）'},
  {id:'c7',spot:'blue',name:'終章　深淵之王',open:{after:'c6',lv:18},
-  intro:'遠洋深藍，海水深得發黑。這裡是海王的領域，也是老漁人一輩子沒能抵達的地方。',
-  tasks:[{t:'catch',sp:'marlin',n:1,txt:'釣到一尾旗魚'},{t:'catch',sp:'sail',n:1,txt:'釣到一尾雨傘旗魚'},{t:'boss',id:'king',n:1,txt:'接受大師挑戰，擊敗深淵海王（Lv 24，⭐ 面板）'}],
-  page:'終章\n海王沉回深淵前，看了你很久。那天晚上，河口的堤防在大潮中自己裂開了一道縫，月光順著水流進湖裡。\n你回到碼頭，在手記最後一頁寫下：「月潮回來了。換我守著這片湖。」',
+  intro:'遠洋深藍，海水深得發黑。這裡是滄淵的領域，也是老漁人一輩子沒能抵達的地方。',
+  tasks:[{t:'catch',sp:'marlin',n:1,txt:'釣到一尾旗魚'},{t:'catch',sp:'sail',n:1,txt:'釣到一尾雨傘旗魚'},{t:'boss',id:'king',n:1,txt:'接受大師挑戰，擊敗滄淵（Lv 24，⭐ 面板）'}],
+  page:'終章\n滄淵沉回深淵前，看了你很久。那天晚上，河口的堤防在大潮中自己裂開了一道縫，月光順著水流進湖裡。\n你回到碼頭，在手記最後一頁寫下：「月潮回來了。換我守著這片湖。」',
   xp:30000,coins:15000,unlock:'全部完成：獲得稱號「守湖人」'}
 ];
 const SPOT_IDS=['dock','lily','wood','deep','moon','reef','blue','ice'];
@@ -136,7 +136,7 @@ function render(){ const act=active(); let h='<div class="pn"><button class="x" 
   const dn=CH.filter(ch=>isDone(ch.id)); if(dn.length) h+='<div class="sec">已收集的手記</div>'+dn.map(ch=>`<div class="ch"><span>📖 ${ch.name}</span><button data-s="read" data-v="${ch.id}">閱讀</button></div>`).join('');
   box.innerHTML=h+'</div>'; }
 /* 終章結局：全螢幕，文字逐段淡入 */
-const END=['海王沉回了深淵。','那一夜大潮，河口的堤防在浪裡裂開一道縫。','月光順著海水流進河口，流過倒木、流過浮萍，一路回到碼頭前。','汐月在浪頭上回頭看了你一眼，然後游向大海。','你翻開手記最後一頁，在老漁人的字跡下面寫——','「月潮回來了。換我守著這片湖。」'];
+const END=['滄淵沉回了深淵。','那一夜大潮，河口的堤防在浪裡裂開一道縫。','月光順著海水流進河口，流過倒木、流過浮萍，一路回到碼頭前。','霜汐在浪頭上回頭看了你一眼，然後游向大海。','你翻開手記最後一頁，在老漁人的字跡下面寫——','「月潮回來了。換我守著這片湖。」'];
 const ed=document.createElement('div'); ed.id='endBox'; ed.className='hidden'; document.body.appendChild(ed);
 const ecss=document.createElement('style'); ecss.textContent=`#endBox{position:fixed;inset:0;z-index:27;background:radial-gradient(ellipse at 50% 30%,#1b2c4a,#05080f 75%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 26px;text-align:center;color:#e9f0ff}#endBox.hidden{display:none}
 #endBox p{margin:9px 0;font-size:17px;line-height:1.7;font-family:serif;opacity:0;animation:endIn 1.6s ease forwards}#endBox p.last{font-size:20px;color:#ffe3a3;margin-top:18px}

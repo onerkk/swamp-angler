@@ -234,7 +234,7 @@ const BOAT_COST={coins:25000,scale:30,bone:10,pearl:2};   // 修復老漁人的�
 const xpNext=lv=>Math.round(120*Math.pow(lv,1.75));   // 升級曲線：Lv 10 約 6,700、Lv 20 約 22,600
 /* 等級里程碑：每級解鎖什麼（升級提示與 ⭐ 面板共用） */
 const LV_TITLES={10:'見習漁人',20:'湖畔好手',30:'老練漁夫',40:'傳說釣手',50:'守湖宗師'};
-const LV_EVENTS={5:'主線第三章「暴風雨之後」',8:'主線第四章「湖心的秘密」',10:'主線第五章「冰下的歌聲」',15:'大師挑戰：巨型鱷雀鱔',18:'主線終章「深淵之王」、大師挑戰：鯰魚之王',20:'大師挑戰：旗魚王',24:'大師挑戰：深淵海王',25:'大師挑戰：大白鯊女王'};
+const LV_EVENTS={5:'主線第三章「暴風雨之後」',8:'主線第四章「湖心的秘密」',10:'主線第五章「冰下的歌聲」',15:'大師挑戰：巨型鱷雀鱔',18:'主線終章「深淵之王」、大師挑戰：鯰魚之王',20:'大師挑戰：旗魚王',24:'大師挑戰：滄淵',25:'大師挑戰：大白鯊女王'};
 function lvGains(lv){ const g=[]; if(lv>=5) g.push('天賦點 +1'); if(lv%3===0&&lv<=30) g.push('強化上限提高到 +'+Math.min(10,lv/3)); if(LV_TITLES[lv]) g.push('稱號「'+LV_TITLES[lv]+'」'); if(LV_EVENTS[lv]) g.push(LV_EVENTS[lv]); return g; }
 window.__LVINFO={gains:lvGains,titles:LV_TITLES,xpNext:lv=>xpNext(lv)};
 
@@ -393,7 +393,7 @@ function render(){
     if(!save.kayak) h+=row('🛶 獨木舟','買了才能划到湖裡的其他釣點','<button class="sbtn pri" data-a="kayak">🪙 800</button>');
     if(!save.yacht){ const ok=window.__STORY&&window.__STORY.done('c5'), m=save.mat||{}, need=BOAT_COST, have=k=>(m[k]||0)>=need[k];
       h+=ok?row('🛥️ 修復老漁人的漁船',`停在河口船塢的舊漁船，修好就能出海。需要 🪙 ${need.coins.toLocaleString()}、魚鱗 ${need.scale}（有 ${m.scale||0}）、魚骨 ${need.bone}（有 ${m.bone||0}）、珍珠 ${need.pearl}（有 ${m.pearl||0}）`,`<button class="sbtn pri" data-a="yacht"${save.coins>=need.coins&&have('scale')&&have('bone')&&have('pearl')?'':' disabled'}>修復</button>`)
-          :row('🔒 ？？？的漁船','完成主線第六章「月潮」後，汐月會告訴你它在哪裡','<span class="lk">第六章後</span>'); }
+          :row('🔒 ？？？的漁船','完成主線第六章「月潮」後，霜汐會告訴你它在哪裡','<span class="lk">第六章後</span>'); }
     h+=SPOTS.map((s,i)=>{ const why=window.__STORY?window.__STORY.lock(i):null, lock=window.__STORY?!!why:(save.lv<s.lv||(s.req==='mer1'&&!(save.mer&&save.mer.n>=1))), need=(s.kayak&&!save.kayak)||(s.yacht&&!save.yacht), here=c.curSpot()===i;
       const btn=here?'<span class="eqd">目前位置</span>':lock?`<span class="lk">${why||(s.req?'需要美人魚的認可':'Lv '+s.lv+' 解鎖')}</span>`:need?`<span class="lk">${s.yacht?'需要遊艇':'需要獨木舟'}</span>`:`<button class="sbtn pri" data-a="go" data-v="${i}">${s.yacht?'出海':s.kayak?'划過去':'回碼頭'}</button>`;
       return row(lock?'🔒 '+(s.req?'？？？':s.name):(s.yacht?'🛥️ ':s.kayak?'🛶 ':s.loc==='ice'?'❄️ ':'🪵 ')+s.name,lock?(s.req?'只在月光下才看得見的地方':'跟著老漁人的手記前進，就會找到這裡'):s.sub,btn); }).join('');

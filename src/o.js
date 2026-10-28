@@ -9,7 +9,7 @@ const BOSS=[
   {id:'flat',lv:18,name:'鯰魚之王',sp:'flathead',loc:'lake',zone:'wood',per:['night'],size:1.45,pow:1.45,title:'鯰魚王者',hint:'倒木區・夜晚',coins:20000,cry:3},
   {id:'marlin',lv:20,name:'旗魚王',sp:'marlin',loc:'sea',zone:'blue',per:['dawn','day'],size:1.35,pow:1.5,title:'怒海旗手',hint:'遠洋深藍・清晨或白天',coins:30000,cry:4},
   {id:'gw',lv:25,name:'大白鯊女王',sp:'gwhite',loc:'sea',zone:'blue',per:['dusk','night'],size:1.3,pow:1.6,title:'深海霸主',hint:'遠洋深藍・黃昏或夜晚',coins:50000,cry:6},
-  {id:'king',lv:24,name:'深淵海王',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'海王征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10}];
+  {id:'king',lv:24,name:'滄淵',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'滄淵征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10}];
 const PER_NAME={dawn:'清晨',day:'白天',dusk:'黃昏',night:'夜晚'};
 
 function createTalents(c){

@@ -1,6 +1,6 @@
-/* ===== 月光灣：汐月的故事 ===== */
+/* ===== 月光灣：霜汐的故事 ===== */
 const MOON_STORY=[
- {t:'序章・月下的人魚',b:'「你終於來了。我叫汐月，是守護月潮的人魚。很久以前，這片濕地還是連著大海的河口……可是現在，我的七片月鱗散落在湖裡，沒有它們，我回不了海。」<br><br>「月鱗會吸引在月光下覓食的魚。請你在月夜的月光灣釣魚，幫我把它們找回來。」'},
+ {t:'序章・月下的人魚',b:'「你終於來了。我叫霜汐，是守護月潮的人魚。很久以前，這片濕地還是連著大海的河口……可是現在，我的七片月鱗散落在湖裡，沒有它們，我回不了海。」<br><br>「月鱗會吸引在月光下覓食的魚。請你在月夜的月光灣釣魚，幫我把它們找回來。」'},
  {t:'第一片・潮汐的記憶',b:'「每逢滿月，潮水會從海上漲進河口，我就順著月光回家。那時候的水是鹹的，夜裡會發光……就像你現在看到的這樣，只是比現在亮上一百倍。」'},
  {t:'第二片・提燈的漁人',b:'「有個老漁人，每晚都在碼頭掛一盞燈給我。我們從沒說過話，但我知道那盞燈是為我點的。你常站的那座碼頭，就是他當年一塊一塊釘起來的。」'},
  {t:'第三片・堤防',b:'「後來人們築起了堤防。潮水再也進不來，河口慢慢淤成沼澤。最後一次滿月那晚，水面的月光被堤防切斷，我就被困在這裡了。」'},
@@ -40,21 +40,21 @@ function moonDir(hour,out){ const H=((hour-12-phase()*24)/24)*2*Math.PI;        
 const hc=document.createElement('canvas'); hc.width=hc.height=128; { const x=hc.getContext('2d'), g=x.createRadialGradient(64,64,0,64,64,64); g.addColorStop(0,'rgba(200,220,255,.55)'); g.addColorStop(.35,'rgba(150,180,255,.18)'); g.addColorStop(1,'rgba(120,150,255,0)'); x.fillStyle=g; x.fillRect(0,0,128,128); }
 const halo=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(hc),blending:T.AdditiveBlending,depthWrite:false,fog:false,transparent:true}));
 halo.renderOrder=-2; S.add(halo);
-/* 汐月：坐在岩石上的美人魚（岩石用 Poly Haven 掃描模型） */
+/* 霜汐：坐在岩石上的美人魚（岩石用 Poly Haven 掃描模型） */
 const spot=(typeof SPOTS!=='undefined'&&SPOTS.find(s=>s.id==='moon'))||{pos:[-10,-40],head:.35};
 const fw=new T.Vector3(-Math.sin(spot.head),0,-Math.cos(spot.head)), rt=new T.Vector3(Math.cos(spot.head),0,-Math.sin(spot.head));
 const NP=new T.Vector3(spot.pos[0],0,spot.pos[1]).addScaledVector(fw,11).addScaledVector(rt,3.5);
 const npc=new T.Group(); npc.position.copy(NP); npc.visible=false; S.add(npc);
 if(T.GLTFLoader) new T.GLTFLoader().load('rock_moss_set_01.glb',g=>{ const r=g.scene; r.scale.setScalar(1.3); r.position.y=-.35; npc.add(r); });
 else { const r=new T.Mesh(new T.DodecahedronGeometry(.9,1),new T.MeshStandardMaterial({color:0x3a4238,roughness:.9})); r.scale.set(1.2,.6,1); npc.add(r); }
-// 夜裡的汐月：用自己的貼圖發光（天越暗越亮），旁邊再放一盞月光，照出臉、頭髮和鱗片的立體感
+// 夜裡的霜汐：用自己的貼圖發光（天越暗越亮），旁邊再放一盞月光，照出臉、頭髮和鱗片的立體感
 const merMats=[], moonL=new T.PointLight(0xc8d8ff,0,10,1.3); moonL.position.set(1.2,2.6,1.6); npc.add(moonL);
 const moonL2=new T.PointLight(0x8fb0ff,0,7,1.5); moonL2.position.set(-1.4,1.4,-1.0); npc.add(moonL2);
 function merNight(){ const lt=W.info?W.info.light:1, k=Math.max(0,.65-lt); merMats.forEach(m=>m.emissiveIntensity=.12+k*1.9); moonL.intensity=k*4.5; moonL2.intensity=k*2.2; }
 const merT=new T.TextureLoader().load('mermaid_front.png',t=>{ const a=t.image.width/t.image.height; mer.scale.set(1.9*a,1.9,1); }); merT.encoding=T.sRGBEncoding;
 const mer=new T.Mesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial({map:merT,transparent:true,alphaTest:.05,depthWrite:true,side:T.DoubleSide,fog:false}));
 mer.position.y=1.25; npc.add(mer);
-/* 3D 汐月：載入後取代平面圖（依玩家設定圖生成的模型） */
+/* 3D 霜汐：載入後取代平面圖（依玩家設定圖生成的模型） */
 let mer3=null;
 if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid3d.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.42,metalness:.08,emissive:new T.Color(0xe4ecff),emissiveMap:mp||null,emissiveIntensity:.15}); merMats.push(x.material); x.frustumCulled=false; } });
   o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.9/Math.max(sz.y,1e-6); o.scale.setScalar(s);
@@ -72,14 +72,14 @@ const st=document.createElement('style'); st.textContent=`
 #moonBox .ch{margin:14px 0;padding:12px 14px;border-radius:14px;background:rgba(120,170,255,.08);line-height:1.75;font-size:15px}
 #moonBox .ch b{display:block;color:#ffd56a;margin-bottom:4px;font-size:14px}#moonBox .ch.lock{opacity:.55;padding:10px 14px}#moonBox .ch.lock b{color:#9fb8d8}#moonBox .ch small{color:#9fb8d8;font-size:12px}#moonBox .ch.tip{background:rgba(255,213,106,.1);border:1px solid rgba(255,213,106,.35)}#moonBox .ch.tip b{color:#ffd56a}#moonBox .ch em{font-style:normal;font-weight:800;color:#ffe9a8}#moonBox .pg{font-size:13px;color:#9fb8d8}`;
 document.head.appendChild(st);
-const tb=document.createElement('button'); tb.id='moonTalk'; tb.className='hidden'; tb.innerHTML='<span class="ic">🧜‍♀️</span>汐月'; tb.setAttribute('aria-label','與汐月說話'); document.body.appendChild(tb);
+const tb=document.createElement('button'); tb.id='moonTalk'; tb.className='hidden'; tb.innerHTML='<span class="ic">🧜‍♀️</span>霜汐'; tb.setAttribute('aria-label','與霜汐說話'); document.body.appendChild(tb);
 const box=document.createElement('div'); box.id='moonBox'; box.className='hidden'; box.innerHTML='<div class="mb"></div>'; document.body.appendChild(box);
 const unlocked=()=>MS.done?7:MS.met?Math.min(6,MS.sc):0;
 function render(){ const n=unlocked(), sc=Math.min(7,MS.sc);
   const pips='🌙'.repeat(sc)+'○'.repeat(7-sc);
-  let h=`<h3>汐月<button class="sbtn" data-m="x">✕</button></h3><div class="pg">月鱗 ${sc}/7　${pips}</div>`;
+  let h=`<h3>霜汐<button class="sbtn" data-m="x">✕</button></h3><div class="pg">月鱗 ${sc}/7　${pips}</div>`;
   if(!MS.done){ const next=MS.sc>=6?'最後一片在<em>月神鯉</em>的肚子裡。在月光灣的深夜釣起牠。':'在<em>月光灣</em>的<em>深夜（約 19:48～04:48）</em>釣魚，每釣到一條魚有 45% 機率從魚肚裡找到一片月鱗。';
-    h+=`<div class="ch tip"><b>🧭 怎麼找月鱗</b>${next}<br><small>找到後回來找汐月，就會解鎖下一段故事。</small></div>`; }
+    h+=`<div class="ch tip"><b>🧭 怎麼找月鱗</b>${next}<br><small>找到後回來找霜汐，就會解鎖下一段故事。</small></div>`; }
   for(let i=n;i>=0;i--) h+=`<div class="ch"><b>${MOON_STORY[i].t}</b>${MOON_STORY[i].b}</div>`;
   for(let i=n+1;i<MOON_STORY.length;i++){ const name=i===7?'終章・？？？':MOON_STORY[i].t, cond=i===7?'集齊 7 片月鱗後解鎖':i===6?`找到第 6 片月鱗後解鎖`:`找到第 ${i} 片月鱗後解鎖`;
     h+=`<div class="ch lock"><b>🔒 ${name}</b><small>${cond}</small></div>`; }
@@ -94,8 +94,8 @@ function koiK(){ if(!active()) return 0; return MS.done?1.5:MS.sc>=6?40:0; }
 function onCatch(fd){ if(!fd||fd.item||!active()||!MS.met) return;
   if(MS.sc<6&&fd.sp.id!=='moonkoi'&&Math.random()<.25+.3*illum()){ MS.sc++; c.persist(); tb.classList.add('dot'); setTimeout(()=>scaleFx(MS.sc),1200); }
   else if(fd.sp.id==='moonkoi'&&!MS.done&&MS.sc>=6){ MS.sc=7; MS.done=true; c.persist(); c.giveRod(); tb.classList.add('dot');
-    setTimeout(()=>{ scaleFx(7); c.toast('🌙 第七片月鱗！月光連成了一條路……去找汐月吧','good',4000); },1200); } }
-/* 找到月鱗：發光的鱗片在畫面中央浮現、旋轉放大，再飛向汐月按鈕 */
+    setTimeout(()=>{ scaleFx(7); c.toast('🌙 第七片月鱗！月光連成了一條路……去找霜汐吧','good',4000); },1200); } }
+/* 找到月鱗：發光的鱗片在畫面中央浮現、旋轉放大，再飛向霜汐按鈕 */
 const fx=document.createElement('div'); fx.id='scaleFx'; fx.innerHTML='<i></i><b></b>'; document.body.appendChild(fx);
 const st2=document.createElement('style'); st2.textContent=`#scaleFx{position:fixed;left:50%;top:42%;z-index:26;pointer-events:none;display:none;transform:translate(-50%,-50%)}
 #scaleFx i{display:block;width:84px;height:110px;margin:0 auto;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;background:radial-gradient(ellipse at 40% 30%,#ffffff,#cfe6ff 35%,#7fb6ff 70%,rgba(80,140,255,0) 72%);box-shadow:0 0 30px 10px rgba(140,190,255,.8),0 0 70px 20px rgba(120,160,255,.4)}
@@ -106,17 +106,17 @@ const st2=document.createElement('style'); st2.textContent=`#scaleFx{position:fi
 document.head.appendChild(st2);
 function scaleFx(n){ fx.querySelector('b').textContent=`🌙 月鱗 ${Math.min(7,n)}/7`; fx.classList.remove('go'); void fx.offsetWidth; fx.classList.add('go');
   if(c.Snd&&c.Snd.fanfare) c.Snd.fanfare(1); if(c.vib) c.vib([30,40,30,40,90]); setTimeout(()=>fx.classList.remove('go'),2700);
-  if(n<7) setTimeout(()=>c.toast('找到新的月鱗！去聽汐月的故事','good',2600),2300); }
+  if(n<7) setTimeout(()=>c.toast('找到新的月鱗！去聽霜汐的故事','good',2600),2300); }
 let endGlow=0;
 const cam=new T.Vector3();
-// 靠近月光灣時，汐月會轉頭看你、輕輕擺尾，並依故事進度主動說話（頭上的對話泡泡）
+// 靠近月光灣時，霜汐會轉頭看你、輕輕擺尾，並依故事進度主動說話（頭上的對話泡泡）
 const say=document.createElement('div'); say.style.cssText='position:fixed;z-index:15;max-width:62vw;padding:9px 13px;border-radius:14px;background:rgba(14,22,40,.78);border:1px solid rgba(190,215,255,.35);color:#e9f1ff;font-size:14px;line-height:1.6;pointer-events:none;opacity:0;transition:opacity .6s;transform:translate(-50%,-100%);text-shadow:0 1px 3px #000;font-family:"Noto Serif TC",serif';
 document.body.appendChild(say);
 const SAYV=new T.Vector3(); let sayT=0, sayI=0, sayNear=false, sayLast='', sayOn=0;
 function sayLines(){ const S=window.__STORY, d=id=>!!(S&&S.done&&S.done(id)), end=c.save&&c.save.story&&c.save.story.ending;
-  if(end) return ['我回來看看你。海很好，爸爸（海王）也很好。','阿蘅說，她在海的那一邊，也看得見碼頭的燈。','今晚的月潮，是為你亮的。','老漁人的椅子……你一直替他擦得很乾淨呢。'];
-  const L=[]; if(d('lantern')) L.push('阿蘅最近常常坐在浮萍灣，望著碼頭的方向。','謝謝你，把那盞燈帶給她（阿蘅）。');
-  if(d('c5')) L.push('河口的門外面就是海。我已經四十年沒聞過海的味道了。','如果你在海上遇見很大很大的影子……別怕他。','他（海王）其實不兇。他只是一直在找人。');
+  if(end) return ['我回來看看你。海很好，爸爸（滄淵）也很好。','林秋月說，她在海的那一邊，也看得見碼頭的燈。','今晚的月潮，是為你亮的。','老漁人的椅子……你一直替他擦得很乾淨呢。'];
+  const L=[]; if(d('lantern')) L.push('林秋月最近常常坐在浮萍灣，望著碼頭的方向。','謝謝你，把那盞燈帶給她（林秋月）。');
+  if(d('c5')) L.push('河口的門外面就是海。我已經四十年沒聞過海的味道了。','如果你在海上遇見很大很大的影子……別怕他。','他（滄淵）其實不兇。他只是一直在找人。');
   else if(d('c3')) L.push('颱風那年倒下的樹，到現在還橫在湖裡。','他（老漁人）說過，總有一天會有人把手記找齊。','浮萍灣那邊……夜裡別划太近。');
   else L.push('……你也是來看燈的嗎？','這座湖，以前每個滿月都會有一盞燈。','你身上，有老漁人手記的味道。');
   return L; }
