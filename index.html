@@ -2842,7 +2842,10 @@ const dDiff=tl.load('dock_diff.jpg'), dNor=tl.load('dock_nor.jpg'), dRough=tl.lo
 if(P.dockMats){ const {plankMat,postMat,beamMat}=P.dockMats;
   Object.assign(plankMat,{map:rep(dDiff,.55,.09,true),normalMap:rep(dNor,.55,.09),roughnessMap:rep(dRough,.55,.09),roughness:1}); plankMat.needsUpdate=true;   // 一片木板只對到照片上一塊板子，少掉一節一節的接縫
   for(const m of [postMat,beamMat]){ Object.assign(m,{map:rep(dDiff.clone(),.4,1.6,true),normalMap:rep(dNor.clone(),.4,1.6),roughnessMap:rep(dRough.clone(),.4,1.6),roughness:1,color:new T.Color(.75,.72,.68)});
-    m.map.needsUpdate=m.normalMap.needsUpdate=m.roughnessMap.needsUpdate=true; m.needsUpdate=true; } }
+    m.map.needsUpdate=m.normalMap.needsUpdate=m.roughnessMap.needsUpdate=true; m.needsUpdate=true; }
+  // 木樁：泡水多年的圓木樁——深褐、木紋直向、霧面不反光（原本用木板照片橫貼，加上反射天空，看起來像金屬管）
+  { const pm=postMat; pm.map.rotation=Math.PI/2; pm.normalMap.rotation=Math.PI/2; pm.map.repeat.set(1.6,.5); pm.normalMap.repeat.set(1.6,.5); pm.roughnessMap=null;
+    pm.color=new T.Color(.42,.34,.27); pm.roughness=.96; pm.metalness=0; pm.envMapIntensity=.25; pm.needsUpdate=true; } }
 
 /* ---------- 岸邊泥灘（實拍泥土落葉材質） ---------- */
 const mud={map:rep(tl.load('mud_diff.jpg'),5,5,true),normalMap:rep(tl.load('mud_nor.jpg'),5,5),roughnessMap:rep(tl.load('mud_rough.jpg'),5,5)};
@@ -5741,7 +5744,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028080318'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028080916'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';

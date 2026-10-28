@@ -63,7 +63,10 @@ const dDiff=tl.load('dock_diff.jpg'), dNor=tl.load('dock_nor.jpg'), dRough=tl.lo
 if(P.dockMats){ const {plankMat,postMat,beamMat}=P.dockMats;
   Object.assign(plankMat,{map:rep(dDiff,.55,.09,true),normalMap:rep(dNor,.55,.09),roughnessMap:rep(dRough,.55,.09),roughness:1}); plankMat.needsUpdate=true;   // 一片木板只對到照片上一塊板子，少掉一節一節的接縫
   for(const m of [postMat,beamMat]){ Object.assign(m,{map:rep(dDiff.clone(),.4,1.6,true),normalMap:rep(dNor.clone(),.4,1.6),roughnessMap:rep(dRough.clone(),.4,1.6),roughness:1,color:new T.Color(.75,.72,.68)});
-    m.map.needsUpdate=m.normalMap.needsUpdate=m.roughnessMap.needsUpdate=true; m.needsUpdate=true; } }
+    m.map.needsUpdate=m.normalMap.needsUpdate=m.roughnessMap.needsUpdate=true; m.needsUpdate=true; }
+  // 木樁：泡水多年的圓木樁——深褐、木紋直向、霧面不反光（原本用木板照片橫貼，加上反射天空，看起來像金屬管）
+  { const pm=postMat; pm.map.rotation=Math.PI/2; pm.normalMap.rotation=Math.PI/2; pm.map.repeat.set(1.6,.5); pm.normalMap.repeat.set(1.6,.5); pm.roughnessMap=null;
+    pm.color=new T.Color(.42,.34,.27); pm.roughness=.96; pm.metalness=0; pm.envMapIntensity=.25; pm.needsUpdate=true; } }
 
 /* ---------- 岸邊泥灘（實拍泥土落葉材質） ---------- */
 const mud={map:rep(tl.load('mud_diff.jpg'),5,5,true),normalMap:rep(tl.load('mud_nor.jpg'),5,5),roughnessMap:rep(tl.load('mud_rough.jpg'),5,5)};
