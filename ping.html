@@ -1,0 +1,12 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>濕地垂釣・連線診斷</title><style>body{font-family:sans-serif;background:#111;color:#eee;padding:16px;line-height:1.7}li{margin:4px 0}.ok{color:#8f8}.bad{color:#f88}</style></head>
+<body><h2>連線診斷</h2><p>這一頁會依序測試遊戲需要下載的東西，每一項完成會打勾；卡在哪一項就截圖給我。</p><ol id="L"></ol>
+<script>
+const L=document.getElementById('L'), t0=performance.now();
+function li(t,cls){ const e=document.createElement('li'); e.className=cls||''; e.textContent=t+'（'+((performance.now()-t0)/1000).toFixed(1)+' 秒）'; L.appendChild(e); return e; }
+li('1. 網頁本身已載入','ok'); li('瀏覽器：'+navigator.userAgent.slice(0,90));
+async function timed(name,url){ const e=li(name+'：下載中…'); const s=performance.now(); try{ const r=await fetch(url,{cache:'no-store'}); const b=await r.arrayBuffer(); e.textContent=name+'：OK '+(b.byteLength/1024|0)+'KB，'+((performance.now()-s)/1000).toFixed(1)+' 秒'; e.className='ok'; }catch(err){ e.textContent=name+'：失敗 '+err; e.className='bad'; } }
+(async()=>{ await timed('2. 版本檔（小）','version.json'); await timed('3. 3D 引擎（600KB）','vendor/three.min.js'); await timed('4. 一張天空照片（2.5MB）','env_day_band.jpg'); await timed('5. 一個魚模型（2MB）','models/fish_carp.glb'); await timed('6. 遊戲主頁面（2.4MB）','index.html');
+  const e=li('7. 載入 3D 引擎並建立畫面…'); const sc=document.createElement('script'); sc.src='vendor/three.min.js'; sc.onload=()=>{ try{ const r=new THREE.WebGLRenderer({canvas:document.createElement('canvas')}); e.textContent='7. 3D 引擎可用、WebGL 正常：'+(r.getContext().getParameter(r.getContext().VERSION)); e.className='ok'; }catch(x){ e.textContent='7. WebGL 失敗：'+x; e.className='bad'; } }; sc.onerror=()=>{ e.textContent='7. 3D 引擎載入失敗'; e.className='bad'; }; document.head.appendChild(sc); })();
+window.addEventListener('error',ev=>li('錯誤：'+ev.message,'bad'));
+</script></body></html>
