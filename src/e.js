@@ -405,6 +405,7 @@ function dexPage(sp){ const d=save.dex[sp.id], r=RAR[sp.rar], wh=dexWhere(sp), t
   if(!d){ h+='<div class="dexsec dim">還沒釣到這種魚，釣到後會解鎖外觀、介紹與完整資料。</div>'; return `<div style="--rc:${r.col}">${h}</div>`; }
   const W=x=>sp.k*Math.pow(x/100,3), wl=W(sp.len[0])*.9, wu=W(sp.len[1])*1.12, val=w=>Math.round(sp.price*Math.pow(w+.3,.85)*r.mult*.4);
   h+=`<div class="dexsec">${sp.desc||''}</div>`;
+  if(window.__layerOf&&!sp.special) h+=`<div class="dexsec" style="opacity:.85">🎚️ 常在水層：${window.__LAYER_N[window.__layerOf(sp)]}</div>`;
   h+=`<div class="dexgrid"><span>體長</span><b>${sp.len[0]}–${sp.len[1]} 公分</b><span>體重</span><b>${fmtW(wl)}–${fmtW(wu)}</b><span>等級</span><b>LVL ${sp.lvl[0]}–${sp.lvl[1]}</b><span>參考售價</span><b>${sp.noSell?'保育類・不可販售':'🪙 '+val(wl).toLocaleString()+'–'+val(wu).toLocaleString()}</b><span>拉扯型態</span><b>${styOf(sp.id).n}</b></div>`;
   if(sp.f){ h+='<div class="dexsec">'+STAT_N.map(([k,n])=>{ const mx=Math.max(...SPECIES.map(s=>s.f?s.f[k]||0:0),.01), v=Math.min(1,(sp.f[k]||0)/mx);
     return `<div class="dexbar"><span>${n}</span><i><em style="width:${(v*100).toFixed(0)}%"></em></i></div>`; }).join('')+'</div>'; }
