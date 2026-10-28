@@ -80,7 +80,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
   async function doUpdate(){ upB.textContent='更新中…'; upB.disabled=true;
     try{ if(window.__saveNow) window.__saveNow(); }catch(e){}
-    try{ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }catch(e){}
+    try{ const ks=await caches.keys(); await Promise.all(ks.filter(k=>!k.startsWith('swamp-assets')).map(k=>caches.delete(k))); /* 更新時保留模型貼圖快取，不必重新下載整個遊戲 */ }catch(e){}
     try{ const r=await navigator.serviceWorker.getRegistration(); if(r) await r.update(); }catch(e){}
     location.reload(); }
   upB.addEventListener('click',doUpdate); noB.addEventListener('click',()=>{ bar.style.display='none'; dismissed=bar.dataset.v||''; });

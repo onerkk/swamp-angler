@@ -60,11 +60,15 @@ function updHot(dt){
 
 /* ---------- 寶物與雜物 ---------- */
 const itemSrc={}; const gl=T.GLTFLoader?new T.GLTFLoader():null;
-if(gl) for(const it of ITEMS) gl.load(it.file,g=>{ const s=g.scene, box=new T.Box3().setFromObject(s), sz=box.getSize(new T.Vector3()), ctr=box.getCenter(new T.Vector3());
-  const k=1/Math.max(sz.x,sz.y,sz.z), wrap=new T.Group(); s.position.sub(ctr).multiplyScalar(k); s.scale.multiplyScalar(k); wrap.add(s); itemSrc[it.id]=wrap; },undefined,()=>{});
+// 寶物模型不在開場載入（約 20MB）：開始遊戲 40 秒後在背景一個一個慢慢下載
+const itemQ=[]; let itemK=0; if(gl) setTimeout(function nx(){ const it=ITEMS[itemK++]; if(!it) return; itemQ.push(it); loadItemModel(it); setTimeout(nx,2500); },40000);
+function loadItemModel(it){ if(!gl||it._ld) return; it._ld=1; gl.load(it.file,g=>{ const s=g.scene, box=new T.Box3().setFromObject(s), sz=box.getSize(new T.Vector3()), ctr=box.getCenter(new T.Vector3());
+  const k=1/Math.max(sz.x,sz.y,sz.z), wrap=new T.Group(); s.position.sub(ctr).multiplyScalar(k); s.scale.multiplyScalar(k); wrap.add(s); itemSrc[it.id]=wrap; },undefined,()=>{}); }
 function rollItem(){ let tot=0; for(const it of ITEMS) tot+=it.p; let r=Math.random()*tot; for(const it of ITEMS){ r-=it.p; if(r<=0) return it; } return ITEMS[0]; }
 function itemFish(it){ const g=new T.Group(); const src=itemSrc[it.id];
-  if(src) g.add(src.clone(true)); else g.add(new T.Mesh(new T.IcosahedronGeometry(.5,2),new T.MeshStandardMaterial({color:0x4a4436,roughness:.8})));
+  if(src) g.add(src.clone(true));
+  else { const ph=new T.Mesh(new T.IcosahedronGeometry(.5,2),new T.MeshStandardMaterial({color:0x4a4436,roughness:.8})); g.add(ph); loadItemModel(it);   // 還沒下載到：先放佔位，下載好立刻換成真的模型
+    const iv=setInterval(()=>{ const s2=itemSrc[it.id]; if(s2){ clearInterval(iv); g.remove(ph); const o=s2.clone(true); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); } },300); setTimeout(()=>clearInterval(iv),60000); }
   g.traverse(o=>{ o.frustumCulled=false; }); return {group:g,uni:{uSwim:{value:0},uAmp:{value:0}},sp:ITEM_SP}; }
 function itemCard(fd,show){ const it=fd.item, R=c.RAR[it.rare];
   $('catch').style.setProperty('--rc',it.rare>=2?R.col:'#9aa4ac');

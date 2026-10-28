@@ -64,12 +64,13 @@ const whale=new T.Group(); whale.visible=false; whale.rotation.order='YXZ'; S.ad
   for(const s of [1,-1]){ const f=new T.Mesh(new T.SphereGeometry(1,12,8),wMat); f.scale.set(2.6,.12,.5); f.position.set(s*2.4,-.6,2.5); f.rotation.set(0,s*.5,s*-.3); whale.add(f); } }
 // 座頭鯨（使用者提供側面、俯視設定圖生成）：模型原本頭朝上，載入後自動綁骨，再轉成水平、頭朝 +z
 let whaleRig=null; const WP={tail:.18,tailF:1.2,bend:0,arch:0};
-if(T.GLTFLoader) new T.GLTFLoader().load('models/whale2.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material.roughness=.42; m.material.metalness=.05; } } });
+let whaleLoaded=false; function loadWhale(){ if(whaleLoaded||!T.GLTFLoader) return; whaleLoaded=true;   // 鯨魚模型 8.6MB：第一次出海才下載
+ new T.GLTFLoader().load('models/whale2.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material.roughness=.42; m.material.metalness=.05; } } });
   o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(13/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
   const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-c2.y,-c2.z);
   const holder=new T.Group(); holder.add(o); holder.updateMatrixWorld(true); try{ whaleRig=autoRig(o,'tail'); }catch(e){ console.warn('whale rig',e); }
   const turn=new T.Group(); turn.rotation.set(-Math.PI/2,Math.PI,0,'YXZ'); turn.add(holder);
-  whale.children.forEach(ch=>{ ch.visible=false; }); whale.add(turn); whale.userData.real=true; },undefined,()=>{ if(window.__MDL) window.__MDL.attach(whale,'whale',{len:13,target:'+z'}); });
+  whale.children.forEach(ch=>{ ch.visible=false; }); whale.add(turn); whale.userData.real=true; },undefined,()=>{ if(window.__MDL) window.__MDL.attach(whale,'whale',{len:13,target:'+z'}); }); }
 const fluke=new T.Group(); fluke.visible=false; S.add(fluke);
 { const sh=new T.Shape(); sh.moveTo(0,.25); sh.quadraticCurveTo(-1.2,.5,-2.6,1.6); sh.quadraticCurveTo(-1.7,.6,-1.5,0); sh.quadraticCurveTo(-1.7,-.6,-2.6,-1.6); sh.quadraticCurveTo(-1.2,-.5,0,-.25); sh.lineTo(0,.25);
   const f=new T.Mesh(new T.ShapeGeometry(sh,14),wMat); f.rotation.z=-Math.PI/2; f.position.y=2.6; fluke.add(f);
@@ -133,7 +134,7 @@ const mets=[]; for(let i=0;i<6;i++){ const m=new T.Mesh(new T.PlaneGeometry(1,1)
 
 /* ---------- 地點切換 ---------- */
 let loc='lake';
-function setLoc(l){ loc=l; G.loc=l; const sea=l==='sea', ice=l==='ice'; W.setSea(sea); if(W.setIce) W.setIce(ice); if(window.__MDL) window.__MDL.preload(l);
+function setLoc(l){ loc=l; G.loc=l; const sea=l==='sea', ice=l==='ice'; if(sea) loadWhale(); W.setSea(sea); if(W.setIce) W.setIce(ice); if(window.__MDL) window.__MDL.preload(l);
   S.children.forEach(o=>{ if(o.userData&&o.userData.lake) o.visible=l==='lake'; });
   if(window.__REAL&&window.__REAL.useSet) window.__REAL.useSet(l);
   yacht.visible=sea; endAll(); if(sea){ evT=6; forced='dolphin'; }
