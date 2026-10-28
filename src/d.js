@@ -122,6 +122,7 @@ const tv=new T.Vector3(), tv2=new T.Vector3(), tq=new T.Quaternion(), te=new T.E
 const bob=P.bobber, rod=P.rod;
 function period(h){ h=((h%24)+24)%24; return h>=4.8&&h<8.5?'dawn':h<16.5&&h>=8.5?'day':h>=16.5&&h<19.8?'dusk':'night'; }
 const PER_WAIT={dawn:.75,day:1.1,dusk:.75,night:1.0};
+const tv2b=new T.Vector3(), tv3b=new T.Vector3(), tv4b=new T.Vector3();
 function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.012,-.24,Math.cos(G.t*1.1)*.01)); }   // 浮標收到竿尖下方約 25 公分，像真的釣客收好線
 
 /* ---------- 選魚 ---------- */
@@ -772,7 +773,9 @@ function update(dt){
     else if(st==='idle'){ if(G.loc==='ice'){ if(!ICE.drilled()){ if(G.held) ICE.drill(dt); setAct(G.held?'鑿冰中 '+Math.round(ICE.progress()*100)+'%':'按住<br>鑿冰洞','冰釣：先在前方鑿開冰洞',false); } else setAct('點擊<br>放線','把浮標從冰洞放下去',false); } else setAct('按住<br>蓄力','左右拖曳畫面可以轉向瞄準',false); }
   }
   P.updateRod(dt);
-  if(st==='intro'||st==='idle'||st==='charge'){ hangPos(bob.position); lineEnd=bob.position; slack=.05; }
+  if(st==='idle'&&rod.guidesW&&rod.guidesW.length>3){ /* 沒拋竿時：像真的釣客把鉤子扣在竿上的掛鉤環，浮標貼著竿身中段，不在眼前晃 */
+    G.idleF=Math.min(1,(G.idleF||0)+dt*1.5); hangPos(tv2b); bob.position.copy(tv2b).lerp(tv3b.copy(rod.guidesW[2]).add(tv4b.set(0,-.05,0)),sstep(0,1,G.idleF)); lineEnd=bob.position; slack=.02; }
+  else if(st==='intro'||st==='idle'||st==='charge'){ G.idleF=0; hangPos(bob.position); lineEnd=bob.position; slack=.05; }
   else if(st==='cast'){
     if(G.delay>0){ G.delay-=dt; hangPos(bob.position); if(G.delay<=0) G.from.copy(bob.position); }
     else { G.castT+=dt; const s=Math.min(1,G.castT/G.castDur);

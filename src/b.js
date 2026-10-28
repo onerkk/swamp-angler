@@ -194,6 +194,7 @@ vec3 photoEnv(vec3 dir){
     vec3 oc = mix(pow(texture2D(uOvcA, vec2(ou, ov)).rgb, vec3(2.2)), pow(texture2D(uOvcB, vec2(ou, ov)).rgb, vec3(2.2)), clamp(uRain*1.4, 0.0, 1.0));
     float skyK = smoothstep(-0.01, 0.06, d.y)*smoothstep(0.10, 0.26, g);
     float om = dot(oc, vec3(0.3, 0.59, 0.11)); oc = max(vec3(0.0), vec3(om) + (oc - vec3(om))*1.5); oc = mix(vec3(om), oc, 1.0)*mix(1.0, 1.35, smoothstep(0.0, 0.3, d.y));   // 加強雲層明暗層次
+    { vec3 tint = c/max(g, 1e-3); tint = clamp(tint, vec3(0.6), vec3(1.6)); oc *= mix(vec3(1.0), tint, 0.4); }   // 帶上當下時段的色調（黃昏陰天偏橘、夜裡偏藍）
     c = mix(c, oc, skyK*uOvcK); g = mix(g, om, skyK*uOvcK);
   }
   float keepSky = 1.0 - 0.8*uOvcK*step(0.0, d.y);   // 天空已是實拍陰天照片，不再整片灰化壓暗
