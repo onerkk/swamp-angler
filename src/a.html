@@ -286,6 +286,13 @@ body.fighting #top,body.fighting #top2,body.fighting #magWin,body.fighting .hotC
 }
 </style>
 <!-- 3D 引擎放在自己的網站上（不靠外部 CDN：手機網路連不到 CDN 時整個頁面會卡在載入畫面） -->
+<script>
+/* 模型、貼圖、音效改從全球 CDN（jsDelivr，直接鏡像這個 GitHub 倉庫）下載：有些電信網路連 GitHub 只有每秒幾十 KB，85MB 要等半小時以上。
+   下載失敗時自動改回 GitHub 本站，並記住，下次直接用本站 */
+window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:localStorage.getItem('swampAngler.cdn')==='on',
+  url(u){ try{ if(!this.on||!u||/^(https?:|data:|blob:)/.test(u)||!/\.(glb|jpg|jpeg|png|webp|hdr|mp3)(\?|$)/i.test(u)) return u; return this.base+u.replace(/^\.?\//,''); }catch(e){ return u; } },
+  fail(u){ if(this.on&&u&&u.indexOf(this.base)===0){ this.on=false; try{ localStorage.setItem('swampAngler.cdn','off'); }catch(e){} console.warn('CDN 下載失敗，改用本站',u); } }};
+</script>
 <script defer src="vendor/three.min.js"></script>
 <script defer src="vendor/GLTFLoader.js"></script>
 <script defer src="vendor/SkeletonUtils.js"></script>

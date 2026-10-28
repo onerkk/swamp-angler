@@ -7,6 +7,11 @@ function li(t,cls){ const e=document.createElement('li'); e.className=cls||''; e
 li('1. 網頁本身已載入','ok'); li('瀏覽器：'+navigator.userAgent.slice(0,90));
 async function timed(name,url){ const e=li(name+'：下載中…'); const s=performance.now(); try{ const r=await fetch(url,{cache:'no-store'}); const b=await r.arrayBuffer(); e.textContent=name+'：OK '+(b.byteLength/1024|0)+'KB，'+((performance.now()-s)/1000).toFixed(1)+' 秒'; e.className='ok'; }catch(err){ e.textContent=name+'：失敗 '+err; e.className='bad'; } }
 (async()=>{ await timed('2. 版本檔（小）','version.json'); await timed('3. 3D 引擎（600KB）','vendor/three.min.js'); await timed('4. 一張天空照片（2.5MB）','env_day_band.jpg'); await timed('5. 一個魚模型（2MB）','models/fish_carp.glb'); await timed('6. 遊戲主頁面（2.4MB）','index.html');
+  li('—— 以下測試其他下載來源（同一個 2MB 魚模型）——');
+  await timed('A. GitHub 本站','models/fish_carp.glb?x='+Date.now());
+  await timed('B. jsDelivr CDN','https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/models/fish_carp.glb');
+  await timed('C. Statically CDN','https://cdn.statically.io/gh/onerkk/swamp-angler/main/models/fish_carp.glb');
+  await timed('D. GitHub raw','https://raw.githubusercontent.com/onerkk/swamp-angler/main/models/fish_carp.glb');
   const e=li('7. 載入 3D 引擎並建立畫面…'); const sc=document.createElement('script'); sc.src='vendor/three.min.js'; sc.onload=()=>{ try{ const r=new THREE.WebGLRenderer({canvas:document.createElement('canvas')}); e.textContent='7. 3D 引擎可用、WebGL 正常：'+(r.getContext().getParameter(r.getContext().VERSION)); e.className='ok'; }catch(x){ e.textContent='7. WebGL 失敗：'+x; e.className='bad'; } }; sc.onerror=()=>{ e.textContent='7. 3D 引擎載入失敗'; e.className='bad'; }; document.head.appendChild(sc); })();
 window.addEventListener('error',ev=>li('錯誤：'+ev.message,'bad'));
 </script></body></html>
