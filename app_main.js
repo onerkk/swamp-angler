@@ -1,4 +1,4 @@
-/*APPV:20261028151217*/
+/*APPV:20261028151546*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -4419,7 +4419,8 @@ const S=c.save;
 const TANKS=[{n:'小水族箱',cap:6,maxL:.6,price:0},{n:'大型水族箱',cap:12,maxL:1.0,price:15000},{n:'展示牆水族箱',cap:20,maxL:1.5,price:60000},{n:'水族館',cap:30,maxL:1.6,price:150000}];
 // 海水缸也能升級（原本只有一種，沒辦法變大）：越大能養越多、越大的海魚
 const SEA_TANKS=[{n:'海水缸',cap:6,maxL:.8,price:25000},{n:'大型海水缸',cap:12,maxL:1.2,price:60000},{n:'珊瑚礁展示缸',cap:20,maxL:1.8,price:150000},{n:'海洋館',cap:30,maxL:2.4,price:300000}];
-const SEA_TANK=SEA_TANKS[0], seaT=()=>SEA_TANKS[Math.min(SEA_TANKS.length-1,H().seaTier||0)]; CHILLER={n:'冷水機',price:12000,lv:10}, MOUNT_MAX=8;
+const SEA_TANK=SEA_TANKS[0], seaT=()=>SEA_TANKS[Math.min(SEA_TANKS.length-1,H().seaTier||0)];
+const CHILLER={n:'冷水機',price:12000,lv:10}, MOUNT_MAX=8;
 function H(){ const h=S.home=S.home||{}; h.fresh=h.fresh||[]; h.sea=h.sea||[]; h.mounts=h.mounts||[]; h.tier=h.tier||0; return h; }
 // 小屋在完成主線第一章後開放（開場就說老漁人留下了小屋）
 const unlocked=()=>!!(S.story&&S.story.done&&S.story.done.includes('c1'));
@@ -5421,7 +5422,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028151217'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028151546'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6525,7 +6526,7 @@ const dragRel=e=>{ if(e.pointerId!==dragPtr) return; dragPtr=null; if(actPtr===n
 cv.addEventListener('pointerup',dragRel); cv.addEventListener('pointercancel',dragRel); cv.addEventListener('lostpointercapture',dragRel);
 ui.act.addEventListener('lostpointercapture',actRel);
 // 保險：手機瀏覽器偶爾會漏掉「放開」事件，讓按鈕／拖曳／搖桿永遠卡住。視窗層級再接一次，螢幕上沒有手指時全部清掉
-function releaseAll(){ if(actPtr!==null){ actPtr=null; actUp(); } dragPtr=null; G.rodSideT=0; if(typeof KY!=='undefined'&&KY.ptr!==null){ KY.ptr=null; KY.thr=0; KY.turn=0; joyK.style.transform=''; } }
+function releaseAll(){ if(actPtr!==null){ actPtr=null; actUp(); } dragPtr=null; G.rodSideT=0; try{ if(KY.ptr!==null){ KY.ptr=null; KY.thr=0; KY.turn=0; joyK.style.transform=''; } }catch(e){} }   /* KY 還沒建立時（剛開頁就切到背景）不會報錯 */
 window.addEventListener('pointerup',e=>{ if(e.pointerId===dragPtr) dragRel(e); if(e.pointerId===actPtr) actRel(e); if(typeof KY!=='undefined'&&e.pointerId===KY.ptr) joyEnd(e); },true);
 window.addEventListener('pointercancel',e=>{ if(e.pointerId===dragPtr) dragRel(e); if(e.pointerId===actPtr) actRel(e); if(typeof KY!=='undefined'&&e.pointerId===KY.ptr) joyEnd(e); },true);
 window.addEventListener('touchend',e=>{ if(e.touches.length===0) setTimeout(()=>{ if(!(navigator.maxTouchPoints>0&&(dragPtr!==null||actPtr!==null))) return; releaseAll(); },120); },{passive:true});

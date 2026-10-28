@@ -6,7 +6,8 @@ const S=c.save;
 const TANKS=[{n:'小水族箱',cap:6,maxL:.6,price:0},{n:'大型水族箱',cap:12,maxL:1.0,price:15000},{n:'展示牆水族箱',cap:20,maxL:1.5,price:60000},{n:'水族館',cap:30,maxL:1.6,price:150000}];
 // 海水缸也能升級（原本只有一種，沒辦法變大）：越大能養越多、越大的海魚
 const SEA_TANKS=[{n:'海水缸',cap:6,maxL:.8,price:25000},{n:'大型海水缸',cap:12,maxL:1.2,price:60000},{n:'珊瑚礁展示缸',cap:20,maxL:1.8,price:150000},{n:'海洋館',cap:30,maxL:2.4,price:300000}];
-const SEA_TANK=SEA_TANKS[0], seaT=()=>SEA_TANKS[Math.min(SEA_TANKS.length-1,H().seaTier||0)]; CHILLER={n:'冷水機',price:12000,lv:10}, MOUNT_MAX=8;
+const SEA_TANK=SEA_TANKS[0], seaT=()=>SEA_TANKS[Math.min(SEA_TANKS.length-1,H().seaTier||0)];
+const CHILLER={n:'冷水機',price:12000,lv:10}, MOUNT_MAX=8;
 function H(){ const h=S.home=S.home||{}; h.fresh=h.fresh||[]; h.sea=h.sea||[]; h.mounts=h.mounts||[]; h.tier=h.tier||0; return h; }
 // 小屋在完成主線第一章後開放（開場就說老漁人留下了小屋）
 const unlocked=()=>!!(S.story&&S.story.done&&S.story.done.includes('c1'));
