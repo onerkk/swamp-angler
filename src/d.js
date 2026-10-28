@@ -697,7 +697,7 @@ function updateFight(dt){
   { const load=clamp(.25+.35*Math.min(1,fd.w/3),.25,.6), jit=(f.run||shake)?Math.sin(G.t*38)*.05*(.5+f.T):0;   // 掛上魚就有弧度，張力再加深，衝刺甩頭時竿尖抖動
     rod.end=G.endV.copy(tv); rod.pitchT=.18+.08*f.T; rod.bendT=clamp(load+.85*f.T+(f.run?.12:0)+jit,0,1.25);
     // 竿子跟著魚：魚往哪邊衝，竿身就被往那邊拖過去；衝刺時再往下壓
-    rod.side=clamp((rod.side||0)+((G.rodSide||0)*.6+clamp(f.theta*1.1,-.7,.7))*.0+((G.rodSide||0)*.6+clamp(f.theta*1.1,-.7,.7)-(rod.side||0))*Math.min(1,dt*3),-1,1); rod.pitchT-=(f.run?.06:0)+.05*f.T; }
+    rod.side=clamp((rod.side||0)+((G.rodSide||0)*.5+clamp(f.theta*.7,-.4,.4)-(rod.side||0))*Math.min(1,dt*3),-.6,.6); /* 竿子跟著魚擺，但不會甩出畫面 */ rod.pitchT-=(f.run?.06:0)+.05*f.T; }
   G.yawT=clamp(az-G.head,-.95,.95);
   // HUD
   ui.tFill.style.width=(f.T*100).toFixed(1)+'%'; ui.tFill.style.background=f.T<.65?'var(--good)':f.T<.9?'var(--warn)':'var(--bad)';
@@ -719,7 +719,7 @@ function updateFight(dt){
     // 魚還有力氣就拉不上來：靠近時再衝出去，要遛到沒力才能收進來
     // 衝出去會消耗魚的體力，最多衝兩次；體力低於 45% 或衝過兩次就拉得上來
     f.surges=f.surges||0; if(f.stam<=45||f.surges>=2){
-      const big=!fd.item&&(fd.w>6||fd.u>.85||fd.boss); if(!big) return land();
+      const big=!fd.item&&(fd.w>3||(fd.u>.9&&fd.w>1.5)||fd.boss); /* 3 公斤以上（或接近該魚種最大且超過 1.5 公斤）才需要抄網 */ if(!big) return land();
       // 大魚要抄網：魚靠近又沒在衝刺時按「抄網」才算起魚；急著在牠衝刺時抄網會讓牠再衝出去
       if(!f.netOn){ f.netOn=true; ui.netBtn.classList.remove('hidden'); toast('🥅 大魚靠近了！按鈕變亮時按「抄網」','good',2200); }
       // 按鈕即時顯示能不能抄：魚在衝＝灰色等待；魚停下＝亮起並震一下。魚剛開始衝的 0.4 秒內按下仍算成功
@@ -820,7 +820,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       if(t<T2){ const hl=.55+L*.2; let hang=tv.copy(tip); if(t>=T1){ const DD=Math.max(D*1.15,L*1.7+.5); W.head.localToWorld(tv2.set(.06,.3*DD+.12+L*.35,-DD)); hang.lerp(tv2,sstep(T1,T2,t)); }   // 大魚吊得遠一點、高一點，不會穿過鏡頭和手
         const sx=Math.sin(G.swing.a)*hl, mouth=tv2.set(hang.x+Math.cos(yaw)*sx,hang.y-hl*Math.cos(G.swing.a),hang.z-Math.sin(yaw)*sx);
         if(t<T1){ const e=sstep(0,T1,t), from=new THREE.Vector3().copy(G.landFrom); mouth.copy(from.lerp(mouth,e)); mouth.y+=Math.sin(Math.PI*e)*.35; }   // 從水裡被拉起、劃一道弧線到竿尖下
-        te.set(0,yaw+Math.PI/2,0,'YXZ'); g.quaternion.setFromEuler(te); g.rotateZ(Math.PI/2+G.swing.a*.6+Math.sin(t*13)*.25); g.updateMatrixWorld(true);
+        te.set(0,yaw+Math.sin(t*1.7)*.35,0,'YXZ'); g.quaternion.setFromEuler(te); /* 魚身側面朝向鏡頭，隨吊線慢慢轉 */ g.rotateZ(Math.PI/2+G.swing.a*.6); g.updateMatrixWorld(true);
         const off=new THREE.Vector3(.5,0,0).applyQuaternion(g.quaternion).multiplyScalar(L); g.position.copy(mouth).sub(off);
         // 吊著的魚：不是一直細碎抖動，而是一陣一陣用力彎成 C 字甩動，甩完短暫垂著喘氣
         G.hf=(G.hf||0)-dt; if(G.hf<=0){ G.hf=rand(.7,1.5); G.hfT=.5; } const fl=G.hfT>0?(G.hfT-=dt,Math.sin((.5-G.hfT)/.5*Math.PI)):0;
