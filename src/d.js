@@ -959,7 +959,10 @@ requestAnimationFrame(frame);
   // 模型、貼圖、音效從 jsDelivr 下載（實測比 GitHub 快約 8 倍）；某個檔案從 CDN 下載失敗，就只對那個檔案改從本站重抓，不影響其他檔案
   try{ const C=window.__CDN, wrap=(proto)=>{ const orig=proto.load; proto.load=function(url,onLoad,onProg,onErr){ const cu=C.url(url); if(cu===url) return orig.call(this,url,onLoad,onProg,onErr);
       const self=this; return orig.call(this,cu,onLoad,onProg,e=>{ console.warn('CDN 失敗，改從本站下載',url); orig.call(self,url,onLoad,onProg,onErr); }); }; };
-    wrap(THREE.FileLoader.prototype); wrap(THREE.ImageLoader.prototype); if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); }catch(e){ console.warn('cdn',e); }
+    wrap(THREE.FileLoader.prototype); wrap(THREE.ImageLoader.prototype);
+    // 所有模型都經過 Draco 幾何壓縮（體積約剩 1/4）：每個 GLTF 載入器自動接上同一個 Draco 解壓器
+    if(THREE.DRACOLoader&&THREE.GLTFLoader){ const dl=new THREE.DRACOLoader(); dl.setDecoderPath('vendor/draco/'); dl.preload();
+      for(const k of ['load','parse']){ const o=THREE.GLTFLoader.prototype[k]; THREE.GLTFLoader.prototype[k]=function(...a){ if(!this.dracoLoader) this.setDRACOLoader(dl); return o.apply(this,a); }; } } if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); }catch(e){ console.warn('cdn',e); }
   try{
     const W=createWorld({canvas:document.getElementById('c')}); window.__DIAG=createDiag(W,{get G(){ return window.__G||{}; },get save(){ return (window.__G&&window.__G.saveRef)||{}; }}); const P=createProps(W);
     // 主畫面的載入提示：進度條、第一次進入的說明、網路慢時的提醒（避免玩家以為當機）

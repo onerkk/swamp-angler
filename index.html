@@ -295,6 +295,7 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:lo
 </script>
 <script defer src="vendor/three.min.js"></script>
 <script defer src="vendor/GLTFLoader.js"></script>
+<script defer src="vendor/DRACOLoader.js"></script>
 <script defer src="vendor/SkeletonUtils.js"></script>
 <script defer src="vendor/RGBELoader.js"></script>
 </head>
@@ -2828,7 +2829,8 @@ const YAW=.25; U.uYaw.value=YAW;
 let total=0, errors=0;
 const mgr=new T.LoadingManager();
 mgr.onProgress=(u,l,t)=>{ window.__LASTURL=(u||'').split('/').pop(); window.__LOADN=l+'/'+t; total=t; if(cb) cb(l/t,false,errors); };
-mgr.onError=(u)=>{ errors++; if(cb) cb(0,false,errors); };
+mgr.onError=(u)=>{ if(window.__CDN&&u&&u.indexOf(window.__CDN.base)===0) return;   /* CDN 失敗的檔案會自動改從本站重抓，不算失敗（原本只要有一個就整個退回簡化畫面） */
+  errors++; if(cb) cb(0,false,errors); };
 const tl=new T.TextureLoader(mgr);
 const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter=T.LinearFilter; t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; return t; };
 const tex={}, env={}, masks={};
@@ -5816,7 +5818,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028143742'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028145600'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -7414,7 +7416,10 @@ requestAnimationFrame(frame);
   // 模型、貼圖、音效從 jsDelivr 下載（實測比 GitHub 快約 8 倍）；某個檔案從 CDN 下載失敗，就只對那個檔案改從本站重抓，不影響其他檔案
   try{ const C=window.__CDN, wrap=(proto)=>{ const orig=proto.load; proto.load=function(url,onLoad,onProg,onErr){ const cu=C.url(url); if(cu===url) return orig.call(this,url,onLoad,onProg,onErr);
       const self=this; return orig.call(this,cu,onLoad,onProg,e=>{ console.warn('CDN 失敗，改從本站下載',url); orig.call(self,url,onLoad,onProg,onErr); }); }; };
-    wrap(THREE.FileLoader.prototype); wrap(THREE.ImageLoader.prototype); if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); }catch(e){ console.warn('cdn',e); }
+    wrap(THREE.FileLoader.prototype); wrap(THREE.ImageLoader.prototype);
+    // 所有模型都經過 Draco 幾何壓縮（體積約剩 1/4）：每個 GLTF 載入器自動接上同一個 Draco 解壓器
+    if(THREE.DRACOLoader&&THREE.GLTFLoader){ const dl=new THREE.DRACOLoader(); dl.setDecoderPath('vendor/draco/'); dl.preload();
+      for(const k of ['load','parse']){ const o=THREE.GLTFLoader.prototype[k]; THREE.GLTFLoader.prototype[k]=function(...a){ if(!this.dracoLoader) this.setDRACOLoader(dl); return o.apply(this,a); }; } } if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); }catch(e){ console.warn('cdn',e); }
   try{
     const W=createWorld({canvas:document.getElementById('c')}); window.__DIAG=createDiag(W,{get G(){ return window.__G||{}; },get save(){ return (window.__G&&window.__G.saveRef)||{}; }}); const P=createProps(W);
     // 主畫面的載入提示：進度條、第一次進入的說明、網路慢時的提醒（避免玩家以為當機）

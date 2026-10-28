@@ -13,7 +13,8 @@ const YAW=.25; U.uYaw.value=YAW;
 let total=0, errors=0;
 const mgr=new T.LoadingManager();
 mgr.onProgress=(u,l,t)=>{ window.__LASTURL=(u||'').split('/').pop(); window.__LOADN=l+'/'+t; total=t; if(cb) cb(l/t,false,errors); };
-mgr.onError=(u)=>{ errors++; if(cb) cb(0,false,errors); };
+mgr.onError=(u)=>{ if(window.__CDN&&u&&u.indexOf(window.__CDN.base)===0) return;   /* CDN 失敗的檔案會自動改從本站重抓，不算失敗（原本只要有一個就整個退回簡化畫面） */
+  errors++; if(cb) cb(0,false,errors); };
 const tl=new T.TextureLoader(mgr);
 const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter=T.LinearFilter; t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; return t; };
 const tex={}, env={}, masks={};
