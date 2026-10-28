@@ -1,4 +1,4 @@
-/*APPV:20261028232755*/
+/*APPV:20261028234317*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -3382,6 +3382,9 @@ const FLAT=new Set(['halibut']), FRIGS=new Set();
 // 特殊游法：魟（左右胸鰭像翅膀上下拍動）、翻車魚（上下兩片大鰭左右划水，身體幾乎不擺）
 const SWIMK={stingray:'ray',sunfish:'mola',ghostcrab:'crab',fiddler:'crab',hermit:'crab',hardclam:'stiff',gomphina:'stiff',tellin:'stiff',razor:'stiff'};   // 螃蟹：兩側的腳一起划動；貝類：殼不彎
 const BX=[.46,.28,.1,-.08,-.25,-.4];
+// 螃蟹、寄居蟹、海瓜子的貼圖在細腳、殼緣會投影到原圖的白色背景：把接近純白的部分挖掉，不再出現一塊塊白色
+const CUTWHITE=new Set(['ghostcrab','fiddler','hermit','tellin','gomphina','hardclam']);
+const cutWhite=sh=>{ sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n if(min(diffuseColor.r,min(diffuseColor.g,diffuseColor.b))>0.86&&max(diffuseColor.r,max(diffuseColor.g,diffuseColor.b))-min(diffuseColor.r,min(diffuseColor.g,diffuseColor.b))<0.08) discard;'); };
 function rigFish(grp,uni,K,mode){ const bones=BX.map(()=>new T.Bone()); bones[0].position.set(BX[0],0,0); for(let i=1;i<bones.length;i++){ bones[i].position.set(BX[i]-BX[i-1],0,0); bones[i-1].add(bones[i]); }
   grp.add(bones[0]); const all=[...bones], band=.06, extra={};
   // 量出身體範圍：魟看左右寬度，翻車魚看上下高度
@@ -3399,7 +3402,7 @@ function rigFish(grp,uni,K,mode){ const bones=BX.map(()=>new T.Bone()); bones[0]
       if(mode==='stiff'&&y>hy*.04){ f=Math.min(1,(y-hy*.04)/(hy*.08)); fb=extra.H; }
       si[i*4]=k; si[i*4+1]=j; si[i*4+2]=fb; sw[i*4]=w*(1-f); sw[i*4+1]=(1-w)*(1-f); sw[i*4+2]=f; }
     g.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); g.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
-    const mats=(Array.isArray(m.material)?m.material:[m.material]); mats.forEach(mm=>{ mm.onBeforeCompile=()=>{}; mm.skinning=true; mm.needsUpdate=true; });
+    const mats=(Array.isArray(m.material)?m.material:[m.material]); mats.forEach(mm=>{ mm.onBeforeCompile=grp.userData.cutWhite?cutWhite:()=>{}; if(grp.userData.cutWhite){ mm.side=T.DoubleSide; mm.customProgramCacheKey=()=>'cutw'; mm.metalness=0; mm.roughness=.62; mm.envMapIntensity=.4; }   /* 甲殼與貝殼：霧面，不像金屬反光 */ mm.skinning=true; mm.needsUpdate=true; });
     const sm=new T.SkinnedMesh(g,m.material); sm.frustumCulled=false; grp.remove(m); grp.add(sm); grp.updateMatrixWorld(true); sm.bind(skel,new T.Matrix4()); });
   const r={grp,uni,K:mode==='mola'?K*.25:mode==='ray'?K*.35:mode==='crab'?K*.06:mode==='stiff'?K*.02:K,flat:mode==='flat'||mode==='ray',mode,bones,all,extra,idle:0}; FRIGS.add(r); return r; }
 function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.delete(r); return; } r.idle=0;
@@ -3449,7 +3452,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
     const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
   try{ if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });
         const rg=autoRig(grp,'tail'); FRIGS.add({grp,uni,up:rg,idle:0}); } }
-    else rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); cloneSafe(grp); }catch(e){ console.warn('fish rig',sp.id,e); }
+    else { grp.userData.cutWhite=CUTWHITE.has(sp.id); rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); } cloneSafe(grp); }catch(e){ console.warn('fish rig',sp.id,e); }
   return {group:grp,uni,sp,real:true}; }
 
 function measure(root){ root.updateMatrixWorld(true); const b=new T.Box3(), v=new T.Vector3();
@@ -5469,7 +5472,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028232755'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028234317'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
