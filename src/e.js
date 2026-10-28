@@ -323,12 +323,15 @@ function render(){
   } else if(cur==='log'){
     shT.textContent='漁獲圖鑑';
     const found=SPECIES.filter(s=>save.dex[s.id]).length;
+    h+=`<div class="tabs" style="margin-bottom:6px"><button class="${logMode!=='list'?'on':''}" data-a="logmode" data-v="dex">📖 圖鑑</button><button class="${logMode==='list'?'on':''}" data-a="logmode" data-v="list">🧾 魚獲紀錄</button></div>`;
+    if(logMode==='list'){ h+=logList(); } else {
     h+=`<div class="note">已發現 ${found}/${SPECIES.length} 種，總漁獲 ${save.total} 尾</div>`;
     const dsp=dexSel&&SPECIES.find(s=>s.id===dexSel);
     if(dsp){ h=dexPage(dsp); }
     else { h+='<div class="note" style="font-size:12px">點任一種魚查看詳細資料</div>';
     h+=SPECIES.map(sp=>{ const d=save.dex[sp.id], r=RAR[sp.rar];
       return `<div class="dexrow" data-a="dex" data-v="${sp.id}"><img class="dexth" data-th="${sp.id}" alt="" src="${DEXV.cached(sp.id,!!d)||DEXV.BLANK}">`+row(d?sp.name:'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${styOf(sp.id).n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col)+'</div>'; }).join(''); }
+  }
   } else if(cur==='home'){
     const HM=window.__HOME, hd=HM.data(), t=HM.tank(), nm=id=>(SPECIES.find(s=>s.id===id)||{}).name||id, dt=d=>new Date(d).toLocaleDateString('zh-TW');
     shT.textContent='老漁人的小屋'; h+='<button class="sbtn" data-a="mapBack">← 返回釣點</button>';
@@ -470,6 +473,18 @@ const DEXV=(()=>{ const T=THREE, R=c.W.renderer; let scene,cam,rt,cv,ctx,img,buf
     if(tq.length&&cur==='log'&&!dexSel) traf=requestAnimationFrame(tstep); else tq=[]; }
   function thumbs(list){ tq=list.slice(); if(!traf) traf=requestAnimationFrame(tstep); }
   return {show,stop,thumbs,cached,BLANK}; })();
+// 魚獲紀錄：每一尾都留下魚種、尺寸、釣點、時段、天氣、餌、釣法、釣棚與去向，可以排序比較
+let logMode='dex', logSort='new';
+const ZN={dock:'木碼頭',lily:'浮萍灣',wood:'倒木區',deep:'深水中央',moon:'月光灣',reef:'近海礁岩',blue:'遠洋深藍',ice:'冰湖'};
+const perOf=h=>h>=5&&h<8?'清晨':h>=8&&h<17?'白天':h>=17&&h<19.5?'黃昏':'夜晚';
+function logList(){ const L=(save.catchLog||[]).slice(); if(!L.length) return '<div class="note">還沒有紀錄。從這次更新開始，每釣起一尾都會記在這裡。</div>';
+  const sorts={new:(a,b)=>b.t-a.t,w:(a,b)=>b.w-a.w,L:(a,b)=>b.L-a.L,sp:(a,b)=>a.id<b.id?-1:a.id>b.id?1:b.w-a.w,z:(a,b)=>(a.z||'').localeCompare(b.z||'')||b.w-a.w}; L.sort(sorts[logSort]||sorts.new);
+  let o='<div class="tabs" style="flex-wrap:wrap">'+[['new','最新'],['w','最重'],['L','最長'],['sp','魚種'],['z','釣點']].map(([k,n])=>`<button class="${logSort===k?'on':''}" data-a="logsort" data-v="${k}">${n}</button>`).join('')+'</div>';
+  o+=`<div class="note" style="font-size:12px">共 ${L.length} 筆（最多保留 300 筆）</div>`;
+  o+=L.slice(0,120).map(r=>{ const sp=SPECIES.find(s=>s.id===r.id), b=BAITS.find(x=>x.id===r.b), d=new Date(r.t);
+    const tag=(r.new?'<b style="color:#7ff0a8">首次</b> ':'')+(r.rec?'<b style="color:#ffd56a">新紀錄</b> ':'');
+    return row(`${sp?sp.name:r.id} ${tag}`,`${r.w>=1?r.w.toFixed(2)+' kg':Math.round(r.w*1000)+' g'}・${Math.round(r.L*100)} cm<br><small>${ZN[r.z]||r.z||''}・${perOf(r.h)}・${r.wx}・${b?b.name:'—'}・${r.m}${r.m==='浮標'||r.m==='沉底'?'・'+['淺棚','中層','深棚'][r.dp]:''}</small>`,`<small>${r.out||''}<br>${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</small>`); }).join('');
+  return o; }
 function open(k){ document.body.classList.add('sheetOn'); cur=k; if(k==='log') dexSel=null; resetArm=false; render(); sheet.classList.remove('hidden'); }
 window.__openSheet=k=>open(k);
 function close(){ sheet.classList.add('hidden'); document.body.classList.remove('sheetOn'); cur=null; DEXV.stop(); }
@@ -501,6 +516,8 @@ shB.addEventListener('click',e=>{
   else if(a==='fuse'){ if(v==='rock'&&window.__HOME.furnInfo('rock').cur.pick){ close(); if(window.__HOMETAP) window.__HOMETAP('rock'); return; } const r=window.__HOME.furnUse(v); if(r.msg) toast(r.msg,r.kind||'good',r.kind?1800:3200); if(v==='rock'&&window.__HOMEFURN) window.__HOMEFURN(); render(); syncHUD(); return; }
   else if(a==='hbuy'){ const m=window.__HOME.buy(v); toast(m||'買好了，已經裝進小屋',m?'bad':'good'); render(); syncHUD(); return; }
   else if(a==='dex'){ dexSel=v; render(); shB.scrollTop=0; return; }
+  else if(a==='logmode'){ logMode=v; dexSel=null; render(); shB.scrollTop=0; return; }
+  else if(a==='logsort'){ logSort=v; render(); return; }
   else if(a==='dexback'){ dexSel=null; render(); return; }
   else if(a==='wx'){ save.wxMode=v; persist(); }
   else if(a==='kayak'){ if(save.coins<800){ toast('金幣不夠','bad'); return; } save.coins-=800; save.kayak=true; persist(); setCoins(); Snd.coin(); toast('買了獨木舟！可以划到其他釣點了','good'); }

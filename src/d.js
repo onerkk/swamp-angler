@@ -161,7 +161,7 @@ function landBobber(){
   if(G.baitUsed&&G.baitUsed.lure){ G.state='lure'; P.splash(G.to.x,0,G.to.z,10,.4); W.addRipple(G.to.x,G.to.z,.4); Snd.plop(); G.sp=null; G.fd=null; FUN.castTag(G.castDist); LURE.start(G.to,G.baitUsed,G.base); return; }
   G.state='wait'; P.splash(G.to.x,0,G.to.z,16,.7); W.addRipple(G.to.x,G.to.z,.55); Snd.plop();
   // 沉底釣：釣棚調到「深棚」又不是路亞時，鉛墜帶著餌沉到底，不看浮標、改看竿尖；結構區會有掛底風險
-  G.bottom=save.depth===2&&!(G.baitUsed&&G.baitUsed.lure)&&G.loc!=='ice'; G.snag=false; G.snagMv=0; G.snagFlip=0;
+  G.bottom=save.depth===2&&!(G.baitUsed&&G.baitUsed.lure)&&G.loc!=='ice'; G.snag=false; G.snagMv=0; G.snagFlip=0; G.snagOnce=false;
   if(G.bottom&&!save.bottomTip){ save.bottomTip=1; persist(); setTimeout(()=>toast('🎣 沉底釣：沒有浮標，看竿尖——輕抖是試咬，竿尖被拉彎才揚竿','',3600),600); }
   G.timer=rand(6,15)*PER_WAIT[period(G.hour)]*(1-G.luck*.6)*(G.baitUsed?G.baitUsed.wait:1)*WL.waitK()*(window.__ECO&&window.__ECO.fxOn('glow')?.6:1)*(1+.2*depNow(depKey())); G.nib=Math.floor(rand(0,3.99)); G.approach=0; G.sp=null; G.fd=null;
   FUN.castTag(G.castDist);
@@ -212,6 +212,13 @@ const SNAG={g:new THREE.Group(),wood:null,rock:null}; W.scene.add(SNAG.g); SNAG.
 function showSnag(reef){ const f=G.f; SNAG.g.clear(); const src=reef?SNAG.rock:SNAG.wood; if(!src) return; const o=src.clone(true); SNAG.g.add(o);
   const az=f.az0+f.coverSide*.62, d=Math.max(6,f.d*.9); SNAG.g.position.set(G.base.x-Math.sin(az)*d,reef?-.7:-.15,G.base.z-Math.cos(az)*d);
   SNAG.g.rotation.y=Math.random()*6.28; SNAG.g.scale.setScalar(reef?1.1:3.2); SNAG.g.visible=true; }
+// 魚訊放大視窗：等魚時在右上角放大顯示浮標（浮標釣）或竿尖（沉底釣），小螢幕也看得清楚試咬與咬口
+const MAG=document.createElement('div'); MAG.id='magWin'; MAG.style.cssText='position:fixed;right:10px;top:calc(var(--hudY,150px) + 54px);z-index:6;width:74px;height:96px;border-radius:12px;background:rgba(10,30,40,.62);border:1px solid rgba(255,255,255,.22);display:none;pointer-events:none;overflow:hidden';
+MAG.innerHTML='<svg viewBox="0 0 74 96" width="74" height="96"><rect x="0" y="52" width="74" height="44" fill="rgba(60,140,170,.35)"/><line x1="0" y1="52" x2="74" y2="52" stroke="rgba(200,240,255,.7)" stroke-width="1.5"/><g id="magF"><line x1="37" y1="14" x2="37" y2="34" stroke="#c03028" stroke-width="2.5"/><circle cx="37" cy="12" r="2.6" fill="#ffd060"/><ellipse cx="37" cy="44" rx="9" ry="12" fill="#d84a3a"/><path d="M28 46 a9 12 0 0 0 18 0 z" fill="#f2f2f2"/></g><path id="magR" d="" stroke="#2a6ad0" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg><div id="magT" style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;color:#dff"></div>';
+document.body.appendChild(MAG); const magF=MAG.querySelector('#magF'), magR=MAG.querySelector('#magR'), magT=MAG.querySelector('#magT');
+function updMag(){ const on=(G.state==='wait'||G.state==='bite')&&!LURE.active?.()&&G.loc!=='ice'&&save.mag!==false; MAG.style.display=on?'block':'none'; if(!on) return;
+  if(G.bottom){ magF.style.display='none'; const b=Math.min(1.2,rod.bendT||0), x2=37+b*26, y2=18+b*60; magR.setAttribute('d',`M37 96 Q37 50 ${x2.toFixed(1)} ${y2.toFixed(1)}`); magT.textContent=G.state==='bite'?'竿尖拉彎！':G.snag?'掛底':'竿尖'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; }
+  else { magR.setAttribute('d',''); magF.style.display=''; const dip=G.state==='bite'?28:Math.max(0,(W.swell(G.to.x,G.to.z,G.t)-bob.position.y))*160; magF.setAttribute('transform',`translate(0 ${Math.min(40,dip).toFixed(1)})`); magT.textContent=G.state==='bite'?'沉下去了！':G.dip>0?'輕點（試咬）':'浮標'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; } }
 function endFightUI(){ SNAG.g.visible=false; if(ui.netBtn) ui.netBtn.classList.add('hidden'); ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); ui.tBar.classList.remove('rub'); }
 function lose(reason){
   endFightUI(); WL.endChase(); SEA.endChase(); G.combo=0; FUN.combo(0); P.shadow.material.opacity=0; if(G.fish){ G.fish.group.visible=false; }
@@ -245,7 +252,12 @@ function showCard(){
   const fd=G.fd, sp=fd.sp, r=RAR[sp.rar], rec=save.dex[sp.id];
   const isNew=!rec, isRec=!!rec&&fd.w>rec.bw;
   // 首次釣獲日期只在第一次釣到時記錄；更新前的舊紀錄沒有日期就不顯示，不亂填
-  save.dex[sp.id]={n:(rec?rec.n:0)+1,bw:Math.max(rec?rec.bw:0,fd.w),bl:Math.max(rec?rec.bl:0,fd.L),md:Math.max(rec&&rec.md||0,FUN.medalLv(fd)),f:rec?rec.f:Date.now()}; save.total++; persist();
+  save.dex[sp.id]={n:(rec?rec.n:0)+1,bw:Math.max(rec?rec.bw:0,fd.w),bl:Math.max(rec?rec.bl:0,fd.L),md:Math.max(rec&&rec.md||0,FUN.medalLv(fd)),f:rec?rec.f:Date.now()}; save.total++;
+  // 魚獲紀錄：魚種、尺寸、釣點、時段、天氣、餌、釣法、釣棚，放生或賣出都保留紀錄與圖鑑進度
+  if(!fd.item){ const wx=WL.wx?WL.wx():{}, wn=wx.r>.5?'雨':wx.r>.15?'毛毛雨':wx.f>.5?'霧':wx.c>.55?'陰':'晴', bt=G.baitUsed||{};
+    save.catchLog=save.catchLog||[]; save.catchLog.unshift({id:sp.id,L:+fd.L.toFixed(3),w:+fd.w.toFixed(3),t:Date.now(),h:+G.hour.toFixed(2),z:(WL.zoneId&&WL.zoneId())||'',loc:G.loc||'lake',wx:wn,b:bt.id||'',m:G.loc==='ice'?'冰釣':bt.lure?'路亞':G.bottom?'沉底':'浮標',dp:save.depth==null?1:save.depth,new:isNew,rec:isRec});
+    if(save.catchLog.length>300) save.catchLog.length=300; G.logRec=save.catchLog[0]; }
+  persist();
   if(window.__STORY&&!G.fd.item) window.__STORY.onCatch(fd,{zone:(SPOTS[G.spot]||{}).id,loc:G.loc,per:period(G.hour),rain:W.U.uRain.value>.25});
   { const xp=META.onCatch(fd,{perfect:!!(G.f&&G.f.perfect),per:period(G.hour)}), pm=window.__ECO?window.__ECO.priceMul(sp.id):1; $('cXp').textContent='+'+xp+' 經驗　'+(window.__ECO?window.__ECO.lastDrop():'')+(pm>1?'　🔥行情 ×'+pm:''); }
   ui.catch.style.setProperty('--rc',r.col);
@@ -340,8 +352,8 @@ $('startBtn').addEventListener('click',()=>{ Snd.init(); $('intro').classList.ad
   if(/[?&]ending=[1-9]/.test(location.search)) setTimeout(()=>window.__playEnding(),1200);
   else if(!save.tutDone&&!(save.total>0)) setTimeout(()=>startTutorial(),2400);   // 新玩家：第一次開始遊戲時跑新手指引
   else if(!save.tutDone){ save.tutDone=1; persist(); } });
-$('bSell').addEventListener('click',()=>{ if(G.state==='catch') finishCatch(true); });
-$('bRel').addEventListener('click',()=>{ if(G.state==='catch') finishCatch(false); });
+$('bSell').addEventListener('click',()=>{ if(G.state==='catch'){ if(G.logRec) G.logRec.out='賣出'; finishCatch(true); } });
+$('bRel').addEventListener('click',()=>{ if(G.state==='catch'){ if(G.logRec) G.logRec.out='放生'; finishCatch(false); } });
 // 保冷箱：魚帶回小屋烤（最多 5 條；保冷類、寶物、美人魚與幻想生物不能烤）
 function canGrill(fd){ return fd&&fd.sp&&!fd.item&&!fd.sp.noSell&&!fd.sp.special&&fd.sp.rar<5; }
 $('bGrill').addEventListener('click',()=>{ if(G.state!=='catch'||!G.fd) return; save.cooler=save.cooler||[];
@@ -652,7 +664,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       if(G.approach>0){ const a=G.t*.8; P.shadow.position.set(G.to.x+Math.cos(a)*.9,.012,G.to.z+Math.sin(a)*.9); P.shadow.rotation.y=-a; P.shadow.scale.setScalar(.45); P.shadow.material.opacity=.18*G.approach; }
       setAct('收線',G.snag?'掛底了！左右來回拖曳畫面試著解開（硬收會斷線）':UW.active()?'魚正在靠近餌……':G.bottom?'看竿尖：被拉彎時立刻點擊！':'浮標被拉進水裡時，立刻點擊！',false);
       if(G.bottom){ bob.position.y=-1.2; rod.bendT=.1+(G.dip>0?.22*Math.sin((G.dip/(G.dipMax||.28))*Math.PI):0)+Math.sin(G.t*1.3)*.012;   // 竿尖：試咬時輕抖、平常隨水流微微晃
-        const zid=WL.zoneId?WL.zoneId():''; if(!G.snag&&!G.fd&&(zid==='wood'||zid==='reef')&&Math.random()<dt*.012){ G.snag=true; G.timer=99; G.snagYaw=G.yawT; vib([40,40]); toast('🪨 掛底了！左右來回拖曳畫面試著解開','warn',2400); }
+        const zid=WL.zoneId?WL.zoneId():''; const snagK=(zid==='reef'?1:.8)*({休閒:.4,標準:1,硬派:1.3,專家:1.6}[D().n]||1); if(!G.snag&&!G.fd&&!G.snagOnce&&(zid==='wood'||zid==='reef')&&Math.random()<dt*.012*snagK){ G.snagOnce=true; G.snag=true; G.timer=99; G.snagYaw=G.yawT; vib([40,40]); toast('🪨 掛底了！左右來回拖曳畫面試著解開','warn',2400); }
         if(G.snag){ const dy=G.yawT-G.snagYaw; if(Math.abs(dy)>.12){ const sg=Math.sign(dy); if(sg!==G.snagLast){ G.snagFlip++; G.snagLast=sg; } G.snagYaw=G.yawT; }
           rod.bendT=.35+Math.sin(G.t*20)*.02; if(G.snagFlip>=3){ G.snag=false; G.snagFlip=0; G.timer=rand(3,8); toast('解開了！','good',1200); vib(20); } } }
     } else {
@@ -696,7 +708,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light, trem);
   if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
-  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); SCH.update(dt,G.t); if(G.spook>0) G.spook=Math.max(0,G.spook-dt*.03); if(!save.lookTip&&W.info.day<.15&&G.state==='idle'&&G.t>20){ save.lookTip=1; persist(); toast('🌌 上下拖曳畫面可以抬頭看星空','good',3500); }
+  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); SCH.update(dt,G.t); try{ updMag(); }catch(e){} if(G.spook>0) G.spook=Math.max(0,G.spook-dt*.03); if(!save.lookTip&&W.info.day<.15&&G.state==='idle'&&G.t>20){ save.lookTip=1; persist(); toast('🌌 上下拖曳畫面可以抬頭看星空','good',3500); }
   if(G.cinePan) G.yawT=Math.sin(performance.now()*.00011)*.55;   // 開場過場：鏡頭緩慢左右擺動
   window.__MOON.update(dt); if(window.__TAL) window.__TAL.tick(G); if(window.__STORY) window.__STORY.tick(dt); { const dr=G.loc==='ice'&&G.held&&G.state==='idle'&&ICE.drilling&&ICE.drilling(); G.drillK=(G.drillK||0)+((dr?1:0)-(G.drillK||0))*Math.min(1,dt*8); if(G.drillK>.01){ stowRod(Math.max(WL.padOn(),G.drillK)); G.pitchT=Math.min(G.pitchT||0,-.4*G.drillK); }
     ARMS.update(!UW.active()&&G.state!=='ending',G.state,G.power,dt,G.drillK>.01?{k:G.drillK,grip:(sd,o)=>ICE.grip(sd,o)}:{k:WL.padOn(),grip:WL.padGrip}); } SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt); ICE.update(dt);
