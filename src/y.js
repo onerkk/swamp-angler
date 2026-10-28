@@ -86,10 +86,10 @@ async function rescue(){ if(!user){ c.toast('請先用 Google 登入','warn',200
   catch(e){ console.warn('rescue',e); c.toast('讀取雲端失敗，請稍後再試','warn',2400); } }
 // 一次性補償（只限擁有者）：存檔救不回時，把等級、金幣、劇情進度恢復到遺失前的狀態（圖鑑與魚獲紀錄無法還原）
 function compensate(){ if(!isOwner(user)){ c.toast('只有擁有者帳號可以使用','warn',2000); return; }
-  if(!confirm('把目前的存檔恢復成：Lv 18、金幣 999,999、主線到第七章完成（終章「深淵之王」待觸發）、獨木舟與漁船已有、稱號「見習漁人」「守燈人」。\n目前的進度會先備份。確定嗎？')) return;
+  if(!confirm('把目前的存檔恢復成：Lv 18、金幣 999,999、主線到第七章與隱藏章節完成（終章「深淵之王」待觸發）、獨木舟與漁船已有、稱號「見習漁人」「守燈人」。\n目前的進度會先備份。確定嗎？')) return;
   const s=JSON.parse(JSON.stringify(c.save())); try{ localStorage.setItem(BK,JSON.stringify(s)); }catch(e){}
   s.lv=18; s.xp=0; s.coins=Math.max(s.coins||0,999999); s.kayak=true; s.yacht=true; s.tutDone=1; s.loaded=1;
-  s.story=s.story||{}; s.story.intro=1; s.story.done=['c1','c2','c3','c4','ice','c5','c6']; s.story.seen=s.story.seen||[]; s.story.read=s.story.read||[];
+  s.story=s.story||{}; s.story.intro=1; s.story.done=['c1','c2','c3','c4','ice','c5','lantern','c6'];   /* 含隱藏章節「湖裡還有人等燈」 */ s.story.seen=s.story.seen||[]; s.story.read=s.story.read||[];
   s.titles=Array.from(new Set([...(s.titles||[]),'見習漁人','守燈人'])); if(!s.title) s.title='守燈人';
   s.spot=0; s.testSeeded=1; c.apply(s); setTimeout(push,1500); }
 return {compensate,rescue,login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
@@ -106,9 +106,8 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
   async function doUpdate(){ upB.textContent='更新中…'; upB.disabled=true;
     try{ if(window.__saveNow) window.__saveNow(); }catch(e){}
-    try{ const ks=await caches.keys(); await Promise.all(ks.filter(k=>!k.startsWith('swamp-assets')).map(k=>caches.delete(k))); /* 更新時保留模型貼圖快取，不必重新下載整個遊戲 */ }catch(e){}
     try{ const r=await navigator.serviceWorker.getRegistration(); if(r) await r.update(); }catch(e){}
-    location.reload(); }
+    location.reload(true); }
   upB.addEventListener('click',doUpdate); noB.addEventListener('click',()=>{ bar.style.display='none'; dismissed=bar.dataset.v||''; });
   async function check(){ try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const j=await r.json();
       if(j.v&&j.v!==APP_VER&&j.v>APP_VER&&j.v!==dismissed){ bar.dataset.v=j.v; bar.style.display='flex'; } }catch(e){} }
