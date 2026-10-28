@@ -50,6 +50,7 @@ const Snd=(()=>{
     splash(s){ s=s||1; nz(.18+.3*s,'bandpass',1100,.7,.22*s,400); nz(.35+.4*s,'lowpass',700,.5,.16*s); tn(140,.12,'sine',.12*s,0,60); },
     plop(){ tn(320,.09,'sine',.14,0,120); nz(.06,'bandpass',1800,2,.05); },
     nibble(){ tn(260,.06,'sine',.07,0,140); },
+    creak(k){ k=k||1; tn(70+Math.random()*50,.16,'sawtooth',.035*k,0,40); nz(.08,'bandpass',900+Math.random()*500,3,.02*k); },   // 竿身承受重量的吱嘎聲
     bite(){ tn(180,.22,'sine',.28,0,55); nz(.25,'lowpass',900,.6,.12); },
     click(p){ nz(.014,'highpass',p||3200,.8,.09); },
     snap(){ nz(.05,'highpass',3000,.6,.5); tn(110,.3,'triangle',.25,0,40); },
@@ -291,9 +292,18 @@ function updMag(){ const magOn=save.mag==='on'||(save.mag!=='off'&&(D().n==='休
   else { MAG.querySelector('#magRod').style.display='none'; magF.style.display=''; const dip=G.state==='bite'?34:Math.max(0,(W.swell(G.to.x,G.to.z,G.t)-bob.position.y))*160; magF.setAttribute('transform',`translate(0 ${Math.min(40,dip).toFixed(1)})`); { const rp=MAG.querySelector('#magRip'); if(rp){ const k=Math.min(1,dip/14); rp.setAttribute('rx',(6+k*16+Math.sin(G.t*3)*.6).toFixed(1)); rp.setAttribute('opacity',(.35+.6*k).toFixed(2)); } } magT.textContent=G.state==='bite'?'沉下去了！':G.dip>0?'輕點（試咬）':'浮標'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; } }
 // 搏魚臨場感：魚衝刺時水面拖出 V 形水痕、線繃緊時入水點甩出細水珠（距離標示原本就有）
 const WKV=new THREE.Vector3();
-function fightFx(dt){ const f=G.f; if(G.state!=='fight'||!f) return; fishPos(WKV,0);
+// 搏魚鏡頭：中魚後視角微微拉近、略往水面看；張力越大拉得越近；魚躍出水面時再拉近並輕晃。結束後平滑回到原本
+G.fovK=G.fovK||1;
+function fightCam(dt){ const f=G.f, fight=G.state==='fight'&&f, want=fight?(.86-.08*(f.T||0)-(f.jumpT>0?.08:0)):(G.state==='land'?.9:1);
+  G.fovK+=(want-G.fovK)*Math.min(1,dt*(fight?2.2:1.5)); const base=W.camera.aspect<1?70:52, nf=base*G.fovK; if(Math.abs(W.camera.fov-nf)>.05){ W.camera.fov=nf; W.camera.updateProjectionMatrix(); }
+  document.body.classList.toggle('fighting',!!fight);
+  if(fight&&f.jumpT>0){ G.gShake=Math.max(G.gShake||0,.35); } }
+function fightFx(dt){ fightCam(dt); const f=G.f; if(G.state!=='fight'||!f) return; fishPos(WKV,0);
   f.wk=(f.wk||0)-dt; if(f.run&&f.wk<=0){ f.wk=.09; const az=f.az0+f.theta, sx=Math.cos(az), sz=-Math.sin(az); W.addRipple(WKV.x+sx*.25,WKV.z+sz*.25,.18); W.addRipple(WKV.x-sx*.25,WKV.z-sz*.25,.18); }
-  if(f.T>.6&&Math.random()<dt*(f.T-.5)*12) P.splash(WKV.x,.05,WKV.z,2,.12); }
+  if(f.T>.6&&Math.random()<dt*(f.T-.5)*12) P.splash(WKV.x,.05,WKV.z,2,.12);
+  // 聲音：張力很大時竿身吱嘎作響；魚在水面衝刺時有破水聲
+  f.ck=(f.ck||0)-dt; if(f.T>.72&&f.ck<=0){ f.ck=rand(.35,.9)*(1.4-f.T); Snd.creak&&Snd.creak(f.T); }
+  f.sw=(f.sw||0)-dt; if(f.run&&f.d<18&&f.sw<=0){ f.sw=rand(.5,1.1); Snd.splash&&Snd.splash(.18+.25*f.T); } }
 function endFightUI(){ SNAG.g.visible=false; if(ui.netBtn) ui.netBtn.classList.add('hidden'); ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); ui.tBar.classList.remove('rub'); }
 function lose(reason){
   endFightUI(); WL.endChase(); SEA.endChase(); G.combo=0; FUN.combo(0); P.shadow.material.opacity=0; if(G.fish){ G.fish.group.visible=false; }
