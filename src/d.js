@@ -84,6 +84,11 @@ const stars=fd=>{ const n=Math.max(1,Math.min(5,Math.round(1+fd.sp.rar*.6+Math.l
 /* ---------- 介面 ---------- */
 const ui={coin:$('coin'),clock:$('clock'),toast:$('toast'),fight:$('fight'),fName:$('fName'),fDist:$('fDist'),tBar:$('tBar'),tFill:$('tFill'),sFill:$('sFill'),
   fTens:$('fTens'),fStam:$('fStam'),steer:$('steer'),actWrap:$('act'),act:$('actBtn'),actLbl:$('actLbl'),pw:$('pw'),sub:$('actSub'),catch:$('catch'),log:$('log')};
+ui.netBtn=$('netBtn'); ui.dragBtn=$('dragBtn');
+// 洩力按鈕：鬆／中／緊循環切換，記在存檔；搏魚中切換立即生效
+const DRAGN=['鬆','中','緊'], dragLbl=()=>{ if(ui.dragBtn) ui.dragBtn.textContent=DRAGN[save.drag==null?1:save.drag]; };
+if(ui.dragBtn){ dragLbl(); ui.dragBtn.addEventListener('pointerdown',e=>{ e.stopPropagation(); save.drag=((save.drag==null?1:save.drag)+1)%3; dragLbl(); if(G.f) G.f.drag=save.drag; vib(10); persist(); }); }
+if(ui.netBtn) ui.netBtn.addEventListener('pointerdown',e=>{ e.stopPropagation(); if(G.f&&G.f.netOn) G.f.netGo=true; });
 let toastTimer=0;
 function toast(msg,cls,ms){ if(window.__ENDON&&window.__ENDON()) return;   // 結局演出時，遊戲裡的任何提示都不顯示
   ui.toast.innerHTML=msg; ui.toast.className='show '+(cls||''); clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ ui.toast.className=''; },ms||1700); }
@@ -168,7 +173,7 @@ function missBite(){ const lastFd=G.fd; FUN.hookEnd(); G.combo=0; FUN.combo(0); 
 function hook(q){
   const sp=G.sp, L=G.fd.L; exitUW();
   const perfect=!!q; if(perfect){ save.perf=(save.perf||0)+1; if(window.__STORY) window.__STORY.onPerfect(); }
-  G.f={perfect,d:G.loc==='ice'?rand(10,18):G.castDist,az0:Math.atan2(-(G.to.x-G.base.x),-(G.to.z-G.base.z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
+  G.f={perfect,hq:perfect?1:.7,drag:save.drag==null?1:save.drag,d:G.loc==='ice'?rand(10,18):G.castDist,az0:Math.atan2(-(G.to.x-G.base.x),-(G.to.z-G.base.z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
   G.state='fight'; P.splash(G.to.x,0,G.to.z,22,1); W.addRipple(G.to.x,G.to.z,.7); Snd.splash(.7); vib(40);
   toast(perfect?'完美揚竿！':'上鉤了！',perfect?'good':'',1200);
   ui.fight.classList.remove('hidden'); WL.onHook(G.fd,()=>fishPos(G.chaseV,0)); SEA.onHook(G.fd,()=>fishPos(G.chaseV,0));
@@ -177,11 +182,16 @@ function hook(q){
 }
 function fishPos(out,y){ const az=G.f.az0+G.f.theta; out.set(G.base.x-Math.sin(az)*G.f.d,y,G.base.z-Math.cos(az)*G.f.d); if(G.loc==='sea') SEA.hullClear(out,.35); else if(G.loc==='ice'&&window.__ICE){ const hp=window.__ICE.holePos(); out.x=hp.x; out.z=hp.z; } return out; }
 function sizeWord(w){ return w<.6?'小傢伙':w<2.5?'中型魚':w<8?'大魚！':'巨物！！'; }
-function endFightUI(){ ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); }
+function endFightUI(){ if(ui.netBtn) ui.netBtn.classList.add('hidden'); ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); }
 function lose(reason){
   endFightUI(); WL.endChase(); SEA.endChase(); G.combo=0; FUN.combo(0); P.shadow.material.opacity=0; if(G.fish){ G.fish.group.visible=false; }
   if(reason==='gator'||reason==='shark'){ fishPos(tv,0); P.splash(tv.x,0,tv.z,60,1.6); W.addRipple(tv.x,tv.z,1.2); Snd.splash(1.5); Snd.gator(); biteFX(reason); }
-  const msg={snap:'啪！線斷了……',slack:'線太鬆，魚脫鉤了',spool:'線放光了，魚跑掉了',gator:'鱷魚把你的魚搶走了！',shark:'鯊魚把你的魚咬走了！'}[reason];
+  const msg={snap:'啪！線斷了……',slack:'線太鬆，魚脫鉤了',spool:'線放光了，魚跑掉了',gator:'鱷魚把你的魚搶走了！',shark:'鯊魚把你的魚咬走了！',shook:'魚甩頭，把鉤甩掉了',jump:'魚在空中甩脫了鉤'}[reason];
+  // 失敗原因與改善方法：慢一點跳出，讓玩家知道下次怎麼做
+  const tip={snap:'原因：張力在紅區停太久。改善：魚衝刺時先放手，或把洩力調「鬆」。',slack:'原因：魚停下時線鬆太久。改善：魚一停就按住收線。',spool:'原因：魚跑太遠把線放光。改善：魚停下時趁機收線，或把洩力調「緊」一點。',
+    gator:'原因：搏魚拖太久引來鱷魚。改善：張力保持在綠黃區、加快收線。',shark:'原因：搏魚拖太久引來鯊魚。改善：張力保持在綠黃區、加快收線。',
+    shook:'原因：揚竿不夠準＋甩頭時線鬆。改善：浮標「沉下去」的瞬間揚竿；魚甩頭時保持收線。',jump:'原因：魚跳起時還在硬拉。改善：看到魚躍出水面先放手。'}[reason];
+  if(tip) setTimeout(()=>toast('💡 '+tip,'',4200),1900);
   if(reason==='snap'){ Snd.snap(); vib([80,40,120]); toast(msg,'bad',1800); G.state='lost'; G.stT=0; G.snapped=true; bob.visible=false; rod.bendT=0; rod.pitchT=.1; rod.end=null; }
   else { vib(60); startRetrieve(msg,'bad'); }
 }
@@ -471,6 +481,9 @@ function updateFight(dt){
   const shake=(f.ev&&f.ev.k==='shake'&&f.ev.t<1.15&&((f.ev.t/.28)%1)<.45)?1:0;
   const dive=(f.ev&&f.ev.k==='dive')?1:0;
   if(shake&&!f.shV) vib(30); f.shV=shake;
+  // 掛鉤品質：揚竿不完美時，魚甩頭又剛好線鬆、或魚躍出水面你還硬拉，就可能把鉤甩掉
+  if(shake&&f.T<.18&&!fd.item&&Math.random()<dt*1.6*(1-f.hq)) { f.lostWhy='shook'; }
+  if(f.jumpT>0&&G.held&&f.T>.85&&!fd.item&&Math.random()<dt*1.2*(1.15-f.hq)) { f.lostWhy='jump'; }
   const stamF=.4+.6*f.stam/100;
   const F=fs.pow*(.8+.25*Math.pow(fd.w,.45))*(1+.22*sp.rar)*(fd.boss?fd.boss.pow:1)*stamF*(f.run?ST.mul:1)*(dive?1.35:1);
   const good=-f.latDir*G.rodSide, steerMul=1-.28*clamp(good,0,1)+.15*clamp(-good,0,1);
@@ -478,6 +491,8 @@ function updateFight(dt){
   if(f.jumpT>0&&G.held) Tt+=.45;
   if(shake) Tt+=G.held?.38:.12;
   Tt+=(Math.sin(G.t*13.1)+Math.sin(G.t*7.3))*.015*(f.run?2:1)*DF.jit;
+  // 洩力：鬆／中／緊。拉力超過洩力門檻的部分改成出線（魚把線拉走），而不是全部變成張力
+  const dcap=[.66,.8,.94][f.drag], over=Math.max(0,Tt-dcap); if(over>0){ Tt=dcap+over*.3; f.d+=over*2.2*dt; if(Math.random()<dt*8) Snd.click(4800); }
   f.T+=(Tt-f.T)*Math.min(1,dt*5);
   if(f.T>.9) f.brk+=dt*(f.T-.9)*14*META.gear().reel.drag*(1-.05*TR('power')); else f.brk=Math.max(0,f.brk-dt*.8);
   // 線太鬆：只有「沒在收線」而且張力過低時才累積——按住收線時線一定是繃的；小魚、漂流物本來就拉不出張力，不能因此判脫鉤
@@ -486,7 +501,7 @@ function updateFight(dt){
   const zone=f.T>.4&&f.T<.8;
   const drain=(3+18*f.T)*(1+.8*clamp(good,0,1))*(zone?1.2:1)/(fs.stam*DF.stam*(.7+.25*Math.sqrt(fd.w)));
   f.stam=clamp(f.stam-drain*(window.__ECO&&window.__ECO.fxOn('meal_str')?1.3:1)*dt+(f.T<.2?2.5*dt:0),0,100);
-  const reel=G.held?META.gear().reel.spd*clamp(1.25-f.T,.15,1)*(f.stam<8?1.4:1)*(zone?1.15:1)*(dive?.3:1):0;
+  const reel=G.held?[.75,1,1.2][f.drag]*META.gear().reel.spd*clamp(1.25-f.T,.15,1)*(f.stam<8?1.4:1)*(zone?1.15:1)*(dive?.3:1):0;
   const run=f.run?fs.spd*ST.spd*stamF*1.5*(G.held?.35:1)*(dive?.4:1):(G.held?0:.05);
   f.d=Math.max(0,f.d+(run-reel)*dt);
   f.theta=clamp(f.theta+f.latDir*fs.agi*ST.lat*.16*stamF*dt*(G.held?.7:1),-.85,.85);
@@ -526,11 +541,17 @@ function updateFight(dt){
   if(SEA.stolen()) return lose('shark');
   if(f.brk>=1){ if(window.__ECO&&window.__ECO.useLeader()){ f.brk=.35; toast('⛓️ 鋼絲前導線撐住了！','good',1600); vib(60); } else return lose('snap'); }
   if(f.slk>=1) return lose('slack');
+  if(f.lostWhy) return lose(f.lostWhy);
   if(f.d>MAX_LINE) return lose('spool');
   if(f.d<(G.spot===0?4.0:2.6)){
     // 魚還有力氣就拉不上來：靠近時再衝出去，要遛到沒力才能收進來
     // 衝出去會消耗魚的體力，最多衝兩次；體力低於 45% 或衝過兩次就拉得上來
-    f.surges=f.surges||0; if(f.stam<=45||f.surges>=2) return land();
+    f.surges=f.surges||0; if(f.stam<=45||f.surges>=2){
+      const big=!fd.item&&(fd.w>6||fd.u>.85||fd.boss); if(!big) return land();
+      // 大魚要抄網：魚靠近又沒在衝刺時按「抄網」才算起魚；急著在牠衝刺時抄網會讓牠再衝出去
+      if(!f.netOn){ f.netOn=true; ui.netBtn.classList.remove('hidden'); toast('🥅 大魚靠近了！趁牠不衝刺時按「抄網」','good',2200); }
+      if(f.netGo){ f.netGo=false; if(!f.run){ ui.netBtn.classList.add('hidden'); return land(); } f.netOn=false; ui.netBtn.classList.add('hidden'); f.d+=3+Math.random()*2; f.stam=Math.max(0,f.stam-10); toast('魚還在衝，被網子嚇到又衝出去了！','warn',1600); vib([30,30,60]); }
+      return; }
     f.surges++; f.stam=Math.max(0,f.stam-25); f.d+=2+Math.random()*2; f.run=true; f.phaseT=rand(1,1.8); P.splash(G.to.x,0,G.to.z,14,.8); vib([30,20,40]);
     if(!f.surgeTip){ f.surgeTip=1; toast('魚還有力氣，又衝出去了','warn',1500); } }
 }
