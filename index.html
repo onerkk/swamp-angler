@@ -5609,7 +5609,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028010656'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028011245'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6223,10 +6223,16 @@ function update(dt,t){ const ok=c.ok(); W.camera.getWorldPosition(cam);
     s.gt-=dt; const ga=s.gl.geometry.attributes.position; if(s.gt<=0){ s.gt=rand(.3,1.2); for(let k=0;k<6;k++){ const o=s.off[Math.floor(rand(0,N))]; ga.setXYZ(k,s.x+Math.sin(s.h)*o.x+rand(-.3,.3),wy+.02,s.z+Math.cos(s.h)*o.x+rand(-.3,.3)); } ga.needsUpdate=true; }
     s.gl.material.opacity=.75*fade*(c.period()==='night'?.2:1)*(.6+.4*Math.sin(t*7+si));
   }); }
+// 受驚：落水點附近的魚群往外逃、往下鑽；如果附近沒有魚群，就在落水點炸出一群逃竄的小魚（讓玩家看得到魚被嚇跑）
+function scare(x,z,r){ let hit=0; schools.forEach(s=>{ if(!s.on) return; const d=Math.hypot(s.x-x,s.z-z); if(d<r){ s.fear=5; s.h=Math.atan2(s.x-x,s.z-z); s.sp=3.4; hit++; } });
+  if(!hit){ const s=schools.find(q=>!q.on); if(s&&spawn(s)){ s.x=x; s.z=z; s.t=2.5; s.life=12; s.fear=5; s.h=Math.random()*6.28; s.sp=3.6; if(P&&P.splash) P.splash(x,0,z,18,.7); } } }
+// 回來：警戒退了以後，一群魚從外側慢慢游回落水點附近
+function comeBack(x,z){ const s=schools.find(q=>!q.on)||schools[0]; if(!spawn(s)) return false; const a=Math.random()*6.28, d=rand(9,13);
+  s.x=x+Math.sin(a)*d; s.z=z+Math.cos(a)*d; s.h=Math.atan2(x-s.x,z-s.z); s.ht=s.h; s.turn=8; s.sp=.9; s.t=0; s.life=60; return true; }
 // 測試用：在鏡頭正前方放一群
 function force(d){ const s=schools.find(q=>!q.on)||schools[0]; W.camera.getWorldPosition(cam); const dir=new T.Vector3(); W.camera.getWorldDirection(dir); dir.y=0; dir.normalize();
   spawn(s); s.x=cam.x+dir.x*(d||12); s.z=cam.z+dir.z*(d||12); s.h=Math.atan2(dir.z,dir.x); s.t=3; }
-return {update,force};
+return {update,force,scare,comeBack};
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
@@ -6399,6 +6405,7 @@ function landBobber(){
   const now=performance.now()/1000, near=G.lastLand&&Math.hypot(G.to.x-G.lastLand.x,G.to.z-G.lastLand.z)<3&&now-G.lastLand.t<25;
   G.spook=Math.min(1.5,(G.spook||0)+(near?.35:0)); G.lastLand={x:G.to.x,z:G.to.z,t:now};
   const hh=FUN.hotHit?FUN.hotHit(G.to):null;
+  if(hh==='center'||near){ SCH.scare(G.to.x,G.to.z,14); G.spookAt={x:G.to.x,z:G.to.z}; }
   if(hh==='center'){ G.hot=false; G.spook=Math.min(1.5,G.spook+.6); toast('💦 砸進魚群正中間，魚嚇散了！要拋在魚群前方','warn',2400); }
   else { G.hot=FUN.inHot(G.to); if(G.hot){ G.timer*=.3; toast('正中魚群！','good',1200); } }
   if(G.spook>.01){ G.timer*=1+G.spook; if(G.spook>.5&&hh!=='center') toast('水面太吵，附近的魚有點警戒；等一下或換個落點','warn',2200); }
@@ -6956,7 +6963,9 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light, trem);
   if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
-  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); SCH.update(dt,G.t); try{ updMag(); }catch(e){} if(G.spook>0) G.spook=Math.max(0,G.spook-dt*.03); if(!save.lookTip&&W.info.day<.15&&G.state==='idle'&&G.t>20){ save.lookTip=1; persist(); toast('🌌 上下拖曳畫面可以抬頭看星空','good',3500); }
+  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); SCH.update(dt,G.t); try{ updMag(); }catch(e){} if(G.spook>0){ const was=G.spook; G.spook=Math.max(0,G.spook-dt*.03);
+    // 警戒退下來時，嚇跑的魚群從外側游回剛才的落水點附近
+    if(was>=.15&&G.spook<.15&&G.spookAt&&(G.loc==='lake'||G.loc==='sea')){ if(SCH.comeBack(G.spookAt.x,G.spookAt.z)) toast('🐟 剛才嚇跑的魚慢慢游回來了，可以再試試','good',2200); G.spookAt=null; } } if(!save.lookTip&&W.info.day<.15&&G.state==='idle'&&G.t>20){ save.lookTip=1; persist(); toast('🌌 上下拖曳畫面可以抬頭看星空','good',3500); }
   if(G.cinePan) G.yawT=Math.sin(performance.now()*.00011)*.55;   // 開場過場：鏡頭緩慢左右擺動
   window.__MOON.update(dt); if(window.__TAL) window.__TAL.tick(G); if(window.__STORY) window.__STORY.tick(dt); { const dr=G.loc==='ice'&&G.held&&G.state==='idle'&&ICE.drilling&&ICE.drilling(); G.drillK=(G.drillK||0)+((dr?1:0)-(G.drillK||0))*Math.min(1,dt*8); if(G.drillK>.01){ stowRod(Math.max(WL.padOn(),G.drillK)); G.pitchT=Math.min(G.pitchT||0,-.4*G.drillK); }
     ARMS.update(!UW.active()&&G.state!=='ending',G.state,G.power,dt,G.drillK>.01?{k:G.drillK,grip:(sd,o)=>ICE.grip(sd,o)}:{k:WL.padOn(),grip:WL.padGrip}); } SKY.update(dt,((G.hour%24)+24)%24); MIST.update(dt); ICE.update(dt);

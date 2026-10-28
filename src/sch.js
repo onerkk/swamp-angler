@@ -52,8 +52,14 @@ function update(dt,t){ const ok=c.ok(); W.camera.getWorldPosition(cam);
     s.gt-=dt; const ga=s.gl.geometry.attributes.position; if(s.gt<=0){ s.gt=rand(.3,1.2); for(let k=0;k<6;k++){ const o=s.off[Math.floor(rand(0,N))]; ga.setXYZ(k,s.x+Math.sin(s.h)*o.x+rand(-.3,.3),wy+.02,s.z+Math.cos(s.h)*o.x+rand(-.3,.3)); } ga.needsUpdate=true; }
     s.gl.material.opacity=.75*fade*(c.period()==='night'?.2:1)*(.6+.4*Math.sin(t*7+si));
   }); }
+// 受驚：落水點附近的魚群往外逃、往下鑽；如果附近沒有魚群，就在落水點炸出一群逃竄的小魚（讓玩家看得到魚被嚇跑）
+function scare(x,z,r){ let hit=0; schools.forEach(s=>{ if(!s.on) return; const d=Math.hypot(s.x-x,s.z-z); if(d<r){ s.fear=5; s.h=Math.atan2(s.x-x,s.z-z); s.sp=3.4; hit++; } });
+  if(!hit){ const s=schools.find(q=>!q.on); if(s&&spawn(s)){ s.x=x; s.z=z; s.t=2.5; s.life=12; s.fear=5; s.h=Math.random()*6.28; s.sp=3.6; if(P&&P.splash) P.splash(x,0,z,18,.7); } } }
+// 回來：警戒退了以後，一群魚從外側慢慢游回落水點附近
+function comeBack(x,z){ const s=schools.find(q=>!q.on)||schools[0]; if(!spawn(s)) return false; const a=Math.random()*6.28, d=rand(9,13);
+  s.x=x+Math.sin(a)*d; s.z=z+Math.cos(a)*d; s.h=Math.atan2(x-s.x,z-s.z); s.ht=s.h; s.turn=8; s.sp=.9; s.t=0; s.life=60; return true; }
 // 測試用：在鏡頭正前方放一群
 function force(d){ const s=schools.find(q=>!q.on)||schools[0]; W.camera.getWorldPosition(cam); const dir=new T.Vector3(); W.camera.getWorldDirection(dir); dir.y=0; dir.normalize();
   spawn(s); s.x=cam.x+dir.x*(d||12); s.z=cam.z+dir.z*(d||12); s.h=Math.atan2(dir.z,dir.x); s.t=3; }
-return {update,force};
+return {update,force,scare,comeBack};
 }
