@@ -31,12 +31,18 @@ const tv=new T.Vector3(), tv2=new T.Vector3(), cw=new T.Vector3();
 /* ---------- 倒木區的枯樹與浮木 ---------- */
 const barkTex=dataTex(64,128,(u,v,o)=>{ const n=fbm(u*12,v*3,3), k=.5+.7*n; o[0]=52*k; o[1]=46*k; o[2]=38*k; });
 const snagMat=new T.MeshStandardMaterial({map:barkTex,roughness:.9});
-function snag(x,z,h){ const g=new T.Group(); const tr=new T.Mesh(new T.CylinderGeometry(.07,.24,h,9),snagMat); tr.position.y=h/2-.4; g.add(tr);
-  const nb=2+Math.floor(Math.random()*3); for(let k=0;k<nb;k++){ const b=new T.Mesh(new T.CylinderGeometry(.015,.05,rand(.6,1.5),6),snagMat); const y=h*rand(.45,.9)-.4, s=Math.random()<.5?-1:1;
-    b.position.set(s*.25,y,0); b.rotation.set(rand(-.4,.4),rand(0,6),s*rand(.7,1.2)); g.add(b); }
-  g.position.set(x,0,z); g.rotation.set((Math.random()-.5)*.1,Math.random()*6,(Math.random()-.5)*.14); g.userData.lake=true; S.add(g); }
+// 倒木區的枯樹：改用實拍掃描的枯樹幹（Poly Haven dead_tree_trunk_02），斜插在水裡、露出半截，取代原本用圓柱拼出來的假樹
+const SNAGQ=[]; let snagSrc=null;
+function snag(x,z,h){ SNAGQ.push([x,z,h]); if(snagSrc) placeSnag(x,z,h); }
+function placeSnag(x,z,h){ const o=snagSrc.clone(true), g=new T.Group(); g.add(o);
+  const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), long=Math.max(sz.x,sz.y,sz.z);
+  if(long===sz.x) o.rotation.z=Math.PI/2; else if(long===sz.z) o.rotation.x=Math.PI/2;   // 長軸立起來
+  o.updateMatrixWorld(true); const b2=new T.Box3().setFromObject(o), c=b2.getCenter(new T.Vector3()); o.position.set(-c.x,-b2.min.y,-c.z);
+  const sc=(h+1.2)/long; g.scale.setScalar(sc); g.position.set(x,-1.0,z); g.rotation.set(rand(-.35,.35),Math.random()*6.28,rand(.25,.55)*(Math.random()<.5?-1:1));
+  g.traverse(m=>{ if(m.isMesh){ m.frustumCulled=true; m.castShadow=false; } }); g.userData.lake=true; g.visible=!(W.isSea&&W.isSea()); S.add(g); }
+if(T.GLTFLoader) new T.GLTFLoader().load('dead_tree_trunk_02.glb',gl=>{ snagSrc=gl.scene; SNAGQ.forEach(a=>placeSnag(...a)); });
 snag(-33,-30,5); snag(-22,-35,3.6); snag(-36,-17,6.5); snag(-18,-29,2.4); snag(-29,-39,4.2); snag(-40,-26,3.2);
-{ const lg=new T.Mesh(new T.CylinderGeometry(.18,.22,4.2,10),snagMat); lg.rotation.set(0,.9,Math.PI/2); lg.position.set(-24,.04,-28); lg.userData.lake=true; S.add(lg); }
+// 原本的圓柱浮木拿掉（像一根黑色水管）；倒木區已有實拍的倒木、樹樁、枯枝
 
 /* ---------- 黃色獨木舟與槳 ---------- */
 let padG=null; const paddleTilt={x:0,z:0};

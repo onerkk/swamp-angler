@@ -2289,12 +2289,18 @@ const tv=new T.Vector3(), tv2=new T.Vector3(), cw=new T.Vector3();
 /* ---------- 倒木區的枯樹與浮木 ---------- */
 const barkTex=dataTex(64,128,(u,v,o)=>{ const n=fbm(u*12,v*3,3), k=.5+.7*n; o[0]=52*k; o[1]=46*k; o[2]=38*k; });
 const snagMat=new T.MeshStandardMaterial({map:barkTex,roughness:.9});
-function snag(x,z,h){ const g=new T.Group(); const tr=new T.Mesh(new T.CylinderGeometry(.07,.24,h,9),snagMat); tr.position.y=h/2-.4; g.add(tr);
-  const nb=2+Math.floor(Math.random()*3); for(let k=0;k<nb;k++){ const b=new T.Mesh(new T.CylinderGeometry(.015,.05,rand(.6,1.5),6),snagMat); const y=h*rand(.45,.9)-.4, s=Math.random()<.5?-1:1;
-    b.position.set(s*.25,y,0); b.rotation.set(rand(-.4,.4),rand(0,6),s*rand(.7,1.2)); g.add(b); }
-  g.position.set(x,0,z); g.rotation.set((Math.random()-.5)*.1,Math.random()*6,(Math.random()-.5)*.14); g.userData.lake=true; S.add(g); }
+// 倒木區的枯樹：改用實拍掃描的枯樹幹（Poly Haven dead_tree_trunk_02），斜插在水裡、露出半截，取代原本用圓柱拼出來的假樹
+const SNAGQ=[]; let snagSrc=null;
+function snag(x,z,h){ SNAGQ.push([x,z,h]); if(snagSrc) placeSnag(x,z,h); }
+function placeSnag(x,z,h){ const o=snagSrc.clone(true), g=new T.Group(); g.add(o);
+  const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), long=Math.max(sz.x,sz.y,sz.z);
+  if(long===sz.x) o.rotation.z=Math.PI/2; else if(long===sz.z) o.rotation.x=Math.PI/2;   // 長軸立起來
+  o.updateMatrixWorld(true); const b2=new T.Box3().setFromObject(o), c=b2.getCenter(new T.Vector3()); o.position.set(-c.x,-b2.min.y,-c.z);
+  const sc=(h+1.2)/long; g.scale.setScalar(sc); g.position.set(x,-1.0,z); g.rotation.set(rand(-.35,.35),Math.random()*6.28,rand(.25,.55)*(Math.random()<.5?-1:1));
+  g.traverse(m=>{ if(m.isMesh){ m.frustumCulled=true; m.castShadow=false; } }); g.userData.lake=true; g.visible=!(W.isSea&&W.isSea()); S.add(g); }
+if(T.GLTFLoader) new T.GLTFLoader().load('dead_tree_trunk_02.glb',gl=>{ snagSrc=gl.scene; SNAGQ.forEach(a=>placeSnag(...a)); });
 snag(-33,-30,5); snag(-22,-35,3.6); snag(-36,-17,6.5); snag(-18,-29,2.4); snag(-29,-39,4.2); snag(-40,-26,3.2);
-{ const lg=new T.Mesh(new T.CylinderGeometry(.18,.22,4.2,10),snagMat); lg.rotation.set(0,.9,Math.PI/2); lg.position.set(-24,.04,-28); lg.userData.lake=true; S.add(lg); }
+// 原本的圓柱浮木拿掉（像一根黑色水管）；倒木區已有實拍的倒木、樹樁、枯枝
 
 /* ---------- 黃色獨木舟與槳 ---------- */
 let padG=null; const paddleTilt={x:0,z:0};
@@ -5694,7 +5700,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028053910'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028071333'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6511,6 +6517,9 @@ function landBobber(){
 const AMB={list:[],app:null};
 function ambMake(sp,L){ let f=null; try{ if(window.__MDL&&window.__MDL.fishReady(sp.id)) f=window.__MDL.fish(sp); }catch(e){} if(!f) return null;
   f.group.scale.setScalar(L); seeThrough(f.group); W.scene.add(f.group);
+  // 隔著水看魚：只看得到被水染色、半透明的暗影，不是清清楚楚浮在水面上的魚
+  f.group.traverse(m=>{ if(!m.isMesh||!m.material) return; const conv=mm=>{ const k=mm.clone(); k.transparent=true; k.opacity=.32; k.depthWrite=false; if(k.color) k.color.multiply(new THREE.Color(.42,.5,.46)); if(k.emissive) k.emissive.setRGB(0,0,0); k.roughness=1; k.metalness=0; return k; };
+    m.material=Array.isArray(m.material)?m.material.map(conv):conv(m.material); m.renderOrder=-1; });
   // 每尾魚自己對這次的餌有多少興趣：魚餌偏好 × 水層對不對
   const bt=G.baitUsed||BAITS[0], aff=bt.aff&&bt.aff[sp.id]!=null?bt.aff[sp.id]:1, lay=layerK(sp), want=Math.min(2,aff)*lay;
   return {f,sp,L,pos:new THREE.Vector3(),h:Math.random()*6.28,sp0:rand(.25,.55),dep:rand(.45,1.1),wt:0,flee:0,want,aff,lay,insp:0}; }

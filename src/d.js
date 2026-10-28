@@ -190,6 +190,9 @@ function landBobber(){
 const AMB={list:[],app:null};
 function ambMake(sp,L){ let f=null; try{ if(window.__MDL&&window.__MDL.fishReady(sp.id)) f=window.__MDL.fish(sp); }catch(e){} if(!f) return null;
   f.group.scale.setScalar(L); seeThrough(f.group); W.scene.add(f.group);
+  // 隔著水看魚：只看得到被水染色、半透明的暗影，不是清清楚楚浮在水面上的魚
+  f.group.traverse(m=>{ if(!m.isMesh||!m.material) return; const conv=mm=>{ const k=mm.clone(); k.transparent=true; k.opacity=.32; k.depthWrite=false; if(k.color) k.color.multiply(new THREE.Color(.42,.5,.46)); if(k.emissive) k.emissive.setRGB(0,0,0); k.roughness=1; k.metalness=0; return k; };
+    m.material=Array.isArray(m.material)?m.material.map(conv):conv(m.material); m.renderOrder=-1; });
   // 每尾魚自己對這次的餌有多少興趣：魚餌偏好 × 水層對不對
   const bt=G.baitUsed||BAITS[0], aff=bt.aff&&bt.aff[sp.id]!=null?bt.aff[sp.id]:1, lay=layerK(sp), want=Math.min(2,aff)*lay;
   return {f,sp,L,pos:new THREE.Vector3(),h:Math.random()*6.28,sp0:rand(.25,.55),dep:rand(.45,1.1),wt:0,flee:0,want,aff,lay,insp:0}; }
