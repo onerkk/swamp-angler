@@ -133,7 +133,8 @@ function updateRod(dt){
   else bdir.set(0,-1,0);
   bdir.addScaledVector(dir,-bdir.dot(dir)); if(bdir.lengthSq()<1e-6) bdir.set(0,-1,0); bdir.normalize();
   const b=Math.max(0.035,rod.bend);
-  for(let i=0;i<=NS;i++){ const s=i/NS; pts[i].copy(R_BASE).addScaledVector(dir,R_LEN*s*(1-.22*b*s*s)).addScaledVector(bdir,R_LEN*b*.52*s*s); }
+  // 竿身越往竿尖越軟：每一小段的彎曲角度隨位置平方增加，重魚時竿尖可以被拉成很深的弧（握把段幾乎不彎）
+  pts[0].copy(R_BASE); { let x=0,y=0; const st=R_LEN/NS; for(let i=1;i<=NS;i++){ const s=(i-.5)/NS, th=Math.min(1.9,b*1.55*Math.pow(Math.max(0,s-.18)/.82,1.8)); x+=Math.cos(th)*st; y+=Math.sin(th)*st; pts[i].copy(R_BASE).addScaledVector(dir,x).addScaledVector(bdir,y); } }
   for(let i=0;i<NS;i++){ const a=pts[i], c=pts[i+1]; const m=segs[i]; m.position.addVectors(a,c).multiplyScalar(.5);
     tmp.subVectors(c,a); const L=tmp.length(); m.quaternion.setFromUnitVectors(AY,tmp.divideScalar(L)); m.scale.set(1,L,1); }
   GS.forEach((s,k)=>{ rodAt(s,tmp); frameAt(s); const g=guides[k]; g.position.copy(tmp).addScaledVector(dn,.008+.026*(1-s)); g.quaternion.setFromUnitVectors(AZ,tan);
