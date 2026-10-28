@@ -397,6 +397,8 @@ function render(){
     if(!save.yacht){ const ok=window.__STORY&&window.__STORY.done('c5'), m=save.mat||{}, need=BOAT_COST, have=k=>(m[k]||0)>=need[k];
       h+=ok?row('🛥️ 修復老漁人的漁船',`停在河口船塢的舊漁船，修好就能出海。需要 🪙 ${need.coins.toLocaleString()}、魚鱗 ${need.scale}（有 ${m.scale||0}）、魚骨 ${need.bone}（有 ${m.bone||0}）、珍珠 ${need.pearl}（有 ${m.pearl||0}）`,`<button class="sbtn pri" data-a="yacht"${save.coins>=need.coins&&have('scale')&&have('bone')&&have('pearl')?'':' disabled'}>修復</button>`)
           :row('🔒 ？？？的漁船','完成主線第六章「月潮」後，霜汐會告訴你它在哪裡','<span class="lk">第六章後</span>'); }
+    { const tl=window.__TIDE, hh=(window.__G&&window.__G.hour)||0, low=tl&&tl.low(hh), nx=tl?tl.nextLow(hh):0;   // 潮間帶：退潮時才能去
+      h+=row('🦀 蚵仔寮潮間帶',low?'退潮中！看泥面痕跡，挖文蛤、赤嘴蛤、竹蟶、海瓜子、沙蟹':'滿潮中，下次退潮 '+String(Math.floor(nx%24)).padStart(2,'0')+':'+(nx%1?'30':'00'),low?'<button class="sbtn pri" data-a="tide">下灘</button>':'<span class="lk">等退潮</span>'); }
     h+=SPOTS.map((s,i)=>{ const why=window.__STORY?window.__STORY.lock(i):null, lock=window.__STORY?!!why:(save.lv<s.lv||(s.req==='mer1'&&!(save.mer&&save.mer.n>=1))), need=(s.kayak&&!save.kayak)||(s.yacht&&!save.yacht), here=c.curSpot()===i;
       const btn=here?'<span class="eqd">目前位置</span>':lock?`<span class="lk">${why||(s.req?'需要美人魚的認可':'Lv '+s.lv+' 解鎖')}</span>`:need?`<span class="lk">${s.yacht?'需要遊艇':'需要獨木舟'}</span>`:`<button class="sbtn pri" data-a="go" data-v="${i}">${s.yacht?'出海':s.kayak?'划過去':'回碼頭'}</button>`;
       return row(lock?'🔒 '+(s.req?'？？？':s.name):(s.yacht?'🛥️ ':s.kayak?'🛶 ':s.loc==='ice'?'❄️ ':'🪵 ')+s.name,lock?(s.req?'只在月光下才看得見的地方':'跟著老漁人的手記前進，就會找到這裡'):s.sub,btn); }).join('');
@@ -543,6 +545,7 @@ shB.addEventListener('click',e=>{
     if(save.coins<need.coins){ toast('金幣不夠','bad'); return; } if((m.scale||0)<need.scale||(m.bone||0)<need.bone||(m.pearl||0)<need.pearl){ toast('修船素材不夠','bad'); return; }
     save.coins-=need.coins; m.scale-=need.scale; m.bone-=need.bone; m.pearl-=need.pearl; save.yacht=true; persist(); setCoins(); Snd.coin(); toast('🛥️ 老漁人的漁船修好了！可以出海了','good',3000); }
   else if(a==='go'){ close(); c.goSpot(+v); return; }
+  else if(a==='tide'){ close(); if(window.__goTide) window.__goTide(); return; }
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
   else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }

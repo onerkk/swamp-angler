@@ -550,6 +550,28 @@ function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id);
   if(legend){ const other=fx.id==='luck'?'meal_str':'luck'; save.fx[other]=Math.max(save.fx[other]||0,Date.now())+min*60000; }
   persist(); if(window.__ECO&&window.__ECO.render) window.__ECO.render();
   toastHome((legend?'👑 傳說料理！':'🍽 ')+sp.name+'：'+name+'！<br>'+fx.i+' '+fx.n+' '+min+' 分鐘'+(season==='herb'?'・♨️ 咬餌更快 '+Math.round(min*(q>=3?.6:.35))+' 分鐘':'')+(legend?'・雙重效果':'')+'<br><small>'+({salt:'🧂 鹽：效果時間 +20%',lemon:'🍋 檸檬：效果時間 +30%、完美更好烤',herb:'🌿 香草：附加咬餌更快'}[season]||'')+'（出門釣魚時生效）</small>','good',4200); fxBurst(fx.i); Snd.coin&&Snd.coin(); }
+/* ===== 潮間帶 ===== */
+const TIDE=createTide(W,{species:id=>SPECIES.find(q=>q.id===id),hour:()=>G.hour,toast:(...a)=>toastHome(...a),onExit:(bag,forced)=>tideDone(bag,forced)}); window.__TIDE=TIDE;
+window.__P_splash=(x,y,z)=>{ try{ P.splash(x,.02,z,8,.25); }catch(e){} };
+function goTide(){ if(G.state!=='idle'){ toast('先收線再下灘','warn'); return; } MDL.preload('tide'); G.state='travel'; fadeEl.classList.add('on');
+  setTimeout(()=>{ if(TIDE.enter()) G.state='tide'; else G.state='idle'; fadeEl.classList.remove('on'); },650); }
+window.__goTide=goTide;
+function tideDone(bag,forced){ G.state='idle';
+  // 圖鑑：挖到的都算發現
+  bag.forEach(b=>{ const r=save.dex[b.id]; save.dex[b.id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,b.L),bl:Math.max(r?r.bl||0:0,b.L),md:r?r.md||0:0,f:r?r.f:Date.now()}; });
+  if(!bag.length){ persist(); toast(forced?'被救回岸邊，這次什麼都沒帶到':'回到岸上了','',1800); return; }
+  const grill=['hardclam','gomphina','tellin','razor','ghostcrab'], total=bag.reduce((a,b)=>a+b.v,0), canKeep=bag.filter(b=>grill.includes(b.id)&&!b.broken);
+  const el=document.createElement('div'); el.style.cssText='position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
+  const names={}; bag.forEach(b=>{ const sp=SPECIES.find(q=>q.id===b.id); names[b.id]=(names[b.id]||0)+1; });
+  el.innerHTML=`<div style="background:#1b2226;color:#fff;border-radius:18px;padding:18px;width:min(88vw,360px);line-height:1.6"><div style="font-weight:800;font-size:17px;margin-bottom:8px">🪣 這次的收穫</div>
+    <div style="font-size:14px;opacity:.9">${Object.entries(names).map(([id,n])=>(SPECIES.find(q=>q.id===id)||{name:id}).name+' ×'+n).join('、')}</div>
+    <div style="margin:10px 0;font-size:13px;opacity:.8">保冷箱可以帶回家烤：文蛤、赤嘴蛤、海瓜子、竹蟶、沙蟹（完整的才行，最多 5 個）</div>
+    <div style="display:flex;gap:8px;flex-direction:column"><button id="tdSell" class="sbtn pri" style="padding:10px">全部賣掉 🪙${total.toLocaleString()}</button>
+    ${canKeep.length?`<button id="tdKeep" class="sbtn" style="padding:10px">能烤的放保冷箱，其他賣掉</button>`:''}</div></div>`;
+  document.body.appendChild(el);
+  const fin=keep=>{ let earn=0; save.cooler=save.cooler||[]; bag.forEach(b=>{ if(keep&&grill.includes(b.id)&&!b.broken&&save.cooler.length<5) save.cooler.push({id:b.id,L:b.L,w:+(b.L*b.L*b.L*600).toFixed(3),d:Date.now()}); else earn+=b.v; });
+    save.coins+=earn; setCoins(); persist(); Snd.coin&&Snd.coin(); el.remove(); toast(earn?'賣了 🪙'+earn.toLocaleString():'放進保冷箱了，回小屋就能烤','good',2200); };
+  el.querySelector('#tdSell').onclick=()=>fin(false); const k=el.querySelector('#tdKeep'); if(k) k.onclick=()=>fin(true); }
 const HOME3D=createHomeScene(W,{openShop:()=>openShop(),save,home:()=>HOME,grillHeat:()=>HOME.grillHeat(),coin:()=>{ Snd.coin&&Snd.coin(); },toast:(...a)=>toastHome(...a),persist:()=>persist(),onGrilled,buy:(id,p)=>{ if(save.coins<p){ toast('金幣不夠','warn',1400); return false; } save.coins-=p; setCoins(); persist(); return true; },sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
   crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(),
@@ -940,7 +962,7 @@ W.setTime(G.hour,true);
 let last=performance.now(), prAcc=0, prN=0, prChecks=0;
 function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
-  try{ update(dt); if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
+  try{ update(dt); if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
   if(prAcc>2){ const fps=prN/prAcc, mode=save.gfx||'auto', ready=window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden;
     if(ready){ G.gfxWarm=(G.gfxWarm||0)+1; }
