@@ -89,7 +89,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
     const conv=mm=>{ const n=new T.MeshStandardMaterial({color:mm.color?mm.color.clone():new T.Color(1,1,1),map:mm.map||null,normalMap:mm.normalMap||null,
         roughnessMap:mm.roughnessMap||null,metalnessMap:mm.metalnessMap||null,roughness:mm.roughness!==undefined?mm.roughness:.5,metalness:mm.metalness!==undefined?mm.metalness:0,
         transparent:!!mm.transparent,alphaTest:mm.alphaTest||0,opacity:mm.opacity!==undefined?mm.opacity:1,side:mm.side,envMapIntensity:1.25,vertexColors:!!geo.attributes.color});
-      if(opt.moon){ n.color=new T.Color(0xd8ecff); n.emissive=new T.Color(0x4aa8ff); n.emissiveIntensity=.55; n.metalness=.6; n.roughness=.2; }
+      if(opt.moon){ n.color=new T.Color(0xc4d8f4); n.emissive=new T.Color(0x2a64a8); n.emissiveIntensity=.22; n.metalness=.55; n.roughness=.24; }   // 月神鯉：保留鯉魚本身的鱗片花紋，只帶銀藍色金屬光澤（不再整條洗成白色）
       if(opt.mer){ n.roughness=.42; n.metalness=.08; }
       if((opt.mer||opt.king)&&n.map){ n.emissive=new T.Color(0xdde6ff); n.emissiveMap=n.map; n.emissiveIntensity=.15; GLOW.push(n); }   // 夜裡用自己的顏色微微發光
       if(opt.king){ n.roughness=.42; n.metalness=.35; n.emissive=new T.Color(0x0a3a5a); n.emissiveIntensity=.35; }
@@ -97,7 +97,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
       if(n.map&&BAKED.has(c[0])){ n.map.generateMipmaps=false; n.map.minFilter=T.LinearFilter; n.map.needsUpdate=true; }   // 烘焙貼圖（三角形成對打包）關閉多層級縮圖，避免方格之間滲色
       [n.map,n.normalMap,n.roughnessMap,n.metalnessMap].forEach(t=>{ if(t&&t.channel) t.channel=0; });
       if(opt.gold){ n.color=new T.Color(0xffc23a); n.emissive=new T.Color(0xffa010); n.emissiveIntensity=.18; n.metalness=.55; n.roughness=.25; }
-      if(opt.ghost){ n.color=new T.Color(0xcfeeff); n.transparent=true; n.opacity=.72; n.emissive=new T.Color(0x5fc8ff); n.emissiveIntensity=.85; n.depthWrite=false; }
+      if(opt.ghost){ n.color=new T.Color(0xbfe6ff); n.transparent=true; n.opacity=.38; n.emissive=new T.Color(0x4ab8ff); n.emissiveIntensity=.55; n.depthWrite=false; n.side=T.DoubleSide; }   // 幽靈魚：真的半透明，看得到後面的水草
       bendify(n,uni,opt.king||opt.mer?.15:1); return n; };
     const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
   try{ if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });

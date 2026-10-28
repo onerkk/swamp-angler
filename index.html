@@ -3696,7 +3696,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
     const conv=mm=>{ const n=new T.MeshStandardMaterial({color:mm.color?mm.color.clone():new T.Color(1,1,1),map:mm.map||null,normalMap:mm.normalMap||null,
         roughnessMap:mm.roughnessMap||null,metalnessMap:mm.metalnessMap||null,roughness:mm.roughness!==undefined?mm.roughness:.5,metalness:mm.metalness!==undefined?mm.metalness:0,
         transparent:!!mm.transparent,alphaTest:mm.alphaTest||0,opacity:mm.opacity!==undefined?mm.opacity:1,side:mm.side,envMapIntensity:1.25,vertexColors:!!geo.attributes.color});
-      if(opt.moon){ n.color=new T.Color(0xd8ecff); n.emissive=new T.Color(0x4aa8ff); n.emissiveIntensity=.55; n.metalness=.6; n.roughness=.2; }
+      if(opt.moon){ n.color=new T.Color(0xc4d8f4); n.emissive=new T.Color(0x2a64a8); n.emissiveIntensity=.22; n.metalness=.55; n.roughness=.24; }   // 月神鯉：保留鯉魚本身的鱗片花紋，只帶銀藍色金屬光澤（不再整條洗成白色）
       if(opt.mer){ n.roughness=.42; n.metalness=.08; }
       if((opt.mer||opt.king)&&n.map){ n.emissive=new T.Color(0xdde6ff); n.emissiveMap=n.map; n.emissiveIntensity=.15; GLOW.push(n); }   // 夜裡用自己的顏色微微發光
       if(opt.king){ n.roughness=.42; n.metalness=.35; n.emissive=new T.Color(0x0a3a5a); n.emissiveIntensity=.35; }
@@ -3704,7 +3704,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
       if(n.map&&BAKED.has(c[0])){ n.map.generateMipmaps=false; n.map.minFilter=T.LinearFilter; n.map.needsUpdate=true; }   // 烘焙貼圖（三角形成對打包）關閉多層級縮圖，避免方格之間滲色
       [n.map,n.normalMap,n.roughnessMap,n.metalnessMap].forEach(t=>{ if(t&&t.channel) t.channel=0; });
       if(opt.gold){ n.color=new T.Color(0xffc23a); n.emissive=new T.Color(0xffa010); n.emissiveIntensity=.18; n.metalness=.55; n.roughness=.25; }
-      if(opt.ghost){ n.color=new T.Color(0xcfeeff); n.transparent=true; n.opacity=.72; n.emissive=new T.Color(0x5fc8ff); n.emissiveIntensity=.85; n.depthWrite=false; }
+      if(opt.ghost){ n.color=new T.Color(0xbfe6ff); n.transparent=true; n.opacity=.38; n.emissive=new T.Color(0x4ab8ff); n.emissiveIntensity=.55; n.depthWrite=false; n.side=T.DoubleSide; }   // 幽靈魚：真的半透明，看得到後面的水草
       bendify(n,uni,opt.king||opt.mer?.15:1); return n; };
     const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
   try{ if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });
@@ -5091,7 +5091,7 @@ function buildTank(water,spec,x){
 // 把水族箱裡記錄的魚做成會游的模型（用遊戲同一個魚模型，按實際體長縮放）
 function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null; const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
   src.traverse(o=>{ o.visible=true; o.frustumCulled=false; if(o.isMesh&&o.material){ const mats=Array.isArray(o.material)?o.material:[o.material];
-      const nm=mats.map(m=>{ const k=m.clone(); k.onBeforeCompile=()=>{}; k.customProgramCacheKey=()=>'tank'; const see=m.transparent&&m.opacity<.95; k.transparent=see; k.opacity=see?Math.max(.7,m.opacity):1; k.depthWrite=!see; k.needsUpdate=true; return k; });   // 半透明的幽靈魚保持半透明
+      const nm=mats.map(m=>{ const k=m.clone(); k.onBeforeCompile=()=>{}; k.customProgramCacheKey=()=>'tank'; const see=m.transparent&&m.opacity<.95; k.transparent=see; k.opacity=see?m.opacity:1; k.depthWrite=!see; k.needsUpdate=true; return k; });   // 半透明的幽靈魚保持半透明
       o.material=Array.isArray(o.material)?nm:nm[0]; o.renderOrder=1; } });
   const w=new T.Group(); w.add(src); const bones=rigFish(src); w.scale.setScalar(rec.L); w.userData.rec=rec; w.userData.real=c.isReal(rec.id); w.userData.bones=bones; return w; }
 // 執行時綁骨：魚頭朝群組的 +x；在每個網格的本地座標裡找出「往前」與「往上」的方向，沿長軸放 7 節骨頭，依前後位置線性分配權重
@@ -5676,7 +5676,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028045930'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028050338'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
