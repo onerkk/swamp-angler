@@ -4211,7 +4211,7 @@ function setup(g){
       const th=n.match(new RegExp('^'+side+'_thumb([123])')); if(th) fing.push({b,k:[.45,.6,.5][+th[1]-1],x0:b.rotation.x}); });   // 拇指同樣繞 −X 內收扣住竿子（實測）
     if(!wrist||!root) continue;
     if(other) other.scale.setScalar(1e-4);
-    o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ m.renderOrder=2; (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.8; }); } });
+    o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ m.renderOrder=2; (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.32; mm.roughness=.95; mm.metalness=0; mm.bumpMap=WEAVE; mm.bumpScale=.0016; mm.needsUpdate=true; }); } });   // 布料不像塑膠：降低環境反光、全霧面，加上細細的布紋凹凸
     const grp=new T.Group(); grp.add(o); S.add(grp); grp.updateMatrixWorld(true);
     const wl=new T.Vector3().setFromMatrixPosition(wrist.matrixWorld), rl=new T.Vector3().setFromMatrixPosition(root.matrixWorld);
     const pl=palm?new T.Vector3().setFromMatrixPosition(palm.matrixWorld):wl.clone();
@@ -4220,6 +4220,10 @@ function setup(g){
     if(W.reflHide) W.reflHide(grp);
   }
   ready=arms.length===2; }
+// 布紋：細密的斜紋織布凹凸（外套、袖子），近看有布料質感
+const WEAVE=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d'); const d=x.createImageData(64,64);
+  for(let j=0;j<64;j++) for(let i2=0;i2<64;i2++){ const v=128+60*Math.sin((i2+j)*.98)*Math.sin((i2-j)*.98*.5)+(Math.random()-.5)*40, k=(j*64+i2)*4; d.data[k]=d.data[k+1]=d.data[k+2]=v; d.data[k+3]=255; }
+  x.putImageData(d,0,0); const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(14,14); return t; })();
 if(T.GLTFLoader) new T.GLTFLoader().load('models/arms.glb',setup);
 /* 雙手補光：掛在鏡頭上、只照 2 米內，亮度跟著日照，夜裡不會像戴頭燈 */
 const fill=new T.PointLight(0xfff2e0,0,2.2,1.6); W.camera.add(fill); fill.position.set(.15,.1,.1); if(!W.camera.parent) S.add(W.camera);
@@ -5744,7 +5748,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028080916'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028081428'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';

@@ -18,7 +18,7 @@ function setup(g){
       const th=n.match(new RegExp('^'+side+'_thumb([123])')); if(th) fing.push({b,k:[.45,.6,.5][+th[1]-1],x0:b.rotation.x}); });   // 拇指同樣繞 −X 內收扣住竿子（實測）
     if(!wrist||!root) continue;
     if(other) other.scale.setScalar(1e-4);
-    o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ m.renderOrder=2; (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.8; }); } });
+    o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ m.renderOrder=2; (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.32; mm.roughness=.95; mm.metalness=0; mm.bumpMap=WEAVE; mm.bumpScale=.0016; mm.needsUpdate=true; }); } });   // 布料不像塑膠：降低環境反光、全霧面，加上細細的布紋凹凸
     const grp=new T.Group(); grp.add(o); S.add(grp); grp.updateMatrixWorld(true);
     const wl=new T.Vector3().setFromMatrixPosition(wrist.matrixWorld), rl=new T.Vector3().setFromMatrixPosition(root.matrixWorld);
     const pl=palm?new T.Vector3().setFromMatrixPosition(palm.matrixWorld):wl.clone();
@@ -27,6 +27,10 @@ function setup(g){
     if(W.reflHide) W.reflHide(grp);
   }
   ready=arms.length===2; }
+// 布紋：細密的斜紋織布凹凸（外套、袖子），近看有布料質感
+const WEAVE=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d'); const d=x.createImageData(64,64);
+  for(let j=0;j<64;j++) for(let i2=0;i2<64;i2++){ const v=128+60*Math.sin((i2+j)*.98)*Math.sin((i2-j)*.98*.5)+(Math.random()-.5)*40, k=(j*64+i2)*4; d.data[k]=d.data[k+1]=d.data[k+2]=v; d.data[k+3]=255; }
+  x.putImageData(d,0,0); const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(14,14); return t; })();
 if(T.GLTFLoader) new T.GLTFLoader().load('models/arms.glb',setup);
 /* 雙手補光：掛在鏡頭上、只照 2 米內，亮度跟著日照，夜裡不會像戴頭燈 */
 const fill=new T.PointLight(0xfff2e0,0,2.2,1.6); W.camera.add(fill); fill.position.set(.15,.1,.1); if(!W.camera.parent) S.add(W.camera);
