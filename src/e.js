@@ -482,9 +482,11 @@ function logList(){ const L=(save.catchLog||[]).slice(); if(!L.length) return '<
   const sorts={new:(a,b)=>b.t-a.t,w:(a,b)=>b.w-a.w,L:(a,b)=>b.L-a.L,sp:(a,b)=>a.id<b.id?-1:a.id>b.id?1:b.w-a.w,z:(a,b)=>(a.z||'').localeCompare(b.z||'')||b.w-a.w}; L.sort(sorts[logSort]||sorts.new);
   let o='<div class="tabs" style="flex-wrap:wrap">'+[['new','最新'],['w','最重'],['L','最長'],['sp','魚種'],['z','釣點']].map(([k,n])=>`<button class="tab${logSort===k?' on':''}" data-a="logsort" data-v="${k}">${n}</button>`).join('')+'</div>';
   o+=`<div class="note" style="font-size:12px">共 ${L.length} 筆（最多保留 300 筆）</div>`;
+  const PH=window.__photoGet?window.__photoGet():{};
   o+=L.slice(0,120).map(r=>{ const sp=SPECIES.find(s=>s.id===r.id), b=BAITS.find(x=>x.id===r.b), d=new Date(r.t);
     const tag=(r.new?'<b style="color:#7ff0a8">首次</b> ':'')+(r.rec?'<b style="color:#ffd56a">新紀錄</b> ':'');
-    return row(`${sp?sp.name:r.id} ${tag}`,`${r.w>=1?r.w.toFixed(2)+' kg':Math.round(r.w*1000)+' g'}・${Math.round(r.L*100)} cm<br><small>${ZN[r.z]||r.z||''}・${perOf(r.h)}・${r.wx}・${b?b.name:'—'}・${r.m}${r.m==='浮標'||r.m==='沉底'?'・'+['淺棚','中層','深棚'][r.dp]:''}${r.ft!=null?'・搏魚 '+Math.round(r.ft)+' 秒':''}</small>`,`<small>${r.out||''}<br>${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</small>`); }).join('');
+    const img=PH[r.t]?`<img src="${PH[r.t]}" style="width:100%;max-width:220px;border-radius:8px;margin-top:4px;display:block">`:'';
+    return row(`${sp?sp.name:r.id} ${tag}`,`${r.w>=1?r.w.toFixed(2)+' kg':Math.round(r.w*1000)+' g'}・${Math.round(r.L*100)} cm<br><small>${ZN[r.z]||r.z||''}・${perOf(r.h)}・${r.wx}・${b?b.name:'—'}・${r.m}${r.m==='浮標'||r.m==='沉底'?'・'+['淺棚','中層','深棚'][r.dp]:''}${r.ft!=null?'・搏魚 '+Math.round(r.ft)+' 秒':''}</small>${img}`,`<small>${r.out||''}<br>${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</small>`); }).join('');
   return o; }
 function open(k){ document.body.classList.add('sheetOn'); cur=k; if(k==='log') dexSel=null; resetArm=false; render(); sheet.classList.remove('hidden'); }
 window.__openSheet=k=>open(k);

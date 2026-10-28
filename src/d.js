@@ -271,6 +271,8 @@ function showCard(){
     if(G.logRec){ G.logRec.ft=+ft.toFixed(1); G.logRec.hq=f.perfect?1:0; } }
   { const mm=sp.special==='mermaid', ns=mm||!!sp.noSell; $('bSell').classList.toggle('hidden',ns); $('bRel').textContent=mm?'送她回家（收下謝禮）':sp.noSell?'拍照後放流':'放生'; if(mm) $('cW').textContent='？？？';
     if(sp.noSell&&!mm) $('cVal').textContent='保育類・不可販售'; }
+  $('bShot').classList.toggle('hidden',!!fd.item||!G.logRec);
+  if(G.logRec&&(G.logRec.new||G.logRec.rec)) setTimeout(()=>{ if(G.state==='catch'&&G.logRec&&!G.logRec.ph&&snapPhoto(G.logRec,true)) $('bShot').classList.add('hidden'); },700);
   $('bGrill').classList.toggle('hidden',!canGrill(fd)||!HOME.unlocked()); $('bGrill').textContent='🔥 放進保冷箱，帶回去烤（'+((save.cooler||[]).length)+'/5）';
   { const hr=HOME.check(fd), b=$('bHome'); b.classList.toggle('hidden',!!hr.hide||!HOME.unlocked()); b.textContent=hr.mount?'🖼 '+hr.short+'，做成標本 🪙'+hr.cost.toLocaleString():'🏠 帶回家';
     b.dataset.mode=hr.ok?'keep':hr.mount?'mount':'no'; b.dataset.why=hr.why||''; b.classList.toggle('dim',!hr.ok&&!hr.mount); }
@@ -357,6 +359,16 @@ $('startBtn').addEventListener('click',()=>{ Snd.init(); $('intro').classList.ad
   if(/[?&]ending=[1-9]/.test(location.search)) setTimeout(()=>window.__playEnding(),1200);
   else if(!save.tutDone&&!(save.total>0)) setTimeout(()=>startTutorial(),2400);   // 新玩家：第一次開始遊戲時跑新手指引
   else if(!save.tutDone){ save.tutDone=1; persist(); } });
+// 魚獲照片：截目前畫面縮成小圖（約 6KB），另存一個獨立的位置（不塞進存檔與雲端同步），最多保留 60 張
+const PHOTO_KEY='swampAngler.photos';
+function photoGet(){ try{ return JSON.parse(localStorage.getItem(PHOTO_KEY)||'{}'); }catch(e){ return {}; } }
+function snapPhoto(rec,quiet){ if(!rec) return false; try{ W.render(); const src=W.renderer.domElement, cv=document.createElement('canvas'), w=200, h=Math.round(200*src.height/src.width*.62);
+    cv.width=w; cv.height=h; const g=cv.getContext('2d'), sh=src.height*.62, sy=src.height*.12; g.drawImage(src,0,sy,src.width,sh,0,0,w,h);
+    const url=cv.toDataURL('image/jpeg',.62); if(url.length<800) return false;   // 空白畫面不存
+    const P2=photoGet(); P2[rec.t]=url; const ks=Object.keys(P2).sort(); while(ks.length>60) delete P2[ks.shift()];
+    localStorage.setItem(PHOTO_KEY,JSON.stringify(P2)); rec.ph=1; persist(); if(!quiet){ toast('📸 已存進魚獲紀錄','good',1200); vib(15); } return true; }catch(e){ if(!quiet) toast('照片存不下了（手機空間不足）','warn',1600); return false; } }
+window.__photoGet=photoGet;
+$('bShot').addEventListener('click',()=>{ if(G.state==='catch'&&G.logRec&&!G.logRec.ph) snapPhoto(G.logRec,false); $('bShot').classList.add('hidden'); });
 $('bSell').addEventListener('click',()=>{ if(G.state==='catch'){ if(G.logRec) G.logRec.out='賣出'; finishCatch(true); } });
 $('bRel').addEventListener('click',()=>{ if(G.state==='catch'){ if(G.logRec) G.logRec.out='放生'; finishCatch(false); } });
 // 保冷箱：魚帶回小屋烤（最多 5 條；保冷類、寶物、美人魚與幻想生物不能烤）

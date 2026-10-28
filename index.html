@@ -341,7 +341,7 @@ body.grilling #homeUI,body.grilling #joy{display:none!important}
       <div class="stat"><small>價值</small><b id="cVal"></b></div>
     </div>
     <p class="desc" id="cDesc"></p>
-    <div class="btns"><button class="btn ph" id="bPhoto" aria-label="拍照留念">📸</button><button class="btn" id="bRel">放生</button><button class="btn pri" id="bSell">賣出</button></div><button class="btn home" id="bHome">🏠 帶回家</button><button class="btn home" id="bGrill">🔥 放進保冷箱，帶回去烤</button>
+    <div class="btns"><button class="btn ph" id="bPhoto" aria-label="拍照留念">📸</button><button class="btn" id="bRel">放生</button><button class="btn pri" id="bSell">賣出</button></div><button class="btn home" id="bHome">🏠 帶回家</button><button class="btn home" id="bGrill">🔥 放進保冷箱，帶回去烤</button><button class="btn" id="bShot" style="background:rgba(255,255,255,.12)">📸 留影（存進魚獲紀錄）</button>
   </div>
 </div>
 <div id="sheet" class="hidden"><div class="sheet"><div class="sh-hd"><b id="shT"></b><button class="ib" id="shX" aria-label="關閉">✕</button></div><div id="shB"></div></div></div>
@@ -2146,9 +2146,11 @@ function logList(){ const L=(save.catchLog||[]).slice(); if(!L.length) return '<
   const sorts={new:(a,b)=>b.t-a.t,w:(a,b)=>b.w-a.w,L:(a,b)=>b.L-a.L,sp:(a,b)=>a.id<b.id?-1:a.id>b.id?1:b.w-a.w,z:(a,b)=>(a.z||'').localeCompare(b.z||'')||b.w-a.w}; L.sort(sorts[logSort]||sorts.new);
   let o='<div class="tabs" style="flex-wrap:wrap">'+[['new','最新'],['w','最重'],['L','最長'],['sp','魚種'],['z','釣點']].map(([k,n])=>`<button class="tab${logSort===k?' on':''}" data-a="logsort" data-v="${k}">${n}</button>`).join('')+'</div>';
   o+=`<div class="note" style="font-size:12px">共 ${L.length} 筆（最多保留 300 筆）</div>`;
+  const PH=window.__photoGet?window.__photoGet():{};
   o+=L.slice(0,120).map(r=>{ const sp=SPECIES.find(s=>s.id===r.id), b=BAITS.find(x=>x.id===r.b), d=new Date(r.t);
     const tag=(r.new?'<b style="color:#7ff0a8">首次</b> ':'')+(r.rec?'<b style="color:#ffd56a">新紀錄</b> ':'');
-    return row(`${sp?sp.name:r.id} ${tag}`,`${r.w>=1?r.w.toFixed(2)+' kg':Math.round(r.w*1000)+' g'}・${Math.round(r.L*100)} cm<br><small>${ZN[r.z]||r.z||''}・${perOf(r.h)}・${r.wx}・${b?b.name:'—'}・${r.m}${r.m==='浮標'||r.m==='沉底'?'・'+['淺棚','中層','深棚'][r.dp]:''}${r.ft!=null?'・搏魚 '+Math.round(r.ft)+' 秒':''}</small>`,`<small>${r.out||''}<br>${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</small>`); }).join('');
+    const img=PH[r.t]?`<img src="${PH[r.t]}" style="width:100%;max-width:220px;border-radius:8px;margin-top:4px;display:block">`:'';
+    return row(`${sp?sp.name:r.id} ${tag}`,`${r.w>=1?r.w.toFixed(2)+' kg':Math.round(r.w*1000)+' g'}・${Math.round(r.L*100)} cm<br><small>${ZN[r.z]||r.z||''}・${perOf(r.h)}・${r.wx}・${b?b.name:'—'}・${r.m}${r.m==='浮標'||r.m==='沉底'?'・'+['淺棚','中層','深棚'][r.dp]:''}${r.ft!=null?'・搏魚 '+Math.round(r.ft)+' 秒':''}</small>${img}`,`<small>${r.out||''}<br>${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</small>`); }).join('');
   return o; }
 function open(k){ document.body.classList.add('sheetOn'); cur=k; if(k==='log') dexSel=null; resetArm=false; render(); sheet.classList.remove('hidden'); }
 window.__openSheet=k=>open(k);
@@ -5607,7 +5609,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028005843'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028010656'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6499,6 +6501,8 @@ function showCard(){
     if(G.logRec){ G.logRec.ft=+ft.toFixed(1); G.logRec.hq=f.perfect?1:0; } }
   { const mm=sp.special==='mermaid', ns=mm||!!sp.noSell; $('bSell').classList.toggle('hidden',ns); $('bRel').textContent=mm?'送她回家（收下謝禮）':sp.noSell?'拍照後放流':'放生'; if(mm) $('cW').textContent='？？？';
     if(sp.noSell&&!mm) $('cVal').textContent='保育類・不可販售'; }
+  $('bShot').classList.toggle('hidden',!!fd.item||!G.logRec);
+  if(G.logRec&&(G.logRec.new||G.logRec.rec)) setTimeout(()=>{ if(G.state==='catch'&&G.logRec&&!G.logRec.ph&&snapPhoto(G.logRec,true)) $('bShot').classList.add('hidden'); },700);
   $('bGrill').classList.toggle('hidden',!canGrill(fd)||!HOME.unlocked()); $('bGrill').textContent='🔥 放進保冷箱，帶回去烤（'+((save.cooler||[]).length)+'/5）';
   { const hr=HOME.check(fd), b=$('bHome'); b.classList.toggle('hidden',!!hr.hide||!HOME.unlocked()); b.textContent=hr.mount?'🖼 '+hr.short+'，做成標本 🪙'+hr.cost.toLocaleString():'🏠 帶回家';
     b.dataset.mode=hr.ok?'keep':hr.mount?'mount':'no'; b.dataset.why=hr.why||''; b.classList.toggle('dim',!hr.ok&&!hr.mount); }
@@ -6585,6 +6589,16 @@ $('startBtn').addEventListener('click',()=>{ Snd.init(); $('intro').classList.ad
   if(/[?&]ending=[1-9]/.test(location.search)) setTimeout(()=>window.__playEnding(),1200);
   else if(!save.tutDone&&!(save.total>0)) setTimeout(()=>startTutorial(),2400);   // 新玩家：第一次開始遊戲時跑新手指引
   else if(!save.tutDone){ save.tutDone=1; persist(); } });
+// 魚獲照片：截目前畫面縮成小圖（約 6KB），另存一個獨立的位置（不塞進存檔與雲端同步），最多保留 60 張
+const PHOTO_KEY='swampAngler.photos';
+function photoGet(){ try{ return JSON.parse(localStorage.getItem(PHOTO_KEY)||'{}'); }catch(e){ return {}; } }
+function snapPhoto(rec,quiet){ if(!rec) return false; try{ W.render(); const src=W.renderer.domElement, cv=document.createElement('canvas'), w=200, h=Math.round(200*src.height/src.width*.62);
+    cv.width=w; cv.height=h; const g=cv.getContext('2d'), sh=src.height*.62, sy=src.height*.12; g.drawImage(src,0,sy,src.width,sh,0,0,w,h);
+    const url=cv.toDataURL('image/jpeg',.62); if(url.length<800) return false;   // 空白畫面不存
+    const P2=photoGet(); P2[rec.t]=url; const ks=Object.keys(P2).sort(); while(ks.length>60) delete P2[ks.shift()];
+    localStorage.setItem(PHOTO_KEY,JSON.stringify(P2)); rec.ph=1; persist(); if(!quiet){ toast('📸 已存進魚獲紀錄','good',1200); vib(15); } return true; }catch(e){ if(!quiet) toast('照片存不下了（手機空間不足）','warn',1600); return false; } }
+window.__photoGet=photoGet;
+$('bShot').addEventListener('click',()=>{ if(G.state==='catch'&&G.logRec&&!G.logRec.ph) snapPhoto(G.logRec,false); $('bShot').classList.add('hidden'); });
 $('bSell').addEventListener('click',()=>{ if(G.state==='catch'){ if(G.logRec) G.logRec.out='賣出'; finishCatch(true); } });
 $('bRel').addEventListener('click',()=>{ if(G.state==='catch'){ if(G.logRec) G.logRec.out='放生'; finishCatch(false); } });
 // 保冷箱：魚帶回小屋烤（最多 5 條；保冷類、寶物、美人魚與幻想生物不能烤）
