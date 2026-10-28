@@ -260,6 +260,7 @@ body.grilling #homeUI,body.grilling #joy{display:none!important}
 #shopUI .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}#shopUI .grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px}
 #shopUI .go{display:block;text-align:center;background:linear-gradient(135deg,#ee4d2d,#ff7337);color:#fff;font-weight:700;padding:13px;border-radius:12px;text-decoration:none;font-size:16px}
 #shopUI .x{display:block;margin:10px auto 0;background:none;border:0;color:#cbbfe0;font-size:14px}
+@keyframes rubBlink{50%{box-shadow:0 0 0 3px #ff9a3c}}.rub{animation:rubBlink .4s infinite}
 @keyframes slackBlink{50%{box-shadow:0 0 0 3px #6ab8ff}}.slack{animation:slackBlink .5s infinite}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
@@ -5582,7 +5583,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028001215'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028001709'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6386,7 +6387,7 @@ function missBite(){ const lastFd=G.fd; FUN.hookEnd(); G.combo=0; FUN.combo(0); 
 function hook(q){
   const sp=G.sp, L=G.fd.L; exitUW();
   const perfect=!!q; if(perfect){ save.perf=(save.perf||0)+1; if(window.__STORY) window.__STORY.onPerfect(); }
-  G.f={perfect,hq:perfect?1:.7,drag:save.drag==null?1:save.drag,d:G.loc==='ice'?rand(10,18):G.castDist,az0:Math.atan2(-(G.to.x-G.base.x),-(G.to.z-G.base.z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
+  G.f={perfect,hq:perfect?1:.7,drag:save.drag==null?1:save.drag,cover:0,abr:0,coverSide:Math.random()<.5?-1:1,d:G.loc==='ice'?rand(10,18):G.castDist,az0:Math.atan2(-(G.to.x-G.base.x),-(G.to.z-G.base.z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
   G.state='fight'; P.splash(G.to.x,0,G.to.z,22,1); W.addRipple(G.to.x,G.to.z,.7); Snd.splash(.7); vib(40);
   toast(perfect?'完美揚竿！':'上鉤了！',perfect?'good':'',1200);
   ui.fight.classList.remove('hidden'); WL.onHook(G.fd,()=>fishPos(G.chaseV,0)); SEA.onHook(G.fd,()=>fishPos(G.chaseV,0));
@@ -6395,15 +6396,15 @@ function hook(q){
 }
 function fishPos(out,y){ const az=G.f.az0+G.f.theta; out.set(G.base.x-Math.sin(az)*G.f.d,y,G.base.z-Math.cos(az)*G.f.d); if(G.loc==='sea') SEA.hullClear(out,.35); else if(G.loc==='ice'&&window.__ICE){ const hp=window.__ICE.holePos(); out.x=hp.x; out.z=hp.z; } return out; }
 function sizeWord(w){ return w<.6?'小傢伙':w<2.5?'中型魚':w<8?'大魚！':'巨物！！'; }
-function endFightUI(){ if(ui.netBtn) ui.netBtn.classList.add('hidden'); ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); }
+function endFightUI(){ if(ui.netBtn) ui.netBtn.classList.add('hidden'); ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); ui.tBar.classList.remove('rub'); }
 function lose(reason){
   endFightUI(); WL.endChase(); SEA.endChase(); G.combo=0; FUN.combo(0); P.shadow.material.opacity=0; if(G.fish){ G.fish.group.visible=false; }
   if(reason==='gator'||reason==='shark'){ fishPos(tv,0); P.splash(tv.x,0,tv.z,60,1.6); W.addRipple(tv.x,tv.z,1.2); Snd.splash(1.5); Snd.gator(); biteFX(reason); }
-  const msg={snap:'啪！線斷了……',slack:'線太鬆，魚脫鉤了',spool:'線放光了，魚跑掉了',gator:'鱷魚把你的魚搶走了！',shark:'鯊魚把你的魚咬走了！',shook:'魚甩頭，把鉤甩掉了',jump:'魚在空中甩脫了鉤'}[reason];
+  const msg={snap:'啪！線斷了……',slack:'線太鬆，魚脫鉤了',spool:'線放光了，魚跑掉了',gator:'鱷魚把你的魚搶走了！',shark:'鯊魚把你的魚咬走了！',shook:'魚甩頭，把鉤甩掉了',jump:'魚在空中甩脫了鉤',rub:'線在障礙物上磨斷了……'}[reason];
   // 失敗原因與改善方法：慢一點跳出，讓玩家知道下次怎麼做
   const tip={snap:'原因：張力在紅區停太久。改善：魚衝刺時先放手，或把洩力調「鬆」。',slack:'原因：魚停下時線鬆太久。改善：魚一停就按住收線。',spool:'原因：魚跑太遠把線放光。改善：魚停下時趁機收線，或把洩力調「緊」一點。',
     gator:'原因：搏魚拖太久引來鱷魚。改善：張力保持在綠黃區、加快收線。',shark:'原因：搏魚拖太久引來鯊魚。改善：張力保持在綠黃區、加快收線。',
-    shook:'原因：揚竿不夠準＋甩頭時線鬆。改善：浮標「沉下去」的瞬間揚竿；魚甩頭時保持收線。',jump:'原因：魚跳起時還在硬拉。改善：看到魚躍出水面先放手。'}[reason];
+    shook:'原因：揚竿不夠準＋甩頭時線鬆。改善：浮標「沉下去」的瞬間揚竿；魚甩頭時保持收線。',jump:'原因：魚跳起時還在硬拉。改善：看到魚躍出水面先放手。',rub:'原因：魚鑽進結構物，線一直在上面磨。改善：看到警告就往反方向控竿；換粗一點的線，或帶鋼絲前導線。'}[reason];
   if(tip) setTimeout(()=>toast('💡 '+tip,'',4200),1900);
   if(reason==='snap'){ Snd.snap(); vib([80,40,120]); toast(msg,'bad',1800); G.state='lost'; G.stT=0; G.snapped=true; bob.visible=false; rod.bendT=0; rod.pitchT=.1; rod.end=null; }
   else { vib(60); startRetrieve(msg,'bad'); }
@@ -6700,6 +6701,16 @@ function updateFight(dt){
   const stamF=.4+.6*f.stam/100;
   const F=fs.pow*(.8+.25*Math.pow(fd.w,.45))*(1+.22*sp.rar)*(fd.boss?fd.boss.pow:1)*stamF*(f.run?ST.mul:1)*(dive?1.35:1);
   const good=-f.latDir*G.rodSide, steerMul=1-.28*clamp(good,0,1)+.15*clamp(-good,0,1);
+  // 障礙物磨線：在倒木區、礁岩中魚時，愛躲的魚（底棲魚、礁岩魚）衝刺時會往結構物鑽；線一碰到就開始磨損。
+  // 往牠鑽的反方向控竿就能把牠帶離；線越粗、鋼絲前導線越耐磨
+  { const zid=WL.zoneId?WL.zoneId():'', stru=zid==='wood'||zid==='reef'||(zid==='lily'&&G.loc!=='sea'), hider=!fd.item&&(LAYER_B.has(fd.sp.id)||(fd.sp.spots&&fd.sp.spots.includes('reef')));
+    if(stru&&hider&&G.loc!=='ice'){
+      if(f.run){ if(f.latDir!==f.coverSide&&Math.random()<dt*.8) f.latDir=f.coverSide;   // 衝刺時偏向結構物那一側
+        const toward=f.latDir===f.coverSide; f.cover=clamp(f.cover+(toward?(good>.4?-.35:.45):-.2)*dt,0,1); }
+      else f.cover=clamp(f.cover-(good>.4?.5:.15)*dt,0,1);
+      if(f.cover>.55&&f.T>.25){ f.abr+=dt*(.18+.5*f.T)*(f.cover-.4)/(.7+.3*META.gear().line.s); if(!f.rubW){ f.rubW=1; toast(zid==='reef'?'🪨 魚往礁石鑽！往反方向控竿把牠帶出來':'🪵 魚往倒木裡鑽！往反方向控竿把牠帶出來','warn',2000); vib([30,30,30]); } }
+      else if(f.cover<.3) f.rubW=0;
+      ui.tBar.classList.toggle('rub',f.cover>.55); } }
   let Tt=(F*(G.held?1:.35)+(G.held?.5:0))/(META.gear().line.s*DF.line)*steerMul*META.gear().rod.tens;
   if(f.jumpT>0&&G.held) Tt+=.45;
   if(shake) Tt+=G.held?.38:.12;
@@ -6749,10 +6760,11 @@ function updateFight(dt){
   if(f.latDir!==0){ ui.steer.classList.remove('hidden'); ui.steer.textContent=f.latDir>0?'◀ 往左拉竿':'往右拉竿 ▶'; ui.steer.classList.toggle('ok',good>.4); }
   else ui.steer.classList.add('hidden');
   if(f.slk>.3&&!f.slkW){ f.slkW=1; vib([40,40,40]); } if(f.slk<.1) f.slkW=0; ui.tBar.classList.toggle('slack',f.slk>.3);
-  setAct(G.held?'收線中':'按住<br>收線', f.slk>.3?'⚠️ 線太鬆了，快按住收線！':f.run&&G.held&&f.T>.8?'魚在衝刺，先放手！':!f.run&&!G.held?'魚停了，快按住收線':'魚往哪游，就往反方向滑動拉竿', false);
+  setAct(G.held?'收線中':'按住<br>收線', f.cover>.55?'🪨 線在磨！往反方向拉竿，把魚帶離障礙物':f.slk>.3?'⚠️ 線太鬆了，快按住收線！':f.run&&G.held&&f.T>.8?'魚在衝刺，先放手！':!f.run&&!G.held?'魚停了，快按住收線':'魚往哪游，就往反方向滑動拉竿', false);
   if(WL.stolen()) return lose('gator');
   if(SEA.stolen()) return lose('shark');
   if(f.brk>=1){ if(window.__ECO&&window.__ECO.useLeader()){ f.brk=.35; toast('⛓️ 鋼絲前導線撐住了！','good',1600); vib(60); } else return lose('snap'); }
+  if(f.abr>=1){ if(window.__ECO&&window.__ECO.useLeader()){ f.abr=.4; f.cover=.2; toast('⛓️ 鋼絲前導線擋住了磨擦！','good',1600); vib(60); } else return lose('rub'); }
   if(f.slk>=1) return lose('slack');
   if(f.lostWhy) return lose(f.lostWhy);
   if(f.d>MAX_LINE) return lose('spool');
