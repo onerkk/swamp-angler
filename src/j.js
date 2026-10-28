@@ -169,6 +169,7 @@ function startEv(id){ Object.assign(ev,{id,t:0,shot:false,data:{}}); const b=bas
 function endAll(){ ev.id=null; banner.classList.add('hidden'); $('bCam').classList.remove('pulse'); rainbow.visible=false; flock.forEach(m=>m.visible=false); dolphins.forEach(o=>{ o.on=false; o.g.visible=false; });
   whale.visible=false; fluke.visible=false; if(!chase) sfin.visible=false; flyers.forEach(f=>{ f.on=false; f.g.visible=false; }); mets.forEach(m=>m.m.visible=false); }
 function updEv(dt,t,wx,day){
+  if(c.G&&c.G.state==='home'){ if(ev.id) endAll(); return; }   // 在小屋裡不會發生、也不會提示外面的事件
   W.camera.getWorldPosition(cw); SPRAY.tick(dt,0); MIST.tick(dt,1.2); updFoam(dt);
   if(!ev.id){ evT-=dt; if(evT<=0){ evT=loc==='sea'?rand(30,60):rand(45,90); if(c.underwater()) return;
       if(forced&&canEv(forced,day,wx)){ startEv(forced); forced=null; return; } forced=null;
