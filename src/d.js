@@ -529,22 +529,26 @@ window.__CLOUD=createCloud({save:()=>save,toast,test:TESTACC,
 const GHOST=createGhost(W,{toast:(m,c2,ms)=>toast(m,c2,ms),splash:(x,z,n,s)=>P.splash(x,0,z,n,s),ripple:(x,z,r)=>W.addRipple(x,z,r),splashSnd:k=>Snd.splash&&Snd.splash(k),save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>uiBusy()?'menu':G.state,base:()=>G.base,head:()=>G.head,yaw:()=>G.yaw,to:()=>G.to,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
 window.__GHOST=GHOST;
 // 烤好了：依兩面熟度評分，吃下去依魚的來源得到效果
+// 吃下料理的效果演出：畫面中央浮起效果圖示、發光擴散
+function fxBurst(icon){ const el=document.createElement('div'); el.textContent=icon; el.style.cssText='position:fixed;left:50%;top:46%;z-index:40;font-size:64px;transform:translate(-50%,-50%) scale(.4);opacity:0;transition:transform .6s cubic-bezier(.2,1.6,.4,1),opacity .4s;filter:drop-shadow(0 0 18px rgba(255,220,120,.9));pointer-events:none';
+  document.body.appendChild(el); requestAnimationFrame(()=>{ el.style.transform='translate(-50%,-50%) scale(1.15)'; el.style.opacity='1'; }); setTimeout(()=>{ el.style.transition='transform 1s,opacity 1s'; el.style.transform='translate(-50%,-140%) scale(.8)'; el.style.opacity='0'; },1100); setTimeout(()=>el.remove(),2300); vib([20,40,20]); }
 function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id); if(!sp) return; const lo=season==='lemon'?.72:.78, hi=season==='lemon'?.95:.92, g=x=>x<.55?0:x<lo?1:x<hi?3:-1, ga=g(a), gb=g(b);
   const burnt=ga<0||gb<0, q=burnt?0:Math.min(ga,gb), name=burnt?'烤焦了':q>=3?'完美':q>=1?'半熟':'還是生的';
   const fx=sp.loc==='sea'||sp.water==='sea'?{id:'luck',n:'好運',i:'🍀'}:sp.loc==='ice'||(sp.spots||[]).includes('ice')?{id:'glow',n:'暖身（咬餌更快）',i:'♨️'}:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'};
   save.cook=save.cook||{}; const ck=save.cook[rec.id]=save.cook[rec.id]||{n:0,best:0}; ck.n++; if(q>ck.best) ck.best=q;
   // 料理圖鑑稱號：完美過的魚種數
-  { const perf=Object.keys(save.cook).filter(k=>save.cook[k].best>=3).length; save.titles=save.titles||[]; for(const [n,tt] of [[5,'烤魚師傅'],[15,'爐火大師']]) if(perf>=n&&save.titles.indexOf(tt)<0){ save.titles.push(tt); setTimeout(()=>toast('🏅 獲得稱號「'+tt+'」：完美烤過 '+n+' 種魚','good',3200),1600); } }
-  if(q<=0){ persist(); toast('🔥 '+sp.name+'：'+name+(who==='friend'?'……釣友客氣地吃了一口':'……吞不下去，沒有效果'),'warn',2600); return; }
+  { const perf=Object.keys(save.cook).filter(k=>save.cook[k].best>=3).length; save.titles=save.titles||[]; for(const [n,tt] of [[5,'烤魚師傅'],[15,'爐火大師']]) if(perf>=n&&save.titles.indexOf(tt)<0){ save.titles.push(tt); setTimeout(()=>toastHome('🏅 獲得稱號「'+tt+'」：完美烤過 '+n+' 種魚','good',3200),1600); } }
+  if(q<=0){ persist(); toastHome('🔥 '+sp.name+'：'+name+(who==='friend'?'……釣友客氣地吃了一口':'……吞不下去，沒有效果'),'warn',2600); return; }
   const legend=(sp.rar||0)>=4&&q>=3;
   if(who==='friend'){ const coins=Math.round((sp.price||20)*Math.pow((rec.w||.5)+.3,.85)*(q>=3?2.2:1.2)*(legend?2:1)); save.coins+=coins; setCoins();
     save.baits=save.baits||{}; const bt=q>=3?(legend?'moon':'live'):'shrimp', bn=q>=3?(legend?1:3):2; save.baits[bt]=(save.baits[bt]||0)+bn; persist();
-    toast('🎁 釣友吃得很開心'+(q>=3?'，直說好吃！':'')+' 🪙'+coins+'・'+({moon:'月光餌',live:'活魚餌',shrimp:'活蝦'}[bt])+' ×'+bn,'good',3200); Snd.coin&&Snd.coin(); return; }
+    toastHome('🎁 釣友吃得很開心'+(q>=3?'，直說好吃！':'')+' 🪙'+coins+'・'+({moon:'月光餌',live:'活魚餌',shrimp:'活蝦'}[bt])+' ×'+bn,'good',3200); Snd.coin&&Snd.coin(); return; }
   const min=Math.round((q>=3?12:5)*Math.min(2,.6+Math.sqrt(rec.w||.5)*.5)*({salt:1.2,lemon:1.3}[season]||1)*(legend?2:1)*HOME.grillFxK()); save.fx=save.fx||{}; save.fx[fx.id]=Math.max(save.fx[fx.id]||0,Date.now())+min*60000;
-  if(q>=3&&season==='herb') save.fx.glow=Math.max(save.fx.glow||0,Date.now())+Math.round(min*.6)*60000;
+  // 香草：不論熟度都附加「咬餌更快」，完美時效果時間更長
+  if(season==='herb') save.fx.glow=Math.max(save.fx.glow||0,Date.now())+Math.round(min*(q>=3?.6:.35))*60000;
   if(legend){ const other=fx.id==='luck'?'meal_str':'luck'; save.fx[other]=Math.max(save.fx[other]||0,Date.now())+min*60000; }
   persist(); if(window.__ECO&&window.__ECO.render) window.__ECO.render();
-  toast((legend?'👑 傳說料理！':'🍽 ')+sp.name+'：'+name+'！'+fx.i+' '+fx.n+' '+min+' 分鐘'+(q>=3&&season==='herb'?'・♨️ 咬餌更快':'')+(legend?'・雙重效果':''),'good',3200); Snd.coin&&Snd.coin(); }
+  toastHome((legend?'👑 傳說料理！':'🍽 ')+sp.name+'：'+name+'！<br>'+fx.i+' '+fx.n+' '+min+' 分鐘'+(season==='herb'?'・♨️ 咬餌更快 '+Math.round(min*(q>=3?.6:.35))+' 分鐘':'')+(legend?'・雙重效果':'')+'<br><small>'+({salt:'🧂 鹽：效果時間 +20%',lemon:'🍋 檸檬：效果時間 +30%、完美更好烤',herb:'🌿 香草：附加咬餌更快'}[season]||'')+'（出門釣魚時生效）</small>','good',4200); fxBurst(fx.i); Snd.coin&&Snd.coin(); }
 const HOME3D=createHomeScene(W,{openShop:()=>openShop(),save,home:()=>HOME,grillHeat:()=>HOME.grillHeat(),coin:()=>{ Snd.coin&&Snd.coin(); },toast:(...a)=>toastHome(...a),persist:()=>persist(),onGrilled,buy:(id,p)=>{ if(save.coins<p){ toast('金幣不夠','warn',1400); return false; } save.coins-=p; setCoins(); persist(); return true; },sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
   crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(),
