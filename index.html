@@ -5637,7 +5637,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028024610'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028025332'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6956,7 +6956,8 @@ function updateFight(dt){
   sh.material.opacity=f.jumpT>0?0:.4*(1-sstep(3,10,f.d));
   // 浮標與釣竿
   { const pull=clamp(f.T*1.1+(f.run?.15:0),0,1);   // 浮標被拖進水裡、朝釣竿方向傾斜
-    bob.position.set(tv.x,-.03-.28*pull+Math.sin(G.t*9)*.012*(f.run?1:.4),tv.z); bob.rotation.set(-.6*pull,0,Math.sin(G.t*7)*.25*(1-pull*.6)); }
+    { const rt=rod.tipW, k=Math.min(.35,1.2/Math.max(2,f.d)); bob.position.set(tv.x+(rt.x-tv.x)*k,-.03-.28*pull+Math.sin(G.t*9)*.012*(f.run?1:.4),tv.z+(rt.z-tv.z)*k); }   // 浮標滑在線上、在魚前方靠釣竿這側
+    bob.rotation.set(-.6*pull,0,Math.sin(G.t*7)*.25*(1-pull*.6)); bob.visible=!(f.jumpT>0)&&!G.bottom; }
   { const load=clamp(.25+.35*Math.min(1,fd.w/3),.25,.6), jit=(f.run||shake)?Math.sin(G.t*38)*.05*(.5+f.T):0;   // 掛上魚就有弧度，張力再加深，衝刺甩頭時竿尖抖動
     rod.end=G.endV.copy(tv); rod.pitchT=.18+.08*f.T; rod.bendT=clamp(load+.85*f.T+(f.run?.12:0)+jit,0,1.25);
     // 竿子跟著魚：魚往哪邊衝，竿身就被往那邊拖過去；衝刺時再往下壓
@@ -7004,7 +7005,7 @@ function update(dt){
   const info=W.setTime(G.hour); W.update(dt,G.t); updateKayak(dt);
   if(keys.ArrowLeft||keys.ArrowRight){ const k=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0); if(G.state==='fight') G.rodSideT=k; else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(G.yawT-k*dt*1.2,-.95,.95); }
   G.rodSide+=(G.rodSideT-G.rodSide)*Math.min(1,dt*8); rod.side=G.rodSide;
-  if(G.state!=='fight'){ rod.end=null; rod.bendT=.03; } bob.visible=!G.snapped&&!((G.drillK||0)>.5)&&!(G.bottom&&(G.state==='wait'||G.state==='bite')); bob.rotation.set(0,0,0);
+  if(G.state!=='fight'){ rod.end=null; rod.bendT=.03; } bob.visible=!G.snapped&&!((G.drillK||0)>.5)&&!(G.bottom&&(G.state==='wait'||G.state==='bite'||G.state==='fight'))&&!(G.state==='fight'&&G.f&&G.f.jumpT>0); bob.rotation.set(0,0,0);
   let lineEnd=null, slack=.35, lineOn=!G.snapped, trem=0;
   const st=G.state;
   if(st==='intro'||st==='idle'||st==='charge'){
@@ -7080,7 +7081,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       if(!G.swing) G.swing={a:0,v:1.6};
       G.swing.v+=(-9.8/Math.max(.4,hangLen)*Math.sin(G.swing.a))*dt+(Math.random()-.5)*dt*6*(t<T2?1:.3); G.swing.v*=Math.exp(-dt*.8); G.swing.a+=G.swing.v*dt;   // 擺盪＋魚掙扎
       W.head.getWorldQuaternion(tq); const yaw=new THREE.Euler().setFromQuaternion(tq,'YXZ').y;
-      if(t<T2){ const hl=.55+L*.2; let hang=tv.copy(tip); if(t>=T1){ W.head.localToWorld(tv2.set(.06,.3*D+.12,-D*1.15)); hang.lerp(tv2,sstep(T1,T2,t)); }
+      if(t<T2){ const hl=.55+L*.2; let hang=tv.copy(tip); if(t>=T1){ const DD=Math.max(D*1.15,L*1.7+.5); W.head.localToWorld(tv2.set(.06,.3*DD+.12+L*.35,-DD)); hang.lerp(tv2,sstep(T1,T2,t)); }   // 大魚吊得遠一點、高一點，不會穿過鏡頭和手
         const sx=Math.sin(G.swing.a)*hl, mouth=tv2.set(hang.x+Math.cos(yaw)*sx,hang.y-hl*Math.cos(G.swing.a),hang.z-Math.sin(yaw)*sx);
         if(t<T1){ const e=sstep(0,T1,t), from=new THREE.Vector3().copy(G.landFrom); mouth.copy(from.lerp(mouth,e)); mouth.y+=Math.sin(Math.PI*e)*.35; }   // 從水裡被拉起、劃一道弧線到竿尖下
         te.set(0,yaw+Math.PI/2,0,'YXZ'); g.quaternion.setFromEuler(te); g.rotateZ(Math.PI/2+G.swing.a*.6+Math.sin(t*13)*.25); g.updateMatrixWorld(true);
