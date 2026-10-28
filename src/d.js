@@ -122,7 +122,7 @@ const tv=new T.Vector3(), tv2=new T.Vector3(), tq=new T.Quaternion(), te=new T.E
 const bob=P.bobber, rod=P.rod;
 function period(h){ h=((h%24)+24)%24; return h>=4.8&&h<8.5?'dawn':h<16.5&&h>=8.5?'day':h>=16.5&&h<19.8?'dusk':'night'; }
 const PER_WAIT={dawn:.75,day:1.1,dusk:.75,night:1.0};
-function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.02,-.5,Math.cos(G.t*1.1)*.015)); }
+function hangPos(out){ return out.copy(rod.tipW).add(tv2.set(Math.sin(G.t*1.3)*.012,-.24,Math.cos(G.t*1.1)*.01)); }   // 浮標收到竿尖下方約 25 公分，像真的釣客收好線
 
 /* ---------- 選魚 ---------- */
 function specialK(sp){ if(!sp.special) return 1;

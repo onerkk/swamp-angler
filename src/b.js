@@ -389,10 +389,15 @@ void main(){
       bed *= lk*(0.6 + 0.75*cs*uLightK*(0.35 + 0.65*uSunVis)*(1.0 - 0.6*reefK)*(1.0 - smoothstep(6.0, 40.0, dist)));
       vec3 Tr = exp(-vec3(0.38, 0.075, 0.055)*(Lp + Dd));
       vec3 shal = bed*Tr + vec3(0.02, 0.30, 0.36)*lk*(1.0 - Tr);
-      bodyD = mix(deepC, shal, uReef*(1.0 - smoothstep(25.0, 130.0, dist)));
+      shal = mix(shal, vec3(dot(shal, vec3(0.3, 0.55, 0.15)))*vec3(0.85, 1.0, 1.0), 0.45*(1.0 - uSunVis));   // 陰天：淺水的藍綠色變得灰而柔和
+      bodyD = mix(deepC, shal, uReef*(1.0 - smoothstep(20.0, 160.0, dist)));
     }
     #ifdef SEAGRID
     bodyD += vec3(0.04, 0.24, 0.26)*smoothstep(-0.1, 0.9, vH)*uLightK*(0.4 + 0.6*clamp(dot(N, normalize(vec3(uSunDir.x, 0.25, uSunDir.z))), 0.0, 1.0));
+    // 浪頭白沫：風越大、浪越高越多；碎成一塊一塊、隨時間消散
+    { float wcN = noise2(vW.xz*0.35 + vec2(uTime*0.05, uTime*0.03))*0.6 + noise2(vW.xz*1.3 - uTime*0.08)*0.4;
+      float wc = smoothstep(0.62, 0.9, vH*0.75 + wcN*0.55)*clamp(uWind.z*1.4 - 0.25, 0.0, 1.0)*(1.0 - smoothstep(60.0, 260.0, dist));
+      bodyD = mix(bodyD, vec3(0.82, 0.86, 0.88)*(0.35 + 0.65*uLightK), wc*0.75); }
     #endif
     refl *= vec3(0.74, 0.88, 1.0); F *= 0.82;
     bodyD *= mix(1.0, 0.1, uNight);
