@@ -264,6 +264,16 @@ body.grilling #homeUI,body.grilling #joy{display:none!important}
 @keyframes slackBlink{50%{box-shadow:0 0 0 3px #6ab8ff}}.slack{animation:slackBlink .5s infinite}
 body.fighting #top,body.fighting #top2,body.fighting #magWin,body.fighting .hotChip,body.fighting #hotChip{opacity:.12;transition:opacity .5s;pointer-events:none}
 #top,#top2{transition:opacity .5s}
+/* 橫向（手機橫拿）：寬螢幕視野；收線鈕移到右下（右手拇指）、搖桿留左下（左手拇指）、搏魚面板縮到左下角，畫面中央全部留給竿與水 */
+@media (orientation:landscape) and (max-height:540px){
+  #act{left:auto;right:calc(env(safe-area-inset-right,0px) + 22px);bottom:calc(env(safe-area-inset-bottom,0px) + 16px);transform:none;width:96px;height:96px}
+  #fight{left:calc(env(safe-area-inset-left,0px) + 140px);transform:none;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);width:min(42vw,380px);padding:6px 12px 4px}
+  #joy{bottom:calc(env(safe-area-inset-bottom,0px) + 16px);width:96px;height:96px}
+  #top{padding-top:calc(env(safe-area-inset-top,0px) + 6px)}
+  #top2{top:calc(env(safe-area-inset-top,0px) + 48px);flex-wrap:wrap;max-width:46vw}
+  .chip{padding:5px 10px}
+  #magWin{top:calc(env(safe-area-inset-top,0px) + 54px)!important}
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
