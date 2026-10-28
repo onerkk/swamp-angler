@@ -61,5 +61,18 @@ function comeBack(x,z){ const s=schools.find(q=>!q.on)||schools[0]; if(!spawn(s)
 // 測試用：在鏡頭正前方放一群
 function force(d){ const s=schools.find(q=>!q.on)||schools[0]; W.camera.getWorldPosition(cam); const dir=new T.Vector3(); W.camera.getWorldDirection(dir); dir.y=0; dir.normalize();
   spawn(s); s.x=cam.x+dir.x*(d||12); s.z=cam.z+dir.z*(d||12); s.h=Math.atan2(dir.z,dir.x); s.t=3; }
-return {update,force,scare,comeBack};
+// 受驚炸水：一群小魚從落點往外跳出水面逃開（每尾一道弧線＋入水水花）
+const BN=14, burstIM=new T.InstancedMesh(GEO,MATS.lake,BN); burstIM.frustumCulled=false; burstIM.visible=false; S.add(burstIM); const BU=[];
+function burst(x,z,n){ BU.length=0; burstIM.material=c.loc()==='sea'?MATS.sea:MATS.lake; n=Math.min(BN,n||10);
+  for(let i=0;i<n;i++){ const a=rand(0,6.28), sp=rand(1.4,3.2); BU.push({x:x+Math.cos(a)*rand(0,.6),z:z+Math.sin(a)*rand(0,.6),vx:Math.cos(a)*sp,vz:Math.sin(a)*sp,vy:rand(1.6,2.8),y:-.05,t:-rand(0,.45),sz:rand(.13,.22),done:false}); }
+  burstIM.visible=true; }
+function burstTick(dt){ if(!BU.length) return; let live=0;
+  BU.forEach((b,i)=>{ b.t+=dt; if(b.t<0||b.done){ M.compose(V.set(0,-50,0),Q.identity(),SC.setScalar(.001)); burstIM.setMatrixAt(i,M); if(!b.done) live++; return; }
+    if(b.y===-.05&&b.t<dt*1.5&&P&&P.splash) P.splash(b.x,0,b.z,5,.25);
+    b.vy-=9.8*dt; b.x+=b.vx*dt; b.z+=b.vz*dt; b.y+=b.vy*dt;
+    if(b.y<0&&b.vy<0){ b.done=true; if(P&&P.splash) P.splash(b.x,0,b.z,6,.3); if(W.addRipple) W.addRipple(b.x,b.z,.28); }
+    const h=Math.atan2(b.vz,b.vx); E.set(Math.atan2(b.vy,Math.hypot(b.vx,b.vz))*.8,-h,Math.sin(b.t*30)*.3,'YXZ'); Q.setFromEuler(E); M.compose(V.set(b.x,b.y,b.z),Q,SC.setScalar(b.sz)); burstIM.setMatrixAt(i,M); if(!b.done) live++; });
+  for(let i=BU.length;i<BN;i++){ M.compose(V.set(0,-50,0),Q.identity(),SC.setScalar(.001)); burstIM.setMatrixAt(i,M); }
+  burstIM.instanceMatrix.needsUpdate=true; if(!live){ BU.length=0; burstIM.visible=false; } }
+return {update:(dt,t)=>{ update(dt,t); burstTick(dt); },force,scare,comeBack,burst};
 }
