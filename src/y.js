@@ -47,6 +47,7 @@ async function copyMain(auto){ if(!TEST||!owner) return; let best=null;
   if(!best){ const s=c.save(); s.testSeeded=1; if(auto){ await onLogin(); if(c.grant) c.grant(); } else c.toast('找不到正式版進度','warn',2000); return; }
   const o=JSON.parse(JSON.stringify(best)); o.testSeeded=1; o.coins=Math.max(999999,o.coins||0);
   c.toast(auto?'🧪 測試帳號：已複製正式版進度':'已複製正式版進度','good',1800);
+  try{ const d0=await docRef().get(); const old=d0.exists&&d0.data()[FIELD]; if(old) await docRef().set({['prev_'+FIELD]:old,['prevT_'+FIELD]:Date.now()},{merge:true}); }catch(e){}   /* 蓋掉測試存檔前先在雲端留一份（救回存檔找得到） */
   try{ await docRef().set({[FIELD]:o,[TFIELD]:Date.now()},{merge:true}); }catch(e){}
   setTimeout(()=>c.apply(o),auto?900:600); }
 function dirty(){ if(!user||(TEST&&!owner)) return; clearTimeout(dirtyT); dirtyT=setTimeout(push,6000); }
