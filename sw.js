@@ -3,7 +3,7 @@
    ・模型、貼圖、音效：有快取就直接用，沒有才下載並存起來
    ・每次部署會產生 assets.json（每個檔案的指紋）；新版啟用時只刪掉「指紋變了」的檔案，其他都保留，不必整個重下
    ・任何快取動作失敗都不會影響載入（最多就是重新下載那個檔案） */
-const VER='swamp-20261028133846';
+const VER='swamp-20261028134525';
 const ASSET='swamp-assets-v2';
 self.addEventListener('install',e=>{ self.skipWaiting(); });
 self.addEventListener('activate',e=>{ e.waitUntil((async()=>{
