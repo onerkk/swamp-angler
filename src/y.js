@@ -1,6 +1,8 @@
 /* ===== 雲端存檔：Google 帳號登入（Firebase），本機進度永遠不會被洗掉 ===== */
 function createCloud(c){
 'use strict';
+// 向瀏覽器申請「持久儲存」：空間吃緊時，瀏覽器不會把這個遊戲的存檔和快取整個清掉（存檔不見的可能原因之一）
+try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persisted().then(p=>{ if(!p) navigator.storage.persist(); }); }catch(e){}
 // 測試帳號（網址帶 test 參數）：只限擁有者 Google 帳號，存檔另開一份，雲端存在同一份文件的 test 欄位，不會碰到正式存檔
 const OWNER=['onerkk@gmail.com'];
 const TEST=!!c.test, FIELD=TEST?'test':'save', TFIELD=TEST?'tt':'t';
@@ -32,7 +34,11 @@ async function onLogin(){ try{ const d=await docRef().get(); const local=c.save(
     if(!d.exists||!d.data()[FIELD]){ await push(); if(!TEST) c.toast('已把目前的進度存到雲端','good',2400); return; }
     const cloud=d.data()[FIELD]; if(JSON.stringify(cloud)===JSON.stringify(local)) return;
     const sl=score(local), sc=score(cloud);
-    if(sc>sl+1&&confirm(`雲端有進度較高的存檔（Lv ${cloud.lv||1}、金幣 ${(cloud.coins||0).toLocaleString()}）。\n要載入雲端存檔嗎？\n目前本機進度會先備份，不會消失。`)){ try{ localStorage.setItem(BK,JSON.stringify(local)); }catch(e){} c.apply(cloud); return; }
+    // 雲端進度較高：預設就是載入雲端（不再有「沒按到確認就把雲端蓋掉」的情況）；本機進度先備份
+    if(sc>sl+1){ try{ localStorage.setItem(BK,JSON.stringify(local)); }catch(e){}
+      c.toast(`已載入雲端存檔（Lv ${cloud.lv||1}），本機原本的進度已備份`,'good',3200); c.apply(cloud); return; }
+    // 要用本機蓋過雲端前，先把雲端原本那份留一份在伺服器上（prevSave），隨時可以救回
+    try{ await docRef().set({['prev_'+FIELD]:cloud,['prevT_'+FIELD]:Date.now()},{merge:true}); }catch(e){}
     await push(); }catch(e){ console.warn('cloud pull',e); c.toast('雲端存檔讀取失敗，使用本機進度','warn',2600); } }
 // 測試帳號：把正式版進度（本機或雲端，取進度較高的那份）複製過來，金幣維持 999,999
 async function copyMain(auto){ if(!TEST||!owner) return; let best=null;
@@ -66,7 +72,17 @@ if(TEST){ const go=()=>{ showGate(); if(window.FIREBASE_CFG) init().catch(()=>{}
 // 之前登入過就自動接上
 if(!TEST&&localStorage.getItem(KEY)==='1'&&window.FIREBASE_CFG) init().catch(()=>{});
 window.addEventListener('beforeunload',()=>{ if(user&&dirtyT){ clearTimeout(dirtyT); push(); } });
-return {login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
+async function rescue(){ if(!user){ c.toast('請先用 Google 登入','warn',2000); return; } try{ await init(); const d=await docRef().get(); const D=d.exists?d.data():{}; const C=[];
+    if(D[FIELD]) C.push(['雲端存檔',D[FIELD]]); if(D['prev_'+FIELD]) C.push(['雲端備份（被覆蓋前的那份）',D['prev_'+FIELD]]);
+    try{ const b=JSON.parse(localStorage.getItem(BK)||'null'); if(b) C.push(['本機備份',b]); }catch(e){}
+    if(!TEST&&D.test){ const t=JSON.parse(JSON.stringify(D.test)); if(t.testSeeded){ t.coins=Math.min(t.coins||0,(D[FIELD]&&D[FIELD].coins)||0); delete t.testSeeded; } C.push(['測試帳號裡的進度副本（金幣不沿用）',t]); }
+    if(!C.length){ c.toast('這個帳號找不到任何存檔','warn',2400); return; }
+    C.sort((a,b)=>score(b[1])-score(a[1])); const [nm,best]=C[0], cur=c.save();
+    const info=C.map(([n,s])=>`・${n}：Lv ${s.lv||1}、圖鑑 ${Object.keys(s.dex||{}).length} 種、金幣 ${(s.coins||0).toLocaleString()}`).join('\n');
+    if(score(best)<=score(cur)+1){ alert('找到的存檔：\n'+info+'\n\n目前的進度已經是最高的，不需要救回。'); return; }
+    if(confirm('找到的存檔：\n'+info+`\n\n要救回進度最高的「${nm}」嗎？目前的進度會先備份。`)){ try{ localStorage.setItem(BK,JSON.stringify(cur)); }catch(e){} c.apply(best); setTimeout(push,1500); c.toast('已救回存檔','good',2400); } }
+  catch(e){ console.warn('rescue',e); c.toast('讀取雲端失敗，請稍後再試','warn',2400); } }
+return {rescue,login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
 }
 /* ===== 安裝到桌面（PWA） ===== */
 const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;

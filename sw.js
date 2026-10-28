@@ -1,7 +1,7 @@
 /* 濕地垂釣 Service Worker：index.html 永遠先抓網路（確保更新）；模型、貼圖、音效放在「資產快取」——
    每次更新遊戲不再整批刪掉重下（原本每次部署都要重新下載 80MB 以上，載入卡住），
    而是先用快取立刻顯示，同時在背景跟伺服器比對，有換過的檔案才重新下載 */
-const VER='swamp-20261028130748';
+const VER='swamp-20261028131518';
 const ASSET='swamp-assets-v1';
 self.addEventListener('install',e=>{ self.skipWaiting(); });
 self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VER&&k!==ASSET).map(k=>caches.delete(k)))).then(()=>self.clients.claim())); });
