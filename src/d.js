@@ -228,11 +228,20 @@ MAG.innerHTML=`<svg viewBox="0 0 74 96" width="74" height="96"><defs><linearGrad
 <rect x="0" y="0" width="74" height="58" fill="url(#ms)" opacity=".55"/>
 <g id="magF"><image href="${FIMG.url}" x="${37-FIMG.w/4}" y="${58-FIMG.wl/2}" width="${FIMG.w/2}" height="${FIMG.h/2}"/></g>
 <rect x="0" y="58" width="74" height="38" fill="url(#mw)"/><ellipse id="magRip" cx="37" cy="58" rx="9" ry="1.6" fill="none" stroke="rgba(230,250,255,.75)" stroke-width="1"/><line x1="0" y1="58" x2="74" y2="58" stroke="rgba(220,245,255,.55)" stroke-width="1"/>
-<path id="magR" d="" stroke="#1f3f8a" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg><div id="magT" style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;color:#dff;text-shadow:0 1px 2px #000"></div>`;
-document.body.appendChild(MAG); const magF=MAG.querySelector('#magF'), magR=MAG.querySelector('#magR'), magT=MAG.querySelector('#magT');
+<g id="magRod" style="display:none"><path id="magR1" d="" stroke="#1a1c20" stroke-width="4.2" fill="none" stroke-linecap="round"/><path id="magR2" d="" stroke="#22252a" stroke-width="3" fill="none" stroke-linecap="round"/><path id="magR3" d="" stroke="#f4f4f0" stroke-width="2" fill="none" stroke-linecap="round"/>
+<path id="magRh" d="" stroke="rgba(255,255,255,.28)" stroke-width="1" fill="none" transform="translate(-.8 0)"/>
+<circle id="magG0" r="2.4" fill="none" stroke="#a9adb3" stroke-width=".9"/><circle id="magG1" r="2" fill="none" stroke="#a9adb3" stroke-width=".8"/><circle id="magG2" r="1.6" fill="none" stroke="#a9adb3" stroke-width=".7"/><circle id="magG3" r="1.3" fill="none" stroke="#a9adb3" stroke-width=".6"/><circle id="magTip" r="1.6" fill="#ff5a1f"/></g></svg><div id="magT" style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;color:#dff;text-shadow:0 1px 2px #000"></div>`;
+document.body.appendChild(MAG); const magF=MAG.querySelector('#magF'), magT=MAG.querySelector('#magT');
 function updMag(){ const magOn=save.mag==='on'||(save.mag!=='off'&&(D().n==='休閒'||D().n==='標準')); const on=(G.state==='wait'||G.state==='bite')&&!LURE.active?.()&&G.loc!=='ice'&&magOn; MAG.style.display=on?'block':'none'; if(!on) return;
-  if(G.bottom){ magF.style.display='none'; const b=Math.min(1.2,rod.bendT||0), x2=37+b*26, y2=18+b*60; magR.setAttribute('d',`M37 96 Q37 50 ${x2.toFixed(1)} ${y2.toFixed(1)}`); magT.textContent=G.state==='bite'?'竿尖拉彎！':G.snag?'掛底':'竿尖'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; }
-  else { magR.setAttribute('d',''); magF.style.display=''; const dip=G.state==='bite'?34:Math.max(0,(W.swell(G.to.x,G.to.z,G.t)-bob.position.y))*160; magF.setAttribute('transform',`translate(0 ${Math.min(40,dip).toFixed(1)})`); { const rp=MAG.querySelector('#magRip'); if(rp){ const k=Math.min(1,dip/14); rp.setAttribute('rx',(6+k*16+Math.sin(G.t*3)*.6).toFixed(1)); rp.setAttribute('opacity',(.35+.6*k).toFixed(2)); } } magT.textContent=G.state==='bite'?'沉下去了！':G.dip>0?'輕點（試咬）':'浮標'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; } }
+  if(G.bottom){ magF.style.display='none'; const b=Math.min(1.2,rod.bendT||0), x2=37+b*24, y2=14+b*52, cx=37, cy=46;
+    const qp=t=>{ const u=1-t; return [u*u*37+2*u*t*cx+t*t*x2, u*u*96+2*u*t*cy+t*t*y2]; };
+    let d=''; const seg=(t0,t1)=>{ const a=qp(t0), m=qp((t0+t1)/2), c=qp(t1); return `M${a[0].toFixed(1)} ${a[1].toFixed(1)} Q${(2*m[0]-(a[0]+c[0])/2).toFixed(1)} ${(2*m[1]-(a[1]+c[1])/2).toFixed(1)} ${c[0].toFixed(1)} ${c[1].toFixed(1)}`; };
+    MAG.querySelector('#magR1').setAttribute('d',seg(0,.45)); MAG.querySelector('#magR2').setAttribute('d',seg(.45,.82)); MAG.querySelector('#magR3').setAttribute('d',seg(.82,1));
+    MAG.querySelector('#magRh').setAttribute('d',seg(.05,.8));
+    [.3,.55,.74,.9].forEach((t,i)=>{ const p=qp(t), gd=MAG.querySelector('#magG'+i); gd.setAttribute('cx',(p[0]+.8).toFixed(1)); gd.setAttribute('cy',p[1].toFixed(1)); });
+    const tp=qp(1); MAG.querySelector('#magTip').setAttribute('cx',tp[0].toFixed(1)); MAG.querySelector('#magTip').setAttribute('cy',tp[1].toFixed(1));
+    MAG.querySelector('#magRod').style.display=''; magT.textContent=G.state==='bite'?'竿尖拉彎！':G.snag?'掛底':'竿尖'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; }
+  else { MAG.querySelector('#magRod').style.display='none'; magF.style.display=''; const dip=G.state==='bite'?34:Math.max(0,(W.swell(G.to.x,G.to.z,G.t)-bob.position.y))*160; magF.setAttribute('transform',`translate(0 ${Math.min(40,dip).toFixed(1)})`); { const rp=MAG.querySelector('#magRip'); if(rp){ const k=Math.min(1,dip/14); rp.setAttribute('rx',(6+k*16+Math.sin(G.t*3)*.6).toFixed(1)); rp.setAttribute('opacity',(.35+.6*k).toFixed(2)); } } magT.textContent=G.state==='bite'?'沉下去了！':G.dip>0?'輕點（試咬）':'浮標'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; } }
 function endFightUI(){ SNAG.g.visible=false; if(ui.netBtn) ui.netBtn.classList.add('hidden'); ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); ui.tBar.classList.remove('rub'); }
 function lose(reason){
   endFightUI(); WL.endChase(); SEA.endChase(); G.combo=0; FUN.combo(0); P.shadow.material.opacity=0; if(G.fish){ G.fish.group.visible=false; }
@@ -734,7 +743,8 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       else { g.position.y=G.from.y-9.8*.5*G.stT*G.stT; if(g.position.y<0&&!G.splashed){ G.splashed=true; P.splash(g.position.x,0,g.position.z,30,1); W.addRipple(g.position.x,g.position.z,.8); Snd.splash(.8); } }
       if(s>=1&&(G.postSell||g.position.y<-1)){ g.visible=false; g.scale.setScalar(1); G.splashed=false; G.state='idle'; }
     }
-    if(lineOn){ W.head.localToWorld(tv.set(0,.14*D+.03,-D+.02)); lineEnd=tv; slack=.05; }
+    // 魚線一直綁在魚嘴上：起魚飛上來的過程中，線跟著魚走，不會先跑到手邊等魚
+    if(lineOn){ g.updateMatrixWorld(true); g.localToWorld(tv.set(.5,.02,0)); lineEnd=tv; slack=st==='land'?.02:.05; }
   }
   if((G.drillK||0)>.5) lineOn=false;
   P.setLine(lineEnd||rod.tipW, slack, lineOn&&!!lineEnd, info.light, trem);

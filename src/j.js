@@ -80,13 +80,17 @@ const dropTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.heig
 function partSys(N,size,opacity,grav,drag){ const pos=new Float32Array(N*3), vel=new Float32Array(N*3), life=new Float32Array(N); const g=new T.BufferGeometry(); g.setAttribute('position',new T.BufferAttribute(pos,3));
   const m=new T.PointsMaterial({map:dropTex,size,transparent:true,opacity,depthWrite:false,color:0xf2f8ff}); const pts=new T.Points(g,m); pts.frustumCulled=false; S.add(pts); let head=0;
   for(let i=0;i<N;i++) pos[i*3+1]=-999;
-  return {emit(x,y,z,n,spd,up,spread,lf){ for(let k=0;k<n;k++){ const i=head; head=(head+1)%N; const a=Math.random()*6.283, r=Math.random()*spread;
+  return {mat:m,emit(x,y,z,n,spd,up,spread,lf){ for(let k=0;k<n;k++){ const i=head; head=(head+1)%N; const a=Math.random()*6.283, r=Math.random()*spread;
       pos[i*3]=x+Math.cos(a)*r; pos[i*3+1]=y+Math.random()*.5; pos[i*3+2]=z+Math.sin(a)*r;
       const hs=spd*(.3+Math.random()*.7); vel[i*3]=Math.cos(a)*hs; vel[i*3+1]=up*(.55+Math.random()*.6); vel[i*3+2]=Math.sin(a)*hs; life[i]=lf*(.6+Math.random()*.6); } },
     tick(dt,wind){ let any=false; for(let i=0;i<N;i++){ if(life[i]<=0) continue; any=true; life[i]-=dt; vel[i*3+1]-=grav*dt; const dk=Math.exp(-drag*dt); vel[i*3]=vel[i*3]*dk+(wind||0)*dt; vel[i*3+2]*=dk; vel[i*3+1]*=grav>3?1:dk;
         pos[i*3]+=vel[i*3]*dt; pos[i*3+1]+=vel[i*3+1]*dt; pos[i*3+2]+=vel[i*3+2]*dt; if(life[i]<=0||pos[i*3+1]<-.3) { life[i]=0; pos[i*3+1]=-999; } }
       if(any) g.attributes.position.needsUpdate=true; pts.visible=any; } }; }
-const SPRAY=partSys(1600,1.15,.92,9.8,.15), MIST=partSys(700,6.5,.28,.6,.6);
+// 霧氣貼圖：不規則的雲絮（多個小團疊成），不是一顆顆圓球
+const mistTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=64; const g=cv.getContext('2d');
+  for(let i=0;i<14;i++){ const x=16+Math.random()*32, y=16+Math.random()*32, r=6+Math.random()*12, rg=g.createRadialGradient(x,y,0,x,y,r); rg.addColorStop(0,'rgba(255,255,255,.28)'); rg.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=rg; g.fillRect(0,0,64,64); }
+  return new T.CanvasTexture(cv); })();
+const SPRAY=partSys(2400,.5,.95,9.8,.12), MIST=partSys(900,2.6,.16,1.2,.9); MIST.mat.map=mistTex; MIST.mat.needsUpdate=true;
 const foamTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=256; const g=cv.getContext('2d');
   for(let i=0;i<900;i++){ const a=Math.random()*6.283, r=70+Math.random()*55*Math.random()+Math.random()*40, x=128+Math.cos(a)*r*.95, y=128+Math.sin(a)*r*.95, s2=1+Math.random()*4; g.fillStyle=`rgba(255,255,255,${.15+Math.random()*.5})`; g.beginPath(); g.arc(x,y,s2,0,7); g.fill(); }
   const rg=g.createRadialGradient(128,128,10,128,128,128); rg.addColorStop(0,'rgba(255,255,255,.35)'); rg.addColorStop(.6,'rgba(255,255,255,.12)'); rg.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=rg; g.fillRect(0,0,256,256); return new T.CanvasTexture(cv); })();
@@ -94,10 +98,10 @@ const foams=[]; for(let i=0;i<4;i++){ const m=new T.Mesh(new T.PlaneGeometry(1,1
 function foam(x,z,r0,r1,dur){ const f=foams.find(q=>q.t>=q.dur)||foams[0]; Object.assign(f,{t:0,dur,r0,r1}); f.m.position.set(x,.06,z); f.m.rotation.y=Math.random()*6.28; f.m.visible=true; }
 function updFoam(dt){ for(const f of foams){ if(f.t>=f.dur){ f.m.visible=false; continue; } f.t+=dt; const k=f.t/f.dur, r=f.r0+(f.r1-f.r0)*(1-Math.pow(1-k,2)); f.m.scale.set(r*2,1,r*2); f.m.material.opacity=.9*(1-k); } }
 // 噴氣：一道往上衝、被風吹斜、慢慢散開的白霧柱
-function blow(x,z){ MIST.emit(x,1,z,90,1.2,11,.6,3.2); SPRAY.emit(x,1,z,60,1.5,10,.4,1.6); c.Snd.splash&&c.Snd.splash(.5); }
+function blow(x,z){ for(let k=0;k<6;k++) setTimeout(()=>{ SPRAY.emit(x,.8,z,110,.55,13,.25,1.9); MIST.emit(x,1.5+k*.6,z,26,.6,6.5,.35,3.6); },k*70); c.Snd.splash&&c.Snd.splash(.5); }
 // 巨大落水：放射狀水牆、四散水滴、白霧、泡沫圈、海面漣漪、船身震動
 function crash(x,z,big){ SPRAY.emit(x,.5,z,big?520:260,big?9:6,big?13:9,big?4:2.5,2.4); SPRAY.emit(x,.5,z,big?200:90,3,big?20:13,1.5,2.8);
-  MIST.emit(x,.8,z,big?220:110,4,big?5:3,big?5:3,4.5); foam(x,z,big?3:2,big?22:12,big?9:6); foam(x,z,1,big?12:7,big?6:4);
+  MIST.emit(x,.8,z,big?160:80,3.2,big?3.2:2,big?4:2.5,3.6); foam(x,z,big?3:2,big?22:12,big?9:6); foam(x,z,1,big?12:7,big?6:4);
   for(let i=0;i<3;i++) setTimeout(()=>W.addRipple(x,z,big?2.5:1.5),i*250);
   if(c.Snd.splash){ c.Snd.splash(big?2.6:1.6); if(big) setTimeout(()=>c.Snd.splash(1.8),180); }
   const d=Math.hypot(x-cw.x,z-cw.z); if(big&&d<80){ G.gShake=Math.max(G.gShake||0,1.6*(1-d/90)); if(navigator.vibrate) try{ navigator.vibrate([90,40,140]); }catch(e){} } }
