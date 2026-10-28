@@ -33,6 +33,7 @@ const fill=new T.PointLight(0xfff2e0,0,2.2,1.6); W.camera.add(fill); fill.positi
 const tg=new T.Vector3(), sh=new T.Vector3(), wd=new T.Vector3(), q=new T.Quaternion(), q2=new T.Quaternion(), cq=new T.Quaternion(),
   upW=new T.Vector3(), upM=new T.Vector3(), sd=new T.Vector3(), tmp=new T.Vector3(), off=new T.Vector3(), pg=new T.Vector3();
 let back=0, fwd=0, lastSt='', reelK=0;
+let pullK=0, lungeK=0;
 function update(show,st,power,dt,pad){
   if(!ready) return; dt=dt||.016; fill.intensity=show?(W.info?W.info.light:1)*(window.__G&&window.__G.loc==='sea'?3.2:1.6):0;
   /* 揮臂：蓄力時往後上方拉，放開瞬間往前揮，再回原位 */
@@ -41,11 +42,15 @@ function update(show,st,power,dt,pad){
   const swing=fwd>0?Math.sin((1-fwd)*Math.PI):0;
   const reeling=st==='fight'||st==='retrieve'; reelK+=((reeling?1:0)-reelK)*Math.min(1,dt*6);
   W.camera.getWorldQuaternion(cq);
+  // 搏魚用力：按住收線撐魚時雙臂往後上方拉；魚衝刺時被往前拖；張力很大時手在發抖、握得更緊
+  const GG=window.__G, ff=GG&&GG.state==='fight'?GG.f:null, T=ff?ff.T||0:0;
+  pullK+=(((ff&&GG.held)?T:0)-pullK)*Math.min(1,dt*5); lungeK+=(((ff&&ff.run)?.5+.5*T:0)-lungeK)*Math.min(1,dt*4);
+  const shake=T>.78?(T-.78)*.05:0;
   for(const a of arms){ a.grp.visible=show; if(!show) continue;
     if(a.side==='L'){ reel.getWorldPosition(tg); tmp.subVectors(rod.tipW,tg).normalize(); tg.addScaledVector(tmp,.2); }   // 沿竿身往竿尖 20cm，一定在竿上
     else crank.localToWorld(tg.copy(KNOB));
     const pk=pad&&pad.k>.001?pad.k:0; if(pk){ pad.grip(a.side,pg); tg.lerp(pg,pk); }   // 划船：握點移到槳桿
-    off.copy(a.side==='R'?SH_R:SH_L); off.y+=.24*back-.08*swing; off.z+=.32*back-.3*swing; off.x+=(a.side==='R'?.06:-.04)*back;
+    off.copy(a.side==='R'?SH_R:SH_L); off.y+=.24*back-.08*swing+.06*pullK-.03*lungeK+(Math.random()-.5)*shake; off.z+=.32*back-.3*swing+.13*pullK-.12*lungeK+(Math.random()-.5)*shake; off.x+=(a.side==='R'?.06:-.04)*back;
     W.camera.localToWorld(sh.copy(off));
     wd.subVectors(tg,sh).normalize();
     q.setFromUnitVectors(a.ld,wd);
@@ -59,7 +64,7 @@ function update(show,st,power,dt,pad){
     // 用掌心對準握點，竿子穿過掌心與手指之間
     upM.set(0,1,0).applyQuaternion(q);
     a.grp.position.copy(tg).sub(tmp.copy(a.pl).multiplyScalar(s).applyQuaternion(q)).addScaledVector(upM,.018);
-    const tight=a.grip+(reeling?.1:0)+(st==='charge'?.05:0);
+    const tight=a.grip+(reeling?.1:0)+(st==='charge'?.05:0)+.12*T;
     for(const f of a.fing) f.b.rotation.x=f.x0-tight*f.k; } }
 return {update};
 }
