@@ -11,9 +11,9 @@ const SETS={
 let SET='lake', META=SETS.lake.meta, started=false, envKey=null;
 const YAW=.25; U.uYaw.value=YAW;
 let total=0, errors=0;
-const mgr=new T.LoadingManager(); mgr.setURLModifier(u=>window.__CDN?window.__CDN.url(u):u);
+const mgr=new T.LoadingManager();
 mgr.onProgress=(u,l,t)=>{ window.__LASTURL=(u||'').split('/').pop(); window.__LOADN=l+'/'+t; total=t; if(cb) cb(l/t,false,errors); };
-mgr.onError=(u)=>{ if(window.__CDN) window.__CDN.fail(u); errors++; if(cb) cb(0,false,errors); };
+mgr.onError=(u)=>{ errors++; if(cb) cb(0,false,errors); };
 const tl=new T.TextureLoader(mgr);
 const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter=T.LinearFilter; t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; return t; };
 const tex={}, env={}, masks={};

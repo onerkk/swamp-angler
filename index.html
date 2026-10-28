@@ -289,7 +289,7 @@ body.fighting #top,body.fighting #top2,body.fighting #magWin,body.fighting .hotC
 <script>
 /* 模型、貼圖、音效改從全球 CDN（jsDelivr，直接鏡像這個 GitHub 倉庫）下載：有些電信網路連 GitHub 只有每秒幾十 KB，85MB 要等半小時以上。
    下載失敗時自動改回 GitHub 本站，並記住，下次直接用本站 */
-window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:localStorage.getItem('swampAngler.cdn')==='on',
+window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:localStorage.getItem('swampAngler.cdn')!=='off',
   url(u){ try{ if(!this.on||!u||/^(https?:|data:|blob:)/.test(u)||!/\.(glb|jpg|jpeg|png|webp|hdr|mp3)(\?|$)/i.test(u)) return u; return this.base+u.replace(/^\.?\//,''); }catch(e){ return u; } },
   fail(u){ if(this.on&&u&&u.indexOf(this.base)===0){ this.on=false; try{ localStorage.setItem('swampAngler.cdn','off'); }catch(e){} console.warn('CDN 下載失敗，改用本站',u); } }};
 </script>
@@ -2826,9 +2826,9 @@ const SETS={
 let SET='lake', META=SETS.lake.meta, started=false, envKey=null;
 const YAW=.25; U.uYaw.value=YAW;
 let total=0, errors=0;
-const mgr=new T.LoadingManager(); mgr.setURLModifier(u=>window.__CDN?window.__CDN.url(u):u);
+const mgr=new T.LoadingManager();
 mgr.onProgress=(u,l,t)=>{ window.__LASTURL=(u||'').split('/').pop(); window.__LOADN=l+'/'+t; total=t; if(cb) cb(l/t,false,errors); };
-mgr.onError=(u)=>{ if(window.__CDN) window.__CDN.fail(u); errors++; if(cb) cb(0,false,errors); };
+mgr.onError=(u)=>{ errors++; if(cb) cb(0,false,errors); };
 const tl=new T.TextureLoader(mgr);
 const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter=T.LinearFilter; t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; return t; };
 const tex={}, env={}, masks={};
@@ -3726,7 +3726,7 @@ const T=THREE, loader=new T.GLTFLoader(), files={}, waiters={}, mixers=[];
 const ang=a=>({'+x':0,'-z':Math.PI/2,'-x':Math.PI,'+z':-Math.PI/2})[a];
 function load(f){ if(files[f]) return; const e=files[f]={g:null};
   const ok=g=>{ e.g=g; (waiters[f]||[]).forEach(fn=>{ try{ fn(g); }catch(err){ console.warn('real',f,err); } }); waiters[f]=[]; };
-  loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{ if(window.__CDN&&window.__CDN.on){ window.__CDN.fail(window.__CDN.base+REAL_DIR+f+'.glb'); loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{ e.err=1; }); } else e.err=1; }); }
+  loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{ e.err=1; }); }
 const ready=f=>files[f]&&files[f].g;
 function onReady(f,fn){ if(ready(f)) fn(files[f].g); else (waiters[f]=waiters[f]||[]).push(fn); }
 function preload(set){ (RSETS[set]||[]).forEach(load); }
@@ -5816,7 +5816,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028142148'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028143742'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -7411,7 +7411,11 @@ requestAnimationFrame(frame);
 
 (function boot(){
   if(!window.THREE){ boot.n=(boot.n||0)+1; { const t=document.getElementById('loadTip'); if(t&&boot.n%20===0) t.textContent='正在下載 3D 引擎…（'+Math.round(boot.n/20)+' 秒）'; } if(boot.n>2400){ showErr('3D 引擎載入失敗。請確認網路連線後重新整理頁面。'); return; } setTimeout(boot,50); return; }
-  try{ THREE.DefaultLoadingManager.setURLModifier(u=>window.__CDN.url(u)); THREE.DefaultLoadingManager.onError=u=>window.__CDN.fail(u);
+  // 模型、貼圖、音效從 jsDelivr 下載（實測比 GitHub 快約 8 倍）；某個檔案從 CDN 下載失敗，就只對那個檔案改從本站重抓，不影響其他檔案
+  try{ const C=window.__CDN, wrap=(proto)=>{ const orig=proto.load; proto.load=function(url,onLoad,onProg,onErr){ const cu=C.url(url); if(cu===url) return orig.call(this,url,onLoad,onProg,onErr);
+      const self=this; return orig.call(this,cu,onLoad,onProg,e=>{ console.warn('CDN 失敗，改從本站下載',url); orig.call(self,url,onLoad,onProg,onErr); }); }; };
+    wrap(THREE.FileLoader.prototype); wrap(THREE.ImageLoader.prototype); if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); }catch(e){ console.warn('cdn',e); }
+  try{
     const W=createWorld({canvas:document.getElementById('c')}); window.__DIAG=createDiag(W,{get G(){ return window.__G||{}; },get save(){ return (window.__G&&window.__G.saveRef)||{}; }}); const P=createProps(W);
     // 主畫面的載入提示：進度條、第一次進入的說明、網路慢時的提醒（避免玩家以為當機）
     const ln=document.getElementById('loadNote'), lbox=document.getElementById('loadBox'), lbar=document.querySelector('#loadBar i'), ltip=document.getElementById('loadTip'), sb=document.getElementById('startBtn');

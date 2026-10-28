@@ -28,7 +28,7 @@ const T=THREE, loader=new T.GLTFLoader(), files={}, waiters={}, mixers=[];
 const ang=a=>({'+x':0,'-z':Math.PI/2,'-x':Math.PI,'+z':-Math.PI/2})[a];
 function load(f){ if(files[f]) return; const e=files[f]={g:null};
   const ok=g=>{ e.g=g; (waiters[f]||[]).forEach(fn=>{ try{ fn(g); }catch(err){ console.warn('real',f,err); } }); waiters[f]=[]; };
-  loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{ if(window.__CDN&&window.__CDN.on){ window.__CDN.fail(window.__CDN.base+REAL_DIR+f+'.glb'); loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{ e.err=1; }); } else e.err=1; }); }
+  loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{ e.err=1; }); }
 const ready=f=>files[f]&&files[f].g;
 function onReady(f,fn){ if(ready(f)) fn(files[f].g); else (waiters[f]=waiters[f]||[]).push(fn); }
 function preload(set){ (RSETS[set]||[]).forEach(load); }
