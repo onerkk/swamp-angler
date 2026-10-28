@@ -69,9 +69,12 @@ function update(dt,held){ if(!cur) return null; const cf=cur.cf;
   let ev=null;
   if(!cur.chase){ cur.delay-=dt; if(cur.delay<=0){ cur.chase={d:3.2}; const f=c.onChase?c.onChase():null; if(f){ chaser=f; f.group.visible=true; if(!f.group.parent) S.add(f.group); f.group.scale.setScalar(f.L); } } }
   else { const inBand=cur.speed>=cf.band[0]&&cur.speed<=cf.band[1];
-    let di=0; if(inBand) di+=.3*dt; else if(cur.speed>cf.band[1]) di-=.35*dt;
-    if(cur.pause>0){ if(cf.pause&&cur.pause<1.2) di+=cf.pause*dt; else if(cur.pause>1.6) di-=.22*dt; }
-    if(cur.twitched){ di+=cf.twitch; cur.twitched=false; }
+    // 魚況：清晨黃昏、陰天魚活躍——穩定收線最有效；正午、夜裡、冷天魚遲鈍——要多停頓、抽竿逗牠
+    const md=c.mood?c.mood():1, act=md>1.1, slow=md<.9;
+    let di=0; if(inBand) di+=(act?.42:slow?.16:.3)*dt; else if(cur.speed>cf.band[1]) di-=(slow?.55:.35)*dt;
+    if(cur.pause>0){ if(cf.pause&&cur.pause<1.2) di+=cf.pause*(slow?1.8:act?.6:1)*dt; else if(cur.pause>(slow?2.4:1.6)) di-=.22*dt; else if(!cf.pause&&slow&&cur.pause<1) di+=.12*dt; }
+    if(cur.twitched){ di+=cf.twitch*(slow?1.6:act?.8:1); cur.twitched=false; }
+    if(!cur.moodShown){ cur.moodShown=true; c.toast(act?'🐟 魚況活躍：穩定收線最有效':slow?'🐟 魚況遲鈍：多停頓、抽竿逗牠':'🐟 魚況普通：收線中偶爾停頓','',2200); }
     cur.interest=Math.max(0,Math.min(1.1,cur.interest+di));
     cur.chase.d+=((3.2-2.8*cur.interest)-cur.chase.d)*Math.min(1,dt*2);
     tmp.copy(pos).addScaledVector(dir,-cur.chase.d); P.shadow.position.set(tmp.x,.02,tmp.z); P.shadow.material.opacity=.15+.35*cur.interest;
