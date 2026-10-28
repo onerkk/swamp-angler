@@ -45,3 +45,11 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 ## 組裝（新）
 - 一律用 `bash src/build.sh`：組 index.html，並把同一個版本號蓋進網頁（APP_VER）、version.json、sw.js 快取版本
 - 玩家端：網頁定時比對 version.json，有新版跳出「有新版本・立即更新」，按下清快取重載
+
+## 部署到 CDN（2026-10-28 起）
+主程式（app_scan.js、app_main.js）由 jsDelivr 送出。每次部署請照這個順序：
+1. `bash src/build.sh` → commit → push（這次提交包含新的 app_*.js）
+2. 把 index.html 裡載入器的 `CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/'` 換成 `@<剛剛那次提交的 SHA>/`，再 commit → push
+   （固定到提交 SHA，jsDelivr 一定拿到新版；用 @main 會有分支快取延遲，載入器會退回本站、變慢）
+3. 換過模型／貼圖時，對換過的檔案呼叫 `https://purge.jsdelivr.net/gh/onerkk/swamp-angler@main/<檔案路徑>`
+4. 上線前一定要跑完整啟動測試（載入到「✅ 真實場景已載入」且 G.state 為 idle、沒有錯誤）
