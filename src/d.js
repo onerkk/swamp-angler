@@ -178,13 +178,26 @@ function landBobber(){
    試咬時會衝向餌又退開、咬住時直接吞下；揚竿錯過或受驚時游走 ===== */
 const AMB={list:[],app:null};
 function ambMake(sp,L){ let f=null; try{ if(window.__MDL&&window.__MDL.fishReady(sp.id)) f=window.__MDL.fish(sp); }catch(e){} if(!f) return null;
-  f.group.scale.setScalar(L); seeThrough(f.group); W.scene.add(f.group); return {f,sp,L,pos:new THREE.Vector3(),h:Math.random()*6.28,sp0:rand(.25,.55),dep:rand(.45,1.1),wt:0,flee:0}; }
+  f.group.scale.setScalar(L); seeThrough(f.group); W.scene.add(f.group);
+  // 每尾魚自己對這次的餌有多少興趣：魚餌偏好 × 水層對不對
+  const bt=G.baitUsed||BAITS[0], aff=bt.aff&&bt.aff[sp.id]!=null?bt.aff[sp.id]:1, lay=layerK(sp), want=Math.min(2,aff)*lay;
+  return {f,sp,L,pos:new THREE.Vector3(),h:Math.random()*6.28,sp0:rand(.25,.55),dep:rand(.45,1.1),wt:0,flee:0,want,aff,lay,insp:0}; }
 function ambStart(){ ambClear(); if(G.loc==='ice'||(G.baitUsed&&G.baitUsed.lure)) return; const n=Math.floor(rand(2,4.99)), seen={};
   for(let i=0;i<n;i++){ const sp=pickSpecies(); if(!sp||sp.special||seen[sp.id]) continue; seen[sp.id]=1; const L=lerp(sp.len[0],sp.len[1],Math.random()*.7)/100, a=ambMake(sp,L); if(!a) continue;
     const ang=rand(0,6.28), r=rand(2.2,6); a.pos.set(G.to.x+Math.cos(ang)*r,-a.dep,G.to.z+Math.sin(ang)*r); AMB.list.push(a); } }
-function ambClear(){ AMB.list.forEach(a=>{ a.f.group.visible=false; if(a.f.group.parent) a.f.group.parent.remove(a.f.group); }); AMB.list=[]; AMB.app=null; }
+function ambClear(){ AMB.told=false; AMB.inspT=null; AMB.list.forEach(a=>{ a.f.group.visible=false; if(a.f.group.parent) a.f.group.parent.remove(a.f.group); }); AMB.list=[]; AMB.app=null; }
 function ambScare(x,z){ AMB.list.forEach(a=>{ a.flee=3; a.h=Math.atan2(a.pos.z-z,a.pos.x-x); }); }
 function ambUpdate(dt){ if(!AMB.list.length) return; if(G.state!=='wait'&&G.state!=='bite'){ ambClear(); return; }
+  // 巡游的魚會輪流過來看餌：有興趣的在旁邊多待（咬口來得快一點）；沒興趣的看一眼就走，並告訴玩家可能的原因（每次拋竿最多提示一次）
+  AMB.inspT=(AMB.inspT==null?rand(4,7):AMB.inspT)-dt;
+  if(AMB.inspT<=0&&G.state==='wait'){ AMB.inspT=rand(6,10); const c=AMB.list.filter(a=>a!==AMB.app&&!a.flee&&!a.insp); if(c.length){ const a=c[Math.floor(Math.random()*c.length)]; a.insp=5; } }
+  AMB.list.forEach(a=>{ if(!(a.insp>0)) return; a.insp-=dt; const dx=G.to.x-a.pos.x, dz=G.to.z-a.pos.z, d=Math.hypot(dx,dz);
+    if(a.insp>2.2){ a.ht=Math.atan2(dz,dx); a.wt=1; }
+    else if(!a.judged){ a.judged=true;
+      if(a.want>=1.1){ a.insp=0; if(G.state==='wait'&&G.timer>2) G.timer=Math.max(1.5,G.timer-2); }   // 有興趣：留在附近，咬口提早
+      else { a.ht=a.h+Math.PI; a.wt=3; a.sp0=.9;
+        if(!AMB.told){ AMB.told=true; const why=a.lay<.9?`牠常在「${window.__LAYER_N[layerOf(a.sp)]}」，試試調整釣棚`:a.aff<.8?'牠對這個餌興趣不大，換個餌試試':'牠今天有點警戒';
+          toast(`🐟 一尾${a.sp.name}靠近看了看又走了——${why}`,'',3200); } } } });
   // 決定要來咬的那一尾：同魚種就用水裡那條，不然從遠處游一條進來
   if(G.fd&&!G.fd.item&&!AMB.app&&G.nib===0&&G.timer<3.5){ let a=AMB.list.find(q=>q.sp.id===G.fd.sp.id&&!q.flee);
     if(!a){ a=ambMake(G.fd.sp,G.fd.L); if(a){ const ang=rand(0,6.28); a.pos.set(G.to.x+Math.cos(ang)*7,-.9,G.to.z+Math.sin(ang)*7); AMB.list.push(a); } }
