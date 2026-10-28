@@ -402,7 +402,8 @@ void main(){
       bed *= lk*(0.6 + 0.75*cs*uLightK*(0.35 + 0.65*uSunVis)*(1.0 - 0.6*reefK)*(1.0 - smoothstep(6.0, 40.0, dist)));
       vec3 Tr = exp(-vec3(0.38, 0.075, 0.055)*(Lp + Dd));
       vec3 shal = bed*Tr + vec3(0.02, 0.30, 0.36)*lk*(1.0 - Tr);
-      shal = mix(shal, vec3(dot(shal, vec3(0.3, 0.55, 0.15)))*vec3(0.85, 1.0, 1.0), 0.45*(1.0 - uSunVis));   // 陰天：淺水的藍綠色變得灰而柔和
+      shal = mix(shal, vec3(dot(shal, vec3(0.3, 0.55, 0.15)))*vec3(0.85, 1.0, 1.0), 0.45*(1.0 - uSunVis) + 0.3*uRain);
+      shal *= 1.0 - 0.45*uRain;   // 下雨：雲厚光弱、水面被雨打花，淺海明顯暗下來   // 陰天：淺水的藍綠色變得灰而柔和
       bodyD = mix(deepC, shal, uReef*(1.0 - smoothstep(20.0, 160.0, dist)));
     }
     #ifdef SEAGRID

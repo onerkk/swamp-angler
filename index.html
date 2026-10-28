@@ -782,7 +782,8 @@ void main(){
       bed *= lk*(0.6 + 0.75*cs*uLightK*(0.35 + 0.65*uSunVis)*(1.0 - 0.6*reefK)*(1.0 - smoothstep(6.0, 40.0, dist)));
       vec3 Tr = exp(-vec3(0.38, 0.075, 0.055)*(Lp + Dd));
       vec3 shal = bed*Tr + vec3(0.02, 0.30, 0.36)*lk*(1.0 - Tr);
-      shal = mix(shal, vec3(dot(shal, vec3(0.3, 0.55, 0.15)))*vec3(0.85, 1.0, 1.0), 0.45*(1.0 - uSunVis));   // 陰天：淺水的藍綠色變得灰而柔和
+      shal = mix(shal, vec3(dot(shal, vec3(0.3, 0.55, 0.15)))*vec3(0.85, 1.0, 1.0), 0.45*(1.0 - uSunVis) + 0.3*uRain);
+      shal *= 1.0 - 0.45*uRain;   // 下雨：雲厚光弱、水面被雨打花，淺海明顯暗下來   // 陰天：淺水的藍綠色變得灰而柔和
       bodyD = mix(deepC, shal, uReef*(1.0 - smoothstep(20.0, 160.0, dist)));
     }
     #ifdef SEAGRID
@@ -3788,14 +3789,19 @@ function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene
     const teak=new T.MeshStandardMaterial({map:tx('dock_diff.jpg',3,true),normalMap:tx('dock_nor.jpg',3),roughnessMap:tx('dock_rough.jpg',3),color:0xc9a27a,roughness:.85});
     const gel=new T.MeshPhysicalMaterial({color:0xf2f4f5,roughness:.22,metalness:0,clearcoat:1,clearcoatRoughness:.06});
     const steel=new T.MeshStandardMaterial({color:0xd9dde1,metalness:1,roughness:.18});
+    const navy=new T.MeshPhysicalMaterial({color:0x1b2a44,roughness:.25,metalness:0,clearcoat:1,clearcoatRoughness:.08});
+    const vinylTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d'); x.fillStyle='#e9e6df'; x.fillRect(0,0,64,64); for(let i=0;i<900;i++){ x.fillStyle=Math.random()<.5?'rgba(0,0,0,.05)':'rgba(255,255,255,.07)'; x.fillRect(Math.random()*64,Math.random()*64,1,1); } const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(6,6); return t; })();
+    const vinyl=new T.MeshStandardMaterial({color:0xffffff,map:vinylTex,bumpMap:vinylTex,bumpScale:.003,roughness:.62});
     const cvs=document.createElement('canvas'); cvs.width=cvs.height=8; const g2=cvs.getContext('2d');
     const avg=t=>{ try{ g2.clearRect(0,0,8,8); g2.drawImage(t.image,0,0,8,8); const d=g2.getImageData(0,0,8,8).data; let r=0,g=0,b=0; for(let i=0;i<d.length;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; } const n=d.length/4; return [r/n,g/n,b/n]; }catch(e){ return null; } };
     const memo=new Map();
     obj.traverse(m=>{ if(!m.isMesh||!m.material) return; const mm=m.material; if(memo.has(mm)){ m.material=memo.get(mm); return; } let out=mm;
-      if(mm.metalness>.6&&!mm.map) out=steel;
+      if(mm.metalness>.6&&!mm.map) out=(mm.color&&(mm.color.r+mm.color.g+mm.color.b)<.5)?navy:steel;   // 很暗的金屬色其實是深藍船身漆，不是不鏽鋼
       else if(mm.map&&mm.map.image){ const c=avg(mm.map); if(c){ const [r,g,b]=c, mx=Math.max(r,g,b), mn=Math.min(r,g,b);
-          if(r>g&&g>b&&r-b>30&&mx<210) out=teak; else if(mn>175&&mx-mn<30) out=gel; } }
-      memo.set(mm,out); m.material=out; }); }catch(e){ console.warn('yacht mats',e); }
+          if(r>g&&g>b&&r-b>30&&mx<210) out=teak; else if(mn>175&&mx-mn<30) out=gel;
+          else if(b>r+15&&mx<140) out=navy;   // 深藍船身：換成深藍亮面漆（清漆反光）
+          else if(mx-mn<22&&mx>95&&mx<=175) out=vinyl; } }   // 灰白座墊、帆布：換成船用防水皮革（細紋、半霧面）
+      memo.set(mm,out); m.material=out; if(window.__YDBG) console.log('YM',mm.name,out===teak?'teak':out===gel?'gel':out===navy?'navy':out===vinyl?'vinyl':out===steel?'steel':'keep',mm.map&&mm.map.image?avg(mm.map).map(v=>v|0).join(','):'-',(mm.color&&mm.color.getHexString())); }); }catch(e){ console.warn('yacht mats',e); }
   host.children.slice().forEach(ch=>{ ch.visible=false; }); host.add(wrap);
   const b3=new T.Box3().setFromObject(wrap); setHull(Math.max(Math.abs(b3.min.x),b3.max.x),b3.min.z,b3.max.z);
   spots.forEach(s=>{ if(s.yacht) s.eye=deck+1.62; }); }); }
@@ -5726,7 +5732,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028074159'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028075337'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
