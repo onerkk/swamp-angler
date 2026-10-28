@@ -165,15 +165,24 @@ function setLine(end, slack, visible, light, trem){
   const k=clamp(light,.12,1); lineMat.color.setRGB(.87*k,.9*k,.91*k);
 }
 
-/* ---------- 浮標 ---------- */
+/* ---------- 浮標：照真實的磯釣棒浮標做——輕木紡錘形浮身、上段螢光漆、下段深色、細長的天線（彩色刻度）、
+   頂端夜光珠、底部金屬轉環；亮光漆有清漆反光。原點在水線：水面上只露出天線和浮身最上面一小截 ---------- */
 const bobber=new T.Group(); scene.add(bobber);
-const bTopMat=new T.MeshStandardMaterial({color:0xd8301a, roughness:.32});
-const bBotMat=new T.MeshStandardMaterial({color:0xf2efe8, roughness:.4});
-const tipMat=new T.MeshStandardMaterial({color:0xff6a20, emissive:0xff5010, emissiveIntensity:0});
-{ const a=new T.Mesh(new T.SphereGeometry(.045,20,10,0,Math.PI*2,0,Math.PI/2),bTopMat); a.scale.set(1,1.7,1); bobber.add(a);
-  const b=new T.Mesh(new T.SphereGeometry(.045,20,10,0,Math.PI*2,Math.PI/2,Math.PI/2),bBotMat); b.scale.set(1,1.3,1); bobber.add(b);
-  const st=new T.Mesh(new T.CylinderGeometry(.005,.006,.14,6),bTopMat); st.position.y=.13; bobber.add(st);
-  const tp=new T.Mesh(new T.SphereGeometry(.01,10,8),tipMat); tp.position.y=.205; bobber.add(tp); }
+const FLOAT_PROFILE=[[0,-.095],[.0035,-.095],[.004,-.08],[.009,-.06],[.019,-.035],[.026,-.01],[.028,.006],[.025,.022],[.017,.038],[.009,.05],[.0045,.058],[.0042,.062]];
+const floatTex=(()=>{ const cv=document.createElement('canvas'); cv.width=8; cv.height=256; const g=cv.getContext('2d');
+  // 由下到上：深墨綠浮腳、金色細線、黑色底漆、水線上方螢光橘
+  const bands=[[0,.18,'#1d2a22'],[.18,.2,'#c9a24a'],[.2,.58,'#141414'],[.58,.6,'#e8d27a'],[.6,1,'#ff4a12']];
+  bands.forEach(([a,b,c])=>{ g.fillStyle=c; g.fillRect(0,(1-b)*256,8,(b-a)*256); }); const t=new T.CanvasTexture(cv); t.encoding=T.sRGBEncoding; return t; })();
+const bTopMat=new T.MeshPhysicalMaterial({map:floatTex,roughness:.32,clearcoat:1,clearcoatRoughness:.08});
+const bBotMat=bTopMat;
+const tipMat=new T.MeshStandardMaterial({color:0xfff080, emissive:0xffb020, emissiveIntensity:0, roughness:.25});
+{ const body=new T.Mesh(new T.LatheGeometry(FLOAT_PROFILE.map(([r,y])=>new T.Vector2(r,y)),28),bTopMat); bobber.add(body);
+  // 天線：一節一節的彩色刻度（橘、黃綠、橘、白），浮標在水面上下時看得出吃水
+  const segs=[['#ff3b10',.03],['#d8ff2a',.025],['#ff3b10',.025],['#f4f4f0',.02],['#ff3b10',.025]]; let y=.06;
+  segs.forEach(([c,h])=>{ const m=new T.Mesh(new T.CylinderGeometry(.0034,.0036,h,12),new T.MeshPhysicalMaterial({color:new T.Color(c),roughness:.3,clearcoat:1,clearcoatRoughness:.1})); m.position.y=y+h/2; bobber.add(m); y+=h; });
+  const tp=new T.Mesh(new T.SphereGeometry(.0055,14,10),tipMat); tp.position.y=y+.003; bobber.add(tp);
+  const ring=new T.Mesh(new T.TorusGeometry(.0045,.0012,8,16),new T.MeshStandardMaterial({color:0xb8b8b8,metalness:.9,roughness:.25})); ring.position.y=-.1; ring.rotation.y=Math.PI/2; bobber.add(ring); }
+window.__FLOAT_PROFILE=FLOAT_PROFILE;
 bobber.scale.setScalar(2.0);
 
 /* ---------- 水花粒子 ---------- */

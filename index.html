@@ -1153,15 +1153,24 @@ function setLine(end, slack, visible, light, trem){
   const k=clamp(light,.12,1); lineMat.color.setRGB(.87*k,.9*k,.91*k);
 }
 
-/* ---------- 浮標 ---------- */
+/* ---------- 浮標：照真實的磯釣棒浮標做——輕木紡錘形浮身、上段螢光漆、下段深色、細長的天線（彩色刻度）、
+   頂端夜光珠、底部金屬轉環；亮光漆有清漆反光。原點在水線：水面上只露出天線和浮身最上面一小截 ---------- */
 const bobber=new T.Group(); scene.add(bobber);
-const bTopMat=new T.MeshStandardMaterial({color:0xd8301a, roughness:.32});
-const bBotMat=new T.MeshStandardMaterial({color:0xf2efe8, roughness:.4});
-const tipMat=new T.MeshStandardMaterial({color:0xff6a20, emissive:0xff5010, emissiveIntensity:0});
-{ const a=new T.Mesh(new T.SphereGeometry(.045,20,10,0,Math.PI*2,0,Math.PI/2),bTopMat); a.scale.set(1,1.7,1); bobber.add(a);
-  const b=new T.Mesh(new T.SphereGeometry(.045,20,10,0,Math.PI*2,Math.PI/2,Math.PI/2),bBotMat); b.scale.set(1,1.3,1); bobber.add(b);
-  const st=new T.Mesh(new T.CylinderGeometry(.005,.006,.14,6),bTopMat); st.position.y=.13; bobber.add(st);
-  const tp=new T.Mesh(new T.SphereGeometry(.01,10,8),tipMat); tp.position.y=.205; bobber.add(tp); }
+const FLOAT_PROFILE=[[0,-.095],[.0035,-.095],[.004,-.08],[.009,-.06],[.019,-.035],[.026,-.01],[.028,.006],[.025,.022],[.017,.038],[.009,.05],[.0045,.058],[.0042,.062]];
+const floatTex=(()=>{ const cv=document.createElement('canvas'); cv.width=8; cv.height=256; const g=cv.getContext('2d');
+  // 由下到上：深墨綠浮腳、金色細線、黑色底漆、水線上方螢光橘
+  const bands=[[0,.18,'#1d2a22'],[.18,.2,'#c9a24a'],[.2,.58,'#141414'],[.58,.6,'#e8d27a'],[.6,1,'#ff4a12']];
+  bands.forEach(([a,b,c])=>{ g.fillStyle=c; g.fillRect(0,(1-b)*256,8,(b-a)*256); }); const t=new T.CanvasTexture(cv); t.encoding=T.sRGBEncoding; return t; })();
+const bTopMat=new T.MeshPhysicalMaterial({map:floatTex,roughness:.32,clearcoat:1,clearcoatRoughness:.08});
+const bBotMat=bTopMat;
+const tipMat=new T.MeshStandardMaterial({color:0xfff080, emissive:0xffb020, emissiveIntensity:0, roughness:.25});
+{ const body=new T.Mesh(new T.LatheGeometry(FLOAT_PROFILE.map(([r,y])=>new T.Vector2(r,y)),28),bTopMat); bobber.add(body);
+  // 天線：一節一節的彩色刻度（橘、黃綠、橘、白），浮標在水面上下時看得出吃水
+  const segs=[['#ff3b10',.03],['#d8ff2a',.025],['#ff3b10',.025],['#f4f4f0',.02],['#ff3b10',.025]]; let y=.06;
+  segs.forEach(([c,h])=>{ const m=new T.Mesh(new T.CylinderGeometry(.0034,.0036,h,12),new T.MeshPhysicalMaterial({color:new T.Color(c),roughness:.3,clearcoat:1,clearcoatRoughness:.1})); m.position.y=y+h/2; bobber.add(m); y+=h; });
+  const tp=new T.Mesh(new T.SphereGeometry(.0055,14,10),tipMat); tp.position.y=y+.003; bobber.add(tp);
+  const ring=new T.Mesh(new T.TorusGeometry(.0045,.0012,8,16),new T.MeshStandardMaterial({color:0xb8b8b8,metalness:.9,roughness:.25})); ring.position.y=-.1; ring.rotation.y=Math.PI/2; bobber.add(ring); }
+window.__FLOAT_PROFILE=FLOAT_PROFILE;
 bobber.scale.setScalar(2.0);
 
 /* ---------- 水花粒子 ---------- */
@@ -5609,7 +5618,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028011245'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028012259'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6451,11 +6460,24 @@ function showSnag(reef){ const f=G.f; SNAG.g.clear(); const src=reef?SNAG.rock:S
   SNAG.g.rotation.y=Math.random()*6.28; SNAG.g.scale.setScalar(reef?1.1:3.2); SNAG.g.visible=true; }
 // 魚訊放大視窗：等魚時在右上角放大顯示浮標（浮標釣）或竿尖（沉底釣），小螢幕也看得清楚試咬與咬口
 const MAG=document.createElement('div'); MAG.id='magWin'; MAG.style.cssText='position:fixed;right:10px;top:calc(var(--hudY,150px) + 54px);z-index:6;width:74px;height:96px;border-radius:12px;background:rgba(10,30,40,.62);border:1px solid rgba(255,255,255,.22);display:none;pointer-events:none;overflow:hidden';
-MAG.innerHTML='<svg viewBox="0 0 74 96" width="74" height="96"><rect x="0" y="52" width="74" height="44" fill="rgba(60,140,170,.35)"/><line x1="0" y1="52" x2="74" y2="52" stroke="rgba(200,240,255,.7)" stroke-width="1.5"/><g id="magF"><line x1="37" y1="14" x2="37" y2="34" stroke="#c03028" stroke-width="2.5"/><circle cx="37" cy="12" r="2.6" fill="#ffd060"/><ellipse cx="37" cy="44" rx="9" ry="12" fill="#d84a3a"/><path d="M28 46 a9 12 0 0 0 18 0 z" fill="#f2f2f2"/></g><path id="magR" d="" stroke="#2a6ad0" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg><div id="magT" style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;color:#dff"></div>';
+// 放大視窗裡的浮標：用和 3D 浮標同一份外形與配色畫出立體感（左右明暗、清漆高光），不再是平面圖示
+function floatImage(){ const P0=window.__FLOAT_PROFILE||[[0,-.095],[.028,0],[.004,.06]], S=560, H=.27, cv=document.createElement('canvas'); cv.width=60; cv.height=Math.round(H*S); const g=cv.getContext('2d'), cx=30, Y=y=>(.17-y)*S;
+  const col=y=>{ const v=(y+.095)/.157; return v<.18?'#1d2a22':v<.2?'#c9a24a':v<.58?'#141414':v<.6?'#e8d27a':'#ff4a12'; };
+  const rAt=y=>{ for(let i=1;i<P0.length;i++){ const [r0,y0]=P0[i-1],[r1,y1]=P0[i]; if(y>=y0&&y<=y1) return r0+(r1-r0)*(y-y0)/Math.max(1e-6,y1-y0); } return 0; };
+  for(let py=0;py<cv.height;py++){ const y=.17-py/S; let r=0, c; if(y<=.062){ r=rAt(y); c=col(y); } else { r=.0035; const k=(y-.06)/.125; c=k<.24?'#ff3b10':k<.44?'#d8ff2a':k<.64?'#ff3b10':k<.8?'#f4f4f0':'#ff3b10'; if(y>.185){ r=.0055*Math.sqrt(Math.max(0,1-((y-.19)/.0055)**2)); c='#fff080'; } }
+    const w=r*S; if(w<.3) continue; const gr=g.createLinearGradient(cx-w,0,cx+w,0); gr.addColorStop(0,'rgba(0,0,0,.9)'); gr.addColorStop(.12,c); gr.addColorStop(.38,c); gr.addColorStop(.48,'rgba(255,255,255,.85)'); gr.addColorStop(.58,c); gr.addColorStop(1,'rgba(0,0,0,.95)');
+    g.fillStyle=c; g.fillRect(cx-w,py,w*2,1); g.globalAlpha=.55; g.fillStyle=gr; g.fillRect(cx-w,py,w*2,1); g.globalAlpha=1; }
+  return {url:cv.toDataURL(),w:cv.width,h:cv.height,wl:Math.round(.17*S)}; }
+const FIMG=floatImage();
+MAG.innerHTML=`<svg viewBox="0 0 74 96" width="74" height="96"><defs><linearGradient id="mw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f7f8c" stop-opacity=".9"/><stop offset="1" stop-color="#0b2c36" stop-opacity=".95"/></linearGradient><linearGradient id="ms" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fb7c2"/><stop offset="1" stop-color="#55707c"/></linearGradient></defs>
+<rect x="0" y="0" width="74" height="58" fill="url(#ms)" opacity=".55"/>
+<g id="magF"><image href="${FIMG.url}" x="${37-FIMG.w/4}" y="${58-FIMG.wl/2}" width="${FIMG.w/2}" height="${FIMG.h/2}"/></g>
+<rect x="0" y="58" width="74" height="38" fill="url(#mw)"/><ellipse id="magRip" cx="37" cy="58" rx="9" ry="1.6" fill="none" stroke="rgba(230,250,255,.75)" stroke-width="1"/><line x1="0" y1="58" x2="74" y2="58" stroke="rgba(220,245,255,.55)" stroke-width="1"/>
+<path id="magR" d="" stroke="#1f3f8a" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg><div id="magT" style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;color:#dff;text-shadow:0 1px 2px #000"></div>`;
 document.body.appendChild(MAG); const magF=MAG.querySelector('#magF'), magR=MAG.querySelector('#magR'), magT=MAG.querySelector('#magT');
 function updMag(){ const magOn=save.mag==='on'||(save.mag!=='off'&&(D().n==='休閒'||D().n==='標準')); const on=(G.state==='wait'||G.state==='bite')&&!LURE.active?.()&&G.loc!=='ice'&&magOn; MAG.style.display=on?'block':'none'; if(!on) return;
   if(G.bottom){ magF.style.display='none'; const b=Math.min(1.2,rod.bendT||0), x2=37+b*26, y2=18+b*60; magR.setAttribute('d',`M37 96 Q37 50 ${x2.toFixed(1)} ${y2.toFixed(1)}`); magT.textContent=G.state==='bite'?'竿尖拉彎！':G.snag?'掛底':'竿尖'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; }
-  else { magR.setAttribute('d',''); magF.style.display=''; const dip=G.state==='bite'?28:Math.max(0,(W.swell(G.to.x,G.to.z,G.t)-bob.position.y))*160; magF.setAttribute('transform',`translate(0 ${Math.min(40,dip).toFixed(1)})`); magT.textContent=G.state==='bite'?'沉下去了！':G.dip>0?'輕點（試咬）':'浮標'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; } }
+  else { magR.setAttribute('d',''); magF.style.display=''; const dip=G.state==='bite'?34:Math.max(0,(W.swell(G.to.x,G.to.z,G.t)-bob.position.y))*160; magF.setAttribute('transform',`translate(0 ${Math.min(40,dip).toFixed(1)})`); { const rp=MAG.querySelector('#magRip'); if(rp){ const k=Math.min(1,dip/14); rp.setAttribute('rx',(6+k*16+Math.sin(G.t*3)*.6).toFixed(1)); rp.setAttribute('opacity',(.35+.6*k).toFixed(2)); } } magT.textContent=G.state==='bite'?'沉下去了！':G.dip>0?'輕點（試咬）':'浮標'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; } }
 function endFightUI(){ SNAG.g.visible=false; if(ui.netBtn) ui.netBtn.classList.add('hidden'); ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); ui.tBar.classList.remove('rub'); }
 function lose(reason){
   endFightUI(); WL.endChase(); SEA.endChase(); G.combo=0; FUN.combo(0); P.shadow.material.opacity=0; if(G.fish){ G.fish.group.visible=false; }
