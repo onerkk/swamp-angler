@@ -80,7 +80,16 @@ mud.repeat.set(10,10);
 const bgeo=new T.PlaneGeometry(70,70,80,80); bgeo.rotateX(-Math.PI/2);
 { const p=bgeo.attributes.position; for(let i=0;i<p.count;i++) p.setY(i,bottomY(p.getX(i),p.getZ(i))); bgeo.computeVertexNormals(); }
 const cau={value:new T.Color(0,0,0)};
-const botMat=new T.MeshStandardMaterial({map:mud,roughness:.95});
+const TLu=new T.TextureLoader(), pbrT=(n,rep)=>{ const f=k=>{ const t=TLu.load('models/home/'+n+'_'+k+'.jpg'); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rep,rep); if(k==='Diffuse') t.encoding=T.sRGBEncoding; return t; }; return {map:f('Diffuse'),normalMap:f('nor_gl'),roughnessMap:f('Rough')}; };
+const BED={lake:pbrT('clean_pebbles',18),sea:pbrT('coral_gravel',14)};   // 湖底與海底改用實拍的卵石、珊瑚砂貼圖
+const botMat=new T.MeshStandardMaterial(Object.assign({roughness:1,color:0x9a9488},BED.lake));
+// 真實水草：湖底散佈實際掃描的植物模型（蕁麻草叢、蕨類），隨水流輕輕搖
+const plants=new T.Group(); scene.add(plants); const plantList=[];
+if(T.GLTFLoader){ const L=new T.GLTFLoader(), put=(g,pick,n,sc)=>{ for(let i=0;i<n;i++){ const src=pick?g.scene.getObjectByName(pick[i%pick.length]):g.scene; if(!src) continue; const o=src.clone(true); o.position.set(0,0,0); const w=new T.Group(); w.add(o);
+      const a=Math.random()*6.28, r=1.5+Math.random()*9; w.position.set(Math.cos(a)*r,0,Math.sin(a)*r); w.position.y=bottomY(w.position.x,w.position.z); w.rotation.y=Math.random()*6.28; w.scale.setScalar(sc*(.7+Math.random()*.6));
+      w.traverse(m=>{ m.frustumCulled=false; if(m.isMesh&&m.material){ m.material=m.material.clone(); m.material.color&&m.material.color.multiplyScalar(.75); } }); plants.add(w); plantList.push({w,ph:Math.random()*6}); } };
+  L.load('models/home/nettle_plant.glb',g=>put(g,['nettle_plant_tall_a_LOD0','nettle_plant_tall_b_LOD0','nettle_plant_medium_a_LOD0'],26,5.5));
+  L.load('fern_02.glb',g=>put(g,null,10,.9)); }
 botMat.onBeforeCompile=s=>{ s.uniforms.uTime=W.U.uTime; s.uniforms.uCau=cau;
   s.vertexShader='varying vec3 vWp;\n'+s.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWp = (modelMatrix*vec4(transformed, 1.0)).xyz;');
   s.fragmentShader='uniform float uTime;\nuniform vec3 uCau;\nvarying vec3 vWp;\nfloat cau_(vec2 p, float t){ vec2 q = p*1.1; float c = 0.0; for(int i = 0; i < 3; i++){ q += vec2(sin(q.y*1.7 + t*0.9), cos(q.x*1.5 - t*0.7))*0.6; c += pow(abs(sin(q.x + q.y)), 10.0); q *= 1.7; } return c; }\n'
@@ -153,7 +162,8 @@ let on=false, fish=null, uni=null, fd=null, prog=0, biteT=-1, camA=0, yaw=0, tt=
 const S=new T.Vector3(), C=new T.Vector3(), dirv=new T.Vector3(), perp=new T.Vector3(), pos=new T.Vector3(), prev=new T.Vector3(), focus=new T.Vector3();
 const cDark=lin('#07110d'), cMid=lin('#2a5240'), cSea=lin('#1d5a7a'), cTint=lin('#3c4a1c'), tmpC=new T.Color();
 function start(fdIn){
-  end(); fd=fdIn; if(fd.sp.special==='mermaid'){ fish=merSprite(); uni=merUni; } else { const src=P.getFish(fd.sp); uni=src.uni; fish=src.group.clone(); fish.traverse(o=>{ o.frustumCulled=false; }); }
+  end(); fd=fdIn; if(fd.sp.special==='mermaid'){ fish=merSprite(); uni=merUni; } else { let src=null; try{ if(window.__MDL&&window.__MDL.fishReady(fd.sp.id)) src=window.__MDL.fish(fd.sp); }catch(e){}   // 用真實的 3D 魚模型（有骨架），不是簡化的魚
+    if(src){ uni=src.uni; fish=src.group; } else { src=P.getFish(fd.sp); uni=src.uni; fish=src.group.clone(); } fish.traverse(o=>{ o.frustumCulled=false; if(o.isMesh&&o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ m.fog=true; }); } }); }
   fish.visible=true; fish.scale.setScalar(fd.L); scene.add(fish);
   const a0=Math.random()*Math.PI*2, R0=3.2+fd.L*2;
   S.set(Math.cos(a0)*R0,BAIT.y+rand(-.5,.3),Math.sin(a0)*R0);
@@ -166,8 +176,8 @@ function end(){ on=false; if(fish){ scene.remove(fish); fish=null; } }
 function update(dt){
   if(!on) return; tt+=dt;
   const L=Math.max(clamp(W.info.light,0,1.2),.62), day=W.info.day;   // 夜裡水下鏡頭保留月光亮度，才看得清楚魚
-  const sea=W.isSea&&W.isSea(); weeds.visible=!sea; const mid=tmpC.copy(cDark).lerp(sea?cSea:cMid,clamp(L,0,1));
-  fog.density+=((biteT<0?.42:.17)-fog.density)*Math.min(1,dt*3);
+  const sea=W.isSea&&W.isSea(); weeds.visible=!sea; plants.visible=!sea; { const bd=sea?BED.sea:BED.lake; if(botMat.map!==bd.map){ Object.assign(botMat,bd); botMat.needsUpdate=true; } } const mid=tmpC.copy(cDark).lerp(sea?cSea:cMid,clamp(L,0,1));
+  fog.density+=((biteT<0?.3:.09)-fog.density)*Math.min(1,dt*3); { const tt=performance.now()/1000; plantList.forEach(p=>{ p.w.rotation.z=Math.sin(tt*.7+p.ph)*.08; p.w.rotation.x=Math.cos(tt*.55+p.ph)*.06; }); }   // 能見度約 10 公尺，看得到魚從遠處游過來
   fog.color.copy(mid); bgU.uMid.value.copy(mid); bgU.uTop.value.copy(mid).multiplyScalar(2.4).add(cTint.clone().multiplyScalar(L*.6)); bgU.uBot.value.copy(mid).multiplyScalar(.35);
   surfU.uCol.value.copy(mid).multiplyScalar(5); surfU.uFog.value.copy(mid);
   hemi.color.copy(mid).multiplyScalar(3.2); hemi.groundColor.copy(mid).multiplyScalar(.6);

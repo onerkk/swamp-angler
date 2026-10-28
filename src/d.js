@@ -226,7 +226,7 @@ const DMK=document.createElement('div'); DMK.style.cssText='position:fixed;z-ind
 DMK.innerHTML='<span></span><div style="width:6px;height:6px;border-radius:50%;background:#fff;margin:3px auto 0;box-shadow:0 0 6px rgba(255,255,255,.9)"></div>'; document.body.appendChild(DMK); const DMKt=DMK.querySelector('span'), DMV=new THREE.Vector3();
 function updDistMark(){ const st=G.state; let p=null;
   if(st==='wait'||st==='bite') p=G.bottom&&G.entry?G.entry:bob.position; else if(st==='lure'&&LURE.active()) p=LURE.pos(); else if(st==='fight'&&G.f){ fishPos(DMV,0); p=DMV; }
-  if(!p||document.body.classList.contains('sheetOn')){ DMK.style.display='none'; return; }
+  if(!p||document.body.classList.contains('sheetOn')||UW.active()){ DMK.style.display='none'; return; }   // 水下鏡頭時不顯示水面距離
   const d=Math.hypot(p.x-G.base.x,p.z-G.base.z); DMV.set(p.x,(p.y||0)+.05,p.z).project(W.camera); if(DMV.z>1){ DMK.style.display='none'; return; }
   DMK.style.display='block'; DMK.style.left=((DMV.x+1)/2*innerWidth)+'px'; DMK.style.top=((1-DMV.y)/2*innerHeight)+'px'; DMKt.textContent=d.toFixed(d<10?1:0)+' 米'; }
 function startRetrieve(msg,cls){ exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
@@ -822,7 +822,9 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
         if(t<T1){ const e=sstep(0,T1,t), from=new THREE.Vector3().copy(G.landFrom); mouth.copy(from.lerp(mouth,e)); mouth.y+=Math.sin(Math.PI*e)*.35; }   // 從水裡被拉起、劃一道弧線到竿尖下
         te.set(0,yaw+Math.PI/2,0,'YXZ'); g.quaternion.setFromEuler(te); g.rotateZ(Math.PI/2+G.swing.a*.6+Math.sin(t*13)*.25); g.updateMatrixWorld(true);
         const off=new THREE.Vector3(.5,0,0).applyQuaternion(g.quaternion).multiplyScalar(L); g.position.copy(mouth).sub(off);
-        G.fish.uni.uAmp.value=.16+.08*Math.sin(t*5); G.fish.uni.uSwim.value+=dt*22;
+        // 吊著的魚：不是一直細碎抖動，而是一陣一陣用力彎成 C 字甩動，甩完短暫垂著喘氣
+        G.hf=(G.hf||0)-dt; if(G.hf<=0){ G.hf=rand(.7,1.5); G.hfT=.5; } const fl=G.hfT>0?(G.hfT-=dt,Math.sin((.5-G.hfT)/.5*Math.PI)):0;
+        G.fish.uni.uAmp.value=.05+.42*fl; G.fish.uni.uSwim.value+=dt*(3+fl*16); G.swing.v+=fl*dt*(Math.random()<.5?-6:6);
         if(t<T1&&g.position.y>-.1&&!G.liftSplash){ G.liftSplash=true; P.splash(g.position.x,0,g.position.z,46,1.4); W.addRipple(g.position.x,g.position.z,1.1); Snd.splash(1.3); vib([20,30,60]); }
         if(Math.random()<dt*14) P.splash(g.position.x,g.position.y-L*.45,g.position.z,1,.12);   // 身上滴水
       } else { const s=sstep(T2,T3,t); W.head.localToWorld(tv.set(0,.14*D,-D)); g.position.lerp(tv,s); g.quaternion.slerp(tq,s); G.fish.uni.uAmp.value=.1; G.fish.uni.uSwim.value+=dt*12; }
