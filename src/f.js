@@ -189,12 +189,15 @@ let thT=rand(20,40), flash=0, sT=rand(3,8), lastIcon='';
 const wxIcon=$id=>document.getElementById($id);
 function pickWx(){ for(let k=0;k<8;k++){ const n=pickWx0(); if(n!==wxType) return n; } return 'cloudy'; }
 function pickWx0(){ let r=Math.random(); if(ctx.period()==='dawn'&&r<.3) return 'fog'; r=Math.random(); for(const [k,w] of [['clear',.3],['breezy',.15],['cloudy',.18],['drizzle',.1],['rain',.12],['storm',.06],['fog',.09]]){ r-=w; if(r<=0) return k; } return 'clear'; }
+let wxPend=null;
 function updateWeather(dt){
   const mode=save.wxMode||'auto';
   if(mode!=='auto'&&WXT[mode]) wxType=mode;
-  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; toast('天氣轉為'+wxName(n)+' '+wxEmo(n)); } wxT=rand(70,150); save.wxCur=wxType; } }
+  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; const tg0=WXT[n]; wxPend={n,d0:Math.max(.05,Math.abs(tg0.c-cur.c)+Math.abs(tg0.r-cur.r)+Math.abs(tg0.f-cur.f))}; } wxT=rand(70,150); save.wxCur=wxType; } }
   const tg=WXT[wxType], k=Math.min(1,dt*.22);
   cur.c+=(tg.c-cur.c)*k; cur.r+=(tg.r-cur.r)*k; cur.f+=(tg.f-cur.f)*k;
+  // 天空、雨、霧真的變化過半時才提示，不會提示「轉晴」時還在下大雨
+  if(wxPend){ const d=Math.abs(tg.c-cur.c)+Math.abs(tg.r-cur.r)+Math.abs(tg.f-cur.f); if(wxPend.n!==wxType) wxPend=null; else if(d<wxPend.d0*.45){ toast('天氣轉為'+wxName(wxType)+' '+wxEmo(wxType)); wxPend=null; } }
   wt+=dt; cur.w+=(tg.w-cur.w)*k; windAng+=dt*.012*Math.sin(wt*.05);
   windNow=Math.max(0,cur.w*(1+tg.g*(Math.sin(wt*.37)*.35+Math.sin(wt*1.13+1.7)*.25+Math.sin(wt*2.9+.4)*.12)));
   W.setWind(Math.cos(windAng),Math.sin(windAng),clamp(windNow/12,0,1));

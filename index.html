@@ -2441,12 +2441,15 @@ let thT=rand(20,40), flash=0, sT=rand(3,8), lastIcon='';
 const wxIcon=$id=>document.getElementById($id);
 function pickWx(){ for(let k=0;k<8;k++){ const n=pickWx0(); if(n!==wxType) return n; } return 'cloudy'; }
 function pickWx0(){ let r=Math.random(); if(ctx.period()==='dawn'&&r<.3) return 'fog'; r=Math.random(); for(const [k,w] of [['clear',.3],['breezy',.15],['cloudy',.18],['drizzle',.1],['rain',.12],['storm',.06],['fog',.09]]){ r-=w; if(r<=0) return k; } return 'clear'; }
+let wxPend=null;
 function updateWeather(dt){
   const mode=save.wxMode||'auto';
   if(mode!=='auto'&&WXT[mode]) wxType=mode;
-  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; toast('天氣轉為'+wxName(n)+' '+wxEmo(n)); } wxT=rand(70,150); save.wxCur=wxType; } }
+  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; const tg0=WXT[n]; wxPend={n,d0:Math.max(.05,Math.abs(tg0.c-cur.c)+Math.abs(tg0.r-cur.r)+Math.abs(tg0.f-cur.f))}; } wxT=rand(70,150); save.wxCur=wxType; } }
   const tg=WXT[wxType], k=Math.min(1,dt*.22);
   cur.c+=(tg.c-cur.c)*k; cur.r+=(tg.r-cur.r)*k; cur.f+=(tg.f-cur.f)*k;
+  // 天空、雨、霧真的變化過半時才提示，不會提示「轉晴」時還在下大雨
+  if(wxPend){ const d=Math.abs(tg.c-cur.c)+Math.abs(tg.r-cur.r)+Math.abs(tg.f-cur.f); if(wxPend.n!==wxType) wxPend=null; else if(d<wxPend.d0*.45){ toast('天氣轉為'+wxName(wxType)+' '+wxEmo(wxType)); wxPend=null; } }
   wt+=dt; cur.w+=(tg.w-cur.w)*k; windAng+=dt*.012*Math.sin(wt*.05);
   windNow=Math.max(0,cur.w*(1+tg.g*(Math.sin(wt*.37)*.35+Math.sin(wt*1.13+1.7)*.25+Math.sin(wt*2.9+.4)*.12)));
   W.setWind(Math.cos(windAng),Math.sin(windAng),clamp(windNow/12,0,1));
@@ -5661,7 +5664,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028034242'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028034959'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6619,7 +6622,7 @@ function lose(reason){
 }
 function startJump(){ const f=G.f; f.jumpT=f.jumpDur=.85+.25*Math.sqrt(G.fd.L); fishPos(tv,0); P.splash(tv.x,0,tv.z,30,1.2); W.addRipple(tv.x,tv.z,.9); Snd.splash(1);
   toast('魚躍出水面！先放手！','warn',1100); vib(30); G.fish.group.visible=true; }
-function dispDist(){ return Math.max(.38,G.fd.L*(G.fd.sp.sh.snout?2.5:2.1))*(W.camera.aspect<1?1:.8); }
+function dispDist(){ return Math.max(.42,G.fd.L*(G.fd.sp.sh.snout?3:2.6))*(W.camera.aspect<1?1:.8); }   // 拿在手上的魚約佔畫面寬度七成，看得清楚又不會塞滿
 function land(){
   if(G.loc==='sea'&&!G.fd.item&&!G.fd.sp.special&&G.fd.sp.id!=='shark'&&G.fd.sp.id!=='gwhite'&&Math.random()<.12*(1-.12*TR('sea'))&&!KK.busy()&&!(window.__ECO&&window.__ECO.fxOn('repel'))){ G.state='snatch'; fishPos(tv,-.05); toast('就在魚出水的瞬間……','warn',1200); KK.snatchOver(tv.clone(),()=>{ G.state='fight'; lose('shark'); }); return; }
   G.state='land'; G.stT=0; endFightUI(); WL.endChase(); SEA.endChase(); G.combo=(G.combo||0)+1; FUN.combo(G.combo); save.maxCombo=Math.max(save.maxCombo||0,G.combo); fishPos(G.landFrom,-.05); P.splash(G.landFrom.x,0,G.landFrom.z,40,1.3); W.addRipple(G.landFrom.x,G.landFrom.z,1);
