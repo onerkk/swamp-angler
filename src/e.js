@@ -347,11 +347,12 @@ function render(){
     shT.textContent='老漁人的小屋'; h+='<button class="sbtn" data-a="mapBack">← 返回釣點</button>';
     const fl=(arr,water)=>arr.length?arr.map((f,i)=>row(nm(f.id)+(f.g?' <small class="cnt">'+f.g+'</small>':''),`${Math.round(f.L*100)} 公分・${fmtW(f.w)}・${f.at||''} ${dt(f.d)}`,`<button class="sbtn" data-a="hrel" data-v="${water}:${i}">放回湖裡</button>`)).join(''):'<div class="note" style="font-size:12px">還是空的。釣到魚時按「🏠 帶回家」就會放進來。</div>';
     h+=`<div class="note">${t.n}（淡水）${hd.fresh.length}/${t.cap}・最大可放 ${Math.round(t.maxL*100)} 公分${hd.chiller?'・已裝冷水機':''}</div>`+fl(hd.fresh,'fresh');
-    if(hd.seaTank) h+=`<div class="note">海水缸 ${hd.sea.length}/${HM.SEA_TANK.cap}・最大可放 ${Math.round(HM.SEA_TANK.maxL*100)} 公分</div>`+fl(hd.sea,'sea');
+    if(hd.seaTank) h+=`<div class="note">海水缸 ${hd.sea.length}/${HM.seaT().cap}・最大可放 ${Math.round(HM.seaT().maxL*100)} 公分</div>`+fl(hd.sea,'sea');
     h+=`<div class="note">標本牆 ${hd.mounts.length}/${HM.MOUNT_MAX}</div>`+(hd.mounts.length?hd.mounts.map((f,i)=>row('🖼 '+nm(f.id),`${Math.round(f.L*100)} 公分・${fmtW(f.w)}・${f.at||''} ${dt(f.d)}`,`<button class="sbtn" data-a="hrel" data-v="mounts:${i}">取下</button>`)).join(''):'<div class="note" style="font-size:12px">放不進水族箱的大魚，可以花錢做成標本掛在牆上。</div>');
     h+='<div class="note">小屋設備</div>'; const nx=HM.TANKS[hd.tier+1];
     if(nx) h+=row('換成'+nx.n,`容量 ${nx.cap} 條、最大可放 ${Math.round(nx.maxL*100)} 公分`,`<button class="sbtn pri" data-a="hbuy" data-v="tier">🪙 ${nx.price.toLocaleString()}</button>`);
     if(!hd.chiller) h+=row('冷水機','裝了才能養冰湖的魚',`<button class="sbtn pri" data-a="hbuy" data-v="chiller">🪙 ${HM.CHILLER.price.toLocaleString()}</button>`);
+    if(hd.seaTank){ const sn=HM.SEA_TANKS[(hd.seaTier||0)+1]; if(sn) h+=row('海水缸換成'+sn.n,`容量 ${sn.cap} 條、最大可放 ${Math.round(sn.maxL*100)} 公分`,`<button class="sbtn pri" data-a="hbuy" data-v="seaTier">🪙 ${sn.price.toLocaleString()}</button>`); }
     if(!hd.seaTank) h+=row('海水缸','另一個水族箱，專門養海水魚',!save.yacht?'<span class="lk">需要漁船</span>':`<button class="sbtn pri" data-a="hbuy" data-v="sea">🪙 ${HM.SEA_TANK.price.toLocaleString()}</button>`);
     // 家具：每件顯示目前效果、能不能用、下一級；在小屋裡才能使用，升級哪裡都可以
     h+='<div class="note">家具（在小屋裡點家具也能使用與升級）</div>'; const home=document.body.classList.contains('athome');
@@ -391,7 +392,7 @@ function render(){
   else if(cur==='spot'){
     shT.textContent='釣點';
     if(window.__HOME&&window.__HOME.unlocked()){ const HM=window.__HOME, hd=HM.data(), t=HM.tank();
-      h+=row('🏠 老漁人的小屋',`${t.n} ${hd.fresh.length}/${t.cap}${hd.seaTank?'・海水缸 '+hd.sea.length+'/'+HM.SEA_TANK.cap:''}・標本 ${hd.mounts.length}/${HM.MOUNT_MAX}`,'<div class="bb"><button class="sbtn" data-a="homeP">管理</button><button class="sbtn pri" data-a="homeGo">回家</button></div>'); }
+      h+=row('🏠 老漁人的小屋',`${t.n} ${hd.fresh.length}/${t.cap}${hd.seaTank?'・海水缸 '+hd.sea.length+'/'+HM.seaT().cap:''}・標本 ${hd.mounts.length}/${HM.MOUNT_MAX}`,'<div class="bb"><button class="sbtn" data-a="homeP">管理</button><button class="sbtn pri" data-a="homeGo">回家</button></div>'); }
     if(!save.kayak) h+=row('🛶 獨木舟','買了才能划到湖裡的其他釣點','<button class="sbtn pri" data-a="kayak">🪙 800</button>');
     if(!save.yacht){ const ok=window.__STORY&&window.__STORY.done('c5'), m=save.mat||{}, need=BOAT_COST, have=k=>(m[k]||0)>=need[k];
       h+=ok?row('🛥️ 修復老漁人的漁船',`停在河口船塢的舊漁船，修好就能出海。需要 🪙 ${need.coins.toLocaleString()}、魚鱗 ${need.scale}（有 ${m.scale||0}）、魚骨 ${need.bone}（有 ${m.bone||0}）、珍珠 ${need.pearl}（有 ${m.pearl||0}）`,`<button class="sbtn pri" data-a="yacht"${save.coins>=need.coins&&have('scale')&&have('bone')&&have('pearl')?'':' disabled'}>修復</button>`)

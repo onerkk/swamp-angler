@@ -4,7 +4,9 @@ function createHome(c){
 const S=c.save;
 // 水族箱等級：容量、能放的最大體長（公尺）、價格、需要等級
 const TANKS=[{n:'小水族箱',cap:6,maxL:.6,price:0},{n:'大型水族箱',cap:12,maxL:1.0,price:15000},{n:'展示牆水族箱',cap:20,maxL:1.5,price:60000},{n:'水族館',cap:30,maxL:1.6,price:150000}];
-const SEA_TANK={n:'海水缸',cap:6,maxL:.8,price:25000}, CHILLER={n:'冷水機',price:12000,lv:10}, MOUNT_MAX=8;
+// 海水缸也能升級（原本只有一種，沒辦法變大）：越大能養越多、越大的海魚
+const SEA_TANKS=[{n:'海水缸',cap:6,maxL:.8,price:25000},{n:'大型海水缸',cap:12,maxL:1.2,price:60000},{n:'珊瑚礁展示缸',cap:20,maxL:1.8,price:150000},{n:'海洋館',cap:30,maxL:2.4,price:300000}];
+const SEA_TANK=SEA_TANKS[0], seaT=()=>SEA_TANKS[Math.min(SEA_TANKS.length-1,H().seaTier||0)]; CHILLER={n:'冷水機',price:12000,lv:10}, MOUNT_MAX=8;
 function H(){ const h=S.home=S.home||{}; h.fresh=h.fresh||[]; h.sea=h.sea||[]; h.mounts=h.mounts||[]; h.tier=h.tier||0; return h; }
 // 小屋在完成主線第一章後開放（開場就說老漁人留下了小屋）
 const unlocked=()=>!!(S.story&&S.story.done&&S.story.done.includes('c1'));
@@ -16,7 +18,7 @@ function check(fd){
   if(!unlocked()) return {ok:false,why:'完成主線第一章後才能整理小屋'};
   if(!sp||fd.item||sp.special==='mermaid') return {ok:false,hide:true};
   if(sp.noSell) return {ok:false,why:'保育類只能放流，不能帶回家'};
-  const sea=waterOf(sp)==='sea', t=sea?SEA_TANK:tank();
+  const sea=waterOf(sp)==='sea', t=sea?seaT():tank();
   if(sea&&!h.seaTank) return big(fd,'海水魚要先在小屋買海水缸','還沒有海水缸');
   if(!sea&&(sp.loc==='ice')&&!h.chiller) return big(fd,'冰湖的魚要先幫水族箱加裝冷水機','還沒有冷水機');
   if(fd.L>t.maxL) return big(fd,t.n+'放不下 '+Math.round(fd.L*100)+' 公分的魚','太大放不進水族箱');
@@ -34,6 +36,7 @@ function release(water,i){ const l=H()[water]; if(!l||!l[i]) return null; const 
 function buy(what){ const h=H();
   if(what==='tier'){ const nx=TANKS[h.tier+1]; if(!nx) return '已經是最大的水族箱了'; if(S.coins<nx.price) return '金幣不夠';
     S.coins-=nx.price; h.tier++; }
+  else if(what==='seaTier'){ if(!h.seaTank) return '還沒有海水缸'; const nx=SEA_TANKS[(h.seaTier||0)+1]; if(!nx) return '已經是最大的海水缸了'; if(S.coins<nx.price) return '金幣不夠'; S.coins-=nx.price; h.seaTier=(h.seaTier||0)+1; }
   else if(what==='sea'){ if(h.seaTank) return '已經有海水缸了'; if(!S.yacht) return '有漁船、能出海之後才需要海水缸'; if(S.coins<SEA_TANK.price) return '金幣不夠'; S.coins-=SEA_TANK.price; h.seaTank=true; }
   else if(what==='chiller'){ if(h.chiller) return '已經裝了冷水機'; if(S.coins<CHILLER.price) return '金幣不夠'; S.coins-=CHILLER.price; h.chiller=true; }
   c.persist(); c.setCoins(); return ''; }
@@ -102,7 +105,7 @@ function use(id,opt){ const d=fdef(id), st=FD()[id], L=d.lv[st.lv], s=state(id),
   return {msg:''}; }
 const grillHeat=()=>fdef('fire').lv[flv('fire')].heat||1;
 const grillFxK=()=>fdef('fire').lv[flv('fire')].fxK||1;
-return {TANKS,SEA_TANK,CHILLER,MOUNT_MAX,unlocked,check,keep,mount,release,buy,data:H,tank,FURN,furnInfo:info,furnUp:upgrade,furnUse:use,furnLv:flv,grillHeat,grillFxK};
+return {TANKS,SEA_TANK,SEA_TANKS,seaT,CHILLER,MOUNT_MAX,unlocked,check,keep,mount,release,buy,data:H,tank,FURN,furnInfo:info,furnUp:upgrade,furnUse:use,furnLv:flv,grillHeat,grillFxK};
 }
 
 /* ===== 小屋內部：第一人稱木屋場景（獨立場景，回家時改畫這裡，外面的湖照常運作） ===== */
@@ -286,7 +289,7 @@ for(const x of [-2.85,2.85]){ put('industrial_wall_lamp',x,2.05,ROOM.zb+.06,0,1)
 const lampL=new T.PointLight(0xffd8a0,1.2,5,1.4); lampL.position.set(LV.x+.2,.9,LV.z-.3); scene.add(lampL);   // 煤油燈
 
 // 水族箱：尺寸跟著等級變；淡水缸在後牆中央，有海水缸時放在右側
-const TSPEC=[{w:1.2,h:.6,d:.45,st:.85},{w:1.8,h:.75,d:.55,st:.85},{w:2.6,h:1.0,d:.7,st:.7},{w:3.4,h:1.2,d:.8,st:.55}], SEA_SPEC={w:1.25,h:.62,d:.5,st:.85};
+const TSPEC=[{w:1.2,h:.6,d:.45,st:.85},{w:1.8,h:.75,d:.55,st:.85},{w:2.6,h:1.0,d:.7,st:.7},{w:3.4,h:1.2,d:.8,st:.55}], SEA_SPEC={w:1.25,h:.62,d:.5,st:.85}, SEA_SPECS=[{w:1.25,h:.62,d:.5,st:.85},{w:1.5,h:.75,d:.55,st:.85},{w:1.75,h:.9,d:.62,st:.75},{w:2.0,h:1.0,d:.7,st:.65}];
 // 底砂壓暗成自然溪砂的灰褐色（原本在缸燈下太白、像雪）
 const sandTex={fresh:pbr('clean_pebbles',2,1,{color:0x9c8f78}),sea:pbr('coral_gravel',2,1,{color:0xc8bca6})};
 const rockM=new T.MeshStandardMaterial({color:0x6a665e,roughness:.95});
@@ -421,8 +424,8 @@ function dispL(tk,L){ const cap=tk.spec.w*.3; return L<=cap?L:cap+(L-cap)*.18; }
 function bounds(tk,L){ L=dispL(tk,L); const s=tk.spec, m=Math.min(L*.55,s.w*.4); return {x0:-s.w/2+m+.03,x1:s.w/2-m-.03,y0:tk.y+.16+L*.22,y1:tk.y+s.h-.12-L*.18,z0:-s.d/2+.06+L*.12,z1:s.d/2-.06-L*.12}; }
 function pickTarget(f,tk){ const b=bounds(tk,f.rec.L), r=(a,b)=>a+Math.random()*Math.max(0,b-a); const cy=f.o?f.o.position.y:(b.y0+b.y1)/2, dyMax=(b.y1-b.y0)*.3; f.tgt.set(r(b.x0,b.x1),Math.max(b.y0,Math.min(b.y1,cy+(Math.random()-.5)*2*dyMax)),r(Math.min(b.z0,b.z1),Math.max(b.z0,b.z1))); }
 function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.sea:[]};
-  const tierSig='t'+hd.tier+(hd.seaTank?'s':'');
-  if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?(hd.tier>=3?-.75:-.55):0); if(hd.seaTank) buildTank('sea',SEA_SPEC,2.25); else if(tanks.sea){ scene.remove(tanks.sea.g); delete tanks.sea; } }
+  const tierSig='t'+hd.tier+(hd.seaTank?'s'+(hd.seaTier||0):'');
+  if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?(hd.tier>=3?-.75:-.55):0); if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,Math.min(2.25,3.1-ss.w/2)); } else if(tanks.sea){ scene.remove(tanks.sea.g); delete tanks.sea; } }
   for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=want[w]||[], sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|');
     if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[];
     list.forEach(rec=>{ try{ c.want(rec.id); const o=fishObj(rec); if(!o) return; o.scale.setScalar(dispL(tk,rec.L)); const f={o,rec,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6}; const b=bounds(tk,rec.L);

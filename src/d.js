@@ -580,8 +580,11 @@ const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* 畫質：高／中／低，影響倒影、霧層光束、雨圈、草叢與解析度上限 */
 // 自動（預設）：特效全開，解析度依實際幀率上下調整；高／中／低：固定，不自動改
 window.__gfxCap=()=>Math.min(window.devicePixelRatio||1,2.5);
-window.__applyGfx=q=>{ window.__GFX=q; const cap={high:2.5,mid:1.5,low:1,auto:2.5}[q]||2.5;
-  if(W.setRefl) W.setRefl(q!=='low',q==='mid'?.22:.35); W.setPR(Math.min(window.devicePixelRatio||1,cap)); };
+window.__applyGfx=q=>{ window.__GFX=q; const dpr=window.devicePixelRatio||1;
+  // 高：手機原生解析度＋完整倒影；中：約 6 成解析度＋簡化倒影；低：約 4 成解析度、沒有倒影（最省電，畫面會明顯變糊）
+  const pr={high:Math.min(dpr,2.5),mid:Math.min(dpr,2.5)*.62,low:Math.min(dpr,2.5)*.42,auto:Math.min(dpr,2.5)}[q]||dpr;
+  if(W.setRefl) W.setRefl(q!=='low',q==='mid'?.22:.35); W.setPR(Math.max(.6,pr));
+  document.body.dataset.gfx=q; if(window.__toastGfx) window.__toastGfx(q); };
 window.__applyGfx(save.gfx||'auto');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,held:()=>G.held,grind:()=>Snd.grind&&Snd.grind(),splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
 function iceDrop(){ G.noBait=false; const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=1.6; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
