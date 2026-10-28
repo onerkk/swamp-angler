@@ -5632,7 +5632,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028023708'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028024418'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6276,12 +6276,18 @@ function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }c
 
 /* ---------- 音效（全程序合成） ---------- */
 const Snd=(()=>{
-  let ctx=null,out=null,nb=null,rainG=null,AMB=null,on=save.sound!==false;
+  let ctx=null,out=null,nb=null,rainG=null,AMB=null,on=save.sound!==false; const SMP={}; let reelSrc=null, reelG=null;
+  // 捲線器循環：rate 決定轉速（收線慢轉、魚拉走線時高速尖叫），vol 0 就淡出
+  function reelLoop(vol,rate){ if(!ctx||!SMP.reel) return false; if(!reelSrc&&vol>.01){ reelSrc=ctx.createBufferSource(); reelSrc.buffer=SMP.reel; reelSrc.loop=true; reelG=ctx.createGain(); reelG.gain.value=0; reelSrc.connect(reelG); reelG.connect(out); reelSrc.start(); }
+    if(reelSrc){ reelG.gain.setTargetAtTime(vol,ctx.currentTime,.06); reelSrc.playbackRate.setTargetAtTime(rate,ctx.currentTime,.08); if(vol<=.01){ const s=reelSrc; reelSrc=null; setTimeout(()=>{ try{ s.stop(); }catch(e){} },400); } } return true; }
+  function sample(k,vol,rate){ if(!ctx||!SMP[k]) return false; const s=ctx.createBufferSource(); s.buffer=SMP[k]; s.playbackRate.value=rate||1; const g=ctx.createGain(); g.gain.value=vol; s.connect(g); g.connect(out); s.start(); return true; }
   function init(){
     if(ctx){ if(ctx.state==='suspended') ctx.resume(); return; }
     const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
     try{ ctx=new AC(); }catch(e){ return; }
     out=ctx.createGain(); out.gain.value=on?.8:0; out.connect(ctx.destination);
+    // 真實錄音音效（OpenGameArt「Fisheefects」，CC0）：捲線器、水花；載入失敗就沿用合成音
+    ['reel','splash'].forEach(k=>fetch('sfx_'+k+'.mp3').then(r=>r.arrayBuffer()).then(b=>ctx.decodeAudioData(b)).then(buf=>{ SMP[k]=buf; }).catch(()=>{}));
     nb=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate); const d=nb.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
     const amb=(rate,type,f,q,g0,lf,lg)=>{ const s=ctx.createBufferSource(); s.buffer=nb; s.loop=true; s.playbackRate.value=rate;
       const fl=ctx.createBiquadFilter(); fl.type=type; fl.frequency.value=f; fl.Q.value=q; const g=ctx.createGain(); g.gain.value=g0;
@@ -6306,8 +6312,9 @@ const Snd=(()=>{
   document.addEventListener('visibilitychange',()=>{ if(!ctx) return; if(document.hidden) ctx.suspend(); else ctx.resume(); });
   return { init, isOn:()=>on, set(v){ on=v; if(out) out.gain.value=v?.8:0; },
     whoosh(){ nz(.4,'bandpass',2400,.9,.18,500); },
-    splash(s){ s=s||1; nz(.18+.3*s,'bandpass',1100,.7,.22*s,400); nz(.35+.4*s,'lowpass',700,.5,.16*s); tn(140,.12,'sine',.12*s,0,60); },
+    splash(s){ s=s||1; if(sample('splash',Math.min(1,.25+.45*s),.85+Math.random()*.3+(s<.5?.25:0))) return; nz(.18+.3*s,'bandpass',1100,.7,.22*s,400); nz(.35+.4*s,'lowpass',700,.5,.16*s); tn(140,.12,'sine',.12*s,0,60); },
     plop(){ tn(320,.09,'sine',.14,0,120); nz(.06,'bandpass',1800,2,.05); },
+    reelLoop,
     nibble(){ tn(260,.06,'sine',.07,0,140); },
     creak(k){ k=k||1; tn(70+Math.random()*50,.16,'sawtooth',.035*k,0,40); nz(.08,'bandpass',900+Math.random()*500,3,.02*k); },   // 竿身承受重量的吱嘎聲
     bite(){ tn(180,.22,'sine',.28,0,55); nz(.25,'lowpass',900,.6,.12); },
@@ -6553,14 +6560,19 @@ function updMag(){ const magOn=save.mag==='on'||(save.mag!=='off'&&(D().n==='休
 const WKV=new THREE.Vector3();
 // 搏魚鏡頭：中魚後視角微微拉近、略往水面看；張力越大拉得越近；魚躍出水面時再拉近並輕晃。結束後平滑回到原本
 G.fovK=G.fovK||1;
-function fightCam(dt){ const f=G.f, fight=G.state==='fight'&&f, want=fight?(.86-.08*(f.T||0)-(f.jumpT>0?.08:0)):(G.state==='land'?.9:1);
+function fightBody(dt){ const f=G.f, fight=G.state==='fight'&&f; G.lean=G.lean||{z:0,y:0,r:0};
+  const tz=fight?(f.run?-.07*(.5+f.T):(G.held?.05*f.T:0)):0, ty=fight?-.03*f.T:0, tr=fight?clamp((f.theta||0)*.06,-.05,.05):0;
+  G.lean.z+=(tz-G.lean.z)*Math.min(1,dt*4); G.lean.y+=(ty-G.lean.y)*Math.min(1,dt*4); G.lean.r+=(tr-G.lean.r)*Math.min(1,dt*3);
+  W.head.position.z=G.lean.z; W.head.position.y=(W.head.userData.y0??(W.head.userData.y0=W.head.position.y))+G.lean.y; W.camera.rotation.z+=G.lean.r; }
+function fightCam(dt){ try{ fightBody(dt); }catch(e){} const f=G.f, fight=G.state==='fight'&&f, want=fight?(.86-.08*(f.T||0)-(f.jumpT>0?.08:0)):(G.state==='land'?.9:1);
   G.fovK+=(want-G.fovK)*Math.min(1,dt*(fight?2.2:1.5)); const base=W.camera.aspect<1?70:52, nf=base*G.fovK; if(Math.abs(W.camera.fov-nf)>.05){ W.camera.fov=nf; W.camera.updateProjectionMatrix(); }
   document.body.classList.toggle('fighting',!!fight);
   if(fight&&f.jumpT>0){ G.gShake=Math.max(G.gShake||0,.35); } }
-function fightFx(dt){ fightCam(dt); const f=G.f; if(G.state!=='fight'||!f) return; fishPos(WKV,0);
+function fightFx(dt){ fightCam(dt); const f=G.f; if(G.state!=='fight'||!f){ if(Snd.reelLoop) Snd.reelLoop(G.state==='retrieve'?.22:0,1.25); return; } fishPos(WKV,0);
   f.wk=(f.wk||0)-dt; if(f.run&&f.wk<=0){ f.wk=.09; const az=f.az0+f.theta, sx=Math.cos(az), sz=-Math.sin(az); W.addRipple(WKV.x+sx*.25,WKV.z+sz*.25,.18); W.addRipple(WKV.x-sx*.25,WKV.z-sz*.25,.18); }
   if(f.T>.6&&Math.random()<dt*(f.T-.5)*12) P.splash(WKV.x,.05,WKV.z,2,.12);
   // 聲音：張力很大時竿身吱嘎作響；魚在水面衝刺時有破水聲
+  { const out=f.run&&f.T>.3, vol=G.held?.32:out?.45*f.T+.12:0, rate=G.held?.85+.35*(1-f.T):out?1.5+.6*f.T:1; f.usedLoop=Snd.reelLoop&&Snd.reelLoop(vol,rate); }
   f.ck=(f.ck||0)-dt; if(f.T>.72&&f.ck<=0){ f.ck=rand(.35,.9)*(1.4-f.T); Snd.creak&&Snd.creak(f.T); }
   f.sw=(f.sw||0)-dt; if(f.run&&f.d<18&&f.sw<=0){ f.sw=rand(.5,1.1); Snd.splash&&Snd.splash(.18+.25*f.T); } }
 function endFightUI(){ SNAG.g.visible=false; if(ui.netBtn) ui.netBtn.classList.add('hidden'); ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); ui.tBar.classList.remove('rub'); }
@@ -7074,8 +7086,12 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       } else { const s=sstep(T2,T3,t); W.head.localToWorld(tv.set(0,.14*D,-D)); g.position.lerp(tv,s); g.quaternion.slerp(tq,s); G.fish.uni.uAmp.value=.1; G.fish.uni.uSwim.value+=dt*12; }
       if(t>=T3){ G.swing=null; G.liftSplash=false; W.head.attach(g); g.position.set(0,.14*D,-D); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }
     } else if(st==='catch'){
-      G.stT+=dt; g.rotation.set(0,Math.sin(G.stT*.6)*.35,Math.sin(G.stT*.9)*.05);
-      G.fish.uni.uAmp.value=.035+.03*Math.max(0,Math.sin(G.stT*2.1)); G.fish.uni.uSwim.value+=dt*7;
+      // 拿在手上的魚：不時用力甩尾掙扎（整條魚跟著扭），身上一直滴水，鰓蓋呼吸般微微起伏
+      G.stT+=dt; G.thr=(G.thr||0)-dt; if(G.thr<=0){ G.thr=rand(1.6,3.4); G.thrT=.55; vib(12); }
+      const th=G.thrT>0?(G.thrT-=dt,Math.sin(G.thrT*28)*Math.min(1,G.thrT*3)):0;
+      g.rotation.set(th*.12,Math.sin(G.stT*.6)*.3+th*.25,Math.sin(G.stT*.9)*.05+th*.18);
+      G.fish.uni.uAmp.value=.035+.03*Math.max(0,Math.sin(G.stT*2.1))+Math.abs(th)*.14; G.fish.uni.uSwim.value+=dt*(7+Math.abs(th)*30);
+      G.drip=(G.drip||0)-dt; if(G.drip<=0){ G.drip=rand(.08,.25); g.updateMatrixWorld(true); const dp=g.localToWorld(new THREE.Vector3(rand(-.4,.4),-.12,0)); P.splash(dp.x,dp.y,dp.z,1,.08); }
     } else {
       G.stT+=dt; const s=Math.min(1,G.stT/.6);
       if(G.postSell){ g.scale.setScalar(G.fd.L*(1-s)); }
