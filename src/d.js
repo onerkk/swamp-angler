@@ -216,7 +216,7 @@ function showSnag(reef){ const f=G.f; SNAG.g.clear(); const src=reef?SNAG.rock:S
 const MAG=document.createElement('div'); MAG.id='magWin'; MAG.style.cssText='position:fixed;right:10px;top:calc(var(--hudY,150px) + 54px);z-index:6;width:74px;height:96px;border-radius:12px;background:rgba(10,30,40,.62);border:1px solid rgba(255,255,255,.22);display:none;pointer-events:none;overflow:hidden';
 MAG.innerHTML='<svg viewBox="0 0 74 96" width="74" height="96"><rect x="0" y="52" width="74" height="44" fill="rgba(60,140,170,.35)"/><line x1="0" y1="52" x2="74" y2="52" stroke="rgba(200,240,255,.7)" stroke-width="1.5"/><g id="magF"><line x1="37" y1="14" x2="37" y2="34" stroke="#c03028" stroke-width="2.5"/><circle cx="37" cy="12" r="2.6" fill="#ffd060"/><ellipse cx="37" cy="44" rx="9" ry="12" fill="#d84a3a"/><path d="M28 46 a9 12 0 0 0 18 0 z" fill="#f2f2f2"/></g><path id="magR" d="" stroke="#2a6ad0" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg><div id="magT" style="position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;color:#dff"></div>';
 document.body.appendChild(MAG); const magF=MAG.querySelector('#magF'), magR=MAG.querySelector('#magR'), magT=MAG.querySelector('#magT');
-function updMag(){ const on=(G.state==='wait'||G.state==='bite')&&!LURE.active?.()&&G.loc!=='ice'&&save.mag!==false; MAG.style.display=on?'block':'none'; if(!on) return;
+function updMag(){ const magOn=save.mag==='on'||(save.mag!=='off'&&(D().n==='休閒'||D().n==='標準')); const on=(G.state==='wait'||G.state==='bite')&&!LURE.active?.()&&G.loc!=='ice'&&magOn; MAG.style.display=on?'block':'none'; if(!on) return;
   if(G.bottom){ magF.style.display='none'; const b=Math.min(1.2,rod.bendT||0), x2=37+b*26, y2=18+b*60; magR.setAttribute('d',`M37 96 Q37 50 ${x2.toFixed(1)} ${y2.toFixed(1)}`); magT.textContent=G.state==='bite'?'竿尖拉彎！':G.snag?'掛底':'竿尖'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; }
   else { magR.setAttribute('d',''); magF.style.display=''; const dip=G.state==='bite'?28:Math.max(0,(W.swell(G.to.x,G.to.z,G.t)-bob.position.y))*160; magF.setAttribute('transform',`translate(0 ${Math.min(40,dip).toFixed(1)})`); magT.textContent=G.state==='bite'?'沉下去了！':G.dip>0?'輕點（試咬）':'浮標'; magT.style.color=G.state==='bite'?'#ffd060':'#dff'; } }
 function endFightUI(){ SNAG.g.visible=false; if(ui.netBtn) ui.netBtn.classList.add('hidden'); ui.fight.classList.add('hidden'); ui.steer.classList.add('hidden'); ui.tBar.classList.remove('danger'); ui.tBar.classList.remove('slack'); ui.tBar.classList.remove('rub'); }
@@ -264,6 +264,11 @@ function showCard(){
   $('cLv').textContent=fd.lvl; $('cName').textContent=sp.name; $('cRar').textContent=r.name+' '+r.en+(fd.grade?'｜'+fd.grade:''); $('cSci').textContent=sp.sci;
   $('cLen').textContent=(fd.L*100).toFixed(1)+' cm'; $('cW').textContent=fd.w<1?Math.round(fd.w*1000)+' g':fd.w.toFixed(2)+' kg';
   $('cVal').textContent='🪙 '+fd.value.toLocaleString(); $('cDesc').textContent=sp.desc+' 拉扯型態：'+styOf(sp.id).n+'，難度 '+stars(fd)+'。';
+  // 搏魚結算：花了多久、揚竿品質、最高張力、魚衝了幾次；刷新最快紀錄時標示
+  if(G.f&&!fd.item){ const f=G.f, ft=f.ft||0, mm=Math.floor(ft/60), ss=Math.round(ft%60), bestK='bf_'+sp.id, best=(save.fightBest||{})[bestK];
+    const fast=!best||ft<best; save.fightBest=save.fightBest||{}; if(fast) save.fightBest[bestK]=+ft.toFixed(1);
+    $('cDesc').textContent+=` 搏魚 ${mm?mm+' 分 ':''}${ss} 秒${fast&&best?'（最快紀錄！）':''}・${f.perfect?'完美揚竿':'普通揚竿'}・最高張力 ${Math.round((f.maxT||0)*100)}%・魚衝刺 ${f.runs||0} 次。`;
+    if(G.logRec){ G.logRec.ft=+ft.toFixed(1); G.logRec.hq=f.perfect?1:0; } }
   { const mm=sp.special==='mermaid', ns=mm||!!sp.noSell; $('bSell').classList.toggle('hidden',ns); $('bRel').textContent=mm?'送她回家（收下謝禮）':sp.noSell?'拍照後放流':'放生'; if(mm) $('cW').textContent='？？？';
     if(sp.noSell&&!mm) $('cVal').textContent='保育類・不可販售'; }
   $('bGrill').classList.toggle('hidden',!canGrill(fd)||!HOME.unlocked()); $('bGrill').textContent='🔥 放進保冷箱，帶回去烤（'+((save.cooler||[]).length)+'/5）';
@@ -510,6 +515,7 @@ function guardUW(){ if(UW.active()&&!uwExiting&&G.state!=='wait'&&G.state!=='bit
 /* ---------- 每幀更新 ---------- */
 function updateFight(dt){
   const f=G.f, sp=G.fd.sp, fs=sp.f, fd=G.fd;
+  f.ft=(f.ft||0)+dt; f.maxT=Math.max(f.maxT||0,f.T); if(f.run&&!f.wasRun) f.runs=(f.runs||0)+1; f.wasRun=f.run;   // 搏魚統計：時間、最高張力、衝刺次數
   const ST=styOf(fd.sp.id), DF=D();
   f.phaseT-=dt;
   if(f.phaseT<=0){

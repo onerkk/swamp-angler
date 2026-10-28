@@ -323,7 +323,7 @@ function render(){
   } else if(cur==='log'){
     shT.textContent='漁獲圖鑑';
     const found=SPECIES.filter(s=>save.dex[s.id]).length;
-    h+=`<div class="tabs" style="margin-bottom:6px"><button class="${logMode!=='list'?'on':''}" data-a="logmode" data-v="dex">📖 圖鑑</button><button class="${logMode==='list'?'on':''}" data-a="logmode" data-v="list">🧾 魚獲紀錄</button></div>`;
+    h+=`<div class="tabs" style="margin-bottom:6px"><button class="tab${logMode!=='list'?' on':''}" data-a="logmode" data-v="dex">📖 圖鑑</button><button class="tab${logMode==='list'?' on':''}" data-a="logmode" data-v="list">🧾 魚獲紀錄</button></div>`;
     if(logMode==='list'){ h+=logList(); } else {
     h+=`<div class="note">已發現 ${found}/${SPECIES.length} 種，總漁獲 ${save.total} 尾</div>`;
     const dsp=dexSel&&SPECIES.find(s=>s.id===dexSel);
@@ -356,6 +356,7 @@ function render(){
     { const n=window.__DIAG?window.__DIAG.count():0; h+=`<div class="note">問題回報（目前記錄 ${n} 筆錯誤）</div><div class="tabs"><button class="tab" data-a="diag" data-v="copy">📋 複製診斷資訊</button><button class="tab" data-a="diag" data-v="clear">清除記錄</button></div><div class="note" style="font-size:12px">遇到怪問題時，按「複製診斷資訊」再貼給開發者，就能看到你手機上實際發生的錯誤和幀率。</div>`; }
     h+='<div class="note">天氣</div><div class="tabs">'+[['auto','自動'],['clear','晴'],['breezy','有風'],['cloudy','陰'],['drizzle','毛毛雨'],['rain','雨'],['storm','雷雨'],['fog','霧']].map(w=>`<button class="tab${(save.wxMode||'auto')===w[0]?' on':''}" data-a="wx" data-v="${w[0]}">${w[1]}</button>`).join('')+'</div>';
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
+    h+='<div class="note">魚訊放大視窗（自動：休閒、標準開，硬派、專家關）</div><div class="tabs">'+[['auto','自動'],['on','開'],['off','關']].map(m=>`<button class="tab${(save.mag||'auto')===m[0]?' on':''}" data-a="mag" data-v="${m[0]}">${m[1]}</button>`).join('')+'</div>';
     const tg=(k,name,sub,onv)=>row(name,sub,`<button class="sbtn${onv?' pri':''}" data-a="tg" data-v="${k}">${onv?'開':'關'}</button>`);
     h+=tg('sound','音效','環境聲、捲線器、水花',Snd.isOn());
     h+=tg('vibe','震動','咬餌、拉扯時的手機震動',save.vibe!==false);
@@ -479,11 +480,11 @@ const ZN={dock:'木碼頭',lily:'浮萍灣',wood:'倒木區',deep:'深水中央'
 const perOf=h=>h>=5&&h<8?'清晨':h>=8&&h<17?'白天':h>=17&&h<19.5?'黃昏':'夜晚';
 function logList(){ const L=(save.catchLog||[]).slice(); if(!L.length) return '<div class="note">還沒有紀錄。從這次更新開始，每釣起一尾都會記在這裡。</div>';
   const sorts={new:(a,b)=>b.t-a.t,w:(a,b)=>b.w-a.w,L:(a,b)=>b.L-a.L,sp:(a,b)=>a.id<b.id?-1:a.id>b.id?1:b.w-a.w,z:(a,b)=>(a.z||'').localeCompare(b.z||'')||b.w-a.w}; L.sort(sorts[logSort]||sorts.new);
-  let o='<div class="tabs" style="flex-wrap:wrap">'+[['new','最新'],['w','最重'],['L','最長'],['sp','魚種'],['z','釣點']].map(([k,n])=>`<button class="${logSort===k?'on':''}" data-a="logsort" data-v="${k}">${n}</button>`).join('')+'</div>';
+  let o='<div class="tabs" style="flex-wrap:wrap">'+[['new','最新'],['w','最重'],['L','最長'],['sp','魚種'],['z','釣點']].map(([k,n])=>`<button class="tab${logSort===k?' on':''}" data-a="logsort" data-v="${k}">${n}</button>`).join('')+'</div>';
   o+=`<div class="note" style="font-size:12px">共 ${L.length} 筆（最多保留 300 筆）</div>`;
   o+=L.slice(0,120).map(r=>{ const sp=SPECIES.find(s=>s.id===r.id), b=BAITS.find(x=>x.id===r.b), d=new Date(r.t);
     const tag=(r.new?'<b style="color:#7ff0a8">首次</b> ':'')+(r.rec?'<b style="color:#ffd56a">新紀錄</b> ':'');
-    return row(`${sp?sp.name:r.id} ${tag}`,`${r.w>=1?r.w.toFixed(2)+' kg':Math.round(r.w*1000)+' g'}・${Math.round(r.L*100)} cm<br><small>${ZN[r.z]||r.z||''}・${perOf(r.h)}・${r.wx}・${b?b.name:'—'}・${r.m}${r.m==='浮標'||r.m==='沉底'?'・'+['淺棚','中層','深棚'][r.dp]:''}</small>`,`<small>${r.out||''}<br>${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</small>`); }).join('');
+    return row(`${sp?sp.name:r.id} ${tag}`,`${r.w>=1?r.w.toFixed(2)+' kg':Math.round(r.w*1000)+' g'}・${Math.round(r.L*100)} cm<br><small>${ZN[r.z]||r.z||''}・${perOf(r.h)}・${r.wx}・${b?b.name:'—'}・${r.m}${r.m==='浮標'||r.m==='沉底'?'・'+['淺棚','中層','深棚'][r.dp]:''}${r.ft!=null?'・搏魚 '+Math.round(r.ft)+' 秒':''}</small>`,`<small>${r.out||''}<br>${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</small>`); }).join('');
   return o; }
 function open(k){ document.body.classList.add('sheetOn'); cur=k; if(k==='log') dexSel=null; resetArm=false; render(); sheet.classList.remove('hidden'); }
 window.__openSheet=k=>open(k);
@@ -518,6 +519,7 @@ shB.addEventListener('click',e=>{
   else if(a==='dex'){ dexSel=v; render(); shB.scrollTop=0; return; }
   else if(a==='logmode'){ logMode=v; dexSel=null; render(); shB.scrollTop=0; return; }
   else if(a==='logsort'){ logSort=v; render(); return; }
+  else if(a==='mag'){ save.mag=v; persist(); render(); return; }
   else if(a==='dexback'){ dexSel=null; render(); return; }
   else if(a==='wx'){ save.wxMode=v; persist(); }
   else if(a==='kayak'){ if(save.coins<800){ toast('金幣不夠','bad'); return; } save.coins-=800; save.kayak=true; persist(); setCoins(); Snd.coin(); toast('買了獨木舟！可以划到其他釣點了','good'); }
