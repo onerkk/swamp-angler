@@ -253,7 +253,7 @@ void main(){
   vec4 wp = modelMatrix*vec4(position, 1.0); vec2 p0 = wp.xz;
   vec2 rel = wp.xz - modelMatrix[3].xz;
   float edge = 1.0 - smoothstep(105.0, 148.0, max(abs(rel.x), abs(rel.y)));
-  vec2 wd = normalize(uWind.xy + vec2(1e-4)); float s = (0.45 + 1.1*uWind.z)*edge;
+  vec2 wd = normalize(uWind.xy + vec2(1e-4)); float s = (0.45 + 1.1*uWind.z + 1.7*max(0.0, uWind.z - 0.6))*edge;
   vec2 d2 = vec2(wd.x*0.77 - wd.y*0.64, wd.y*0.77 + wd.x*0.64); vec2 d3 = vec2(wd.x*0.77 + wd.y*0.64, wd.y*0.77 - wd.x*0.64);
   vec2 d4 = vec2(wd.x*0.34 - wd.y*0.94, wd.y*0.34 + wd.x*0.94);
   vec3 n = vec3(0.0, 1.0, 0.0); vec3 off = vec3(0.0);
@@ -597,7 +597,7 @@ function setTime(hour, force){
 
 const ripS = []; for(let i=0;i<12;i++) ripS.push({x:0,z:0,age:9,amp:0}); let ripI = 0;
 function addRipple(x, z, amp){ const r = ripS[ripI]; ripI = (ripI+1)%12; r.x=x; r.z=z; r.age=0; r.amp=amp; }
-function seaH(x,z,t){ const w=U.uWind.value, L=Math.hypot(w.x,w.y)||1, dx=w.x/L, dz=w.y/L, s=.45+1.1*w.z;
+function seaH(x,z,t){ const w=U.uWind.value, L=Math.hypot(w.x,w.y)||1, dx=w.x/L, dz=w.y/L, s=.45+1.1*w.z+1.7*Math.max(0,w.z-.6);   /* 大風時浪高非線性增加：暴風雨約兩倍 */
   const D=[[dx,dz],[dx*.77-dz*.64,dz*.77+dx*.64],[dx*.77+dz*.64,dz*.77-dx*.64],[dx*.34-dz*.94,dz*.34+dx*.94],[.6,.8],[-.8,.6]], LL=[38,23,15,9,5.5,3.2], A=[.42,.28,.18,.11,.06,.035];
   let h=0; for(let i=0;i<6;i++){ const k=6.2831853/LL[i]; h+=A[i]*s*Math.sin(k*(D[i][0]*x+D[i][1]*z)-Math.sqrt(9.81*k)*t); } return h; }
 function swell(x, z, t){ if(seaMode) return seaH(x,z,t); return 0.006*Math.sin(t*1.9+x*0.7) + 0.004*Math.sin(t*2.6+z*0.9+1.3); }
