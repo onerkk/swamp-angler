@@ -39,7 +39,14 @@ function placeSnag(x,z,h){ const o=snagSrc.clone(true), g=new T.Group(); g.add(o
   if(long===sz.x) o.rotation.z=Math.PI/2; else if(long===sz.z) o.rotation.x=Math.PI/2;   // 長軸立起來
   o.updateMatrixWorld(true); const b2=new T.Box3().setFromObject(o), c=b2.getCenter(new T.Vector3()); o.position.set(-c.x,-b2.min.y,-c.z);
   const sc=(h+1.2)/long; g.scale.setScalar(sc); g.position.set(x,-1.0,z); g.rotation.set(rand(-.35,.35),Math.random()*6.28,rand(.25,.55)*(Math.random()<.5?-1:1));
-  g.traverse(m=>{ if(m.isMesh){ m.frustumCulled=true; m.castShadow=false; } }); g.userData.lake=true; g.visible=!(W.isSea&&W.isSea()); S.add(g); }
+  // 水面以下的部分裁掉（水不夠透，水下的樹幹會讓整棵樹看起來浮在半空）；水線處加深成濕木色，並不時冒出一圈漣漪
+  W.renderer.localClippingEnabled=true;
+  g.traverse(m=>{ if(m.isMesh){ m.frustumCulled=true; m.castShadow=false; const conv=mm=>{ const k=mm.clone(); k.clippingPlanes=[SNAG_CLIP]; k.clipShadows=true;
+      k.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying float vWY;').replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWY=(modelMatrix*vec4(transformed,1.0)).y;');
+        sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vWY;').replace('#include <dithering_fragment>','#include <dithering_fragment>\ngl_FragColor.rgb*=mix(0.45,1.0,smoothstep(0.0,0.55,vWY));'); };
+      return k; }; m.material=Array.isArray(m.material)?m.material.map(conv):conv(m.material); } });
+  g.userData.lake=true; g.visible=!(W.isSea&&W.isSea()); S.add(g); SNAG_RIP.push([x,z]); }
+const SNAG_CLIP=new T.Plane(new T.Vector3(0,1,0),.01), SNAG_RIP=[];
 if(T.GLTFLoader) new T.GLTFLoader().load('dead_tree_trunk_02.glb',gl=>{ snagSrc=gl.scene; SNAGQ.forEach(a=>placeSnag(...a)); });
 snag(-33,-30,5); snag(-22,-35,3.6); snag(-36,-17,6.5); snag(-18,-29,2.4); snag(-29,-39,4.2); snag(-40,-26,3.2);
 // 原本的圓柱浮木拿掉（像一根黑色水管）；倒木區已有實拍的倒木、樹樁、枯枝
@@ -237,7 +244,9 @@ function paddle(dt,k,ringFn){
   else { padG.rotation.z*=.9; padG.rotation.y*=.9; padG.position.y+=(PAD_Y-low-padG.position.y)*.15; paddleTilt.z*=.9; paddleTilt.x*=.9; }
 }
 const padGrip=(side,out)=>padG?padG.localToWorld(out.set(side==='L'?-.28:.28,0,0)):out;   // 兩手握在槳桿中段左右
+let snagRipT=0;
 function update(dt,t){
+  snagRipT-=dt; if(snagRipT<=0&&SNAG_RIP.length&&!(W.isSea&&W.isSea())){ snagRipT=.7+Math.random()*.9; const r=SNAG_RIP[Math.floor(Math.random()*SNAG_RIP.length)]; W.addRipple(r[0]+(Math.random()-.5)*.4,r[1]+(Math.random()-.5)*.4,.22); }   // 樹幹入水處的小漣漪
   const s=sp(), bx=s.pos[0], bz=s.pos[1];
   if(s.kayak){ const sw=W.swell(bx,bz,t)*2.2; boat.visible=true; boat.position.set(bx,sw,bz); boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
     W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=Math.sin(t*1.1)*.012+paddleTilt.z*.5; }

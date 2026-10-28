@@ -32,7 +32,7 @@ const popEl=$('pop'); let popT=0;
 function pop(txt,cls){ popEl.textContent=txt; popEl.className='show '+(cls||''); clearTimeout(popT); popT=setTimeout(()=>{ popEl.className=''; },1100); }
 /* ---------- 拋竿距離 ---------- */
 const ctEl=$('castTag'); let ctT=0;
-function castTag(d){ ctEl.innerHTML='拋竿距離<b>'+d.toFixed(2)+' 米</b>'; ctEl.classList.remove('hidden'); clearTimeout(ctT); ctT=setTimeout(()=>ctEl.classList.add('hidden'),3200); }
+function castTag(d){ ctEl.innerHTML='拋竿距離<b>'+d.toFixed(2)+' 米</b>'; ctEl.classList.remove('hidden'); clearTimeout(ctT); ctT=setTimeout(()=>ctEl.classList.add('hidden'),1500); }   // 只閃一下；之後由水面的距離標記接手，不重複顯示
 /* ---------- 連擊 ---------- */
 const cbEl=$('combo');
 function combo(n){ if(n>=2){ cbEl.innerHTML='連擊 <b>×'+n+'</b><small>獎勵 +'+Math.min(n,6)*5+'%</small>'; cbEl.classList.remove('hidden'); cbEl.classList.remove('bump'); void cbEl.offsetWidth; cbEl.classList.add('bump'); } else cbEl.classList.add('hidden'); }
