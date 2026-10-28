@@ -52,7 +52,7 @@ async function copyMain(auto){ if(!TEST||!owner) return; let best=null;
 function dirty(){ if(!user||(TEST&&!owner)) return; clearTimeout(dirtyT); dirtyT=setTimeout(push,6000); }
 // 切到背景、關閉頁面前立刻把進度推上雲端（不等 6 秒），減少「玩了一段卻沒同步到」的情況
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&user){ clearTimeout(dirtyT); push(); } });
-function status(){ if(!window.FIREBASE_CFG) return {state:'nocfg'}; if(!user) return {state:'out'}; return {state:'in',name:(user.displayName||user.email||'')+(TEST?'（測試帳號）':'')}; }
+function status(){ if(!window.FIREBASE_CFG) return {state:'nocfg'}; if(!user) return {state:'out'}; return {state:'in',name:(user.displayName||user.email||'')+(TEST?'（測試帳號）':''),owner:isOwner(user)}; }
 // 測試帳號的門：沒登入或不是擁有者就整個畫面擋住，驗證通過才放行
 function showGate(){ if(!TEST) return;
   if(owner){ if(gate){ gate.remove(); gate=null; } return; }
@@ -84,7 +84,15 @@ async function rescue(){ if(!user){ c.toast('請先用 Google 登入','warn',200
     if(score(best)<=score(cur)+1){ alert('找到的存檔：\n'+info+'\n\n目前的進度已經是最高的，不需要救回。'); return; }
     if(confirm('找到的存檔：\n'+info+`\n\n要救回進度最高的「${nm}」嗎？目前的進度會先備份。`)){ try{ localStorage.setItem(BK,JSON.stringify(cur)); }catch(e){} c.apply(best); setTimeout(push,1500); c.toast('已救回存檔','good',2400); } }
   catch(e){ console.warn('rescue',e); c.toast('讀取雲端失敗，請稍後再試','warn',2400); } }
-return {rescue,login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
+// 一次性補償（只限擁有者）：存檔救不回時，把等級、金幣、劇情進度恢復到遺失前的狀態（圖鑑與魚獲紀錄無法還原）
+function compensate(){ if(!isOwner(user)){ c.toast('只有擁有者帳號可以使用','warn',2000); return; }
+  if(!confirm('把目前的存檔恢復成：Lv 18、金幣 999,999、主線到第七章完成（終章「深淵之王」待觸發）、獨木舟與漁船已有、稱號「見習漁人」「守燈人」。\n目前的進度會先備份。確定嗎？')) return;
+  const s=JSON.parse(JSON.stringify(c.save())); try{ localStorage.setItem(BK,JSON.stringify(s)); }catch(e){}
+  s.lv=18; s.xp=0; s.coins=Math.max(s.coins||0,999999); s.kayak=true; s.yacht=true; s.tutDone=1; s.loaded=1;
+  s.story=s.story||{}; s.story.intro=1; s.story.done=['c1','c2','c3','c4','ice','c5','c6']; s.story.seen=s.story.seen||[]; s.story.read=s.story.read||[];
+  s.titles=Array.from(new Set([...(s.titles||[]),'見習漁人','守燈人'])); if(!s.title) s.title='守燈人';
+  s.spot=0; s.testSeeded=1; c.apply(s); setTimeout(push,1500); }
+return {compensate,rescue,login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
 }
 /* ===== 安裝到桌面（PWA） ===== */
 const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;

@@ -2128,6 +2128,7 @@ function render(){
       else if(st.state==='out') h+=row('☁️ 雲端存檔','用 Google 帳號登入，換手機或清除瀏覽器也不會丟進度。目前的本機進度會先上傳，不會被洗掉',`<button class="sbtn pri" data-a="cloud" data-v="in">Google 登入</button>`);
       else h+=row('☁️ 雲端存檔','Google 登入尚未設定',`<span class="lk">尚未設定</span>`);
       if(st.state==='in') h+=row('🛟 救回存檔','進度不見時用：檢查雲端存檔、雲端備份、本機備份，救回進度最高的那份',`<button class="sbtn" data-a="cloud" data-v="rescue">檢查並救回</button>`);
+      if(st.state==='in'&&window.__CLOUD.compensate&&st.owner) h+=row('🩹 一次性補償','存檔救不回時用：恢復 Lv 18、金幣、主線到終章前（圖鑑無法還原）',`<button class="sbtn" data-a="cloud" data-v="comp">恢復進度</button>`);
       if(st.state==='in'&&window.__CLOUD.isTest&&window.__CLOUD.isTest()) h+=row('🧪 測試帳號','把正式版目前的進度複製過來覆蓋測試存檔（金幣維持 999,999）',`<button class="sbtn" data-a="cloud" data-v="copy">複製正式進度</button>`);
       h+=row('📘 新手指引','重新看一次每個按鈕的用途',`<button class="sbtn" data-a="tut">重看</button>`);
       h+=row('📲 安裝到桌面',PWA.installed()?'已安裝成 App，從桌面開啟時進度一樣保留':'像 App 一樣從手機桌面開啟，進度與瀏覽器共用',PWA.installed()?`<span class="lk">已安裝</span>`:`<button class="sbtn pri" data-a="pwa">安裝</button>`); }
@@ -2298,7 +2299,7 @@ shB.addEventListener('click',e=>{
   else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
   else if(a==='shop'){ if(window.__SHOP) window.__SHOP(); }
-  else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else if(v==='rescue') window.__CLOUD.rescue(); else if(v==='copy') window.__CLOUD.copyMain(); else window.__CLOUD.logout(); }
+  else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else if(v==='rescue') window.__CLOUD.rescue(); else if(v==='comp') window.__CLOUD.compensate(); else if(v==='copy') window.__CLOUD.copyMain(); else window.__CLOUD.logout(); }
   else if(a==='tut'){ const sh=document.getElementById('sheet'); if(sh) sh.classList.add('hidden'); setTimeout(()=>startTutorial(true),300); return; }
   else if(a==='pwa'){ PWA.install().then(r=>{ if(r==='ios') toast('iPhone：按 Safari 的「分享」→「加入主畫面」','',4200); else if(r==='manual') toast('瀏覽器選單 ⋮ →「加到主畫面」或「安裝應用程式」','',4200); else if(r==='installed') toast('已經安裝了','',1600); }); }
   else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem(window.__SAVE_KEY||'swampAngler.v1'); }catch(_){} location.reload(); return; } }
@@ -5759,7 +5760,7 @@ async function copyMain(auto){ if(!TEST||!owner) return; let best=null;
 function dirty(){ if(!user||(TEST&&!owner)) return; clearTimeout(dirtyT); dirtyT=setTimeout(push,6000); }
 // 切到背景、關閉頁面前立刻把進度推上雲端（不等 6 秒），減少「玩了一段卻沒同步到」的情況
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&user){ clearTimeout(dirtyT); push(); } });
-function status(){ if(!window.FIREBASE_CFG) return {state:'nocfg'}; if(!user) return {state:'out'}; return {state:'in',name:(user.displayName||user.email||'')+(TEST?'（測試帳號）':'')}; }
+function status(){ if(!window.FIREBASE_CFG) return {state:'nocfg'}; if(!user) return {state:'out'}; return {state:'in',name:(user.displayName||user.email||'')+(TEST?'（測試帳號）':''),owner:isOwner(user)}; }
 // 測試帳號的門：沒登入或不是擁有者就整個畫面擋住，驗證通過才放行
 function showGate(){ if(!TEST) return;
   if(owner){ if(gate){ gate.remove(); gate=null; } return; }
@@ -5791,7 +5792,15 @@ async function rescue(){ if(!user){ c.toast('請先用 Google 登入','warn',200
     if(score(best)<=score(cur)+1){ alert('找到的存檔：\n'+info+'\n\n目前的進度已經是最高的，不需要救回。'); return; }
     if(confirm('找到的存檔：\n'+info+`\n\n要救回進度最高的「${nm}」嗎？目前的進度會先備份。`)){ try{ localStorage.setItem(BK,JSON.stringify(cur)); }catch(e){} c.apply(best); setTimeout(push,1500); c.toast('已救回存檔','good',2400); } }
   catch(e){ console.warn('rescue',e); c.toast('讀取雲端失敗，請稍後再試','warn',2400); } }
-return {rescue,login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
+// 一次性補償（只限擁有者）：存檔救不回時，把等級、金幣、劇情進度恢復到遺失前的狀態（圖鑑與魚獲紀錄無法還原）
+function compensate(){ if(!isOwner(user)){ c.toast('只有擁有者帳號可以使用','warn',2000); return; }
+  if(!confirm('把目前的存檔恢復成：Lv 18、金幣 999,999、主線到第七章完成（終章「深淵之王」待觸發）、獨木舟與漁船已有、稱號「見習漁人」「守燈人」。\n目前的進度會先備份。確定嗎？')) return;
+  const s=JSON.parse(JSON.stringify(c.save())); try{ localStorage.setItem(BK,JSON.stringify(s)); }catch(e){}
+  s.lv=18; s.xp=0; s.coins=Math.max(s.coins||0,999999); s.kayak=true; s.yacht=true; s.tutDone=1; s.loaded=1;
+  s.story=s.story||{}; s.story.intro=1; s.story.done=['c1','c2','c3','c4','ice','c5','c6']; s.story.seen=s.story.seen||[]; s.story.read=s.story.read||[];
+  s.titles=Array.from(new Set([...(s.titles||[]),'見習漁人','守燈人'])); if(!s.title) s.title='守燈人';
+  s.spot=0; s.testSeeded=1; c.apply(s); setTimeout(push,1500); }
+return {compensate,rescue,login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
 }
 /* ===== 安裝到桌面（PWA） ===== */
 const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -5799,7 +5808,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028134525'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028135217'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
