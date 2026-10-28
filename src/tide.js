@@ -101,15 +101,22 @@ function startDig(s){ const k=s.k, cr=k?CR[k]:null; const dep=new Float32Array(N
   $('digInfo').textContent=cr?'用手指刮開沙泥，慢慢往下挖…':'這裡看起來沒什麼痕跡，挖挖看？'; $('digBtns').innerHTML='<button id="dgGive" style="background:#333;color:#fff">放棄</button>';
   $('dgGive').onclick=()=>{ endDig(false); }; box.style.display='flex'; drawDig(); }
 function inBody(x,y){ const b=dig.body; const dx=x+.5-b.cx, dy=y+.5-b.cy, ca=Math.cos(b.ang), sa=Math.sin(b.ang); const u=(dx*ca+dy*sa)/b.rx, v=(-dx*sa+dy*ca)/b.ry; return u*u+v*v<=1; }
-function drawDig(){ const d=dig; g2.clearRect(0,0,360,360);
+// 畫挖掘面：深度網格先畫成一張小圖，再用平滑縮放放大（不再是一格一格的馬賽克）；每層有自己的顏色與顆粒，挖痕邊緣是柔和的濕泥色
+const DOC=document.createElement('canvas'), DMK=document.createElement('canvas'), DTMP=document.createElement('canvas');
+function drawDig(){ const d=dig; if(DOC.width!==N){ DOC.width=DOC.height=N; DMK.width=DMK.height=N; DTMP.width=DTMP.height=360; }
+  g2.clearRect(0,0,360,360); g2.imageSmoothingEnabled=true;
   if(mudImg.complete) g2.drawImage(mudImg,0,0,mudImg.width*.3,mudImg.height*.3,0,0,360,360); else { g2.fillStyle='#8a7a62'; g2.fillRect(0,0,360,360); }
-  for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const z=d.dep[y*N+x]; if(z>3) continue; const li=z>2?0:z>1?1:2, c=LAYER[li].col, sh=.75+.25*(z%1);
-    g2.fillStyle=`rgb(${c[0]*sh|0},${c[1]*sh|0},${c[2]*sh|0})`; g2.fillRect(x*CS,y*CS,CS,CS); }
-  // 露出的殼／身體：只畫已經挖到那個深度的格子
-  if(d.cr&&!d.fled){ const im=sprite(d.k); if(im.complete&&im.naturalWidth){ g2.save(); g2.beginPath(); let any=false;
-      for(let y=0;y<N;y++) for(let x=0;x<N;x++){ if(inBody(x,y)&&d.dep[y*N+x]<=3-d.depth*.9){ g2.rect(x*CS,y*CS,CS,CS); any=true; } }
-      if(any){ g2.clip(); const b=d.body; g2.translate(b.cx*CS,b.cy*CS); g2.rotate(b.ang); const w=b.rx*2*CS*1.05, h=b.ry*2*CS*1.05; g2.drawImage(im,-w/2,-h/2,w,h); }
-      g2.restore(); } }
+  const oc=DOC.getContext('2d'), id=oc.createImageData(N,N), mk=DMK.getContext('2d'), md=mk.createImageData(N,N);
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const k=y*N+x, z=d.dep[k], o=k*4;
+    const a=Math.max(0,Math.min(1,(3.05-z)/0.35));   // 表層還在的地方透明，開始挖下去才慢慢出現下層
+    const li=z>2?0:z>1?1:2, cc=LAYER[li].col, sh=.62+.3*(z%1)+.08*((x*7+y*13)%5)/5;
+    id.data[o]=cc[0]*sh; id.data[o+1]=cc[1]*sh; id.data[o+2]=cc[2]*sh; id.data[o+3]=a*255;
+    const vis=d.cr&&!d.fled&&inBody(x,y)&&z<=3-d.depth*.9; md.data[o+3]=vis?255:0; }
+  oc.putImageData(id,0,0); g2.drawImage(DOC,0,0,360,360);
+  // 挖出來的殼／身體：用平滑放大的遮罩只露出已經挖到的部分
+  if(d.cr&&!d.fled){ const im=sprite(d.k); if(im.complete&&im.naturalWidth){ mk.putImageData(md,0,0); const t=DTMP.getContext('2d'); t.clearRect(0,0,360,360); t.imageSmoothingEnabled=true;
+      const b=d.body; t.save(); t.translate(b.cx*CS,b.cy*CS); t.rotate(b.ang); const w=b.rx*2*CS*1.05, h=b.ry*2*CS*1.05; t.drawImage(im,-w/2,-h/2,w,h); t.restore();
+      t.globalCompositeOperation='destination-in'; t.drawImage(DMK,0,0,360,360); t.globalCompositeOperation='source-over'; g2.drawImage(DTMP,0,0); } }
   if(d.dmg>0&&d.cr){ g2.strokeStyle='rgba(255,255,255,'+Math.min(.8,d.dmg*.25)+')'; g2.lineWidth=2; g2.beginPath(); const b=d.body; for(let i=0;i<d.dmg;i++){ g2.moveTo(b.cx*CS+rand(-8,8),b.cy*CS+rand(-8,8)); g2.lineTo(b.cx*CS+rand(-14,14),b.cy*CS+rand(-14,14)); } g2.stroke(); } }
 function reveal(){ const d=dig; let tot=0,vis=0; for(let y=0;y<N;y++) for(let x=0;x<N;x++) if(inBody(x,y)){ tot++; if(d.dep[y*N+x]<=3-d.depth*.9) vis++; } return tot?vis/tot:0; }
 function scrape(px,py,spd){ const d=dig; if(!d||d.done) return; const gx=px/CS, gy=py/CS, R=1.6; let layerHit=-1, onShell=false;

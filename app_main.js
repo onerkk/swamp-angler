@@ -1,4 +1,4 @@
-/*APPV:20261028230434*/
+/*APPV:20261028231430*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -3388,12 +3388,14 @@ function rigFish(grp,uni,K,mode){ const bones=BX.map(()=>new T.Bone()); bones[0]
   const addB=(parent,x,y,z)=>{ const b=new T.Bone(); b.position.set(x,y,z); parent.add(b); all.push(b); return all.length-1; };
   if(mode==='ray'||mode==='crab'){ const r0=wz*(mode==='crab'?.42:.28), r1=wz*.62; extra.L=[addB(bones[2],0,0,r0)]; extra.L.push(addB(all[extra.L[0]],0,0,r1-r0)); extra.R=[addB(bones[2],0,0,-r0)]; extra.R.push(addB(all[extra.R[0]],0,0,-(r1-r0))); extra.r0=r0; extra.r1=r1; }
   if(mode==='mola'){ const y0=hy*.42; extra.D=addB(bones[2],0,y0,0); extra.A=addB(bones[2],0,-y0,0); extra.y0=y0; }
+  if(mode==='stiff'){ extra.H=addB(bones[0],0,0,0); }   // 貝殼：上殼掛在殼頂的鉸鏈上，可以開合
   const skel=new T.Skeleton(all);
   grp.children.filter(o=>o.isMesh&&!o.isSkinnedMesh).forEach(m=>{ const g=m.geometry, P=g.attributes.position, n=P.count, si=new Uint16Array(n*4), sw=new Float32Array(n*4);
     for(let i=0;i<n;i++){ const x=P.getX(i), y=P.getY(i), z=P.getZ(i); let k=0; while(k<BX.length-1&&x<BX[k+1]) k++; let w=1, j=k; if(k>0&&x>BX[k]-band&&x<=BX[k]){ j=k-1; w=.5+.5*(BX[k]-x)/band; }
       let f=0, fb=0;
       if(mode==='ray'||mode==='crab'){ const az=Math.abs(z), side=z>0?extra.L:extra.R; if(az>extra.r0){ f=Math.min(1,(az-extra.r0)/(wz*.12)); fb=az>extra.r1?side[1]:side[0]; } }
       if(mode==='mola'){ const ay=Math.abs(y); if(ay>extra.y0){ f=Math.min(1,(ay-extra.y0)/(hy*.1)); fb=y>0?extra.D:extra.A; } }
+      if(mode==='stiff'&&y>hy*.04){ f=Math.min(1,(y-hy*.04)/(hy*.08)); fb=extra.H; }
       si[i*4]=k; si[i*4+1]=j; si[i*4+2]=fb; sw[i*4]=w*(1-f); sw[i*4+1]=(1-w)*(1-f); sw[i*4+2]=f; }
     g.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); g.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
     const mats=(Array.isArray(m.material)?m.material:[m.material]); mats.forEach(mm=>{ mm.onBeforeCompile=()=>{}; mm.skinning=true; mm.needsUpdate=true; });
@@ -3406,6 +3408,7 @@ function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.dele
   const amp=Math.min(1,.25+r.uni.uAmp.value*6), ph=u*.55, e=r.extra;
   if(r.mode==='ray'||r.mode==='crab'){ const cr=r.mode==='crab', a0=Math.sin(cr?u*2.2:ph)*(cr?.22:.38)*amp, a1=Math.sin((cr?u*2.2:ph)-.9)*(cr?.28:.45)*amp;   // 外側比內側慢半拍，翅膀呈波浪
     r.all[e.L[0]].rotation.set(a0,0,0); r.all[e.L[1]].rotation.set(a1,0,0); r.all[e.R[0]].rotation.set(-a0,0,0); r.all[e.R[1]].rotation.set(-a1,0,0); }
+  if(r.mode==='stiff'&&e.H!=null){ const gape=Math.max(0,Math.sin(u*.35))*(.05+.25*Math.min(1,r.uni.uAmp.value*4)); r.all[e.H].rotation.set(0,0,gape); }   // 殼慢慢張開一條縫再合上，被挖出來掙扎時開合更大
   if(r.mode==='mola'){ const a=Math.sin(u*.8)*.55*amp; r.all[e.D].rotation.set(a,0,0); r.all[e.A].rotation.set(a,0,0); } }
 // 有骨架的魚被複製時（水族箱、標本、烤魚、圖鑑…），複製成不帶骨架的普通網格：直接複製骨架網格會指向原本那副骨頭，畫不出來
 function cloneSafe(grp){ grp.clone=function(){ const g=new T.Group(); this.traverse(ch=>{ if(!ch.isMesh) return; const mats=(Array.isArray(ch.material)?ch.material:[ch.material]).map(m=>{ const k=m.clone(); k.skinning=false; k.onBeforeCompile=()=>{}; k.needsUpdate=true; return k; });
@@ -5462,7 +5465,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028230434'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028231430'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6202,15 +6205,22 @@ function startDig(s){ const k=s.k, cr=k?CR[k]:null; const dep=new Float32Array(N
   $('digInfo').textContent=cr?'用手指刮開沙泥，慢慢往下挖…':'這裡看起來沒什麼痕跡，挖挖看？'; $('digBtns').innerHTML='<button id="dgGive" style="background:#333;color:#fff">放棄</button>';
   $('dgGive').onclick=()=>{ endDig(false); }; box.style.display='flex'; drawDig(); }
 function inBody(x,y){ const b=dig.body; const dx=x+.5-b.cx, dy=y+.5-b.cy, ca=Math.cos(b.ang), sa=Math.sin(b.ang); const u=(dx*ca+dy*sa)/b.rx, v=(-dx*sa+dy*ca)/b.ry; return u*u+v*v<=1; }
-function drawDig(){ const d=dig; g2.clearRect(0,0,360,360);
+// 畫挖掘面：深度網格先畫成一張小圖，再用平滑縮放放大（不再是一格一格的馬賽克）；每層有自己的顏色與顆粒，挖痕邊緣是柔和的濕泥色
+const DOC=document.createElement('canvas'), DMK=document.createElement('canvas'), DTMP=document.createElement('canvas');
+function drawDig(){ const d=dig; if(DOC.width!==N){ DOC.width=DOC.height=N; DMK.width=DMK.height=N; DTMP.width=DTMP.height=360; }
+  g2.clearRect(0,0,360,360); g2.imageSmoothingEnabled=true;
   if(mudImg.complete) g2.drawImage(mudImg,0,0,mudImg.width*.3,mudImg.height*.3,0,0,360,360); else { g2.fillStyle='#8a7a62'; g2.fillRect(0,0,360,360); }
-  for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const z=d.dep[y*N+x]; if(z>3) continue; const li=z>2?0:z>1?1:2, c=LAYER[li].col, sh=.75+.25*(z%1);
-    g2.fillStyle=`rgb(${c[0]*sh|0},${c[1]*sh|0},${c[2]*sh|0})`; g2.fillRect(x*CS,y*CS,CS,CS); }
-  // 露出的殼／身體：只畫已經挖到那個深度的格子
-  if(d.cr&&!d.fled){ const im=sprite(d.k); if(im.complete&&im.naturalWidth){ g2.save(); g2.beginPath(); let any=false;
-      for(let y=0;y<N;y++) for(let x=0;x<N;x++){ if(inBody(x,y)&&d.dep[y*N+x]<=3-d.depth*.9){ g2.rect(x*CS,y*CS,CS,CS); any=true; } }
-      if(any){ g2.clip(); const b=d.body; g2.translate(b.cx*CS,b.cy*CS); g2.rotate(b.ang); const w=b.rx*2*CS*1.05, h=b.ry*2*CS*1.05; g2.drawImage(im,-w/2,-h/2,w,h); }
-      g2.restore(); } }
+  const oc=DOC.getContext('2d'), id=oc.createImageData(N,N), mk=DMK.getContext('2d'), md=mk.createImageData(N,N);
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const k=y*N+x, z=d.dep[k], o=k*4;
+    const a=Math.max(0,Math.min(1,(3.05-z)/0.35));   // 表層還在的地方透明，開始挖下去才慢慢出現下層
+    const li=z>2?0:z>1?1:2, cc=LAYER[li].col, sh=.62+.3*(z%1)+.08*((x*7+y*13)%5)/5;
+    id.data[o]=cc[0]*sh; id.data[o+1]=cc[1]*sh; id.data[o+2]=cc[2]*sh; id.data[o+3]=a*255;
+    const vis=d.cr&&!d.fled&&inBody(x,y)&&z<=3-d.depth*.9; md.data[o+3]=vis?255:0; }
+  oc.putImageData(id,0,0); g2.drawImage(DOC,0,0,360,360);
+  // 挖出來的殼／身體：用平滑放大的遮罩只露出已經挖到的部分
+  if(d.cr&&!d.fled){ const im=sprite(d.k); if(im.complete&&im.naturalWidth){ mk.putImageData(md,0,0); const t=DTMP.getContext('2d'); t.clearRect(0,0,360,360); t.imageSmoothingEnabled=true;
+      const b=d.body; t.save(); t.translate(b.cx*CS,b.cy*CS); t.rotate(b.ang); const w=b.rx*2*CS*1.05, h=b.ry*2*CS*1.05; t.drawImage(im,-w/2,-h/2,w,h); t.restore();
+      t.globalCompositeOperation='destination-in'; t.drawImage(DMK,0,0,360,360); t.globalCompositeOperation='source-over'; g2.drawImage(DTMP,0,0); } }
   if(d.dmg>0&&d.cr){ g2.strokeStyle='rgba(255,255,255,'+Math.min(.8,d.dmg*.25)+')'; g2.lineWidth=2; g2.beginPath(); const b=d.body; for(let i=0;i<d.dmg;i++){ g2.moveTo(b.cx*CS+rand(-8,8),b.cy*CS+rand(-8,8)); g2.lineTo(b.cx*CS+rand(-14,14),b.cy*CS+rand(-14,14)); } g2.stroke(); } }
 function reveal(){ const d=dig; let tot=0,vis=0; for(let y=0;y<N;y++) for(let x=0;x<N;x++) if(inBody(x,y)){ tot++; if(d.dep[y*N+x]<=3-d.depth*.9) vis++; } return tot?vis/tot:0; }
 function scrape(px,py,spd){ const d=dig; if(!d||d.done) return; const gx=px/CS, gy=py/CS, R=1.6; let layerHit=-1, onShell=false;
