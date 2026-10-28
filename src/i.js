@@ -215,5 +215,7 @@ function update(dt){
   if(hk.on){ hk.t+=dt; hgM.style.bottom=(hpos()*100)+'%'; htF.style.height=(clamp(1-hk.t/hk.win,0,1)*100)+'%'; }
   updHot(dt); updTour(dt);
 }
-return {items:ITEMS,spawnHot,goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,hookExpired,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
+// 落點和魚群的關係：砸在正中間會把魚群嚇散；落在魚群前方最好
+function hotHit(p){ if(!hot.on) return null; const d=Math.hypot(p.x-hot.x,p.z-hot.z); if(d<1.6){ hot.on=false; hot.t=0; hotEl.classList.add('hidden'); return 'center'; } return d<5?'in':null; }
+return {hotHit,items:ITEMS,spawnHot,goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,hookExpired,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
 }
