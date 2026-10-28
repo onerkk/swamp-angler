@@ -1074,12 +1074,17 @@ reeds.userData.lake=true; scene.add(reeds);
 /* ---------- 釣竿（藍色碳纖竿、導環、紡車捲線器） ---------- */
 const rod={pitch:0, pitchT:0, side:0, bend:0, bendT:0, spin:0, end:null, tipW:new T.Vector3(), spoolW:new T.Vector3(), guidesW:[]};
 const R_BASE=new T.Vector3(0.21,-0.80,-0.78), R_DIR=new T.Vector3(-0.07,0.42,-0.9).normalize(), R_LEN=2.65, NS=20;
-const blankMat=new T.MeshStandardMaterial({color:0x1d4fb8, metalness:.6, roughness:.26});
-const gripMat=new T.MeshStandardMaterial({color:0x1c1d20, roughness:.8});
+// 真實釣竿材質：碳纖編織紋竿身＋透明亮光漆、EVA 發泡握把（細小氣孔）、捲線器線杯纏著一圈圈釣線
+const texC=(w,h,draw,rx,ry)=>{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; draw(cv.getContext('2d'),w,h); const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx||1,ry||1); return t; };
+const carbonTex=texC(64,64,(g,w,h)=>{ g.fillStyle='#16181c'; g.fillRect(0,0,w,h); for(let y=0;y<h;y+=8) for(let x=0;x<w;x+=8){ const on=((x+y)/8)%2===0, gr=g.createLinearGradient(x,y,on?x+8:x,on?y:y+8); gr.addColorStop(0,'#1c1f24'); gr.addColorStop(.5,on?'#3a414b':'#2c323a'); gr.addColorStop(1,'#1c1f24'); g.fillStyle=gr; g.fillRect(x+.5,y+.5,7,7); } },3,4);
+const evaTex=texC(64,64,(g,w,h)=>{ g.fillStyle='#202124'; g.fillRect(0,0,w,h); for(let i=0;i<500;i++){ g.fillStyle=Math.random()<.5?'rgba(0,0,0,.55)':'rgba(70,72,78,.35)'; g.beginPath(); g.arc(Math.random()*w,Math.random()*h,Math.random()*1.3+.3,0,7); g.fill(); } },2,6);
+const blankMat=new T.MeshPhysicalMaterial({color:0xffffff,map:carbonTex,metalness:.25,roughness:.38,clearcoat:1,clearcoatRoughness:.05});
+const gripMat=new T.MeshStandardMaterial({color:0xffffff,map:evaTex,bumpMap:evaTex,bumpScale:.002,roughness:.92});
 const chromeMat=new T.MeshStandardMaterial({color:0xdde2e6, metalness:1, roughness:.16});
 const darkMetal=new T.MeshStandardMaterial({color:0x2a2e35, metalness:.75, roughness:.3});
 const goldMat=new T.MeshStandardMaterial({color:0xd9b25a, metalness:1, roughness:.2});
-const blueAno=new T.MeshStandardMaterial({color:0x1f55c8, metalness:.85, roughness:.28});
+const spoolTex=texC(16,128,(g,w,h)=>{ for(let y=0;y<h;y++){ const v=170+Math.round(60*Math.abs(Math.sin(y*1.7))); g.fillStyle=`rgb(${v-30},${v},${v+10})`; g.fillRect(0,y,w,1); } },6,1);
+const blueAno=new T.MeshPhysicalMaterial({color:0xffffff,map:spoolTex,metalness:.2,roughness:.35,clearcoat:.6});   // 線杯上纏滿的透明尼龍線
 const rRad=s=>s<.1?.0155:s<.155?.0105:s<.21?.0128:lerp(.0082,.0021,(s-.21)/.79);
 const rodGroup=new T.Group(); player.add(rodGroup);
 const segs=[];
@@ -1087,7 +1092,8 @@ for(let i=0;i<NS;i++){ const s0=i/NS, s1=(i+1)/NS, sm=(s0+s1)/2;
   const mat=sm<.1?gripMat:sm<.155?chromeMat:sm<.21?gripMat:blankMat;
   const m=new T.Mesh(new T.CylinderGeometry(rRad(s1),rRad(s0),1,10),mat); rodGroup.add(m); segs.push(m); }
 const GS=[.3,.42,.53,.63,.72,.8,.87,.93,.975];
-const guides=GS.map(s=>{ const r=.004+.008*(1-s); const m=new T.Mesh(new T.TorusGeometry(r,.0011,6,14),chromeMat); rodGroup.add(m); rod.guidesW.push(new T.Vector3()); return m; });
+const sicMat=new T.MeshStandardMaterial({color:0x2a2c30,metalness:.4,roughness:.25});
+const guides=GS.map(s=>{ const r=.004+.008*(1-s); const m=new T.Mesh(new T.TorusGeometry(r,.0011,6,14),chromeMat); const ins=new T.Mesh(new T.TorusGeometry(r*.78,.0009,6,14),sicMat); m.add(ins); rodGroup.add(m); rod.guidesW.push(new T.Vector3()); return m; });   // 金屬導環架＋深色陶瓷內環
 const tipTop=new T.Mesh(new T.TorusGeometry(.0035,.001,6,10),chromeMat); rodGroup.add(tipTop);
 // 捲線器
 const reel=new T.Group(); rodGroup.add(reel);
@@ -1131,7 +1137,7 @@ function updateRod(dt){
 const LN=72, lpos=new Float32Array(LN*2*3), lidx=[];
 for(let i=0;i<LN-1;i++){ const a=i*2; lidx.push(a,a+1,a+2, a+1,a+3,a+2); }
 const lgeo=new T.BufferGeometry(); lgeo.setAttribute('position',new T.BufferAttribute(lpos,3)); lgeo.setIndex(lidx);
-const lineMat=new T.MeshBasicMaterial({color:0xdfe6e8, transparent:true, opacity:.85, side:T.DoubleSide, depthWrite:false});
+const lineMat=new T.MeshBasicMaterial({color:0xdfe6e8, transparent:true, opacity:.42, side:T.DoubleSide, depthWrite:false});   // 尼龍線是半透明的，只在反光處看得清楚
 const lineMesh=new T.Mesh(lgeo,lineMat); lineMesh.frustumCulled=false; scene.add(lineMesh);
 const LP=[]; for(let i=0;i<LN;i++) LP.push(new T.Vector3());
 const camW=new T.Vector3(), lt=new T.Vector3(), lc=new T.Vector3(), ls=new T.Vector3();
@@ -1150,7 +1156,7 @@ function setLine(end, slack, visible, light, trem){
     const w=Math.max(.0006,d*pix*1.25)*.5; ls.multiplyScalar(w/L);
     lpos[i*6]=p.x-ls.x; lpos[i*6+1]=p.y-ls.y; lpos[i*6+2]=p.z-ls.z; lpos[i*6+3]=p.x+ls.x; lpos[i*6+4]=p.y+ls.y; lpos[i*6+5]=p.z+ls.z; }
   lgeo.attributes.position.needsUpdate=true; lgeo.setDrawRange(0,(n-1)*6);
-  const k=clamp(light,.12,1); lineMat.color.setRGB(.87*k,.9*k,.91*k);
+  const k=clamp(light,.12,1); lineMat.color.setRGB(.8*k,.86*k,.88*k);
 }
 
 /* ---------- 浮標：照真實的磯釣棒浮標做——輕木紡錘形浮身、上段螢光漆、下段深色、細長的天線（彩色刻度）、
@@ -1668,7 +1674,8 @@ function getFish(sp){
 
 const showLight=new T.PointLight(0xfff4e8,0,6,1.2); showLight.position.set(.5,.6,.3); head.add(showLight);
 
-function setRodLook(col,gold){ blankMat.color.set(col); const gm=gold?goldMat:chromeMat; guides.forEach(g=>{ g.material=gm; }); tipTop.material=gm; }
+function setRodLook(col,gold){ blankMat.color.set(col).lerp(new T.Color(1,1,1),.5);   // 不同竿子在碳纖紋上帶一點顏色（像真的有色碳纖竿），不是整根塗成純色
+  const gm=gold?goldMat:chromeMat; guides.forEach(g=>{ g.material=gm; }); tipTop.material=gm; }
 return { dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook, rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
 }
 /* ===== 第 2 段 · 水下鏡頭、釣具店、等級與任務 ===== */
@@ -5622,7 +5629,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028014331'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028015350'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
