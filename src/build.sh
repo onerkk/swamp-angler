@@ -8,6 +8,21 @@ python3 tools/lintc.py >/dev/null
 STAMP=$(date +%Y%m%d%H%M%S)
 { cat a.html; echo "<script>"; cat scan.js; echo "</script>"; echo "<script>"; cat $JS; echo "</script>"; echo "</body></html>"; } > ../index.html
 sed -i "s/__APP_BUILD__/$STAMP/" ../index.html
+
+
+# 資產指紋：Service Worker 用來判斷哪些模型／貼圖換過、需要重新下載（沒換過的保留在手機裡）
+( cd .. && python3 - <<'PY'
+import os,hashlib,json
+out={}
+for root,ds,fs in os.walk('.'):
+    if root.startswith('./src') or root.startswith('./.git'): continue
+    for f in fs:
+        if f.lower().endswith(('.glb','.jpg','.jpeg','.png','.webp','.hdr','.mp3')):
+            p=os.path.join(root,f)[2:]; out[p]=hashlib.md5(open(os.path.join(root,f),'rb').read()).hexdigest()[:12]
+json.dump(out,open('assets.json','w'),separators=(',',':'))
+PY
+)
+
 sed -i "s/const VER='[^']*'/const VER='swamp-$STAMP'/" ../sw.js
 echo "{\"v\":\"$STAMP\"}" > ../version.json
 echo "BUILT $STAMP"
