@@ -50,6 +50,8 @@ async function copyMain(auto){ if(!TEST||!owner) return; let best=null;
   try{ await docRef().set({[FIELD]:o,[TFIELD]:Date.now()},{merge:true}); }catch(e){}
   setTimeout(()=>c.apply(o),auto?900:600); }
 function dirty(){ if(!user||(TEST&&!owner)) return; clearTimeout(dirtyT); dirtyT=setTimeout(push,6000); }
+// 切到背景、關閉頁面前立刻把進度推上雲端（不等 6 秒），減少「玩了一段卻沒同步到」的情況
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&user){ clearTimeout(dirtyT); push(); } });
 function status(){ if(!window.FIREBASE_CFG) return {state:'nocfg'}; if(!user) return {state:'out'}; return {state:'in',name:(user.displayName||user.email||'')+(TEST?'（測試帳號）':'')}; }
 // 測試帳號的門：沒登入或不是擁有者就整個畫面擋住，驗證通過才放行
 function showGate(){ if(!TEST) return;

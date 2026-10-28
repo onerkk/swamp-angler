@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
+<script>
+/* 載入卡住時的錯誤顯示：任何程式錯誤或下載失敗，直接寫在畫面最下方（手機沒有開發者工具也看得到），方便截圖回報 */
+(function(){ var box=null, n=0; function show(t){ try{ if(++n>6) return; if(!box){ box=document.createElement('div'); box.id='errBox'; box.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:999999;background:rgba(120,0,0,.88);color:#fff;font:12px/1.4 monospace;padding:8px 10px;border-radius:10px;max-height:40vh;overflow:auto;white-space:pre-wrap;word-break:break-all'; (document.body||document.documentElement).appendChild(box); }
+  box.textContent+=(box.textContent?'\n':'')+'⚠️ '+t; }catch(e){} }
+  window.addEventListener('error',function(e){ if(e&&e.target&&e.target!==window&&(e.target.src||e.target.href)){ show('載入失敗：'+(e.target.src||e.target.href)); return; } show((e.message||'錯誤')+' @'+String(e.filename||'').split('/').pop()+':'+(e.lineno||'')+':'+(e.colno||'')); },true);
+  window.addEventListener('unhandledrejection',function(e){ var r=e&&e.reason; show('非同步錯誤：'+String(r&&r.message||r).slice(0,200)); });
+  window.__showErr=show; })();
+</script>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0b1210">
@@ -276,10 +285,11 @@ body.fighting #top,body.fighting #top2,body.fighting #magWin,body.fighting .hotC
   #magWin{top:calc(env(safe-area-inset-top,0px) + 54px)!important}
 }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+<!-- 3D 引擎放在自己的網站上（不靠外部 CDN：手機網路連不到 CDN 時整個頁面會卡在載入畫面） -->
+<script src="vendor/three.min.js"></script>
+<script src="vendor/GLTFLoader.js"></script>
+<script src="vendor/SkeletonUtils.js"></script>
+<script src="vendor/RGBELoader.js"></script>
 </head>
 <body>
 <canvas id="c"></canvas>

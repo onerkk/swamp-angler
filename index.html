@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
+<script>
+/* 載入卡住時的錯誤顯示：任何程式錯誤或下載失敗，直接寫在畫面最下方（手機沒有開發者工具也看得到），方便截圖回報 */
+(function(){ var box=null, n=0; function show(t){ try{ if(++n>6) return; if(!box){ box=document.createElement('div'); box.id='errBox'; box.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:999999;background:rgba(120,0,0,.88);color:#fff;font:12px/1.4 monospace;padding:8px 10px;border-radius:10px;max-height:40vh;overflow:auto;white-space:pre-wrap;word-break:break-all'; (document.body||document.documentElement).appendChild(box); }
+  box.textContent+=(box.textContent?'\n':'')+'⚠️ '+t; }catch(e){} }
+  window.addEventListener('error',function(e){ if(e&&e.target&&e.target!==window&&(e.target.src||e.target.href)){ show('載入失敗：'+(e.target.src||e.target.href)); return; } show((e.message||'錯誤')+' @'+String(e.filename||'').split('/').pop()+':'+(e.lineno||'')+':'+(e.colno||'')); },true);
+  window.addEventListener('unhandledrejection',function(e){ var r=e&&e.reason; show('非同步錯誤：'+String(r&&r.message||r).slice(0,200)); });
+  window.__showErr=show; })();
+</script>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0b1210">
@@ -276,10 +285,11 @@ body.fighting #top,body.fighting #top2,body.fighting #magWin,body.fighting .hotC
   #magWin{top:calc(env(safe-area-inset-top,0px) + 54px)!important}
 }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';document.head.appendChild(s)"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+<!-- 3D 引擎放在自己的網站上（不靠外部 CDN：手機網路連不到 CDN 時整個頁面會卡在載入畫面） -->
+<script src="vendor/three.min.js"></script>
+<script src="vendor/GLTFLoader.js"></script>
+<script src="vendor/SkeletonUtils.js"></script>
+<script src="vendor/RGBELoader.js"></script>
 </head>
 <body>
 <canvas id="c"></canvas>
@@ -5742,6 +5752,8 @@ async function copyMain(auto){ if(!TEST||!owner) return; let best=null;
   try{ await docRef().set({[FIELD]:o,[TFIELD]:Date.now()},{merge:true}); }catch(e){}
   setTimeout(()=>c.apply(o),auto?900:600); }
 function dirty(){ if(!user||(TEST&&!owner)) return; clearTimeout(dirtyT); dirtyT=setTimeout(push,6000); }
+// 切到背景、關閉頁面前立刻把進度推上雲端（不等 6 秒），減少「玩了一段卻沒同步到」的情況
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&user){ clearTimeout(dirtyT); push(); } });
 function status(){ if(!window.FIREBASE_CFG) return {state:'nocfg'}; if(!user) return {state:'out'}; return {state:'in',name:(user.displayName||user.email||'')+(TEST?'（測試帳號）':'')}; }
 // 測試帳號的門：沒登入或不是擁有者就整個畫面擋住，驗證通過才放行
 function showGate(){ if(!TEST) return;
@@ -5782,7 +5794,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028132055'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028133846'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
