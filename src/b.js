@@ -27,6 +27,9 @@ uniform sampler2D uBandB;
 uniform sampler2D uFullA;
 uniform sampler2D uFullB;
 uniform sampler2D uMask;
+uniform sampler2D uOvcA;
+uniform sampler2D uOvcB;
+uniform float uOvcK;
 uniform float uPMix;
 uniform float uPhoto;
 uniform float uYaw;
@@ -185,21 +188,30 @@ vec3 photoEnv(vec3 dir){
   vec3 d = normalize(dir);
   vec3 c = mix(photoS(uBandA, uFullA, d), photoS(uBandB, uFullB, d), uPMix);
   float g = dot(c, vec3(0.3, 0.59, 0.11));
-  c = mix(c, vec3(g)*vec3(0.94, 0.97, 1.02), clamp(uCloud - 0.3, 0.0, 1.0)*0.75);
-  c *= 1.0 - 0.35*clamp(uCloud - 0.4, 0.0, 1.0) - 0.25*uRain;
+  // 陰天／下雨：天空部分換成實拍的陰天雲層照片（Poly Haven，CC0）；遠山、岸邊等地景保留原照片
+  if(uOvcK > 0.01 && d.y > -0.02){
+    float ou = fract(atan(d.x, -d.z)*0.15915494 + 0.37), ov = asin(clamp(d.y, -1.0, 1.0))*0.31830989 + 0.5;
+    vec3 oc = mix(pow(texture2D(uOvcA, vec2(ou, ov)).rgb, vec3(2.2)), pow(texture2D(uOvcB, vec2(ou, ov)).rgb, vec3(2.2)), clamp(uRain*1.4, 0.0, 1.0));
+    float skyK = smoothstep(-0.01, 0.06, d.y)*smoothstep(0.10, 0.26, g);
+    float om = dot(oc, vec3(0.3, 0.59, 0.11)); oc = max(vec3(0.0), vec3(om) + (oc - vec3(om))*1.5); oc = mix(vec3(om), oc, 1.0)*mix(1.0, 1.35, smoothstep(0.0, 0.3, d.y));   // 加強雲層明暗層次
+    c = mix(c, oc, skyK*uOvcK); g = mix(g, om, skyK*uOvcK);
+  }
+  float keepSky = 1.0 - 0.8*uOvcK*step(0.0, d.y);   // 天空已是實拍陰天照片，不再整片灰化壓暗
+  c = mix(c, vec3(g)*vec3(0.94, 0.97, 1.02), clamp(uCloud - 0.3, 0.0, 1.0)*0.75*keepSky);
+  c *= 1.0 - (0.35*clamp(uCloud - 0.4, 0.0, 1.0) + 0.25*uRain)*mix(1.0, 0.45, 1.0 - keepSky);
   c *= mix(1.0, uNightDeep, uNight);
   vec3 navy = mix(vec3(0.006, 0.009, 0.02), vec3(0.0012, 0.002, 0.0065), smoothstep(0.1, 0.9, d.y));
   c = mix(c, navy, uNight*0.9*smoothstep(0.02, 0.35, d.y));
   if(d.y > 0.0){
     vec2 cuv = d.xz/(d.y + 0.10)*0.6 + uCloudOff;
     float n = fbm5(cuv);
-    float cov = smoothstep(0.66 - uCloud*0.38, 0.95 - uCloud*0.3, n)*clamp((uCloud - 0.35)*1.8, 0.0, 1.0);
+    float cov = smoothstep(0.66 - uCloud*0.38, 0.95 - uCloud*0.3, n)*clamp((uCloud - 0.35)*1.8, 0.0, 1.0)*(1.0 - 0.85*uOvcK);   // 已換成實拍雲層時，程式雲幾乎不疊
     float n2 = fbm3(cuv + uSunDir.xz*0.08);
     float lit = clamp(0.55 + (n - n2)*2.8, 0.0, 1.0);
     c = mix(c, mix(vec3(g*0.55), vec3(g*1.15), lit), cov*smoothstep(0.0, 0.16, d.y)*0.92);
   }
   float hz = exp(-abs(d.y)*10.0);
-  c = mix(c, vec3(g)*0.9 + uFogCol*0.15, clamp(hz*(uMist*0.35 + max(uFogDen - 0.006, 0.0)*35.0), 0.0, 0.8));
+  c = mix(c, vec3(g)*0.9 + uFogCol*0.15, clamp(hz*(uMist*0.35 + max(uFogDen - 0.006, 0.0)*35.0), 0.0, 0.8)*(1.0 - 0.6*uOvcK*step(0.0, d.y)));   // 有實拍雲層時，地平線霧氣不再把雲層蓋掉
   return c;
 }
 vec3 envRay(vec3 P, vec3 dir, bool disks, bool lite){
@@ -465,7 +477,7 @@ const head = new T.Group(); head.rotation.x = -0.16; player.add(head); head.add(
 const V = () => new T.Vector3();
 const U = { uTime:{value:0}, uSunDir:{value:new T.Vector3(0,1,0)}, uLightCol:{value:V()}, uSunDisk:{value:new T.Vector3(0,1,0)},
   uSunCol:{value:V()}, uMoonDir:{value:new T.Vector3(0,1,0)}, uMoonCol:{value:V()}, uZenith:{value:V()}, uHorizon:{value:V()},
-  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.035,.25,.40)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
+  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.035,.25,.40)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
 
 // 天空球（含樹林遠景）
 const skyMat = new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:SH.common+SH.skyFS, side:T.BackSide, depthWrite:false, depthTest:false});

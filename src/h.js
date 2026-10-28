@@ -36,7 +36,11 @@ function sched(h){
 }
 const dA=new T.Vector3(), dB=new T.Vector3(), dir=new T.Vector3();
 const sunDir=(m,o)=>{ const th=(m.u-YAW)*Math.PI*2, e=m.el*Math.PI/180; return o.set(Math.sin(th)*Math.cos(e),Math.sin(e),-Math.cos(th)*Math.cos(e)); };
+// 實拍陰天天空：輕陰（Kloofendal Overcast）與厚雲雨天（Overcast Soil），依雲量、雨量淡入
+{ const ld=f=>{ const t=tl.load(f); t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; t.minFilter=T.LinearFilter; t.generateMipmaps=false; return t; };
+  U.uOvcA.value=ld('sky_ovc_light.jpg'); U.uOvcB.value=ld('sky_ovc_heavy.jpg'); }
 W.setPhotoHook((h,wx)=>{
+  { const k=Math.min(1,Math.max(0,(wx.cloud-.35)/.4)+wx.rain*.6); U.uOvcK.value+=(k-U.uOvcK.value)*.08; }
   const [a,b,m]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b];
   if(!A||!A.ready||!B||!B.ready) return null;
   if(!started){ started=true; W.setPhotoActive(); if(cb) cb(1,true,errors); }
