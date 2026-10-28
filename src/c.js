@@ -34,6 +34,11 @@ const NPL=46, planks=new T.InstancedMesh(new T.BoxGeometry(2.5,.055,.19), plankM
 { const R=rng(7); for(let i=0;i<NPL;i++){ eu.set((R()-.5)*.02,(R()-.5)*.03,(R()-.5)*.015); q4.setFromEuler(eu);
   pv.set((R()-.5)*.06,.8+R()*.01,-3.2+i*.205); sv.set(1+R()*.03,1,1); m4.compose(pv,q4,sv); planks.setMatrixAt(i,m4);
   const c=.72+R()*.38; planks.setColorAt(i,new T.Color(c,c*(.95+R()*.06),c*(.9+R()*.08))); } }
+// 每片木板取照片上不同的一段（隨機錯開紋理），不會每片長得一模一樣、排成一格一格的地磚
+{ const off=new Float32Array(NPL*2), R=rng(19); for(let i=0;i<NPL;i++){ off[i*2]=R(); off[i*2+1]=R(); }
+  planks.geometry.setAttribute('iOff',new T.InstancedBufferAttribute(off,2));
+  plankMat.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute vec2 iOff;').replace('#include <uv_vertex>','#include <uv_vertex>\n#ifdef USE_UV\nvUv += iOff;\n#endif'); };
+  plankMat.customProgramCacheKey=()=>'plankOff'; }
 planks.userData.lake=true; scene.add(planks);
 const postTex=dataTex(64,128,(u,v,o)=>{ const n=fbm(u*8,v*30,3), g=sstep(.58,.66,v), w=[34,38,24], dr=[96,80,62];
   for(let k=0;k<3;k++) o[k]=(w[k]+(dr[k]-w[k])*g)*(.7+.6*n); });

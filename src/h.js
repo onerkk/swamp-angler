@@ -61,7 +61,7 @@ W.setPhotoHook((h,wx)=>{
 const rep=(t,x,y,srgb)=>{ t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(x,y); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; return t; };
 const dDiff=tl.load('dock_diff.jpg'), dNor=tl.load('dock_nor.jpg'), dRough=tl.load('dock_rough.jpg');
 if(P.dockMats){ const {plankMat,postMat,beamMat}=P.dockMats;
-  Object.assign(plankMat,{map:rep(dDiff,1.25,.1,true),normalMap:rep(dNor,1.25,.1),roughnessMap:rep(dRough,1.25,.1),roughness:1}); plankMat.needsUpdate=true;
+  Object.assign(plankMat,{map:rep(dDiff,.55,.09,true),normalMap:rep(dNor,.55,.09),roughnessMap:rep(dRough,.55,.09),roughness:1}); plankMat.needsUpdate=true;   // 一片木板只對到照片上一塊板子，少掉一節一節的接縫
   for(const m of [postMat,beamMat]){ Object.assign(m,{map:rep(dDiff.clone(),.4,1.6,true),normalMap:rep(dNor.clone(),.4,1.6),roughnessMap:rep(dRough.clone(),.4,1.6),roughness:1,color:new T.Color(.75,.72,.68)});
     m.map.needsUpdate=m.normalMap.needsUpdate=m.roughnessMap.needsUpdate=true; m.needsUpdate=true; } }
 

@@ -1058,6 +1058,11 @@ const NPL=46, planks=new T.InstancedMesh(new T.BoxGeometry(2.5,.055,.19), plankM
 { const R=rng(7); for(let i=0;i<NPL;i++){ eu.set((R()-.5)*.02,(R()-.5)*.03,(R()-.5)*.015); q4.setFromEuler(eu);
   pv.set((R()-.5)*.06,.8+R()*.01,-3.2+i*.205); sv.set(1+R()*.03,1,1); m4.compose(pv,q4,sv); planks.setMatrixAt(i,m4);
   const c=.72+R()*.38; planks.setColorAt(i,new T.Color(c,c*(.95+R()*.06),c*(.9+R()*.08))); } }
+// 每片木板取照片上不同的一段（隨機錯開紋理），不會每片長得一模一樣、排成一格一格的地磚
+{ const off=new Float32Array(NPL*2), R=rng(19); for(let i=0;i<NPL;i++){ off[i*2]=R(); off[i*2+1]=R(); }
+  planks.geometry.setAttribute('iOff',new T.InstancedBufferAttribute(off,2));
+  plankMat.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute vec2 iOff;').replace('#include <uv_vertex>','#include <uv_vertex>\n#ifdef USE_UV\nvUv += iOff;\n#endif'); };
+  plankMat.customProgramCacheKey=()=>'plankOff'; }
 planks.userData.lake=true; scene.add(planks);
 const postTex=dataTex(64,128,(u,v,o)=>{ const n=fbm(u*8,v*30,3), g=sstep(.58,.66,v), w=[34,38,24], dr=[96,80,62];
   for(let k=0;k<3;k++) o[k]=(w[k]+(dr[k]-w[k])*g)*(.7+.6*n); });
@@ -2835,7 +2840,7 @@ W.setPhotoHook((h,wx)=>{
 const rep=(t,x,y,srgb)=>{ t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(x,y); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; return t; };
 const dDiff=tl.load('dock_diff.jpg'), dNor=tl.load('dock_nor.jpg'), dRough=tl.load('dock_rough.jpg');
 if(P.dockMats){ const {plankMat,postMat,beamMat}=P.dockMats;
-  Object.assign(plankMat,{map:rep(dDiff,1.25,.1,true),normalMap:rep(dNor,1.25,.1),roughnessMap:rep(dRough,1.25,.1),roughness:1}); plankMat.needsUpdate=true;
+  Object.assign(plankMat,{map:rep(dDiff,.55,.09,true),normalMap:rep(dNor,.55,.09),roughnessMap:rep(dRough,.55,.09),roughness:1}); plankMat.needsUpdate=true;   // 一片木板只對到照片上一塊板子，少掉一節一節的接縫
   for(const m of [postMat,beamMat]){ Object.assign(m,{map:rep(dDiff.clone(),.4,1.6,true),normalMap:rep(dNor.clone(),.4,1.6),roughnessMap:rep(dRough.clone(),.4,1.6),roughness:1,color:new T.Color(.75,.72,.68)});
     m.map.needsUpdate=m.normalMap.needsUpdate=m.roughnessMap.needsUpdate=true; m.needsUpdate=true; } }
 
@@ -5736,7 +5741,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028075913'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028080318'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
