@@ -114,7 +114,7 @@ function createHomeScene(W,c){
 'use strict';
 const T=THREE, R=W.renderer, scene=new T.Scene(), cam=new T.PerspectiveCamera(62,1,.05,60), TL=new T.TextureLoader();
 let on=false, yaw=0, pitch=-.08, yawT=0, pitchT=-.08, drag=null, t=0;
-const EYE=1.6, ROOM={x:3.2,zb:-4.2,zf:2.8,h:2.9};
+const EYE=1.6, ROOM={x:4.4,zb:-4.2,zf:2.8,h:2.9}   /* 房間加寬（6.4→8.8 公尺），兩個水族箱升到最大也能並排、一樣大 */;
 // 站在房間中段：轉頭時左邊窗戶、右邊壁爐都在畫面中央
 cam.position.set(0,EYE,.9); scene.background=new T.Color(0x1a120c);
 // 真實木紋貼圖（碼頭用的那組），每個用途各自一份，才能設不同重複次數
@@ -290,7 +290,7 @@ for(const x of [-2.85,2.85]){ put('industrial_wall_lamp',x,2.05,ROOM.zb+.06,0,1)
 const lampL=new T.PointLight(0xffd8a0,1.2,5,1.4); lampL.position.set(LV.x+.2,.9,LV.z-.3); scene.add(lampL);   // 煤油燈
 
 // 水族箱：尺寸跟著等級變；淡水缸在後牆中央，有海水缸時放在右側
-const TSPEC=[{w:1.2,h:.6,d:.45,st:.85},{w:1.8,h:.75,d:.55,st:.85},{w:2.6,h:1.0,d:.7,st:.7},{w:3.4,h:1.2,d:.8,st:.55}], SEA_SPEC={w:1.25,h:.62,d:.5,st:.85}, SEA_SPECS=[{w:1.25,h:.62,d:.5,st:.85},{w:1.5,h:.75,d:.55,st:.85},{w:1.75,h:.9,d:.62,st:.75},{w:2.0,h:1.0,d:.7,st:.65}];
+const TSPEC=[{w:1.2,h:.6,d:.45,st:.85},{w:1.8,h:.75,d:.55,st:.85},{w:2.6,h:1.0,d:.7,st:.7},{w:3.4,h:1.2,d:.8,st:.55}], SEA_SPEC={w:1.25,h:.62,d:.5,st:.85}, SEA_SPECS=TSPEC;   /* 海水缸每一級的尺寸和淡水缸相同 */
 // 底砂壓暗成自然溪砂的灰褐色（原本在缸燈下太白、像雪）
 const sandTex={fresh:pbr('clean_pebbles',2,1,{color:0x9c8f78}),sea:pbr('coral_gravel',2,1,{color:0xc8bca6})};
 const rockM=new T.MeshStandardMaterial({color:0x6a665e,roughness:.95});
@@ -426,7 +426,7 @@ function bounds(tk,L){ L=dispL(tk,L); const s=tk.spec, m=Math.min(L*.55,s.w*.4);
 function pickTarget(f,tk){ const b=bounds(tk,f.rec.L), r=(a,b)=>a+Math.random()*Math.max(0,b-a); const cy=f.o?f.o.position.y:(b.y0+b.y1)/2, dyMax=(b.y1-b.y0)*.3; f.tgt.set(r(b.x0,b.x1),Math.max(b.y0,Math.min(b.y1,cy+(Math.random()-.5)*2*dyMax)),r(Math.min(b.z0,b.z1),Math.max(b.z0,b.z1))); }
 function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.sea:[]};
   const tierSig='t'+hd.tier+(hd.seaTank?'s'+(hd.seaTier||0):'');
-  if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?(hd.tier>=3?-.75:-.55):0); if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,Math.min(2.25,3.1-ss.w/2)); } else if(tanks.sea){ scene.remove(tanks.sea.g); delete tanks.sea; } }
+  if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?-ROOM.x*.42:0);   /* 有海水缸時兩缸左右對稱並排 */ if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,ROOM.x*.42); } else if(tanks.sea){ scene.remove(tanks.sea.g); delete tanks.sea; } }
   for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=want[w]||[], sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|');
     if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[];
     list.forEach(rec=>{ try{ c.want(rec.id); const o=fishObj(rec); if(!o) return; o.scale.setScalar(dispL(tk,rec.L)); const f={o,rec,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6}; const b=bounds(tk,rec.L);
@@ -618,7 +618,7 @@ function tagTxt(f,H){ if(f==='light') return [lightsOff()?'💡 點吊燈開燈'
   return ['',false]; }
 function updFurnTags(){ const H=c.home&&c.home(); if(!H) return; const mounts=(c.data().mounts||[]).length;
   furnTags.forEach(t=>{ const [txt,hot]=tagTxt(t.f,H); setTag(t.s,txt,hot); t.ready=t.f==='mount'?mounts>0:true;
-    if(t.f==='herb'){ if(H.furnLv('herb')===0){ t.s.position.set(-2.5,1.6,ROOM.zb+.5); t.y=1.6; } else { t.s.position.set(-2.75,1.05,.35); t.y=1.05; } } }); }
+    if(t.f==='herb'){ if(H.furnLv('herb')===0){ t.s.position.set(-(ROOM.x-.7),1.6,ROOM.zb+.5); t.y=1.6; } else { t.s.position.set(-(ROOM.x-.45),1.05,.35); t.y=1.05; } } }); }
 let furnTick=0;
 // 開遊戲時就把目前等級的家具載好；其他等級的模型等一下在背景預先載入，升級時立刻換好，不用等
 setTimeout(()=>{ try{ syncFurn(); }catch(e){ console.warn('furn init',e); } },1500);
