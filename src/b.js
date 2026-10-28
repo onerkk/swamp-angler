@@ -347,27 +347,36 @@ void main(){
     }
   }
   if(uRain > 0.01){
-    float rf = uRain*(1.0 - smoothstep(8.0, 30.0, dist))*(1.0 - 0.8*dw)*(1.0 + uSea);
+    // 雨打在水面：湖上是一圈圈擴散的漣漪；海上有風有浪，雨點只留下密密麻麻的小凹點，漣漪還沒擴散就被浪打散
+    float rf = uRain*(1.0 - smoothstep(mix(8.0, 4.0, uSea), mix(30.0, 16.0, uSea), dist))*(1.0 - 0.8*dw)*(1.0 - 0.45*uSea);
     for(int k = 0; k < 2; k++){
-      float sc = k == 0 ? 2.2 : 3.4;
+      float sc = (k == 0 ? 2.2 : 3.4)*mix(1.0, 5.5, uSea);
       vec2 q = p*sc + float(k)*7.31;
       vec2 ci = floor(q); vec2 cf = fract(q) - 0.5;
       float h = hash21(ci + float(k)*13.1);
       float ph = fract(uTime*(0.8 + h*0.7) + h*7.0);
       vec2 o = vec2(hash21(ci + 3.1), hash21(ci + 7.7)) - 0.5;
       vec2 dv = cf - o*0.4; float d = length(dv) + 1e-4;
-      float x = d - ph*0.42;
+      float x = d - ph*mix(0.42, 0.22, uSea);
       g += (dv/d)*sin(x*55.0)*exp(-x*x*700.0)*(1.0 - ph)*rf*1.4;
     }
+    // 海上下雨：整片海面被雨點打出細密的凹凸（像磨砂），遠處也看得到——海面失去鏡面光澤、變得霧霧的
+    if(uSea > 0.5){ float pf = uRain*(1.0 - smoothstep(25.0, 140.0, dist))*0.9;
+      vec2 pq = p*9.0 + vec2(uTime*0.7, -uTime*0.5);
+      float e = 0.07, n0 = noise2(pq), nx = noise2(pq + vec2(e, 0.0)), nz = noise2(pq + vec2(0.0, e));
+      vec2 pq2 = p*23.0 - vec2(uTime*1.3, uTime*0.9);
+      float m0 = noise2(pq2), mx = noise2(pq2 + vec2(e, 0.0)), mz = noise2(pq2 + vec2(0.0, e));
+      g += (vec2(nx - n0, nz - n0)*0.55 + vec2(mx - m0, mz - m0)*0.45)/e*0.06*pf; }
   }
   #ifdef SEAGRID
   g += vec2(-vNs.x, -vNs.z)/max(vNs.y, 0.2);
   #endif
   vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
   float NdV = max(dot(N, V), 0.0);
-  float F = 0.02 + 0.98*pow(1.0 - NdV, 5.0);
+  float F = (0.02 + 0.98*pow(1.0 - NdV, 5.0))*(1.0 - 0.3*uRain*uSea);   // 雨中的海面粗糙，鏡面反光變弱，浪坡不會反出一條條亮線
   vec3 R = reflect(-V, N); R.y = max(R.y, 0.003); R = normalize(R);
   vec3 refl = envRay(vW, R, false, true);
+  refl = mix(refl, vec3(dot(refl, vec3(0.3, 0.59, 0.11))), 0.35*uRain*uSea);   // 雨打花的海面把天空反得糊而灰
   if(uReflOn > 0.5){
     vec4 rp = uReflMat*vec4(vW.x, 0.0, vW.z, 1.0);
     vec2 ruv = rp.xy/rp.w + N.xz*(0.03 + 0.05*uSea)*(1.0 - smoothstep(30.0, 160.0, dist)*0.6);
@@ -387,6 +396,8 @@ void main(){
   if(uSea > 0.5){
     float lk = 0.22 + 0.78*uLightK;
     vec3 deepC = uSeaCol*lk*(0.72 + 0.56*clamp(dot(N, normalize(vec3(uSunDir.x, 0.6, uSunDir.z))), 0.0, 1.0));
+    deepC *= 1.0 - 0.38*uRain - 0.15*(1.0 - uSunVis);
+    deepC = mix(deepC, vec3(dot(deepC, vec3(0.3, 0.55, 0.15)))*vec3(0.9, 1.0, 1.02), clamp(0.55*uRain + 0.3*(1.0 - uSunVis), 0.0, 0.7));   // 去掉晴天的飽和藍，偏鉛灰   // 下雨、陰天的海是暗沉的鉛灰藍，不是晴天的亮藍
     bodyD = deepC;
     if(uReef > 0.01){
       vec3 Vr = refract(-V, N, 0.75);
@@ -396,7 +407,7 @@ void main(){
       float reefK = smoothstep(0.46, 0.56, rf_), grass = smoothstep(0.38, 0.46, rf_)*(1.0 - reefK);
       float Dd = 4.5 - 1.6*reefK, Lp = Dd*iy;
       vec2 bp = vW.xz + Vr.xz*Lp;
-      float cs = causF(bp, uTime) + 0.6*causF(bp*1.7 + 9.0, uTime*1.2);
+      float cs = (causF(bp, uTime) + 0.6*causF(bp*1.7 + 9.0, uTime*1.2))*mix(0.15, 1.0, uSunVis)*(1.0 - 0.7*uRain);   // 陰天下雨沒有陽光，海底不會有亮晶晶的光紋
       vec3 rk = mix(vec3(0.10, 0.13, 0.11), vec3(0.04, 0.06, 0.06), noise2(bp*0.9));
       vec3 bed = mix(mix(vec3(0.92, 0.88, 0.72), vec3(0.45, 0.50, 0.35), grass*0.6), rk, reefK);
       bed *= lk*(0.6 + 0.75*cs*uLightK*(0.35 + 0.65*uSunVis)*(1.0 - 0.6*reefK)*(1.0 - smoothstep(6.0, 40.0, dist)));
@@ -411,7 +422,8 @@ void main(){
     // 浪頭白沫：風越大、浪越高越多；碎成一塊一塊、隨時間消散
     { float wcN = noise2(vW.xz*0.35 + vec2(uTime*0.05, uTime*0.03))*0.6 + noise2(vW.xz*1.3 - uTime*0.08)*0.4;
       float wc = smoothstep(0.62, 0.9, vH*0.75 + wcN*0.55)*clamp(uWind.z*1.4 - 0.25, 0.0, 1.0)*(1.0 - smoothstep(60.0, 260.0, dist));
-      bodyD = mix(bodyD, vec3(0.82, 0.86, 0.88)*(0.35 + 0.65*uLightK), wc*0.75); }
+      wc *= smoothstep(0.45, 0.8, noise2(vW.xz*0.06 + vec2(uTime*0.02, 0.0)))*smoothstep(0.3, 0.7, noise2(vW.xz*0.9 + uTime*0.1));   // 白沫零星成塊，不會沿著浪的等高線連成一條條白線
+      bodyD = mix(bodyD, vec3(0.82, 0.86, 0.88)*(0.35 + 0.65*uLightK), wc*0.6); }
     #endif
     refl *= vec3(0.74, 0.88, 1.0); F *= 0.82;
     bodyD *= mix(1.0, 0.1, uNight);
