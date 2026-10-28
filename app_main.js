@@ -1,4 +1,4 @@
-/*APPV:20261028231430*/
+/*APPV:20261028232755*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -1618,6 +1618,7 @@ const GEAR={
 const BAITS=[
  {id:'worm',name:'蚯蚓',icon:'🪱',price:0,pack:0,lv:1,desc:'什麼魚都吃一點，用不完',aff:{},rare:0,wait:1},
  {id:'corn',name:'甜玉米',icon:'🌽',price:60,pack:10,lv:1,desc:'鯉魚、草魚、鯽魚、印度鯪愛吃，咬口快',aff:{reba:2.2,bluegill:1.6,crappie:1.3,crucian:2.2,tilapia:1.8,carp:2.5,grasscarp:2.2,silvercarp:1.2,clarias:.5,mekong:1.5,yperch:.8,whitefish:.8},rare:-.2,wait:.75},
+ {id:'ragworm',name:'沙蠶',icon:'🪱',price:0,pack:0,lv:1,shop:false,desc:'潮間帶挖來的沙蠶，海釣的萬用餌：黑鯛、真鯛、石斑、沙梭都愛',aff:{porgy:2.2,redbream:2,grouper:1.6,grouper2:1.4,knifejaw:1.8,emperor:1.6,wrasse:2,flathead:1.3,cobia:1.2,amber:1.2}},
  {id:'shrimp',name:'活蝦',icon:'🦐',price:180,pack:10,lv:2,desc:'鱖魚、鯰魚、黑鯛、真鯛、江鱈的最愛',aff:{perch:2.2,channel:2,flathead:1.4,clarias:1.8,blackcarp:2,carp:1.2,porgy:2.2,redbream:2,emperor:1.8,burbot:1.8,wrasse:1.2,yperch:1.8,whitefish:1.6,eel:1.6,laketrout:1.2,clownfish:1.6,copperband:1.6,bluetang:1.2,seahorse:1.8,blenny:1.4,angelfish:1.2},rare:.35,wait:1},
  {id:'soft',name:'軟蟲路亞',icon:'🐛',price:240,pack:10,lv:3,desc:'專攻黑鱸和弓鰭魚',aff:{lmbass:2.6,smbass:2.6,bowfin:1.5,snakehead:1.8,peacock:1.5},rare:.4,wait:1.05},
  {id:'live',name:'活魚餌',icon:'🐟',price:600,pack:5,lv:5,desc:'小魚幾乎不碰，大型掠食魚才會咬',aff:{flathead:3,gar:3,bowfin:2,channel:1.6,snakehead:2.2,peacock:2.4,arapaima:3,spgar:2,clarias:.6,cobia:2,yellowfin:1.5,sawara:1.5,emperor:1.2,char:1.6,burbot:1.5,bluegill:.2,crappie:.2,reba:.2,crucian:.2,tilapia:.3,eel:2.5,taimen:2.5,laketrout:2,gt:2.2,swordfish:1.8,mekong:.3,yperch:.3,whitefish:.3,threadfin:2},rare:1.0,wait:1.4},
@@ -1715,7 +1716,7 @@ function render(){
         return row(it.name,sub,btn); }).join('');
     } else {
       h+=BAITS.map((b,i)=>{ const n=b.id==='worm'?'∞':(save.baits[b.id]||0), lock=save.lv<b.lv, using=save.bait===b.id;
-        let btn=''; if(b.id!=='worm') btn+=lock?`<span class="lk">Lv ${b.lv} 解鎖</span>`:`<button class="sbtn" data-a="bb" data-v="${i}">+${b.pack} 🪙${b.price}</button>`;
+        let btn=''; if(b.shop===false){ if(!n) return ''; } else if(b.id!=='worm') btn+=lock?`<span class="lk">Lv ${b.lv} 解鎖</span>`:`<button class="sbtn" data-a="bb" data-v="${i}">+${b.pack} 🪙${b.price}</button>`;
         btn+=using?'<span class="eqd">使用中</span>':(b.id==='worm'||n>0)?`<button class="sbtn pri" data-a="ub" data-v="${i}">使用</button>`:'';
         return row(`${b.icon} ${b.name} <small class="cnt">×${n}</small>`,b.desc,`<div class="bb">${btn}</div>`); }).join('');
     }
@@ -3407,7 +3408,10 @@ function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.dele
     if(r.flat) r.bones[i].rotation.set(0,0,a); else r.bones[i].rotation.set(0,-a,0); }
   const amp=Math.min(1,.25+r.uni.uAmp.value*6), ph=u*.55, e=r.extra;
   if(r.mode==='ray'||r.mode==='crab'){ const cr=r.mode==='crab', a0=Math.sin(cr?u*2.2:ph)*(cr?.22:.38)*amp, a1=Math.sin((cr?u*2.2:ph)-.9)*(cr?.28:.45)*amp;   // 外側比內側慢半拍，翅膀呈波浪
-    r.all[e.L[0]].rotation.set(a0,0,0); r.all[e.L[1]].rotation.set(a1,0,0); r.all[e.R[0]].rotation.set(-a0,0,0); r.all[e.R[1]].rotation.set(-a1,0,0); }
+    if(r.mode==='crab'){ const w=u*2.2, sw=Math.min(1,r.uni.uAmp.value*6)*.32;   // 螃蟹走路：左右兩側交替抬腳、往前後划，不是像翅膀一起拍
+      r.all[e.L[0]].rotation.set(Math.max(0,Math.sin(w))*.3*amp,Math.sin(w)*sw,0); r.all[e.L[1]].rotation.set(Math.max(0,Math.sin(w+1.6))*.25*amp,Math.sin(w+1.6)*sw,0);
+      r.all[e.R[0]].rotation.set(-Math.max(0,Math.sin(w+Math.PI))*.3*amp,Math.sin(w+Math.PI)*sw,0); r.all[e.R[1]].rotation.set(-Math.max(0,Math.sin(w+Math.PI+1.6))*.25*amp,Math.sin(w+Math.PI+1.6)*sw,0); }
+    else { r.all[e.L[0]].rotation.set(a0,0,0); r.all[e.L[1]].rotation.set(a1,0,0); r.all[e.R[0]].rotation.set(-a0,0,0); r.all[e.R[1]].rotation.set(-a1,0,0); } }
   if(r.mode==='stiff'&&e.H!=null){ const gape=Math.max(0,Math.sin(u*.35))*(.05+.25*Math.min(1,r.uni.uAmp.value*4)); r.all[e.H].rotation.set(0,0,gape); }   // 殼慢慢張開一條縫再合上，被挖出來掙扎時開合更大
   if(r.mode==='mola'){ const a=Math.sin(u*.8)*.55*amp; r.all[e.D].rotation.set(a,0,0); r.all[e.A].rotation.set(a,0,0); } }
 // 有骨架的魚被複製時（水族箱、標本、烤魚、圖鑑…），複製成不帶骨架的普通網格：直接複製骨架網格會指向原本那副骨頭，畫不出來
@@ -5465,7 +5469,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028231430'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261028232755'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6833,7 +6837,9 @@ function fxBurst(icon){ const el=document.createElement('div'); el.textContent=i
   document.body.appendChild(el); requestAnimationFrame(()=>{ el.style.transform='translate(-50%,-50%) scale(1.15)'; el.style.opacity='1'; }); setTimeout(()=>{ el.style.transition='transform 1s,opacity 1s'; el.style.transform='translate(-50%,-140%) scale(.8)'; el.style.opacity='0'; },1100); setTimeout(()=>el.remove(),2300); vib([20,40,20]); }
 function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id); if(!sp) return; const lo=season==='lemon'?.72:.78, hi=season==='lemon'?.95:.92, g=x=>x<.55?0:x<lo?1:x<hi?3:-1, ga=g(a), gb=g(b);
   const burnt=ga<0||gb<0, q=burnt?0:Math.min(ga,gb), name=burnt?'烤焦了':q>=3?'完美':q>=1?'半熟':'還是生的';
-  const fx=sp.loc==='sea'||sp.water==='sea'?{id:'luck',n:'好運',i:'🍀'}:sp.loc==='ice'||(sp.spots||[]).includes('ice')?{id:'glow',n:'暖身（咬餌更快）',i:'♨️'}:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'};
+  // 潮間帶的海味：文蛤好運、海瓜子咬餌更快、竹蟶與沙蟹力氣；赤嘴蛤把身上所有效果延長
+  const TFX={hardclam:{id:'luck',n:'好運',i:'🍀'},tellin:{id:'glow',n:'咬餌更快',i:'♨️'},razor:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'},ghostcrab:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'},gomphina:{id:'extend',n:'所有效果延長',i:'⏳'}};
+  const fx=TFX[rec.id]?TFX[rec.id]:sp.loc==='sea'||sp.water==='sea'?{id:'luck',n:'好運',i:'🍀'}:sp.loc==='ice'||(sp.spots||[]).includes('ice')?{id:'glow',n:'暖身（咬餌更快）',i:'♨️'}:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'};
   save.cook=save.cook||{}; const ck=save.cook[rec.id]=save.cook[rec.id]||{n:0,best:0}; ck.n++; if(q>ck.best) ck.best=q;
   // 料理圖鑑稱號：完美過的魚種數
   { const perf=Object.keys(save.cook).filter(k=>save.cook[k].best>=3).length; save.titles=save.titles||[]; for(const [n,tt] of [[5,'烤魚師傅'],[15,'爐火大師']]) if(perf>=n&&save.titles.indexOf(tt)<0){ save.titles.push(tt); setTimeout(()=>toastHome('🏅 獲得稱號「'+tt+'」：完美烤過 '+n+' 種魚','good',3200),1600); } }
@@ -6842,7 +6848,8 @@ function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id);
   if(who==='friend'){ const coins=Math.round((sp.price||20)*Math.pow((rec.w||.5)+.3,.85)*(q>=3?2.2:1.2)*(legend?2:1)); save.coins+=coins; setCoins();
     save.baits=save.baits||{}; const bt=q>=3?(legend?'moon':'live'):'shrimp', bn=q>=3?(legend?1:3):2; save.baits[bt]=(save.baits[bt]||0)+bn; persist();
     toastHome('🎁 釣友吃得很開心'+(q>=3?'，直說好吃！':'')+' 🪙'+coins+'・'+({moon:'月光餌',live:'活魚餌',shrimp:'活蝦'}[bt])+' ×'+bn,'good',3200); Snd.coin&&Snd.coin(); return; }
-  const min=Math.round((q>=3?12:5)*Math.min(2,.6+Math.sqrt(rec.w||.5)*.5)*({salt:1.2,lemon:1.3}[season]||1)*(legend?2:1)*HOME.grillFxK()); save.fx=save.fx||{}; save.fx[fx.id]=Math.max(save.fx[fx.id]||0,Date.now())+min*60000;
+  const min=Math.round((q>=3?12:5)*Math.min(2,.6+Math.sqrt(rec.w||.5)*.5)*({salt:1.2,lemon:1.3}[season]||1)*(legend?2:1)*HOME.grillFxK()); save.fx=save.fx||{}; if(fx.id==='extend'){ const now=Date.now(); let any=0; for(const k of Object.keys(save.fx)){ if(save.fx[k]>now){ save.fx[k]+=min*60000; any++; } } if(!any) save.fx.luck=now+Math.round(min*.5)*60000; }   /* 赤嘴蛤：延長身上所有效果；沒有效果時給一點好運 */
+  else save.fx[fx.id]=Math.max(save.fx[fx.id]||0,Date.now())+min*60000;
   // 香草：不論熟度都附加「咬餌更快」，完美時效果時間更長
   if(season==='herb') save.fx.glow=Math.max(save.fx.glow||0,Date.now())+Math.round(min*(q>=3?.6:.35))*60000;
   if(legend){ const other=fx.id==='luck'?'meal_str':'luck'; save.fx[other]=Math.max(save.fx[other]||0,Date.now())+min*60000; }
@@ -6854,10 +6861,12 @@ window.__P_splash=(x,y,z)=>{ try{ P.splash(x,.02,z,8,.25); }catch(e){} };
 function goTide(){ if(G.state!=='idle'){ toast('先收線再下灘','warn'); return; } MDL.preload('tide'); G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ if(TIDE.enter()) G.state='tide'; else G.state='idle'; fadeEl.classList.remove('on'); },650); }
 window.__goTide=goTide;
-function tideDone(bag,forced){ G.state='idle';
+function tideDone(bag0,forced){ let bag=bag0.slice(); G.state='idle';
   // 圖鑑：挖到的都算發現
   bag.forEach(b=>{ const r=save.dex[b.id]; save.dex[b.id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,b.L),bl:Math.max(r?r.bl||0:0,b.L),md:r?r.md||0:0,f:r?r.f:Date.now()}; });
   if(!bag.length){ persist(); toast(forced?'被救回岸邊，這次什麼都沒帶到':'回到岸上了','',1800); return; }
+  // 挖到的沙蠶直接變成魚餌（不賣、不烤）
+  { const nw=bag.filter(b=>b.id==='ragworm'&&!b.broken).length*3; if(nw){ save.baits=save.baits||{}; save.baits.ragworm=(save.baits.ragworm||0)+nw; bag=bag.filter(b=>b.id!=='ragworm'); setTimeout(()=>toast('🪱 沙蠶 ×'+nw+' 放進魚餌盒了（海釣萬用餌）','good',2600),400); if(!bag.length){ persist(); return; } } }
   const grill=['hardclam','gomphina','tellin','razor','ghostcrab'], total=bag.reduce((a,b)=>a+b.v,0), canKeep=bag.filter(b=>grill.includes(b.id)&&!b.broken);
   const el=document.createElement('div'); el.style.cssText='position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
   const names={}; bag.forEach(b=>{ const sp=SPECIES.find(q=>q.id===b.id); names[b.id]=(names[b.id]||0)+1; });

@@ -223,6 +223,7 @@ const GEAR={
 const BAITS=[
  {id:'worm',name:'蚯蚓',icon:'🪱',price:0,pack:0,lv:1,desc:'什麼魚都吃一點，用不完',aff:{},rare:0,wait:1},
  {id:'corn',name:'甜玉米',icon:'🌽',price:60,pack:10,lv:1,desc:'鯉魚、草魚、鯽魚、印度鯪愛吃，咬口快',aff:{reba:2.2,bluegill:1.6,crappie:1.3,crucian:2.2,tilapia:1.8,carp:2.5,grasscarp:2.2,silvercarp:1.2,clarias:.5,mekong:1.5,yperch:.8,whitefish:.8},rare:-.2,wait:.75},
+ {id:'ragworm',name:'沙蠶',icon:'🪱',price:0,pack:0,lv:1,shop:false,desc:'潮間帶挖來的沙蠶，海釣的萬用餌：黑鯛、真鯛、石斑、沙梭都愛',aff:{porgy:2.2,redbream:2,grouper:1.6,grouper2:1.4,knifejaw:1.8,emperor:1.6,wrasse:2,flathead:1.3,cobia:1.2,amber:1.2}},
  {id:'shrimp',name:'活蝦',icon:'🦐',price:180,pack:10,lv:2,desc:'鱖魚、鯰魚、黑鯛、真鯛、江鱈的最愛',aff:{perch:2.2,channel:2,flathead:1.4,clarias:1.8,blackcarp:2,carp:1.2,porgy:2.2,redbream:2,emperor:1.8,burbot:1.8,wrasse:1.2,yperch:1.8,whitefish:1.6,eel:1.6,laketrout:1.2,clownfish:1.6,copperband:1.6,bluetang:1.2,seahorse:1.8,blenny:1.4,angelfish:1.2},rare:.35,wait:1},
  {id:'soft',name:'軟蟲路亞',icon:'🐛',price:240,pack:10,lv:3,desc:'專攻黑鱸和弓鰭魚',aff:{lmbass:2.6,smbass:2.6,bowfin:1.5,snakehead:1.8,peacock:1.5},rare:.4,wait:1.05},
  {id:'live',name:'活魚餌',icon:'🐟',price:600,pack:5,lv:5,desc:'小魚幾乎不碰，大型掠食魚才會咬',aff:{flathead:3,gar:3,bowfin:2,channel:1.6,snakehead:2.2,peacock:2.4,arapaima:3,spgar:2,clarias:.6,cobia:2,yellowfin:1.5,sawara:1.5,emperor:1.2,char:1.6,burbot:1.5,bluegill:.2,crappie:.2,reba:.2,crucian:.2,tilapia:.3,eel:2.5,taimen:2.5,laketrout:2,gt:2.2,swordfish:1.8,mekong:.3,yperch:.3,whitefish:.3,threadfin:2},rare:1.0,wait:1.4},
@@ -320,7 +321,7 @@ function render(){
         return row(it.name,sub,btn); }).join('');
     } else {
       h+=BAITS.map((b,i)=>{ const n=b.id==='worm'?'∞':(save.baits[b.id]||0), lock=save.lv<b.lv, using=save.bait===b.id;
-        let btn=''; if(b.id!=='worm') btn+=lock?`<span class="lk">Lv ${b.lv} 解鎖</span>`:`<button class="sbtn" data-a="bb" data-v="${i}">+${b.pack} 🪙${b.price}</button>`;
+        let btn=''; if(b.shop===false){ if(!n) return ''; } else if(b.id!=='worm') btn+=lock?`<span class="lk">Lv ${b.lv} 解鎖</span>`:`<button class="sbtn" data-a="bb" data-v="${i}">+${b.pack} 🪙${b.price}</button>`;
         btn+=using?'<span class="eqd">使用中</span>':(b.id==='worm'||n>0)?`<button class="sbtn pri" data-a="ub" data-v="${i}">使用</button>`:'';
         return row(`${b.icon} ${b.name} <small class="cnt">×${n}</small>`,b.desc,`<div class="bb">${btn}</div>`); }).join('');
     }

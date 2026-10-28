@@ -535,7 +535,9 @@ function fxBurst(icon){ const el=document.createElement('div'); el.textContent=i
   document.body.appendChild(el); requestAnimationFrame(()=>{ el.style.transform='translate(-50%,-50%) scale(1.15)'; el.style.opacity='1'; }); setTimeout(()=>{ el.style.transition='transform 1s,opacity 1s'; el.style.transform='translate(-50%,-140%) scale(.8)'; el.style.opacity='0'; },1100); setTimeout(()=>el.remove(),2300); vib([20,40,20]); }
 function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id); if(!sp) return; const lo=season==='lemon'?.72:.78, hi=season==='lemon'?.95:.92, g=x=>x<.55?0:x<lo?1:x<hi?3:-1, ga=g(a), gb=g(b);
   const burnt=ga<0||gb<0, q=burnt?0:Math.min(ga,gb), name=burnt?'烤焦了':q>=3?'完美':q>=1?'半熟':'還是生的';
-  const fx=sp.loc==='sea'||sp.water==='sea'?{id:'luck',n:'好運',i:'🍀'}:sp.loc==='ice'||(sp.spots||[]).includes('ice')?{id:'glow',n:'暖身（咬餌更快）',i:'♨️'}:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'};
+  // 潮間帶的海味：文蛤好運、海瓜子咬餌更快、竹蟶與沙蟹力氣；赤嘴蛤把身上所有效果延長
+  const TFX={hardclam:{id:'luck',n:'好運',i:'🍀'},tellin:{id:'glow',n:'咬餌更快',i:'♨️'},razor:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'},ghostcrab:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'},gomphina:{id:'extend',n:'所有效果延長',i:'⏳'}};
+  const fx=TFX[rec.id]?TFX[rec.id]:sp.loc==='sea'||sp.water==='sea'?{id:'luck',n:'好運',i:'🍀'}:sp.loc==='ice'||(sp.spots||[]).includes('ice')?{id:'glow',n:'暖身（咬餌更快）',i:'♨️'}:{id:'meal_str',n:'力氣（魚累得更快）',i:'💪'};
   save.cook=save.cook||{}; const ck=save.cook[rec.id]=save.cook[rec.id]||{n:0,best:0}; ck.n++; if(q>ck.best) ck.best=q;
   // 料理圖鑑稱號：完美過的魚種數
   { const perf=Object.keys(save.cook).filter(k=>save.cook[k].best>=3).length; save.titles=save.titles||[]; for(const [n,tt] of [[5,'烤魚師傅'],[15,'爐火大師']]) if(perf>=n&&save.titles.indexOf(tt)<0){ save.titles.push(tt); setTimeout(()=>toastHome('🏅 獲得稱號「'+tt+'」：完美烤過 '+n+' 種魚','good',3200),1600); } }
@@ -544,7 +546,8 @@ function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id);
   if(who==='friend'){ const coins=Math.round((sp.price||20)*Math.pow((rec.w||.5)+.3,.85)*(q>=3?2.2:1.2)*(legend?2:1)); save.coins+=coins; setCoins();
     save.baits=save.baits||{}; const bt=q>=3?(legend?'moon':'live'):'shrimp', bn=q>=3?(legend?1:3):2; save.baits[bt]=(save.baits[bt]||0)+bn; persist();
     toastHome('🎁 釣友吃得很開心'+(q>=3?'，直說好吃！':'')+' 🪙'+coins+'・'+({moon:'月光餌',live:'活魚餌',shrimp:'活蝦'}[bt])+' ×'+bn,'good',3200); Snd.coin&&Snd.coin(); return; }
-  const min=Math.round((q>=3?12:5)*Math.min(2,.6+Math.sqrt(rec.w||.5)*.5)*({salt:1.2,lemon:1.3}[season]||1)*(legend?2:1)*HOME.grillFxK()); save.fx=save.fx||{}; save.fx[fx.id]=Math.max(save.fx[fx.id]||0,Date.now())+min*60000;
+  const min=Math.round((q>=3?12:5)*Math.min(2,.6+Math.sqrt(rec.w||.5)*.5)*({salt:1.2,lemon:1.3}[season]||1)*(legend?2:1)*HOME.grillFxK()); save.fx=save.fx||{}; if(fx.id==='extend'){ const now=Date.now(); let any=0; for(const k of Object.keys(save.fx)){ if(save.fx[k]>now){ save.fx[k]+=min*60000; any++; } } if(!any) save.fx.luck=now+Math.round(min*.5)*60000; }   /* 赤嘴蛤：延長身上所有效果；沒有效果時給一點好運 */
+  else save.fx[fx.id]=Math.max(save.fx[fx.id]||0,Date.now())+min*60000;
   // 香草：不論熟度都附加「咬餌更快」，完美時效果時間更長
   if(season==='herb') save.fx.glow=Math.max(save.fx.glow||0,Date.now())+Math.round(min*(q>=3?.6:.35))*60000;
   if(legend){ const other=fx.id==='luck'?'meal_str':'luck'; save.fx[other]=Math.max(save.fx[other]||0,Date.now())+min*60000; }
@@ -556,10 +559,12 @@ window.__P_splash=(x,y,z)=>{ try{ P.splash(x,.02,z,8,.25); }catch(e){} };
 function goTide(){ if(G.state!=='idle'){ toast('先收線再下灘','warn'); return; } MDL.preload('tide'); G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ if(TIDE.enter()) G.state='tide'; else G.state='idle'; fadeEl.classList.remove('on'); },650); }
 window.__goTide=goTide;
-function tideDone(bag,forced){ G.state='idle';
+function tideDone(bag0,forced){ let bag=bag0.slice(); G.state='idle';
   // 圖鑑：挖到的都算發現
   bag.forEach(b=>{ const r=save.dex[b.id]; save.dex[b.id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,b.L),bl:Math.max(r?r.bl||0:0,b.L),md:r?r.md||0:0,f:r?r.f:Date.now()}; });
   if(!bag.length){ persist(); toast(forced?'被救回岸邊，這次什麼都沒帶到':'回到岸上了','',1800); return; }
+  // 挖到的沙蠶直接變成魚餌（不賣、不烤）
+  { const nw=bag.filter(b=>b.id==='ragworm'&&!b.broken).length*3; if(nw){ save.baits=save.baits||{}; save.baits.ragworm=(save.baits.ragworm||0)+nw; bag=bag.filter(b=>b.id!=='ragworm'); setTimeout(()=>toast('🪱 沙蠶 ×'+nw+' 放進魚餌盒了（海釣萬用餌）','good',2600),400); if(!bag.length){ persist(); return; } } }
   const grill=['hardclam','gomphina','tellin','razor','ghostcrab'], total=bag.reduce((a,b)=>a+b.v,0), canKeep=bag.filter(b=>grill.includes(b.id)&&!b.broken);
   const el=document.createElement('div'); el.style.cssText='position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
   const names={}; bag.forEach(b=>{ const sp=SPECIES.find(q=>q.id===b.id); names[b.id]=(names[b.id]||0)+1; });
