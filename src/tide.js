@@ -9,21 +9,71 @@ function createTide(W,c){
 const T=THREE, rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const S=new T.Scene(), cam=new T.PerspectiveCamera(58,1,.05,400);
 const sky=new T.Color(0xb9c4c8); S.background=sky; new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.encoding=T.sRGBEncoding; const dome=new T.Mesh(new T.SphereGeometry(300,48,24),new T.MeshBasicMaterial({map:t,side:T.BackSide,fog:false,depthWrite:false})); dome.renderOrder=-10; dome.onBeforeRender=()=>dome.position.copy(cam.position); S.add(dome); });   /* 實拍海邊陰天天空（360 度全景貼在大球內側） */ S.fog=new T.Fog(sky,40,260);
-S.add(new T.HemisphereLight(0xeef4f8,0x6a6050,2.3)); const sun=new T.DirectionalLight(0xfff2dc,1.6); sun.position.set(30,60,-20); S.add(sun);
-// 泥灘地面：實拍貼圖＋法線，一般重複（不鏡射，鏡射會出現對稱花紋）；再疊一層大尺度明暗起伏，打散重複感
-const TL=new T.TextureLoader(), tx=(f,r,srgb)=>{ const t=TL.load(f); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(r,r); t.rotation=.37; if(srgb) t.encoding=T.sRGBEncoding; t.anisotropy=8; return t; };
-const mudT=tx('models/tide/mud_diff.jpg',34,true), mudN=tx('models/tide/mud_nor.jpg',34), sandT=tx('models/tide/sand_diff.jpg',26,true), sandN=tx('models/tide/sand_nor.jpg',26);
-const breakUp=m=>{ m.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec2 vWP;').replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWP=(modelMatrix*vec4(transformed,1.0)).xz;');
-  sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec2 vWP;').replace('#include <map_fragment>','#include <map_fragment>\n{ float v=sin(vWP.x*.071+sin(vWP.y*.053)*2.)*.5+sin(vWP.y*.089+vWP.x*.031)*.5; diffuseColor.rgb*=0.82+0.18*v; }'); }; return m; };
-const ground=new T.Mesh(new T.PlaneGeometry(260,260).rotateX(-Math.PI/2),breakUp(new T.MeshStandardMaterial({map:mudT,normalMap:mudN,normalScale:new T.Vector2(1.2,1.2),roughness:.32,metalness:.05,color:0xd8d0c4}))); S.add(ground);   // 濕泥面微反光
-const sandBand=new T.Mesh(new T.PlaneGeometry(260,40).rotateX(-Math.PI/2),breakUp(new T.MeshStandardMaterial({map:sandT,normalMap:sandN,roughness:.8,color:0xe6dccb}))); sandBand.position.set(0,.01,40); S.add(sandBand);
+S.add(new T.HemisphereLight(0xeef4f8,0x6a6050,1.7)); const sun=new T.DirectionalLight(0xfff2dc,1.6); sun.position.set(30,60,-20); S.add(sun);
+// 泥灘地面（3D 地形）：沙紋起伏、潮溝、低窪積水都是真的高低差，不是平面貼圖
+//   ・岸邊是沙、往海那邊是泥，兩種用噪聲邊界自然融合（不是一條直線交接）
+//   ・低於積水面的地方有真正會反射天空的水窪
+const TL=new T.TextureLoader(), tx=(f,srgb)=>{ const t=TL.load(f); t.wrapS=t.wrapT=T.RepeatWrapping; if(srgb) t.encoding=T.sRGBEncoding; t.anisotropy=8; return t; };
+const mudT=tx('models/tide/mud_diff.jpg',true), mudN=tx('models/tide/mud_nor.jpg'), sandT=tx('models/tide/sand_diff.jpg',true), sandN=tx('models/tide/sand_nor.jpg');
+const hn=(x,z)=>Math.sin(x*.13+Math.sin(z*.07)*1.7)*.5+Math.sin(z*.11-x*.05)*.5;
+function sandK(x,z){ const e=34+hn(x*1.7,z*1.3)*7+Math.sin(x*.21)*2.5; return Math.min(1,Math.max(0,(z-(e-4))/8)); }   // 越靠岸（z 大）越是沙
+function hAt(x,z){ const sk=sandK(x,z);
+  const rip=Math.sin(z*5.2+Math.sin(x*.6)*1.4+hn(x,z)*2)*.022*(.6+.4*sk);   // 沙紋（細波浪狀起伏）
+  const und=hn(x*.35,z*.35)*.12;                                             // 大範圍的起伏
+  const ch=Math.exp(-Math.pow((x-6*Math.sin(z*.045)-4)/2.6,2))*.16+Math.exp(-Math.pow((x+14+5*Math.sin(z*.06+1))/2,2))*.12;   // 兩條彎曲的潮溝
+  return und+rip-ch*(1-sk)+sk*.18; }
+window.__tideH=hAt;
+const GN=220, gg=new T.PlaneGeometry(200,200,GN,GN).rotateX(-Math.PI/2), gp=gg.attributes.position;
+for(let k=0;k<gp.count;k++) gp.setY(k,hAt(gp.getX(k),gp.getZ(k)));
+gg.computeVertexNormals();
+const gmat=new T.MeshStandardMaterial({color:0xb8aea0,map:mudT,normalMap:mudN,normalScale:new T.Vector2(1.1,1.1),roughness:.42,metalness:0});
+gmat.onBeforeCompile=sh=>{ sh.uniforms.tSand={value:sandT}; sh.uniforms.tSandN={value:sandN};
+  sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP2;').replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWP2=(modelMatrix*vec4(transformed,1.0)).xyz;');
+  sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
+uniform sampler2D tSand; uniform sampler2D tSandN; varying vec3 vWP2;
+float th(vec2 p){ return sin(p.x*.13+sin(p.y*.07)*1.7)*.5+sin(p.y*.11-p.x*.05)*.5; }
+float sandKf(vec2 p){ float e=34.+th(p*vec2(1.7,1.3))*7.+sin(p.x*.21)*2.5; return clamp((p.y-(e-4.))/8.,0.,1.); }`)
+  .replace('#include <map_fragment>',`
+  vec2 uvA=vWP2.xz*.29, uvB=vec2(vWP2.x*.83-vWP2.z*.55,vWP2.x*.55+vWP2.z*.83)*.071;   // 兩種尺度、旋轉錯開，看不出重複
+  float sk=sandKf(vWP2.xz) + (texture2D(tSand,vWP2.xz*.9).r-.5)*.25; sk=clamp(sk,0.,1.);
+  vec3 mudC=mix(texture2D(map,uvA).rgb,texture2D(map,uvB).rgb,.35), sandC=mix(texture2D(tSand,uvA*1.1).rgb,texture2D(tSand,uvB).rgb,.3);
+  float wet=1.-smoothstep(-.06,.06,vWP2.y);   // 越低越濕越暗
+  vec4 texelColor=vec4(mix(pow(mudC,vec3(1.25))*.82*(1.-.25*wet),sandC*(.9-.1*wet),sk),1.);   // 泥比較深、對比高
+  texelColor=mapTexelToLinear(texelColor); diffuseColor*=texelColor;
+  float macro=th(vWP2.xz*.4)*.5+.5; diffuseColor.rgb*=.85+.2*macro;`)
+  .replace('#include <normal_fragment_maps>',`
+  { vec3 nm=mix(texture2D(normalMap,vWP2.xz*.29).xyz,texture2D(tSandN,vWP2.xz*.3).xyz,clamp(sandKf(vWP2.xz),0.,1.))*2.-1.; nm.xy*=normalScale;
+    #ifdef USE_TANGENT
+    normal=normalize(vTBN*nm);
+    #else
+    normal=perturbNormal2Arb(-vViewPosition,normal,nm,faceDirection);
+    #endif
+  }`)
+  .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n roughnessFactor=mix(.5,.9,clamp(sandKf(vWP2.xz),0.,1.));   // 泥濕亮、沙乾霧');
+};
+gmat.customProgramCacheKey=()=>'tideGround';
+const ground=new T.Mesh(gg,gmat); S.add(ground);
+// 積水：一片略高於最低處的水面，只在低窪地方露出來；反射天空
+const pud=new T.Mesh(new T.PlaneGeometry(200,200).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x9aa6a8,roughness:.04,metalness:.9,transparent:true,opacity:.75}));
+pud.position.y=-.105; S.add(pud);
+const sandBand={position:new T.Vector3()};   // 舊程式相容用（沙地已併入地形）
+new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.mapping=T.EquirectangularReflectionMapping; t.encoding=T.sRGBEncoding; try{ const pm=new T.PMREMGenerator(W.renderer); const env=pm.fromEquirectangular(t).texture; gmat.envMap=env; gmat.envMapIntensity=.18; pud.material.envMap=env; pud.material.envMapIntensity=1.2; gmat.needsUpdate=pud.material.needsUpdate=true; pm.dispose(); }catch(e){} });
 // 海水：從遠處慢慢漲回來
 const sea=new T.Mesh(new T.PlaneGeometry(400,300).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x4d6a72,roughness:.12,metalness:.3,transparent:true,opacity:.92})); sea.position.set(0,.06,-200); S.add(sea);
-// 撤離路線：插竿＋小旗（漲潮警告時亮起）
-const route=new T.Group(); S.add(route); route.visible=false;
-for(let i=0;i<9;i++){ const p=new T.Mesh(new T.CylinderGeometry(.03,.03,1.4,6),new T.MeshStandardMaterial({color:0x8a6a44})); p.position.set(Math.sin(i*.6)*1.5,.7,30-i*7); route.add(p);
-  const f=new T.Mesh(new T.PlaneGeometry(.45,.28),new T.MeshBasicMaterial({color:0xff5a2a,side:T.DoubleSide})); f.position.set(p.position.x+.23,1.25,p.position.z); route.add(f); }
-
+// 撤離路線：竹竿＋褪色的布旗（漲潮警告時亮起），布會隨風飄
+const route=new T.Group(); S.add(route); route.visible=false; const flags=[];
+const bambooM=new T.MeshStandardMaterial({color:0xb59a62,roughness:.6}), nodeM=new T.MeshStandardMaterial({color:0x8d7444,roughness:.7});
+const clothTex=(()=>{ const c=document.createElement('canvas'); c.width=64; c.height=40; const g=c.getContext('2d'); g.fillStyle='#d4502a'; g.fillRect(0,0,64,40);
+  for(let i=0;i<500;i++){ g.fillStyle=`rgba(${Math.random()<.5?'255,220,190':'90,30,10'},${Math.random()*.12})`; g.fillRect(Math.random()*64,Math.random()*40,1+Math.random()*2,1); }
+  g.fillStyle='rgba(255,255,255,.18)'; g.fillRect(0,0,64,3); g.fillRect(0,37,64,3); const t=new T.CanvasTexture(c); t.encoding=T.sRGBEncoding; return t; })();
+for(let i=0;i<9;i++){ const x=Math.sin(i*.6)*1.5, z=30-i*7, y0=hAt(x,z), H=1.6;
+  const pole=new T.Mesh(new T.CylinderGeometry(.022,.028,H,8),bambooM); pole.position.set(x,y0+H/2-.15,z); pole.rotation.z=(Math.random()-.5)*.08; route.add(pole);
+  for(let n=1;n<5;n++){ const nd=new T.Mesh(new T.TorusGeometry(.026,.006,5,10),nodeM); nd.rotation.x=Math.PI/2; nd.position.set(0,-H/2+n*H/5,0); pole.add(nd); }   // 竹節
+  const fg=new T.PlaneGeometry(.5,.32,14,6); fg.translate(.25,0,0);
+  const fl=new T.Mesh(fg,new T.MeshStandardMaterial({map:clothTex,side:T.DoubleSide,roughness:.95})); fl.position.set(0,H/2-.2,0); pole.add(fl);
+  flags.push({g:fg,base:fg.attributes.position.array.slice(),ph:Math.random()*6}); }
+function flagTick(t){ if(!route.visible) return; flags.forEach(f=>{ const P=f.g.attributes.position, b=f.base;
+  for(let k=0;k<P.count;k++){ const x=b[k*3], y=b[k*3+1], w=x/.5; P.setZ(k,Math.sin(t*6+f.ph-x*9)*.06*w+Math.sin(t*3.3+y*6)*.015*w); P.setY(k,y-w*w*.04); } P.needsUpdate=true; f.g.computeVertexNormals(); }); }
 /* ---------- 生物資料 ---------- */
 const CR={
   hardclam:{n:'文蛤',sign:'hole',depth:2.0,size:[.04,.09],hard:1,price:90,desc:'泥面上一個會噴水的小圓孔。'},
@@ -51,13 +101,13 @@ const DEC={}; ['hole','key','slit','pellet','burrow','cast','flat'].forEach(k=>D
 let signs=[];
 function spawnSigns(){ signs.forEach(s=>S.remove(s.m)); signs=[]; const kinds=Object.keys(CR);
   for(let i=0;i<22;i++){ const k=Math.random()<.22?null:kinds[Math.floor(Math.random()*kinds.length)];
-    const sign=k?CR[k].sign:'flat', m=new T.Mesh(new T.PlaneGeometry(.9,.9).rotateX(-Math.PI/2),DEC[sign]); m.position.set(rand(-14,14),.02,rand(-26,12)); m.rotation.y=rand(0,6.28); S.add(m);
+    const sign=k?CR[k].sign:'flat', m=new T.Mesh(new T.PlaneGeometry(.9,.9).rotateX(-Math.PI/2),DEC[sign]); m.position.set(rand(-14,14),0,rand(-26,12)); m.position.y=hAt(m.position.x,m.position.z)+.015; m.rotation.y=rand(0,6.28); S.add(m);
     signs.push({m,k,sign,done:false,spurt:rand(2,6)}); } }
 /* ---------- 泥面上的活生物（3D 模型＋骨架） ---------- */
 let roamers=[];
 function spawnRoamers(){ roamers.forEach(r=>S.remove(r.g)); roamers=[];
   for(const [id,n] of [['fiddler',6],['mudskip',4],['hermit',3]]) for(let i=0;i<n;i++){ const sp=c.species(id); let f=null; try{ if(window.__MDL&&window.__MDL.fishReady(id)) f=window.__MDL.fish(sp); }catch(e){} if(!f) continue;
-    const L=sp?(sp.len[0]+Math.random()*(sp.len[1]-sp.len[0]))/100:.05; f.group.scale.setScalar(L*1.4); f.group.position.set(rand(-12,12),.01,rand(-22,10)); S.add(f.group);
+    const L=sp?(sp.len[0]+Math.random()*(sp.len[1]-sp.len[0]))/100:.05; f.group.scale.setScalar(L*1.4); f.group.position.set(rand(-12,12),0,rand(-22,10)); f.group.position.y=hAt(f.group.position.x,f.group.position.z)+.01; S.add(f.group);
     roamers.push({id,g:f.group,uni:f.uni,h:rand(0,6.28),t:rand(0,3),hop:0,L,flee:0}); } }
 /* ---------- 狀態 ---------- */
 let on=false, yaw=0, pitch=-.32, pos=new T.Vector3(0,1.6,18), bag=[], warned=0, evac=false, endH=0;
@@ -145,7 +195,7 @@ function digTick(dt){ const d=dig; if(!d||d.done||!d.cr) return; d.t+=dt;
   if(d.cr.flee&&!d.found&&d.t>9){ d.fled=true; d.done=true; $('digInfo').textContent='沙蟹從另一個出口溜走了！洞口有沙堆的要挖快一點'; $('digBtns').innerHTML='<button id="dgOk" style="background:#555;color:#fff">可惜</button>'; $('dgOk').onclick=()=>endDig(false); } }
 /* ---------- 挖出來的生物：在洞旁邊用 3D 模型＋骨架動一下 ---------- */
 const shown=[];
-function showCatch(id,p){ const sp=c.species(id); if(!sp) return; try{ if(!window.__MDL||!window.__MDL.fishReady(id)) return; const f=window.__MDL.fish(sp); f.group.scale.setScalar(Math.max(.06,(sp.len[0]+sp.len[1])/200)*1.5); f.group.position.set(p.x+.3,.05,p.z); S.add(f.group); shown.push({f,t:0}); }catch(e){} }
+function showCatch(id,p){ const sp=c.species(id); if(!sp) return; try{ if(!window.__MDL||!window.__MDL.fishReady(id)) return; const f=window.__MDL.fish(sp); f.group.scale.setScalar(Math.max(.06,(sp.len[0]+sp.len[1])/200)*1.5); f.group.position.set(p.x+.3,hAt(p.x+.3,p.z)+.05,p.z); S.add(f.group); shown.push({f,t:0}); }catch(e){} }
 /* ---------- 進入／離開 ---------- */
 function enter(){ const h=c.hour(), w=lowWin(h); if(!w){ const n=nextLow(h); c.toast(`🌊 現在是滿潮，泥灘都在水下。下次退潮 ${String(Math.floor(n%24)).padStart(2,'0')}:${n%1?'30':'00'}`,'warn',3200); return false; }
   on=true; endH=w[1]; warned=0; evac=false; bag=[]; yaw=0; pitch=-.32; pos.set(0,1.6,18); spawnSigns(); spawnRoamers(); bagText(); hud.style.display='block'; document.body.classList.add('attide');
@@ -183,12 +233,13 @@ function render(dt){ if(!on) return; t+=dt; if(!roamers.length&&(rspawn-=dt)<=0)
   // 活生物：招潮蟹橫著走、彈塗魚一跳一跳、寄居蟹慢慢爬；骨架擺動
   roamers.forEach(r=>{ r.t-=dt; if(r.t<=0){ r.t=rand(1.5,4); r.h+=rand(-1.4,1.4); } const near=r.g.position.distanceTo(pos)<2.5; if(near&&r.flee<=0){ r.flee=1.5; r.h=Math.atan2(r.g.position.x-pos.x,r.g.position.z-pos.z); }
     r.flee-=dt; const sp=(r.id==='hermit'?.05:r.id==='fiddler'?.18:.12)*(r.flee>0?3:1);
-    if(r.id==='mudskip'){ r.hop-=dt; if(r.hop<=0){ r.hop=rand(.8,2.2); r.jy=.35; } r.jy=Math.max(0,(r.jy||0)-dt*1.4); r.g.position.y=Math.sin(Math.min(1,(.35-r.jy)/.35)*Math.PI)*.08; }
+    if(r.id==='mudskip'){ r.hop-=dt; if(r.hop<=0){ r.hop=rand(.8,2.2); r.jy=.35; } r.jy=Math.max(0,(r.jy||0)-dt*1.4); r.g.position.y=Math.sin(Math.min(1,(.35-r.jy)/.35)*Math.PI)*.08; } else r.g.position.y=0;
     const side=r.id==='fiddler'?Math.PI/2:0; r.g.position.x+=Math.sin(r.h)*sp*dt; r.g.position.z+=Math.cos(r.h)*sp*dt; r.g.rotation.y=r.h-Math.PI/2+side;
-    r.g.position.x=clamp(r.g.position.x,-18,18); r.g.position.z=clamp(r.g.position.z,-30,20); r.uni.uSwim.value+=dt*(4+sp*30); r.uni.uAmp.value=.05+sp*.4; });
+    r.g.position.x=clamp(r.g.position.x,-18,18); r.g.position.z=clamp(r.g.position.z,-30,20); r.g.position.y+=hAt(r.g.position.x,r.g.position.z)+.01; r.uni.uSwim.value+=dt*(4+sp*30); r.uni.uAmp.value=.05+sp*.4; });
   shown.forEach(s=>{ s.t+=dt; s.f.uni.uSwim.value+=dt*8; s.f.uni.uAmp.value=.08+.06*Math.sin(s.t*3); s.f.group.rotation.y+=dt*.6; });
-  digTick(dt);
+  digTick(dt); flagTick(performance.now()*.001);
+  pos.y=hAt(pos.x,pos.z)+1.55;   // 跟著地形高低走
   cam.position.copy(pos); cam.rotation.set(pitch,yaw,0,'YXZ'); cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix();
   W.renderer.render(S,cam); }
-return {testDig:k=>{ const s=signs.find(q=>q.k===k&&!q.done)||signs.find(q=>q.k); if(s) startDig(s); return !!s; },enter,exit,render,active:()=>on,low:h=>!!lowWin(h),nextLow,CR,SURF,ALL};
+return {showRoute:v=>{ route.visible=v; },testDig:k=>{ const s=signs.find(q=>q.k===k&&!q.done)||signs.find(q=>q.k); if(s) startDig(s); return !!s; },enter,exit,render,active:()=>on,low:h=>!!lowWin(h),nextLow,CR,SURF,ALL};
 }
