@@ -794,7 +794,7 @@ function update(dt){
   // 離開拉魚：釣竿傾斜一律歸零，不受手指狀態影響
   if(G.prevSt==='fight'&&G.state!=='fight'){ G.yawT=G.aimYaw||0; G.rodSideT=0; }
   if(G.state==='fight'&&G.prevSt!=='fight') G.aimYaw=G.aimYawCast!=null?G.aimYawCast:G.yawT; G.prevSt=G.state;
-  G.t+=dt; G.hour+=dt/40;
+  G.t+=dt; G.hour+=dt/(G.state==='tide'?240:40);   // 在泥灘上時間放慢 6 倍，退潮有足夠的時間慢慢找、慢慢挖
   G.hSave=(G.hSave||0)+dt; if(G.hSave>10){ G.hSave=0; save.hour=((G.hour%24)+24)%24; persist(); }
   const info=W.setTime(G.hour); W.update(dt,G.t); updateKayak(dt);
   if(keys.ArrowLeft||keys.ArrowRight){ const k=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0); if(G.state==='fight') G.rodSideT=k; else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(G.yawT-k*dt*1.2,-.95,.95); }

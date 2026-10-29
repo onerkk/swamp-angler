@@ -1,4 +1,4 @@
-/*APPV:20261029011846*/
+/*APPV:20261029012908*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5480,7 +5480,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029011846'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029012908'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6225,6 +6225,13 @@ for(let i=0;i<9;i++){ const x=Math.sin(i*.6)*1.5, z=30-i*7, y0=hAt(x,z), H=1.6;
   const fg=new T.PlaneGeometry(.5,.32,14,6); fg.translate(.25,0,0);
   const fl=new T.Mesh(fg,new T.MeshStandardMaterial({map:clothTex,side:T.DoubleSide,roughness:.95})); fl.position.set(0,H/2-.2,0); pole.add(fl);
   flags.push({g:fg,base:fg.attributes.position.array.slice(),ph:Math.random()*6}); }
+// 撤離指引：地上一排發光的箭頭，從腳下一路指向岸邊，依序閃爍（像跑馬燈）；越接近滿潮越紅、閃得越快
+const chev=new T.Group(); S.add(chev); chev.visible=false;
+{ const sh=new T.Shape(); sh.moveTo(0,.32); sh.lineTo(.36,-.05); sh.lineTo(.22,-.05); sh.lineTo(0,.17); sh.lineTo(-.22,-.05); sh.lineTo(-.36,-.05); sh.closePath();
+  const cg=new T.ShapeGeometry(sh).rotateX(-Math.PI/2); for(let i=0;i<10;i++){ const m=new T.Mesh(cg,new T.MeshBasicMaterial({color:0xffc23a,transparent:true,opacity:0,depthWrite:false,blending:T.AdditiveBlending})); m.rotation.y=Math.PI; chev.add(m); } }
+function chevTick(t,left){ chev.visible=left<=40&&!dig; if(!chev.visible) return; const urg=clamp(1-left/40,0,1), col=new T.Color().setHSL(.12-.12*urg,1,.55);
+  chev.children.forEach((m,i)=>{ const z=pos.z+1.6+i*1.5, x=pos.x+(0-pos.x)*Math.min(1,i/8)*.3; m.position.set(x,hAt(x,z)+.02,z); m.rotation.y=Math.PI; m.scale.setScalar(1.6);
+    const ph=((t*(1.2+urg*1.8))-i*.18)%1; m.material.color.copy(col); m.material.opacity=Math.min(1,.25+Math.max(0,1-ph*2.2)*1.2)*(z>34?.2:1); }); }
 function flagTick(t){ if(!route.visible) return; flags.forEach(f=>{ const P=f.g.attributes.position, b=f.base;
   for(let k=0;k<P.count;k++){ const x=b[k*3], y=b[k*3+1], w=x/.5; P.setZ(k,Math.sin(t*6+f.ph-x*9)*.06*w+Math.sin(t*3.3+y*6)*.015*w); P.setY(k,y-w*w*.04); } P.needsUpdate=true; f.g.computeVertexNormals(); }); }
 /* ---------- 生物資料 ---------- */
@@ -6252,9 +6259,9 @@ function decal(kind){ const cv=document.createElement('canvas'); cv.width=cv.hei
   const t=new T.CanvasTexture(cv); return new T.MeshBasicMaterial({map:t,transparent:true,depthWrite:false}); }
 const DEC={}; ['hole','key','slit','pellet','burrow','cast','flat'].forEach(k=>DEC[k]=decal(k));
 let signs=[];
-const ringG=new T.RingGeometry(.42,.5,32).rotateX(-Math.PI/2), ringM=new T.MeshBasicMaterial({color:0xfff2b0,transparent:true,opacity:0,depthWrite:false});
+const ringG=new T.RingGeometry(.36,.5,40).rotateX(-Math.PI/2), ringM=new T.MeshBasicMaterial({color:0xffe08a,transparent:true,opacity:0,depthWrite:false,blending:T.AdditiveBlending});
 function spawnSigns(){ signs.forEach(s=>{ S.remove(s.m); if(s.ring) S.remove(s.ring); }); signs=[]; const kinds=Object.keys(CR);
-  for(let i=0;i<22;i++){ const k=Math.random()<.22?null:kinds[Math.floor(Math.random()*kinds.length)];
+  for(let i=0;i<36;i++){ const k=Math.random()<.18?null:kinds[Math.floor(Math.random()*kinds.length)];
     const sign=k?CR[k].sign:'flat', m=new T.Mesh(new T.PlaneGeometry(.9,.9).rotateX(-Math.PI/2),DEC[sign]); m.position.set(rand(-14,14),0,rand(-26,12)); m.position.y=hAt(m.position.x,m.position.z)+.015; m.rotation.y=rand(0,6.28); S.add(m);
     const ring=new T.Mesh(ringG,ringM.clone()); ring.position.copy(m.position); ring.position.y+=.01; S.add(ring);
     signs.push({m,k,sign,ring,done:false,spurt:rand(2,6)}); } }
@@ -6266,7 +6273,7 @@ function spawnRoamers(){ roamers.forEach(r=>S.remove(r.g)); roamers=[];
     roamers.push({id,g:f.group,uni:f.uni,h:rand(0,6.28),t:rand(0,3),hop:0,L,flee:0}); } }
 /* ---------- 狀態 ---------- */
 let on=false, yaw=0, pitch=-.32, pos=new T.Vector3(0,1.6,18), bag=[], warned=0, evac=false, endH=0;
-const LOW=[[4.5,7.5],[16.5,19.5]];
+const LOW=[[3,8],[15,20]];   /* 退潮 5 小時；在泥灘上時間走得比較慢（見 d.js），實際可以玩約 20 分鐘 */
 function lowWin(h){ for(const w of LOW) if(h>=w[0]&&h<w[1]) return w; return null; }
 function nextLow(h){ for(const w of LOW) if(h<w[0]) return w[0]; return LOW[0][0]+24; }
 /* ---------- HUD ---------- */
@@ -6478,7 +6485,7 @@ let t=0;
 let rspawn=0;
 function render(dt){ if(!on) return; t+=dt; if(!roamers.length&&(rspawn-=dt)<=0){ rspawn=2; spawnRoamers(); } /* 模型下載好就放出泥面上的生物 */ const h=c.hour(), left=(endH-h)*60;   // 剩下幾分鐘（遊戲時間）
   $('tdClock').innerHTML=left>40?`🌊 退潮中・離漲潮還有 ${Math.floor(left)} 分`:`<span style="color:#ffb39a">⚠️ 漲潮倒數 ${Math.max(0,Math.floor(left))} 分</span>`;
-  if(left<=40&&warned<1){ warned=1; warnEl.innerHTML='🌊 潮水開始回漲了！<br><small>請沿著插著橘色旗子的路線往岸邊移動</small>'; warnEl.style.display='block'; setTimeout(()=>warnEl.style.display='none',3800); vib([80,60,80]); route.visible=true; }
+  if(left<=40&&warned<1){ warned=1; warnEl.innerHTML='🌊 潮水開始回漲了！<br><small>跟著地上發亮的箭頭往岸邊走</small>'; warnEl.style.display='block'; setTimeout(()=>warnEl.style.display='none',3800); vib([80,60,80]); /* 不再插旗子 */ }
   if(left<=20&&warned<2){ warned=2; warnEl.innerHTML='⚠️ 二十分鐘後滿潮！立刻撤離<br><small>真實的泥灘：漲潮速度常比走路快，泥灘也會陷住腳。一定要先查潮汐表、結伴、提早離開</small>'; warnEl.style.display='block'; setTimeout(()=>warnEl.style.display='none',5200); vib([120,80,120,80,120]); }
   if(left<=0&&!evac){ evac=true; c.toast('🌊 潮水漲上來了！你被救生員帶回岸邊，桶子裡掉了一半','warn',4200); setTimeout(()=>exit(true),600); }
   // 海水往岸邊推進
@@ -6492,12 +6499,12 @@ function render(dt){ if(!on) return; t+=dt; if(!roamers.length&&(rspawn-=dt)<=0)
     const side=r.id==='fiddler'?Math.PI/2:0; r.g.position.x+=Math.sin(r.h)*sp*dt; r.g.position.z+=Math.cos(r.h)*sp*dt; r.g.rotation.y=r.h-Math.PI/2+side;
     r.g.position.x=clamp(r.g.position.x,-18,18); r.g.position.z=clamp(r.g.position.z,-30,20); r.g.position.y+=hAt(r.g.position.x,r.g.position.z)+.01; r.uni.uSwim.value+=dt*(4+sp*30); r.uni.uAmp.value=.05+sp*.4; });
   shown.forEach(s=>{ s.t+=dt; s.f.uni.uSwim.value+=dt*8; s.f.uni.uAmp.value=.08+.06*Math.sin(s.t*3); s.f.group.rotation.y+=dt*.6; });
-  digTick(dt); flagTick(performance.now()*.001); if(gmat.userData.sh){ gmat.userData.sh.uniforms.uTW.value=performance.now()*.001; gmat.userData.sh.uniforms.uSkyK.value=Math.min(1.2,.35+.8*(S.children.find(o=>o.isHemisphereLight)||{intensity:1.7}).intensity/1.7); }
+  digTick(dt); flagTick(performance.now()*.001); chevTick(performance.now()*.001,left); if(gmat.userData.sh){ gmat.userData.sh.uniforms.uTW.value=performance.now()*.001; gmat.userData.sh.uniforms.uSkyK.value=Math.min(1.2,.35+.8*(S.children.find(o=>o.isHemisphereLight)||{intensity:1.7}).intensity/1.7); }
   walkTick(dt,left);
   pos.y=hAt(pos.x,pos.z)+1.55-sink+Math.abs(Math.sin(bobT))*-.035*Math.min(1,Math.abs(walkV));   // 跟著地形、走路上下晃、軟泥會陷
   { const fx=-Math.sin(yaw), fz=-Math.cos(yaw), rel=Math.atan2(0,1)-Math.atan2(fx,fz); const ar=document.getElementById('tdArr'); if(ar) ar.style.transform='rotate('+(-rel)+'rad)';   // 岸在 +z 方向
     const dd=document.getElementById('tdDist'); if(dd) dd.textContent=Math.max(0,Math.round(34-pos.z))+' m'; const sh=document.getElementById('tdShore'); if(sh) sh.classList.toggle('warn',!!warned); }
-  signs.forEach(s=>{ if(!s.ring) return; const d=Math.hypot(s.m.position.x-pos.x,s.m.position.z-pos.z); s.ring.visible=!s.done; s.ring.material.opacity=s.done?0:Math.max(0,1-d/7)*(.35+.25*Math.sin(performance.now()*.004+s.m.position.x)); });   // 跟著地形高低走
+  signs.forEach(s=>{ if(!s.ring) return; const d=Math.hypot(s.m.position.x-pos.x,s.m.position.z-pos.z); s.ring.visible=!s.done; s.ring.material.opacity=s.done?0:Math.max(0,1-d/12)*(.55+.4*Math.sin(performance.now()*.005+s.m.position.x)); const sc=1+.12*Math.sin(performance.now()*.005+s.m.position.x); s.ring.scale.set(sc,1,sc); });   // 12 公尺內的痕跡發光、呼吸，越近越亮   // 跟著地形高低走
   if(dig) digCam(); else {  cam.position.copy(pos); cam.rotation.set(pitch+Math.sin(bobT*2)*.006*Math.min(1,Math.abs(walkV)),yaw,Math.sin(bobT)*.01*Math.min(1,Math.abs(walkV)),'YXZ'); cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); }
   W.renderer.render(S,cam); }
 return {testTake:()=>{ if(dig&&dig.crea){ dig.phase='dig'; dig.found=true; dig.ready=true; for(let i=0;i<dig.D.length;i++) dig.D[i]=Math.max(dig.D[i],0); takeOut(); return true; } return false; },showRoute:v=>{ route.visible=v; },testDig:k=>{ const s=signs.find(q=>q.k===k&&!q.done)||signs.find(q=>q.k); if(s) startDig(s); return !!s; },enter,exit,render,active:()=>on,low:h=>!!lowWin(h),nextLow,CR,SURF,ALL};
@@ -7298,7 +7305,7 @@ function update(dt){
   // 離開拉魚：釣竿傾斜一律歸零，不受手指狀態影響
   if(G.prevSt==='fight'&&G.state!=='fight'){ G.yawT=G.aimYaw||0; G.rodSideT=0; }
   if(G.state==='fight'&&G.prevSt!=='fight') G.aimYaw=G.aimYawCast!=null?G.aimYawCast:G.yawT; G.prevSt=G.state;
-  G.t+=dt; G.hour+=dt/40;
+  G.t+=dt; G.hour+=dt/(G.state==='tide'?240:40);   // 在泥灘上時間放慢 6 倍，退潮有足夠的時間慢慢找、慢慢挖
   G.hSave=(G.hSave||0)+dt; if(G.hSave>10){ G.hSave=0; save.hour=((G.hour%24)+24)%24; persist(); }
   const info=W.setTime(G.hour); W.update(dt,G.t); updateKayak(dt);
   if(keys.ArrowLeft||keys.ArrowRight){ const k=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0); if(G.state==='fight') G.rodSideT=k; else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(G.yawT-k*dt*1.2,-.95,.95); }
