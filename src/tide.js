@@ -159,7 +159,12 @@ function signDetail(kind){ const g=new T.Group();
   else if(kind==='pellet'){ for(let i=0;i<34;i++){ const a=Math.random()*6.28, r=.03+Math.random()*.18; const b=new T.Mesh(new T.SphereGeometry(.0055,5,4),SD.sand); b.position.set(Math.cos(a)*r,.005,Math.sin(a)*r); g.add(b); } hole(.01,0,0); }   // 海瓜子：一圈小沙球
   else if(kind==='coil'){ const pts=[]; for(let i=0;i<40;i++){ const a=i*.42, r=.015+i*.0028; pts.push(new T.Vector3(Math.cos(a)*r,.008+Math.sin(i*1.7)*.002,Math.sin(a)*r)); } g.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),80,.0065,6),SD.cast)); }   // 沙蠶：一圈圈盤繞的泥條
   else return null; return g; }
+const TIDETEST=/[?&]tidetest=1/.test(location.search);
 function spawnSigns(){ signs.forEach(s=>{ S.remove(s.m); if(s.m.userData.det) S.remove(s.m.userData.det); }); signs=[]; const kinds=Object.keys(CR);
+  if(TIDETEST){ const kinds=Object.keys(CR); let n=0;   // 測試版：每種生物 6 個，排成好找的幾排，就在下灘處前方
+    for(let r=0;r<kinds.length;r++) for(let q=0;q<6;q++){ const k=kinds[r], sign=CR[k].sign, m=new T.Mesh(new T.PlaneGeometry(.9,.9).rotateX(-Math.PI/2),DEC[sign]); const x=-7.5+q*3+(r%2)*1.5, z=14-r*3.2;
+      m.position.set(x,hAt(x,z)+.015,z); m.rotation.y=rand(0,6.28); m.scale.setScalar(1.35); S.add(m); const det=signDetail(sign); if(det){ det.position.copy(m.position); det.position.y=m.position.y-.012; det.rotation.y=m.rotation.y; S.add(det); m.userData.det=det; }
+      signs.push({m,k,sign,ring:null,done:false,spurt:rand(2,6)}); n++; } return; }
   for(let i=0;i<36;i++){ const k=Math.random()<.18?null:kinds[Math.floor(Math.random()*kinds.length)];
     const sign=k?CR[k].sign:'flat', m=new T.Mesh(new T.PlaneGeometry(.9,.9).rotateX(-Math.PI/2),DEC[sign]); m.position.set(rand(-14,14),0,rand(-26,12)); m.position.y=hAt(m.position.x,m.position.z)+.015; m.rotation.y=rand(0,6.28); S.add(m);
     const ring=null; m.scale.setScalar(1.35);   // 不再用提示光圈：痕跡本身放大、做成立體的
@@ -168,7 +173,7 @@ function spawnSigns(){ signs.forEach(s=>{ S.remove(s.m); if(s.m.userData.det) S.
 /* ---------- 泥面上的活生物（3D 模型＋骨架） ---------- */
 let roamers=[];
 function spawnRoamers(){ roamers.forEach(r=>S.remove(r.g)); roamers=[];
-  for(const [id,n] of [['fiddler',6],['mudskip',4],['hermit',3]]) for(let i=0;i<n;i++){ const sp=c.species(id); let f=null; try{ if(creaReady(id)) f=creaModel(sp); }catch(e){} if(!f) continue;
+  for(const [id,n] of (TIDETEST?[['fiddler',12],['mudskip',8],['hermit',8]]:[['fiddler',6],['mudskip',4],['hermit',3]])) for(let i=0;i<n;i++){ const sp=c.species(id); let f=null; try{ if(creaReady(id)) f=creaModel(sp); }catch(e){} if(!f) continue;
     const L=sp?(sp.len[0]+Math.random()*(sp.len[1]-sp.len[0]))/100:.05; f.group.scale.setScalar(L*1.4); f.group.position.set(rand(-12,12),0,rand(-22,10)); f.group.position.y=hAt(f.group.position.x,f.group.position.z)+.01; S.add(f.group);
     roamers.push({id,g:f.group,uni:f.uni,h:rand(0,6.28),t:rand(0,3),hop:0,L,flee:0}); } }
 /* ---------- 狀態 ---------- */
@@ -572,7 +577,7 @@ function holdTick(dt){ if(!hold) return; hold.t+=dt; const g=hold.f.group, u=hol
 const shown=[];
 function showCatch(id,p){ const sp=c.species(id); if(!sp) return; try{ if(!creaReady(id)) return; const f=creaModel(sp); f.group.scale.setScalar(Math.max(.06,(sp.len[0]+sp.len[1])/200)*1.5); f.group.position.set(p.x+.3,hAt(p.x+.3,p.z)+.05,p.z); S.add(f.group); shown.push({f,t:0}); }catch(e){} }
 /* ---------- 進入／離開 ---------- */
-function enter(){ const h=c.hour(), w=lowWin(h); if(!w){ const n=nextLow(h); c.toast(`🌊 現在是滿潮，泥灘都在水下。下次退潮 ${String(Math.floor(n%24)).padStart(2,'0')}:${n%1?'30':'00'}`,'warn',3200); return false; }
+function enter(){ const h=c.hour(), w=TIDETEST?[h,h+24]:lowWin(h); if(!w){ const n=nextLow(h); c.toast(`🌊 現在是滿潮，泥灘都在水下。下次退潮 ${String(Math.floor(n%24)).padStart(2,'0')}:${n%1?'30':'00'}`,'warn',3200); return false; }
   on=true; rakeMud=0; setTimeout(tutShow,1200); ambStart(); inBucket.forEach(f=>bucketIn.remove(f.group)); inBucket.length=0; walkReq=0; walkV=0; sink=0; prints.forEach(p=>S.remove(p.m)); prints.length=0; endH=w[1]; warned=0; evac=false; bag=[]; yaw=0; pitch=-.32; pos.set(0,1.6,18); spawnSigns(); spawnRoamers(); bagText(); hud.style.display='block'; document.body.classList.add('attide');
   c.toast('🦀 退潮了！看泥面痕跡找生物。注意右上角的漲潮時間','good',3200); return true; }
 function exit(forced){ if(!on) return; on=false; coach.style.display='none'; holePatches.forEach(p2=>S.remove(p2)); holePatches.length=0; HOLES.forEach(h=>h.set(0,0,0)); ambStop(); cageOff(); trails.forEach(o=>S.remove(o.m)); trails.length=0; cage.items=[]; cage.fill=0; cage.wash=0; hud.style.display='none'; warnEl.style.display='none'; box.style.display='none'; dig=null; document.body.classList.remove('attide');
