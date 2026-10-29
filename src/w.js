@@ -12,7 +12,7 @@ function H(){ const h=S.home=S.home||{}; h.fresh=h.fresh||[]; h.sea=h.sea||[]; h
 // 小屋在完成主線第一章後開放（開場就說老漁人留下了小屋）
 const unlocked=()=>!!(S.story&&S.story.done&&S.story.done.includes('c1'));
 const tank=()=>TANKS[H().tier];
-const waterOf=sp=>(sp.water||sp.loc||'lake')==='sea'?'sea':'fresh';   // 月光灣的海水魚雖然在湖區，仍要放海水缸
+const waterOf=sp=>{ const w=sp.water||sp.loc||'lake'; return w==='sea'||w==='tide'?'sea':'fresh'; };   // 潮間帶生物養在海水缸   // 月光灣的海水魚雖然在湖區，仍要放海水缸
 // 這條魚能不能帶回家：回傳是否可以、是否改做標本、原因、標本費用
 function check(fd){
   const sp=fd&&fd.sp, h=H();
