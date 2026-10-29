@@ -1,4 +1,4 @@
-/*APPV:20261029004609*/
+/*APPV:20261029005056*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5480,7 +5480,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029004609'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029005056'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6355,20 +6355,51 @@ const shown=[];
 function showCatch(id,p){ const sp=c.species(id); if(!sp) return; try{ if(!window.__MDL||!window.__MDL.fishReady(id)) return; const f=window.__MDL.fish(sp); f.group.scale.setScalar(Math.max(.06,(sp.len[0]+sp.len[1])/200)*1.5); f.group.position.set(p.x+.3,hAt(p.x+.3,p.z)+.05,p.z); S.add(f.group); shown.push({f,t:0}); }catch(e){} }
 /* ---------- 進入／離開 ---------- */
 function enter(){ const h=c.hour(), w=lowWin(h); if(!w){ const n=nextLow(h); c.toast(`🌊 現在是滿潮，泥灘都在水下。下次退潮 ${String(Math.floor(n%24)).padStart(2,'0')}:${n%1?'30':'00'}`,'warn',3200); return false; }
-  on=true; endH=w[1]; warned=0; evac=false; bag=[]; yaw=0; pitch=-.32; pos.set(0,1.6,18); spawnSigns(); spawnRoamers(); bagText(); hud.style.display='block'; document.body.classList.add('attide');
+  on=true; ambStart(); walkReq=0; walkV=0; sink=0; prints.forEach(p=>S.remove(p.m)); prints.length=0; endH=w[1]; warned=0; evac=false; bag=[]; yaw=0; pitch=-.32; pos.set(0,1.6,18); spawnSigns(); spawnRoamers(); bagText(); hud.style.display='block'; document.body.classList.add('attide');
   c.toast('🦀 退潮了！看泥面痕跡找生物。注意右上角的漲潮時間','good',3200); return true; }
-function exit(forced){ if(!on) return; on=false; hud.style.display='none'; warnEl.style.display='none'; box.style.display='none'; dig=null; document.body.classList.remove('attide');
+function exit(forced){ if(!on) return; on=false; ambStop(); hud.style.display='none'; warnEl.style.display='none'; box.style.display='none'; dig=null; document.body.classList.remove('attide');
   roamers.forEach(r=>S.remove(r.g)); roamers=[]; shown.forEach(s=>S.remove(s.f.group)); shown.length=0;
   if(forced&&bag.length){ bag.splice(Math.ceil(bag.length/2)); }
   c.onExit(bag.slice(),forced); bag=[]; }
 $('tdExit').onclick=()=>exit(false);
 /* ---------- 操作：拖曳轉頭與前進、點痕跡或活生物 ---------- */
-const canvas=W.renderer.domElement; let drag=null;
+const canvas=W.renderer.domElement;
+/* ---------- 走在泥灘上的體感 ----------
+   ・每一步：腳步聲（沙地沙沙、泥地「啵」的吸附聲）、手機輕震、鏡頭隨步伐上下晃、左右微傾
+   ・低窪的軟泥：走得慢、鏡頭往下沉、拔腳時有「噗滋」的吸附聲和比較長的震動
+   ・腳印：左右交替留在泥上，泥地的腳印會慢慢積水反光，一段時間後被抹平
+   ・環境聲：海風、遠處浪聲（漲潮越近越大聲）、偶爾的海鳥叫聲 */
+let walkReq=0, walkV=0, stepAcc=0, stepSide=1, bobT=0, sink=0;
+const fpG=new T.PlaneGeometry(.13,.3).rotateX(-Math.PI/2);
+const fpTex=(()=>{ const c=document.createElement('canvas'); c.width=32; c.height=64; const g=c.getContext('2d'); const r=g.createRadialGradient(16,22,2,16,26,16); r.addColorStop(0,'rgba(30,24,18,.75)'); r.addColorStop(1,'rgba(30,24,18,0)'); g.fillStyle=r; g.beginPath(); g.ellipse(16,22,11,18,0,0,7); g.fill(); g.beginPath(); g.ellipse(16,52,9,10,0,0,7); g.fill(); return new T.CanvasTexture(c); })();
+const prints=[];
+function footprint(x,z,ang,soft){ const m=new T.Mesh(fpG,new T.MeshStandardMaterial({map:fpTex,transparent:true,depthWrite:false,roughness:.25,metalness:.2,color:soft?0x6a6a70:0x8a8070,opacity:.9}));
+  m.position.set(x,hAt(x,z)+.006,z); m.rotation.y=ang; S.add(m); prints.push({m,t:0,soft}); if(prints.length>40){ const o=prints.shift(); S.remove(o.m); } }
+function stepSound(soft,sandy){ const a=ac(); if(!a) return; if(sandy){ noise(.12,2600,1.2,.06); return; }
+  noise(.09,500,2,.16); if(soft) setTimeout(()=>{ noise(.22,320,5,.14); noise(.06,1400,3,.05); },120); }   // 泥：落腳的悶響＋拔腳的吸附聲
+let amb=null;
+function ambStart(){ const a=ac(); if(!a||amb) return; const mk=(f,q,vol)=>{ const n=a.sampleRate*3, b=a.createBuffer(1,n,a.sampleRate), d=b.getChannelData(0); let l=0; for(let i=0;i<n;i++){ l=l*.97+(Math.random()*2-1)*.03; d[i]=l*6; }
+    const s=a.createBufferSource(); s.buffer=b; s.loop=true; const fl=a.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=f; fl.Q.value=q; const g=a.createGain(); g.gain.value=vol; s.connect(fl); fl.connect(g); g.connect(a.destination); s.start(); return {s,g,fl}; };
+  amb={wind:mk(900,.4,.05),wave:mk(380,.7,.03),bird:0}; }
+function ambStop(){ if(!amb) return; try{ amb.wind.s.stop(); amb.wave.s.stop(); }catch(e){} amb=null; }
+function birdCall(){ const a=ac(); if(!a) return; const o=a.createOscillator(), g=a.createGain(); o.type='sine'; const t=a.currentTime, f=1800+Math.random()*900;
+  o.frequency.setValueAtTime(f,t); o.frequency.exponentialRampToValueAtTime(f*1.6,t+.08); o.frequency.exponentialRampToValueAtTime(f*.9,t+.18);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.025,t+.03); g.gain.exponentialRampToValueAtTime(.0005,t+.22); o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+.25); }
+function walkTick(dt,left){ const soft=hAt(pos.x,pos.z)<-.06, sandy=sandK(pos.x,pos.z)>.5, maxV=soft?.55:sandy?1.5:1.1;   // 公尺／秒：軟泥很慢
+  walkV+=((walkReq*maxV)-walkV)*Math.min(1,dt*(soft?2:5));
+  pos.x+=-Math.sin(yaw)*walkV*dt; pos.z+=-Math.cos(yaw)*walkV*dt; pos.x=clamp(pos.x,-18,18); pos.z=clamp(pos.z,-30,24);
+  const sp=Math.abs(walkV); stepAcc+=sp*dt; bobT+=sp*dt*(Math.PI/.7);
+  sink+=((soft&&sp>.05?.09:soft?.05:0)-sink)*Math.min(1,dt*2);   // 站在軟泥裡會慢慢陷下去
+  if(stepAcc>.7){ stepAcc=0; stepSide=-stepSide; const sx=pos.x+Math.cos(yaw)*.12*stepSide, sz=pos.z-Math.sin(yaw)*.12*stepSide; footprint(sx,sz,yaw,soft); stepSound(soft,sandy); vib(soft?[10,60,25]:12);
+    if(soft&&Math.random()<.12) c.toast('腳陷進軟泥裡了，走慢一點','',1200); }
+  prints.forEach(p=>{ p.t+=dt; const m=p.m.material; if(p.soft) m.color.setHex(p.t<20?0x6a6a70:0x7d8a90); m.roughness=p.soft?Math.max(.05,.25-p.t*.01):.5; m.opacity=Math.max(0,.9-Math.max(0,p.t-50)/30); });   // 泥地腳印慢慢積水、反光，之後被抹平
+  if(amb){ amb.wind.g.gain.value=.04+.02*Math.sin(performance.now()*.0003); amb.wave.g.gain.value=.02+.08*Math.max(0,1-left/40); amb.bird-=dt; if(amb.bird<=0){ amb.bird=4+Math.random()*9; birdCall(); if(Math.random()<.5) setTimeout(birdCall,180); } } }
+ let drag=null;
 const ray=new T.Raycaster(), v2=new T.Vector2();
 function down(e){ if(!on||dig) return; drag={x:e.clientX,y:e.clientY,yaw,moved:0,t:performance.now()}; }
 function move(e){ if(!on||!drag||dig) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.moved=Math.max(drag.moved,Math.hypot(dx,dy)); yaw=drag.yaw-dx*.005;
-  const sp=-dy*.0009; pos.x+=-Math.sin(yaw)*sp*20*.05; pos.z+=-Math.cos(yaw)*sp*20*.05; pos.x=clamp(pos.x,-18,18); pos.z=clamp(pos.z,-30,22); }
-function up(e){ if(!on||!drag||dig) return; const was=drag; drag=null; if(was.moved>10) return;
+  walkReq=clamp(-dy*.012,-1,1); }   // 上下拖曳的距離＝走路的意圖（快慢），實際移動在每格畫面裡算（軟泥會變慢）
+function up(e){ walkReq=0; if(!on||!drag||dig) return; const was=drag; drag=null; if(was.moved>10) return;
   v2.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1); ray.setFromCamera(v2,cam);
   const rh=ray.intersectObjects(roamers.map(r=>r.g),true); if(rh.length){ let o=rh[0].object; const r=roamers.find(q=>{ let x=o; while(x){ if(x===q.g) return true; x=x.parent; } return false; });
       if(r&&r.g.position.distanceTo(pos)<6){ if(Math.random()<.55){ const sp=c.species(r.id); bag.push({id:r.id,v:SURF[r.id].price+Math.round(Math.random()*30),L:r.L}); bagText(); S.remove(r.g); roamers.splice(roamers.indexOf(r),1); vib(30); c.toast('抓到'+SURF[r.id].n+'了！','good',1400); }
@@ -6397,11 +6428,12 @@ function render(dt){ if(!on) return; t+=dt; if(!roamers.length&&(rspawn-=dt)<=0)
     r.g.position.x=clamp(r.g.position.x,-18,18); r.g.position.z=clamp(r.g.position.z,-30,20); r.g.position.y+=hAt(r.g.position.x,r.g.position.z)+.01; r.uni.uSwim.value+=dt*(4+sp*30); r.uni.uAmp.value=.05+sp*.4; });
   shown.forEach(s=>{ s.t+=dt; s.f.uni.uSwim.value+=dt*8; s.f.uni.uAmp.value=.08+.06*Math.sin(s.t*3); s.f.group.rotation.y+=dt*.6; });
   digTick(dt); flagTick(performance.now()*.001); if(gmat.userData.sh){ gmat.userData.sh.uniforms.uTW.value=performance.now()*.001; gmat.userData.sh.uniforms.uSkyK.value=Math.min(1.2,.35+.8*(S.children.find(o=>o.isHemisphereLight)||{intensity:1.7}).intensity/1.7); }
-  pos.y=hAt(pos.x,pos.z)+1.55;
+  walkTick(dt,left);
+  pos.y=hAt(pos.x,pos.z)+1.55-sink+Math.abs(Math.sin(bobT))*-.035*Math.min(1,Math.abs(walkV));   // 跟著地形、走路上下晃、軟泥會陷
   { const fx=-Math.sin(yaw), fz=-Math.cos(yaw), rel=Math.atan2(0,1)-Math.atan2(fx,fz); const ar=document.getElementById('tdArr'); if(ar) ar.style.transform='rotate('+(-rel)+'rad)';   // 岸在 +z 方向
     const dd=document.getElementById('tdDist'); if(dd) dd.textContent=Math.max(0,Math.round(34-pos.z))+' m'; const sh=document.getElementById('tdShore'); if(sh) sh.classList.toggle('warn',!!warned); }
   signs.forEach(s=>{ if(!s.ring) return; const d=Math.hypot(s.m.position.x-pos.x,s.m.position.z-pos.z); s.ring.visible=!s.done; s.ring.material.opacity=s.done?0:Math.max(0,1-d/7)*(.35+.25*Math.sin(performance.now()*.004+s.m.position.x)); });   // 跟著地形高低走
-  cam.position.copy(pos); cam.rotation.set(pitch,yaw,0,'YXZ'); cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix();
+  cam.position.copy(pos); cam.rotation.set(pitch+Math.sin(bobT*2)*.006*Math.min(1,Math.abs(walkV)),yaw,Math.sin(bobT)*.01*Math.min(1,Math.abs(walkV)),'YXZ'); cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix();
   W.renderer.render(S,cam); }
 return {showRoute:v=>{ route.visible=v; },testDig:k=>{ const s=signs.find(q=>q.k===k&&!q.done)||signs.find(q=>q.k); if(s) startDig(s); return !!s; },enter,exit,render,active:()=>on,low:h=>!!lowWin(h),nextLow,CR,SURF,ALL};
 }
