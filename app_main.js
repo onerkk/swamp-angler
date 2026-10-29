@@ -1,4 +1,4 @@
-/*APPV:20261029144051*/
+/*APPV:20261029150309*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -4607,8 +4607,12 @@ for(const x of [-ROOM.x+.08,ROOM.x-.08]) for(const z of [ROOM.zb+.08,ROOM.zf-.08
 const trimM=new T.MeshStandardMaterial({color:0x5a3e28,roughness:.7});
 box(RW,.12,.03,trimM,0,.06,ROOM.zb+.015); box(.03,.12,RD,trimM,-ROOM.x+.015,.06,cz); box(.03,.12,RD,trimM,ROOM.x-.015,.06,cz);
 // 窗戶（左牆）：窗外是真實湖景全景，依時段換成白天／黃昏／夜晚
-const WIN={w:1.6,h:1.1,y:1.55,z:.5}, winTex={}; ['day','dawn','night'].forEach(k=>{ const x=TL.load('env_'+k+'_band.jpg'); x.encoding=T.sRGBEncoding; winTex[k]=x; });
-const viewM=new T.MeshBasicMaterial({map:winTex.day}); const view=plane(WIN.w*1.6,WIN.h*1.6,viewM,-ROOM.x-.6,WIN.y,WIN.z,Math.PI/2);
+const WIN={w:1.6,h:1.1,y:1.55,z:.5}, WINROT=+(new URLSearchParams(location.search).get('winrot')||1.2), winTex={}; ['day','dawn','night'].forEach(k=>{ const x=TL.load('env_'+k+'_band.jpg'); x.encoding=T.sRGBEncoding; winTex[k]=x; });
+const viewM=new T.MeshBasicMaterial({map:winTex.day,side:T.BackSide,fog:false});
+// 窗外：把湖景全景貼在房子外面一圈 60 公尺遠的大圓筒內側（比例與實景一致、遠近有視差），原本是一張貼在窗後 60 公分的平面照片，又近又被壓扁
+const view=(()=>{ const R=60, Hh=2*Math.PI*R*1366/8192, g=new T.CylinderGeometry(R,R,Hh,96,1,true), uv=g.attributes.uv; for(let i=0;i<uv.count;i++) uv.setX(i,1-uv.getX(i));   // 從內側看要左右翻
+  const m=new T.Mesh(g,viewM); m.position.set(0,1.45+.3*Hh,WIN.z);   /* 全景的地平線在圖的下方兩成：對齊到眼睛高度 */ m.rotation.y=WINROT; m.renderOrder=-1; scene.add(m);
+  const gr=new T.Mesh(new T.CircleGeometry(R,48).rotateX(-Math.PI/2),new T.MeshBasicMaterial({color:0x4a3f33,fog:false})); gr.position.set(0,1.45+.3*Hh-Hh/2+.05,WIN.z); scene.add(gr); return m; })();
 { // 左牆分成窗戶上、下、前、後四塊，窗戶位置真的留空，才看得到窗外
   const yb=WIN.y-WIN.h/2, yt=WIN.y+WIN.h/2, z0=WIN.z-WIN.w/2, z1=WIN.z+WIN.w/2, X=-ROOM.x, r=Math.PI/2;
   plane(RD,yb,wallM,X,yb/2,cz,r); plane(RD,H-yt,wallM,X,(yt+H)/2,cz,r);
@@ -4635,17 +4639,42 @@ function makeTag(text){ const cv=document.createElement('canvas'); cv.width=512;
 // 換標籤文字（有東西可以領、可以採時改成金色醒目的樣式）；文字沒變就不重畫
 function setTag(sp,text,hot){ const k=text+(hot?'*':''); if(sp.userData.txt===k) return; sp.userData.txt=k; drawTag(sp.userData.g,text,hot); sp.material.map.needsUpdate=true; }
 const tags=[];
-// 靜月之光水晶展示櫃：入口牆上的木框玻璃櫃，陳列作者的水晶作品，點擊可前往作者的蝦皮小店
-const shopParts=[];
+// 靜月之光水晶展示櫃：深色實木櫃＋玻璃門、黑絲絨底板、每格作品照片裝框並有黃銅名牌、每層 LED 燈條、頂部招牌；
+// 櫃子下方小檯面放一簇立體紫水晶和一顆水晶球，還有點點閃光——點任何一處都前往作者的蝦皮小店
+const shopParts=[], sparkles=[];
 { const cab=new T.Group(); cab.position.set(0,1.55,ROOM.zf-.12); cab.rotation.y=Math.PI; scene.add(cab);
-  const woodM=new T.MeshStandardMaterial({color:0x4a2e1c,roughness:.6,metalness:.05});
-  const back=new T.Mesh(new T.BoxGeometry(1.56,1.2,.06),new T.MeshStandardMaterial({color:0x1a1412,roughness:.9})); back.position.z=-.08; cab.add(back);
-  for(const [w,h,x,y] of [[1.66,.07,0,.63],[1.66,.07,0,-.63],[.07,1.3,-.8,0],[.07,1.3,.8,0],[1.56,.03,0,.2],[1.56,.03,0,-.2]]){ const b=new T.Mesh(new T.BoxGeometry(w,h,.2),woodM); b.position.set(x,y,0); cab.add(b); }
-  for(let i=0;i<9;i++){ const tx=TL.load('shop'+(i+1)+'.jpg'); tx.encoding=T.sRGBEncoding; const r=Math.floor(i/3), cI=i%3;
-    const ph=new T.Mesh(new T.PlaneGeometry(.42,.34),new T.MeshStandardMaterial({map:tx,roughness:.5,emissive:0xffffff,emissiveMap:tx,emissiveIntensity:.25})); ph.position.set((cI-1)*.5,(1-r)*.4,-.045); cab.add(ph); shopParts.push(ph); }
-  const glass=new T.Mesh(new T.PlaneGeometry(1.56,1.2),new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.08,roughness:.05,metalness:.3,depthWrite:false})); glass.position.z=.1; cab.add(glass); shopParts.push(glass);
-  const lamp=new T.SpotLight(0xfff0d8,1.4,3.2,.7,.5,1.2); lamp.position.set(0,1.0,.6); lamp.target=back; lamp.visible=false; cab.add(lamp);   /* 省效能：不用即時光 */
-  const tg=makeTag('💎 靜月之光 水晶'); tg.position.set(0,2.32,ROOM.zf-.2); scene.add(tg); tags.push({s:tg,y:2.32,k:'shop'}); }
+  const woodM=new T.MeshStandardMaterial({color:0x3a2416,roughness:.45,metalness:.05}), brass=new T.MeshStandardMaterial({color:0xc9a35a,roughness:.3,metalness:.85}), velvet=new T.MeshStandardMaterial({color:0x14101a,roughness:1});
+  const back=new T.Mesh(new T.BoxGeometry(1.7,1.32,.04),velvet); back.position.z=-.1; cab.add(back);
+  for(const [w,h,d,x,y,z] of [[1.82,.09,.3,0,.7,0],[1.82,.09,.3,0,-.7,0],[.09,1.48,.3,-.87,0,0],[.09,1.48,.3,.87,0,0],[1.7,.035,.26,0,.22,-.01],[1.7,.035,.26,0,-.22,-.01]]){ const b=new T.Mesh(new T.BoxGeometry(w,h,d),woodM); b.position.set(x,y,z); cab.add(b); }
+  // 頂冠＋招牌
+  const crown=new T.Mesh(new T.BoxGeometry(1.95,.16,.34),woodM); crown.position.y=.82; cab.add(crown);
+  const sc=document.createElement('canvas'); sc.width=1024; sc.height=128; { const g=sc.getContext('2d'); const gr=g.createLinearGradient(0,0,0,128); gr.addColorStop(0,'#2a1a10'); gr.addColorStop(1,'#1a0f08'); g.fillStyle=gr; g.fillRect(0,0,1024,128);
+    g.strokeStyle='#c9a35a'; g.lineWidth=4; g.strokeRect(8,8,1008,112); g.font='bold 64px serif'; g.textAlign='center'; g.textBaseline='middle'; const tg2=g.createLinearGradient(0,30,0,100); tg2.addColorStop(0,'#fff2c4'); tg2.addColorStop(1,'#c9963a'); g.fillStyle=tg2; g.fillText('✦ 靜月之光 · 天然水晶 ✦',512,66); }
+  const st=new T.CanvasTexture(sc); st.encoding=T.sRGBEncoding; const sign=new T.Mesh(new T.PlaneGeometry(1.8,.225),new T.MeshStandardMaterial({map:st,emissive:0xffffff,emissiveMap:st,emissiveIntensity:.35,roughness:.4})); sign.position.set(0,.82,.172); cab.add(sign); shopParts.push(sign);
+  // 每層頂上的暖白 LED 燈條＋往下的柔光
+  const ledM=new T.MeshBasicMaterial({color:0xfff1d6}); for(const y of [.64,.2,-.24]){ const l=new T.Mesh(new T.BoxGeometry(1.6,.012,.012),ledM); l.position.set(0,y,.06); cab.add(l);
+    const glow=new T.Mesh(new T.PlaneGeometry(1.6,.36),new T.MeshBasicMaterial({color:0xffe2b0,transparent:true,opacity:.07,blending:T.AdditiveBlending,depthWrite:false})); glow.position.set(0,y-.18,-.06); cab.add(glow); }
+  for(let i=0;i<9;i++){ const tx=TL.load('shop'+(i+1)+'.jpg'); tx.encoding=T.sRGBEncoding; const r=Math.floor(i/3), cI=i%3, x=(cI-1)*.54, y=(1-r)*.44;
+    const fr=new T.Mesh(new T.BoxGeometry(.46,.38,.02),brass); fr.position.set(x,y+.01,-.075); cab.add(fr);   // 黃銅細框
+    const ph=new T.Mesh(new T.PlaneGeometry(.42,.34),new T.MeshStandardMaterial({map:tx,roughness:.35,emissive:0xffffff,emissiveMap:tx,emissiveIntensity:.32})); ph.position.set(x,y+.01,-.063); cab.add(ph); shopParts.push(ph);
+    const pl=new T.Mesh(new T.BoxGeometry(.14,.025,.01),brass); pl.position.set(x,y-.19,-.06); cab.add(pl); }   // 小名牌
+  // 玻璃門（兩片＋把手），帶一點反光
+  for(const s2 of [-1,1]){ const gl=new T.Mesh(new T.PlaneGeometry(.84,1.32),new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.1,roughness:.02,metalness:.4,depthWrite:false})); gl.position.set(s2*.42,0,.14); cab.add(gl); shopParts.push(gl);
+    const hd=new T.Mesh(new T.CylinderGeometry(.008,.008,.12,8),brass); hd.position.set(s2*.05,0,.16); cab.add(hd); }
+  // 下方小檯面：一簇立體紫水晶＋水晶球
+  const ledge=new T.Mesh(new T.BoxGeometry(1.2,.05,.28),woodM); ledge.position.set(0,-.86,.06); cab.add(ledge);
+  const amM=new T.MeshPhysicalMaterial({color:0x8a4fd0,roughness:.08,metalness:0,transparent:true,opacity:.82,clearcoat:1,emissive:0x2a0a50,emissiveIntensity:.6});
+  const clu=new T.Group(); clu.position.set(-.3,-.83,.06); cab.add(clu);
+  const rock=new T.Mesh(new T.IcosahedronGeometry(.075,1),new T.MeshStandardMaterial({color:0x5a5248,roughness:.9})); rock.scale.set(1.4,.55,1); clu.add(rock);
+  for(let i=0;i<9;i++){ const h=.06+Math.random()*.1, cr=new T.Group(); const p=new T.Mesh(new T.CylinderGeometry(.016,.018,h,6),amM); p.position.y=h/2; cr.add(p); const tip=new T.Mesh(new T.ConeGeometry(.016,.035,6),amM); tip.position.y=h+.017; cr.add(tip);
+    cr.position.set((Math.random()-.5)*.12,.02,(Math.random()-.5)*.06); cr.rotation.set((Math.random()-.5)*.8,Math.random()*6,(Math.random()-.5)*.8); clu.add(cr); }   // 六角柱＋尖頂的紫水晶簇
+  shopParts.push(rock);
+  const ball=new T.Mesh(new T.SphereGeometry(.07,32,24),new T.MeshPhysicalMaterial({color:0xeaf4ff,roughness:0,metalness:0,transparent:true,opacity:.45,clearcoat:1,emissive:0x203040,emissiveIntensity:.3})); ball.position.set(.3,-.76,.06); cab.add(ball); shopParts.push(ball);
+  const bstand=new T.Mesh(new T.CylinderGeometry(.05,.065,.04,24),brass); bstand.position.set(.3,-.82,.06); cab.add(bstand);
+  // 閃光
+  const spT=(()=>{ const c2=document.createElement('canvas'); c2.width=c2.height=64; const g=c2.getContext('2d'); const gr=g.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(.2,'rgba(255,240,220,.6)'); gr.addColorStop(1,'rgba(255,240,220,0)'); g.fillStyle=gr; g.fillRect(0,0,64,64); g.fillStyle='rgba(255,255,255,.9)'; g.fillRect(30,4,4,56); g.fillRect(4,30,56,4); return new T.CanvasTexture(c2); })();
+  for(let i=0;i<10;i++){ const sp=new T.Sprite(new T.SpriteMaterial({map:spT,transparent:true,blending:T.AdditiveBlending,depthWrite:false,opacity:0})); sp.scale.setScalar(.05); sp.position.set((Math.random()-.5)*1.5,(Math.random()-.5)*1.2,.0); cab.add(sp); sparkles.push({sp,ph:Math.random()*20}); }
+  const tg=makeTag('💎 靜月之光 水晶'); tg.position.set(0,2.55,ROOM.zf-.2); scene.add(tg); tags.push({s:tg,y:2.55,k:'shop'}); }
 box(.55,1.3,.32,stoneM,FX,.65,FP.z-.66); box(.55,1.3,.32,stoneM,FX,.65,FP.z+.66);
 box(.55,.5,1.0,stoneM,FX,1.05,FP.z); box(.45,1.6,1.0,stoneM,ROOM.x-.22,2.1,FP.z);
 box(.75,.08,1.9,new T.MeshStandardMaterial({color:0x5a4030,roughness:.8}),ROOM.x-.36,1.34,FP.z);
@@ -5250,6 +5279,7 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
   updAct(dt); swingLamp(dt);
   furnTick-=dt; if(furnTick<=0){ furnTick=3; updFurnTags(); syncTime(); }
   updGrill(dt);   // 爐火劈啪聲，隨機間隔
+  sparkles.forEach(q=>{ const k=Math.max(0,Math.sin(t*1.7+q.ph)); q.sp.material.opacity=Math.pow(k,8); q.sp.scale.setScalar(.03+.05*Math.pow(k,4)); if(k<.02&&Math.random()<.02) q.sp.position.set((Math.random()-.5)*1.5,(Math.random()-.5)*1.2,.0); });   // 水晶閃光
   updTanks(dt); R.setRenderTarget(null); R.render(scene,cam); }
 window.addEventListener('resize',()=>{ if(on) resize(); });
 return {enter,exit,render,active:()=>on,scene,cam,grill:()=>pickFish(),grillSet:(a,b,f)=>{ if(!GR.on) return; GR.a=a; GR.b=b; if(f!=null){ GR.face=f; spin.rotation.z=f*Math.PI; } }};
@@ -5500,7 +5530,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029144051'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029150309'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
