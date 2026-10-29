@@ -295,6 +295,8 @@ function hermitModel(){ const group=new T.Group(), body=new T.Group(); group.add
   // 從殼口探出來的前半身（眼柄、觸角、大小螯都在這張照片上）
   const fr=new T.Group(); fr.position.set(.12,.2,0); body.add(fr);
   const fg=new T.PlaneGeometry(.62,.49); const front=new T.Mesh(fg,partMat('her_front')); front.rotation.y=Math.PI/2; front.position.set(.02,.04,0); fr.add(front);
+  for(const s2 of [-1,1]){ const big=s2<0, f=big?'her_clawB':'her_clawS', sc=big?1:.75, root=new T.Group(); root.position.set(.1,-.04,s2*.09); root.rotation.y=s2*.35;
+    const arm=seg(f,0,.42,.26*sc,.09*sc), hand=seg(f,.42,1,.4*sc,.15*sc); arm.rotation.z=.15; root.add(arm); const wr=new T.Group(); wr.position.x=.26*sc; arm.add(wr); hand.rotation.z=-.35; hand.rotation.y=-s2*.6; wr.add(hand); fr.add(root); }   // 從殼口伸出的立體大小螯
   const front2=front.clone(); front2.rotation.set(-Math.PI/2+.5,0,Math.PI/2); front2.position.set(.08,-.02,0); front2.scale.set(.9,.7,1); fr.add(front2);   // 從上面看也看得到螯
   // 走路的腳：左右各兩隻
   const legs=[], L=.62;
@@ -310,19 +312,31 @@ function hermitModel(){ const group=new T.Group(), body=new T.Group(); group.add
   return {group,uni,crab:true}; }
 /* ---------- 彈塗魚、沙蠶（程式組裝）：身體照輪廓做成立體，貼使用者的實拍照片；鰭用照片本身的透明輪廓 ---------- */
 // 彈塗魚：頭大、圓鼓眼、身體往尾巴漸細；側面照片投影在身上，背鰭尾鰭用貫穿身體的側面照片片、胸鰭用俯視照片片
+// 彈塗魚（依使用者提供的側面、俯視、頭、胸鰭照片組裝）：身寬照俯視輪廓、身高照側面比例；背上半圈貼俯視照片、其餘貼側面照片；
+// 頭頂一對突出的金色大眼、像手臂一樣撐地的胸鰭；鰭的輪廓用側面照片本身
+const MUD_W=[0.03,0.22,0.33,0.38,0.4,0.46,0.52,0.55,0.55,0.52,0.48,0.46,0.44,0.42,0.40,0.38,0.36,0.35,0.34,0.34,0.34,0.33,0.33,0.33,0.31,0.3,0.29,0.29,0.3,0.31,0.31,0.31,0.3,0.3,0.29,0.28,0.27,0.26,0.24,0.21,0.18,0.17,0.16,0.15,0.14,0.12,0.11,0.11,0.11,0.11,0.1,0.1,0.09,0.08,0.07,0.06,0.05,0.04,0.03,0.01];   // 俯視圖每一段的寬（胸鰭那段已扣掉）
 function mudskipModel(){ const group=new T.Group(), body=new T.Group(); group.add(body);
-  const NS=36, NR=14, g=new T.BufferGeometry(), pos=[], uvs=[], idx=[];
-  const hProf=t=>(t<.3?.06+.035*Math.sin(t/.3*Math.PI*.5):.095-.07*Math.pow((t-.3)/.7,1.2))*Math.pow(Math.sin(Math.PI*Math.min(1,t*1.04+.03)),.35), wProf=t=>(t<.3?.065+.03*Math.sin(t/.3*Math.PI*.5):.095-.075*Math.pow((t-.3)/.7,1.1))*Math.pow(Math.sin(Math.PI*Math.min(1,t*1.04+.03)),.35);   /* 彈塗魚：鈍圓的大頭、胖胖的前半身，往尾巴快速變細 */   // t=0 頭、t=1 尾
-  for(let i=0;i<=NS;i++){ const t=i/NS, x=.5-t, hh=hProf(t), ww=wProf(t);
-    for(let j=0;j<=NR;j++){ const a=j/NR*Math.PI*2, y=Math.cos(a)*hh+.01*(1-t), z=Math.sin(a)*ww; pos.push(x,y,z); uvs.push(t*.98+.01,.5+y/.32); } }
-  for(let i=0;i<NS;i++) for(let j=0;j<NR;j++){ const a=i*(NR+1)+j, b=a+NR+1; idx.push(a,b,a+1,b,b+1,a+1); }
-  g.setAttribute('position',new T.Float32BufferAttribute(pos,3)); g.setAttribute('uv',new T.Float32BufferAttribute(uvs,2)); g.setIndex(idx); g.computeVertexNormals();
-  const skin=new T.MeshStandardMaterial({map:crabTex('mud_side'),roughness:.35,metalness:0}); const bm=new T.Mesh(g,skin); body.add(bm);
-  const finS=new T.Mesh(new T.PlaneGeometry(1,.3).rotateY(Math.PI),partMat('mud_side')); body.add(finS);   /* 照片左邊是頭，模型頭朝 +X：轉過來對齊 */   // 背鰭、尾鰭（側面照片的輪廓）
-  const finT=new T.Mesh(new T.PlaneGeometry(1,.33).rotateX(-Math.PI/2).rotateY(Math.PI),partMat('mud_top')); finT.position.y=-.01; body.add(finT);   // 胸鰭（俯視照片的輪廓）
-  const eyeM=new T.MeshStandardMaterial({color:0x101010,roughness:.08}); for(const s of [-1,1]){ const e=new T.Mesh(new T.SphereGeometry(.042,14,10),eyeM); e.position.set(.36,.115,s*.032); body.add(e); const lid=new T.Mesh(new T.SphereGeometry(.05,14,10,0,Math.PI*2,Math.PI*.45,Math.PI*.55),skin); lid.position.copy(e.position); lid.position.y-=.008; body.add(lid); }   // 頭頂兩顆大大鼓起的眼睛（下半包在皮膚裡）   // 頭頂兩顆鼓出來的眼睛
-  const P0=g.attributes.position.array.slice(), uni={uSwim:{value:0},uAmp:{value:0}};
-  bm.onBeforeRender=()=>{ const ph=uni.uSwim.value, a=uni.uAmp.value, P=g.attributes.position; for(let k=0;k<P.count;k++){ const x=P0[k*3], t=.5-x; P.setZ(k,P0[k*3+2]+Math.sin(ph-t*5)*t*t*.35*a*3); } P.needsUpdate=true; finS.rotation.y=Math.sin(ph-2.5)*.15*a*3; };   // 身體往尾巴擺動
+  const NS=59, NR=20, half=t=>{ const f=t*NS, i=Math.min(NS-1,Math.floor(f)), r=f-i; return (MUD_W[i]*(1-r)+MUD_W[i+1]*r)*.327/2; };
+  const mk=(a0,a1,top)=>{ const g=new T.BufferGeometry(), pos=[], uvs=[], idx=[];
+    for(let i=0;i<=NS;i++){ const t=i/NS, x=.5-t, w=half(t), h=w*(t<.25?1.05:.95);
+      for(let j=0;j<=NR;j++){ const a=a0+(a1-a0)*j/NR, y=Math.cos(a)*h+.012, z=Math.sin(a)*w; pos.push(x,y,z); uvs.push(t*.985+.008, top?.5-z/.327*.95:.36+(y-.012)/.307*.9); } }
+    for(let i=0;i<NS;i++) for(let j=0;j<NR;j++){ const a=i*(NR+1)+j, b=a+NR+1; idx.push(a,b,a+1,b,b+1,a+1); }
+    g.setAttribute('position',new T.Float32BufferAttribute(pos,3)); g.setAttribute('uv',new T.Float32BufferAttribute(uvs,2)); g.setIndex(idx); g.computeVertexNormals(); return g; };
+  const skinS=new T.MeshStandardMaterial({map:crabTex('mud2_side'),roughness:.32,metalness:0}), skinT=new T.MeshStandardMaterial({map:crabTex('mud2_top'),roughness:.32,metalness:0});
+  const gTop=mk(-1.05,1.05,true), gSide=mk(1.05,Math.PI*2-1.05,false), mT=new T.Mesh(gTop,skinT), mS=new T.Mesh(gSide,skinS); body.add(mT); body.add(mS);
+  const finS=new T.Mesh((()=>{ const g=new T.PlaneGeometry(1,.307), uv=g.attributes.uv; for(let i=0;i<uv.count;i++) uv.setX(i,1-uv.getX(i)); return g; })(),partMat('mud2_side'));   /* 照片頭在左；模型頭朝 +X：把貼圖左右翻過來對齊 */ finS.position.y=.012+(.36-.5)*-.307*.0; body.add(finS);   // 背鰭、第二背鰭、臀鰭、尾鰭（照片輪廓）
+  finS.position.y=.012+(.5-.36)*.307/.9;
+  // 胸鰭：兩側像手臂撐在地上
+  const pecs=[]; for(const s of [-1,1]){ const p=new T.Group(); p.position.set(.29,-.02,s*.07); const fin=new T.Mesh(new T.PlaneGeometry(.2,.11).translate(.1,0,0),partMat('mud2_pec')); fin.rotation.x=-Math.PI/2; p.add(fin); p.rotation.y=-s*1.9; p.rotation.z=-.35; body.add(p); pecs.push({p,s}); }
+  // 眼睛：頭頂突出的金色眼球＋黑瞳，眼底下一圈皮膚
+  const eyeG=new T.MeshStandardMaterial({color:0x5e4a1c,roughness:.12,metalness:.1}), pupil=new T.MeshStandardMaterial({color:0x050505,roughness:.05});
+  for(const s of [-1,1]){ const e=new T.Mesh(new T.SphereGeometry(.036,16,12),eyeG); e.position.set(.415,.1,s*.034); body.add(e); const pu=new T.Mesh(new T.SphereGeometry(.027,12,8),pupil); pu.position.set(.425,.108,s*.047); body.add(pu);
+    const sock=new T.Mesh(new T.CylinderGeometry(.03,.042,.05,14),skinT); sock.position.set(.415,.065,s*.034); body.add(sock); }
+  body.scale.setScalar(1);
+  const P1=gTop.attributes.position.array.slice(), P2=gSide.attributes.position.array.slice(), uni={uSwim:{value:0},uAmp:{value:0}};
+  mS.onBeforeRender=()=>{ const ph=uni.uSwim.value, a=Math.min(1,uni.uAmp.value*3);
+    for(const [g,P0] of [[gTop,P1],[gSide,P2]]){ const P=g.attributes.position; for(let k=0;k<P.count;k++){ const t=.5-P0[k*3]; P.setZ(k,P0[k*3+2]+Math.sin(ph-t*5)*t*t*.18*a); } P.needsUpdate=true; }
+    finS.rotation.y=Math.sin(ph-2.5)*.12*a; pecs.forEach(q=>{ q.p.rotation.z=-.35+Math.sin(ph*1.3)*.35*a; }); };   // 尾巴擺、胸鰭一撐一撐
   return {group,uni,fishLike:true}; }
 // 沙蠶：一節一節的長條身體，俯視照片沿身長貼上（兩側的疣足在照片輪廓裡），整條蠕動
 function wormModel(){ const group=new T.Group(), NS=60, NR=8, g=new T.BufferGeometry(), pos=[], uvs=[], idx=[];
