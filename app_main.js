@@ -1,4 +1,4 @@
-/*APPV:20261029111139*/
+/*APPV:20261029113438*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5498,7 +5498,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029111139'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029113438'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6558,7 +6558,7 @@ function scrape3(p,spd,dir,dist){ const d=dig; if(!d||d.phase!=='dig') return; c
   if(info.moved>.0004) spawnMud(p.clone().setY(patchY(p.x,p.z)+.006),dir,Math.min(5,1+Math.round(info.moved*300)),info.layer>0);
   const now=performance.now(); if(now-d.lastSnd>90&&info.moved>.0002){ d.lastSnd=now; LAYER[info.layer].snd(); vib(LAYER[info.layer].vib); }
   if(info.touch&&d.cr){ d.touchT=0; d.poke=Math.min(1,(d.poke||0)+.35); if(!d.found){ d.found=true; tut('found'); if(d.mud){ vib(25); noise(.07,500,3,.22); } else { vib([30,40,30]); noise(.05,1600,8,.25); } $('digInfo').innerHTML=d.cr.soft?'碰到軟軟的東西了<br><small>輕一點，把周圍的泥撥開</small>':'喀！手指碰到硬硬的東西了<br><small>放慢速度（看下面的力道條），沿著周圍把泥清掉</small>'; }
-    const lim=digLim(); if(spd>lim&&now-d.hit>700&&d.dmg<3){ d.hit=now; d.dmg++; vib(60); noise(.08,900,4,.35); $('digInfo').innerHTML=d.cr.soft?'太用力了，'+d.cr.n+'被扯斷了一截！':'喀啦！刮太快把殼刮傷了（'+d.dmg+'）<br><small>力道條要保持在綠色</small>'; } }
+    const lim=digLim(); if(spd>lim&&now-d.hit>1000&&d.dmg<3){ d.hit=now; if(!d.warned){ d.warned=1; vib(30); $('digInfo').innerHTML='手指太快了！碰到殼要放慢<br><small>力道條保持綠色，再快就會刮傷</small>'; return; } d.dmg++; vib(60); noise(.08,900,4,.35); $('digInfo').innerHTML=d.cr.soft?'太用力了，'+d.cr.n+'被扯斷了一截！':'喀啦！刮太快把殼刮傷了（'+d.dmg+'）<br><small>力道條要保持在綠色</small>'; } }
   if(!d.found&&d.cr&&!d.fled&&now-(d.hintT||0)>1500){ d.hintT=now; const g=d.crea.group, dc=Math.round((patchY(g.position.x,g.position.z)-(hAt(g.position.x,g.position.z)-d.depth))*100);
     const far=Math.hypot(p.x-g.position.x,p.z-g.position.z)>.12; $('digInfo').innerHTML=far?(d.got?'震動是從洞的另一邊傳來的<br><small>沿著洞的邊緣往外挖</small>':'痕跡在洞的正中間<br><small>往中間挖，'+d.cr.n+'通常就在孔的正下方</small>'):(dc>1?'再往下挖一點…<br><small>還差大約 '+dc+' 公分</small>':'快碰到了，放慢…'); }
   if(d.found&&!d.fled){ const rv=reveal3(); if(rv>.62&&!d.ready){ d.ready=true; tut('ready'); exposeCrea(); $('digInfo').innerHTML='<b>'+d.cr.n+'露出來了！</b><br><small>可以取出了，再多清一點周圍也可以</small>'; $('digBtns').innerHTML='<button id="dgTake" style="background:#ffcf66;color:#3a2600">✋ 取出</button><button id="dgNo" style="background:#333;color:#fff">放棄</button>'; $('dgTake').onclick=takeOut; $('dgNo').onclick=()=>endDig(false); }
@@ -6642,7 +6642,7 @@ function digPoint(e){ dv2.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*
 window.addEventListener('pointerdown',e=>{ if(!dig||dig.phase!=='dig') return; if(e.target&&e.target.closest&&e.target.closest('button')) return; const p=digPoint(e); dig.ptr=p?{p,t:performance.now()}:{p:null,t:performance.now()}; });
 let spdS=0;
 const spdEl=document.createElement('div'); spdEl.id='digSpd'; spdEl.innerHTML='<span>力道</span><i><b></b></i>'; box.insertBefore(spdEl,box.firstChild);
-function digLim(){ const d=dig; return d&&d.cr?(d.cr.fragile?.8:d.cr.soft?.95:1.25):1.25; }   /* 公尺／秒：一般手指慢慢撥約 0.3～0.8 */
+function digLim(){ const d=dig; return d&&d.cr?(d.cr.fragile?1.5:d.cr.soft?1.7:2.2):2.2; }   /* 公尺／秒：手機上快速撥動換算成實際距離常超過 1，原本太容易刮傷 */   /* 公尺／秒：一般手指慢慢撥約 0.3～0.8 */
 function spdShow(v){ const b=spdEl.querySelector('b'), lim=digLim(), f=Math.min(1,v/(lim*1.4)); b.style.width=(f*100)+'%'; b.style.background=v<lim*.7?'#5fd38a':v<lim?'#f4c542':'#ff5b4a'; }
 window.addEventListener('pointermove',e=>{ if(!dig||dig.phase!=='dig') return; const p=digPoint(e); if(!p) return;
   rake.visible=false; dig.handP=p.clone().setY(patchY(p.x,p.z)+.025); scoop=Math.min(1,scoop+.25);
@@ -6697,7 +6697,8 @@ function cageUI(){ const b=cageEl.querySelector('b'); b.style.width=Math.round(c
 function cageOn(){ if(dig) return; cage.on=true; cage.g.visible=true; cageEl.style.display='flex'; ['tdHint','tdStomp'].forEach(id=>{ const e=$(id); if(e) e.style.visibility='hidden'; }); cageUI(); }
 function cageOff(){ cage.on=false; pitch=-.32; cage.g.visible=false; cageEl.style.display='none'; ['tdHint','tdStomp'].forEach(id=>{ const e=$(id); if(e) e.style.visibility=''; }); }
 function cageTick(dt){ if(!cage.on) return; pitch+=(-.5-pitch)*Math.min(1,dt*3); const fx=-Math.sin(yaw), fz=-Math.cos(yaw), x=pos.x+fx*1.9, z=pos.z+fz*1.9;   /* 低頭看著前面的籠子 */
-  cage.g.position.set(x,hAt(x,z)-.028,z);   // 籠底和鐵齒陷在泥裡 cage.g.rotation.set(0,yaw,Math.sin(cage.shake*1.3)*.12*Math.min(1,cage.wash*4));   /* 籠口朝前、竿子朝你 */
+  cage.shakeX=(cage.shakeX||0)+(((cage.wash>0&&cage.wash<1)?(cage.swipeDir||0)*.14:0)-(cage.shakeX||0))*Math.min(1,dt*14); const rx=Math.cos(yaw), rz=-Math.sin(yaw);
+  cage.g.position.set(x+rx*cage.shakeX,hAt(x,z)-.028+(cage.wash>0&&cage.wash<1?.06:0),z+rz*cage.shakeX);   /* 淘洗時整個籠子提起來，跟著手指左右甩 */   // 籠底和鐵齒陷在泥裡 cage.g.rotation.set(0,yaw,-(cage.shakeX||0)*1.6);   /* 籠口朝前、竿子朝你 */
   if(cage.wash===0&&walkV<-.05&&cage.fill<1){ const dd=-walkV*dt; cage.dist+=dd; trailAcc+=dd; if(trailAcc>.2){ trailAcc=0; trailStamp(x-fx*.05,z-fz*.05); } cage.fill=Math.min(1,cage.fill+dd*.06);   // 倒退拖：約 17 公尺裝滿
     if(Math.random()<dt*6){ spawnMud(cage.g.position.clone().add(vS.set(fx*.05,.02,fz*.05)),vS.set(-fx,0,-fz).clone(),2,true); noise(.05,700+Math.random()*400,2,.05); }
     let near=null,nd=2.5; signs.forEach(s=>{ if(s.done||!s.k||!CR[s.k]||s.k==='ghostcrab'||s.k==='ragworm') return;   /* 拖籠拖得到文蛤、赤嘴蛤、海瓜子、竹蟶 */ const d=Math.hypot(s.m.position.x-x,s.m.position.z-z); if(d<nd){ nd=d; near=s; } });
@@ -6708,7 +6709,7 @@ function cageTick(dt){ if(!cage.on) return; pitch+=(-.5-pitch)*Math.min(1,dt*3);
   if(cage.wash>0){ cage.sand.scale.y=Math.max(.002,(1-cage.wash)*(.004+cage.fill*.12)); if(Math.random()<dt*10) squirt(cage.g.position.clone().add(vS.set(rand(-.15,.15),.05,rand(-.1,.1))),.6,3); } }
 // 淘洗：左右快速滑動
 let lastSX=null, lastDir=0;
-window.addEventListener('pointermove',e=>{ if(!cage.on||!(cage.wash>0)||cage.wash>=1) return; if(lastSX===null){ lastSX=e.clientX; return; } const dx=e.clientX-lastSX; if(Math.abs(dx)>25){ const d=Math.sign(dx); if(d!==lastDir){ lastDir=d; cage.wash=Math.min(1,cage.wash+.09); hand.mud=Math.max(0,(hand.mud||0)-.04); handL.mud=Math.max(0,(handL.mud||0)-.04); cage.shake+=1.4; noise(.15,500,1.5,.12); vib(12); cageUI();
+window.addEventListener('pointermove',e=>{ if(!cage.on||!(cage.wash>0)||cage.wash>=1) return; if(lastSX===null){ lastSX=e.clientX; return; } const dx=e.clientX-lastSX; if(Math.abs(dx)>25){ const d=Math.sign(dx); cage.swipeDir=d; if(d!==lastDir){ lastDir=d; cage.wash=Math.min(1,cage.wash+.09); for(let n=0;n<8;n++){ const w=drops.find(q=>q.a<=0); if(!w) break; w.a=1; w.p.copy(cage.g.position).add(vS.set(rand(-.2,.2),.04,rand(-.1,.3))); w.v.set(-d*rand(.3,.8)*Math.cos(yaw),rand(.2,.6),d*rand(.3,.8)*Math.sin(yaw)); w.s=rand(.003,.006); } spawnMud(cage.g.position.clone(),vS.set(-d*Math.cos(yaw),0,d*Math.sin(yaw)).clone(),3,true); hand.mud=Math.max(0,(hand.mud||0)-.04); handL.mud=Math.max(0,(handL.mud||0)-.04); cage.shake+=1.4; noise(.15,500,1.5,.12); vib(12); cageUI();
       if(cage.wash>=1) cageReveal(); } lastSX=e.clientX; } });
 window.addEventListener('pointerup',()=>{ lastSX=null; });
 function cageReveal(){ cage.inside.clear(); cage.sand.visible=false; const shown=cage.items.slice(0,14);
@@ -6857,7 +6858,7 @@ function up(e){ walkReq=0; if(!on||!drag||dig||cage.on||hold){ drag=null; return
         else { r.flee=2.5; r.h=Math.atan2(r.g.position.x-pos.x,r.g.position.z-pos.z); if(r.id==='fiddler'&&Math.random()<.6) r.burrow=1;   // 招潮蟹一溜煙鑽進洞裡
           c.toast(r.id==='fiddler'?(r.burrow?'招潮蟹一溜煙鑽回洞裡了':'招潮蟹橫著逃走了'):r.id==='mudskip'?'彈塗魚一彈就跳開了':'寄居蟹縮進殼裡滾開了',''+'',1300); c.toast((sneak<1?'走太快把牠驚動了，放慢腳步再靠近':'差一點！再試一次'),'',1500); } return; } }
   let hits=ray.intersectObjects(signs.filter(s=>!s.done).map(s=>s.m));
-  if(!hits.length){ const gh=ray.intersectObject(ground); if(gh.length){ const p=gh[0].point; let best=null,bd=1.3; signs.forEach(s=>{ if(s.done) return; const d=Math.hypot(s.m.position.x-p.x,s.m.position.z-p.z); if(d<bd){ bd=d; best=s; } }); if(best) hits=[{object:best.m}]; else { c.toast('這裡看不出痕跡，找找泥面上的小孔、凹痕或沙堆（附近的會微微發亮）','',1800); return; } } }
+  if(!hits.length){ const gh=ray.intersectObject(ground); if(gh.length){ const p=gh[0].point; let best=null,bd=1.3; signs.forEach(s=>{ if(s.done) return; const d=Math.hypot(s.m.position.x-p.x,s.m.position.z-p.z); if(d<bd){ bd=d; best=s; } }); if(best) hits=[{object:best.m}]; else { c.toast('這裡看不出痕跡，找找泥面上的小孔、雙孔、細長的孔、沙堆或一圈小沙球，也可以按「跺腳」看哪裡噴水','',1800); return; } } }
   if(hits.length){ const s=signs.find(q=>q.m===hits[0].object); if(s.m.position.distanceTo(pos)>7){ c.toast('走近一點才能挖','',1200); return; } startDig(s); } }
 window.addEventListener('pointerdown',e=>{ if(!on||dig) return; const t=e.target; if(t&&t.closest&&t.closest('button,#tdDig,#tdBag,#tdClock,.sheet,#sheet')) return; down(e); });   /* 原本只聽 3D 畫布，畫布上面還蓋著遊戲的其他觸控層，點了沒反應 */ window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
 /* ---------- 每一格 ---------- */
