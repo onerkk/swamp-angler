@@ -53,13 +53,17 @@ function rigFish(grp,uni,K,mode){ const bones=BX.map(()=>new T.Bone()); bones[0]
   const addB=(parent,x,y,z)=>{ const b=new T.Bone(); b.position.set(x,y,z); parent.add(b); all.push(b); return all.length-1; };
   if(mode==='ray'||mode==='crab'){ const r0=wz*(mode==='crab'?.42:.28), r1=wz*.62; extra.L=[addB(bones[2],0,0,r0)]; extra.L.push(addB(all[extra.L[0]],0,0,r1-r0)); extra.R=[addB(bones[2],0,0,-r0)]; extra.R.push(addB(all[extra.R[0]],0,0,-(r1-r0))); extra.r0=r0; extra.r1=r1; }
   if(mode==='mola'){ const y0=hy*.42; extra.D=addB(bones[2],0,y0,0); extra.A=addB(bones[2],0,-y0,0); extra.y0=y0; }
-  if(mode==='stiff'){ extra.H=addB(bones[0],0,0,0); }   // 貝殼：上殼掛在殼頂的鉸鏈上，可以開合
+  if(mode==='stiff'){ extra.H=addB(bones[0],0,0,0); }
+  if(mode==='crab'&&grp.userData.bigClaw){ // 大螯在哪一側：比較前半身左右兩邊的頂點數量，多的那邊就是大螯
+    let zp=0,zn=0; grp.children.forEach(m=>{ if(!m.isMesh) return; const P=m.geometry.attributes.position; for(let i=0;i<P.count;i++){ if(P.getX(i)>.02){ if(P.getZ(i)>0) zp++; else zn++; } } });
+    extra.clawSide=zp>zn?1:-1; extra.C=addB(bones[1],0,0,extra.clawSide*wz*.25); }   // 貝殼：上殼掛在殼頂的鉸鏈上，可以開合
   const skel=new T.Skeleton(all);
   grp.children.filter(o=>o.isMesh&&!o.isSkinnedMesh).forEach(m=>{ const g=m.geometry, P=g.attributes.position, n=P.count, si=new Uint16Array(n*4), sw=new Float32Array(n*4);
     for(let i=0;i<n;i++){ const x=P.getX(i), y=P.getY(i), z=P.getZ(i); let k=0; while(k<BX.length-1&&x<BX[k+1]) k++; let w=1, j=k; if(k>0&&x>BX[k]-band&&x<=BX[k]){ j=k-1; w=.5+.5*(BX[k]-x)/band; }
       let f=0, fb=0;
       if(mode==='ray'||mode==='crab'){ const az=Math.abs(z), side=z>0?extra.L:extra.R; if(az>extra.r0){ f=Math.min(1,(az-extra.r0)/(wz*.12)); fb=az>extra.r1?side[1]:side[0]; } }
       if(mode==='mola'){ const ay=Math.abs(y); if(ay>extra.y0){ f=Math.min(1,(ay-extra.y0)/(hy*.1)); fb=y>0?extra.D:extra.A; } }
+      if(extra.C!=null&&x>.02&&z*extra.clawSide>wz*.28){ f=Math.min(1,(z*extra.clawSide-wz*.28)/(wz*.12)); fb=extra.C; }
       if(mode==='stiff'&&y>hy*.04){ f=Math.min(1,(y-hy*.04)/(hy*.08)); fb=extra.H; }
       si[i*4]=k; si[i*4+1]=j; si[i*4+2]=fb; sw[i*4]=w*(1-f); sw[i*4+1]=(1-w)*(1-f); sw[i*4+2]=f; }
     g.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); g.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
@@ -76,6 +80,7 @@ function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.dele
       r.all[e.L[0]].rotation.set(Math.max(0,Math.sin(w))*.3*amp,Math.sin(w)*sw,0); r.all[e.L[1]].rotation.set(Math.max(0,Math.sin(w+1.6))*.25*amp,Math.sin(w+1.6)*sw,0);
       r.all[e.R[0]].rotation.set(-Math.max(0,Math.sin(w+Math.PI))*.3*amp,Math.sin(w+Math.PI)*sw,0); r.all[e.R[1]].rotation.set(-Math.max(0,Math.sin(w+Math.PI+1.6))*.25*amp,Math.sin(w+Math.PI+1.6)*sw,0); }
     else { r.all[e.L[0]].rotation.set(a0,0,0); r.all[e.L[1]].rotation.set(a1,0,0); r.all[e.R[0]].rotation.set(-a0,0,0); r.all[e.R[1]].rotation.set(-a1,0,0); } }
+  if(e.C!=null){ const wv=(Math.sin(u*.9)>.55)?Math.sin(u*6)*.5:0; r.all[e.C].rotation.set(e.clawSide*wv*.3,0,Math.max(0,wv)*.6); }   // 招潮蟹一陣一陣舉起大螯揮動
   if(r.mode==='stiff'&&e.H!=null){ const gape=Math.max(0,Math.sin(u*.35))*(.05+.25*Math.min(1,r.uni.uAmp.value*4)); r.all[e.H].rotation.set(0,0,gape); }   // 殼慢慢張開一條縫再合上，被挖出來掙扎時開合更大
   if(r.mode==='mola'){ const a=Math.sin(u*.8)*.55*amp; r.all[e.D].rotation.set(a,0,0); r.all[e.A].rotation.set(a,0,0); } }
 // 有骨架的魚被複製時（水族箱、標本、烤魚、圖鑑…），複製成不帶骨架的普通網格：直接複製骨架網格會指向原本那副骨頭，畫不出來
@@ -113,7 +118,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
     const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
   try{ if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });
         const rg=autoRig(grp,'tail'); FRIGS.add({grp,uni,up:rg,idle:0}); } }
-    else { grp.userData.cutWhite=CUTWHITE.has(sp.id); rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); } cloneSafe(grp); }catch(e){ console.warn('fish rig',sp.id,e); }
+    else { grp.userData.cutWhite=CUTWHITE.has(sp.id); grp.userData.bigClaw=sp.id==='fiddler'; rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); } cloneSafe(grp); }catch(e){ console.warn('fish rig',sp.id,e); }
   return {group:grp,uni,sp,real:true}; }
 
 function measure(root){ root.updateMatrixWorld(true); const b=new T.Box3(), v=new T.Vector3();

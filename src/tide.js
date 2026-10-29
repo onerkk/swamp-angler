@@ -8,7 +8,7 @@ function createTide(W,c){
 'use strict';
 const T=THREE, rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const S=new T.Scene(), cam=new T.PerspectiveCamera(58,1,.05,400);
-const sky=new T.Color(0xb9c4c8); S.background=sky; S.fog=new T.Fog(sky,25,140);
+const sky=new T.Color(0xb9c4c8); S.background=sky; new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.encoding=T.sRGBEncoding; const dome=new T.Mesh(new T.SphereGeometry(300,48,24),new T.MeshBasicMaterial({map:t,side:T.BackSide,fog:false,depthWrite:false})); dome.renderOrder=-10; dome.onBeforeRender=()=>dome.position.copy(cam.position); S.add(dome); });   /* 實拍海邊陰天天空（360 度全景貼在大球內側） */ S.fog=new T.Fog(sky,40,260);
 S.add(new T.HemisphereLight(0xeef4f8,0x6a6050,2.3)); const sun=new T.DirectionalLight(0xfff2dc,1.6); sun.position.set(30,60,-20); S.add(sun);
 // 泥灘地面：實拍貼圖＋法線，一般重複（不鏡射，鏡射會出現對稱花紋）；再疊一層大尺度明暗起伏，打散重複感
 const TL=new T.TextureLoader(), tx=(f,r,srgb)=>{ const t=TL.load(f); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(r,r); t.rotation=.37; if(srgb) t.encoding=T.sRGBEncoding; t.anisotropy=8; return t; };

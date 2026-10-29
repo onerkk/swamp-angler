@@ -339,8 +339,10 @@ function render(){
     h+=`<div class="note">已發現 ${found}/${SPECIES.length} 種，總漁獲 ${save.total} 尾</div>`;
     const dsp=dexSel&&SPECIES.find(s=>s.id===dexSel);
     if(dsp){ h=dexPage(dsp); }
-    else { h+='<div class="note" style="font-size:12px">點任一種魚查看詳細資料</div>';
-    h+=SPECIES.map(sp=>{ const d=save.dex[sp.id], r=RAR[sp.rar];
+    else { const RG=[['all','全部'],['lake','湖'],['ice','冰湖'],['sea','海'],['tide','潮間帶']], rg=window.__DEXRG||'all', inRg=sp=>rg==='all'||(sp.loc||'lake')===rg||(rg==='lake'&&sp.loc==='both')||(rg==='sea'&&sp.loc==='both');
+    h+='<div class="tabs" style="flex-wrap:wrap;margin-bottom:6px">'+RG.map(([k,n])=>{ const L=SPECIES.filter(s=>k==='all'||(s.loc||'lake')===k||(s.loc==='both'&&(k==='lake'||k==='sea'))); return `<button class="tab${rg===k?' on':''}" data-a="dexrg" data-v="${k}">${n} ${L.filter(s=>save.dex[s.id]).length}/${L.length}</button>`; }).join('')+'</div>';
+    h+='<div class="note" style="font-size:12px">點任一種查看詳細資料</div>';
+    h+=SPECIES.filter(inRg).map(sp=>{ const d=save.dex[sp.id], r=RAR[sp.rar];
       return `<div class="dexrow" data-a="dex" data-v="${sp.id}"><img class="dexth" data-th="${sp.id}" alt="" src="${DEXV.cached(sp.id,!!d)||DEXV.BLANK}">`+row(d?sp.name:'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${styOf(sp.id).n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col)+'</div>'; }).join(''); }
   }
   } else if(cur==='home'){
@@ -535,6 +537,7 @@ shB.addEventListener('click',e=>{
   else if(a==='fuse'){ if(v==='rock'&&window.__HOME.furnInfo('rock').cur.pick){ close(); if(window.__HOMETAP) window.__HOMETAP('rock'); return; } const r=window.__HOME.furnUse(v); if(r.msg) toast(r.msg,r.kind||'good',r.kind?1800:3200); if(v==='rock'&&window.__HOMEFURN) window.__HOMEFURN(); render(); syncHUD(); return; }
   else if(a==='hbuy'){ const m=window.__HOME.buy(v); toast(m||'買好了，已經裝進小屋',m?'bad':'good'); render(); syncHUD(); return; }
   else if(a==='dex'){ dexSel=v; render(); shB.scrollTop=0; return; }
+  else if(a==='dexrg'){ window.__DEXRG=v; render(); shB.scrollTop=0; return; }
   else if(a==='logmode'){ logMode=v; dexSel=null; render(); shB.scrollTop=0; return; }
   else if(a==='logsort'){ logSort=v; render(); return; }
   else if(a==='mag'){ save.mag=v; persist(); render(); return; }

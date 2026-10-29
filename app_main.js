@@ -1,4 +1,4 @@
-/*APPV:20261028235917*/
+/*APPV:20261029001042*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -1734,8 +1734,10 @@ function render(){
     h+=`<div class="note">已發現 ${found}/${SPECIES.length} 種，總漁獲 ${save.total} 尾</div>`;
     const dsp=dexSel&&SPECIES.find(s=>s.id===dexSel);
     if(dsp){ h=dexPage(dsp); }
-    else { h+='<div class="note" style="font-size:12px">點任一種魚查看詳細資料</div>';
-    h+=SPECIES.map(sp=>{ const d=save.dex[sp.id], r=RAR[sp.rar];
+    else { const RG=[['all','全部'],['lake','湖'],['ice','冰湖'],['sea','海'],['tide','潮間帶']], rg=window.__DEXRG||'all', inRg=sp=>rg==='all'||(sp.loc||'lake')===rg||(rg==='lake'&&sp.loc==='both')||(rg==='sea'&&sp.loc==='both');
+    h+='<div class="tabs" style="flex-wrap:wrap;margin-bottom:6px">'+RG.map(([k,n])=>{ const L=SPECIES.filter(s=>k==='all'||(s.loc||'lake')===k||(s.loc==='both'&&(k==='lake'||k==='sea'))); return `<button class="tab${rg===k?' on':''}" data-a="dexrg" data-v="${k}">${n} ${L.filter(s=>save.dex[s.id]).length}/${L.length}</button>`; }).join('')+'</div>';
+    h+='<div class="note" style="font-size:12px">點任一種查看詳細資料</div>';
+    h+=SPECIES.filter(inRg).map(sp=>{ const d=save.dex[sp.id], r=RAR[sp.rar];
       return `<div class="dexrow" data-a="dex" data-v="${sp.id}"><img class="dexth" data-th="${sp.id}" alt="" src="${DEXV.cached(sp.id,!!d)||DEXV.BLANK}">`+row(d?sp.name:'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${styOf(sp.id).n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col)+'</div>'; }).join(''); }
   }
   } else if(cur==='home'){
@@ -1930,6 +1932,7 @@ shB.addEventListener('click',e=>{
   else if(a==='fuse'){ if(v==='rock'&&window.__HOME.furnInfo('rock').cur.pick){ close(); if(window.__HOMETAP) window.__HOMETAP('rock'); return; } const r=window.__HOME.furnUse(v); if(r.msg) toast(r.msg,r.kind||'good',r.kind?1800:3200); if(v==='rock'&&window.__HOMEFURN) window.__HOMEFURN(); render(); syncHUD(); return; }
   else if(a==='hbuy'){ const m=window.__HOME.buy(v); toast(m||'買好了，已經裝進小屋',m?'bad':'good'); render(); syncHUD(); return; }
   else if(a==='dex'){ dexSel=v; render(); shB.scrollTop=0; return; }
+  else if(a==='dexrg'){ window.__DEXRG=v; render(); shB.scrollTop=0; return; }
   else if(a==='logmode'){ logMode=v; dexSel=null; render(); shB.scrollTop=0; return; }
   else if(a==='logsort'){ logSort=v; render(); return; }
   else if(a==='mag'){ save.mag=v; persist(); render(); return; }
@@ -3392,13 +3395,17 @@ function rigFish(grp,uni,K,mode){ const bones=BX.map(()=>new T.Bone()); bones[0]
   const addB=(parent,x,y,z)=>{ const b=new T.Bone(); b.position.set(x,y,z); parent.add(b); all.push(b); return all.length-1; };
   if(mode==='ray'||mode==='crab'){ const r0=wz*(mode==='crab'?.42:.28), r1=wz*.62; extra.L=[addB(bones[2],0,0,r0)]; extra.L.push(addB(all[extra.L[0]],0,0,r1-r0)); extra.R=[addB(bones[2],0,0,-r0)]; extra.R.push(addB(all[extra.R[0]],0,0,-(r1-r0))); extra.r0=r0; extra.r1=r1; }
   if(mode==='mola'){ const y0=hy*.42; extra.D=addB(bones[2],0,y0,0); extra.A=addB(bones[2],0,-y0,0); extra.y0=y0; }
-  if(mode==='stiff'){ extra.H=addB(bones[0],0,0,0); }   // 貝殼：上殼掛在殼頂的鉸鏈上，可以開合
+  if(mode==='stiff'){ extra.H=addB(bones[0],0,0,0); }
+  if(mode==='crab'&&grp.userData.bigClaw){ // 大螯在哪一側：比較前半身左右兩邊的頂點數量，多的那邊就是大螯
+    let zp=0,zn=0; grp.children.forEach(m=>{ if(!m.isMesh) return; const P=m.geometry.attributes.position; for(let i=0;i<P.count;i++){ if(P.getX(i)>.02){ if(P.getZ(i)>0) zp++; else zn++; } } });
+    extra.clawSide=zp>zn?1:-1; extra.C=addB(bones[1],0,0,extra.clawSide*wz*.25); }   // 貝殼：上殼掛在殼頂的鉸鏈上，可以開合
   const skel=new T.Skeleton(all);
   grp.children.filter(o=>o.isMesh&&!o.isSkinnedMesh).forEach(m=>{ const g=m.geometry, P=g.attributes.position, n=P.count, si=new Uint16Array(n*4), sw=new Float32Array(n*4);
     for(let i=0;i<n;i++){ const x=P.getX(i), y=P.getY(i), z=P.getZ(i); let k=0; while(k<BX.length-1&&x<BX[k+1]) k++; let w=1, j=k; if(k>0&&x>BX[k]-band&&x<=BX[k]){ j=k-1; w=.5+.5*(BX[k]-x)/band; }
       let f=0, fb=0;
       if(mode==='ray'||mode==='crab'){ const az=Math.abs(z), side=z>0?extra.L:extra.R; if(az>extra.r0){ f=Math.min(1,(az-extra.r0)/(wz*.12)); fb=az>extra.r1?side[1]:side[0]; } }
       if(mode==='mola'){ const ay=Math.abs(y); if(ay>extra.y0){ f=Math.min(1,(ay-extra.y0)/(hy*.1)); fb=y>0?extra.D:extra.A; } }
+      if(extra.C!=null&&x>.02&&z*extra.clawSide>wz*.28){ f=Math.min(1,(z*extra.clawSide-wz*.28)/(wz*.12)); fb=extra.C; }
       if(mode==='stiff'&&y>hy*.04){ f=Math.min(1,(y-hy*.04)/(hy*.08)); fb=extra.H; }
       si[i*4]=k; si[i*4+1]=j; si[i*4+2]=fb; sw[i*4]=w*(1-f); sw[i*4+1]=(1-w)*(1-f); sw[i*4+2]=f; }
     g.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); g.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
@@ -3415,6 +3422,7 @@ function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.dele
       r.all[e.L[0]].rotation.set(Math.max(0,Math.sin(w))*.3*amp,Math.sin(w)*sw,0); r.all[e.L[1]].rotation.set(Math.max(0,Math.sin(w+1.6))*.25*amp,Math.sin(w+1.6)*sw,0);
       r.all[e.R[0]].rotation.set(-Math.max(0,Math.sin(w+Math.PI))*.3*amp,Math.sin(w+Math.PI)*sw,0); r.all[e.R[1]].rotation.set(-Math.max(0,Math.sin(w+Math.PI+1.6))*.25*amp,Math.sin(w+Math.PI+1.6)*sw,0); }
     else { r.all[e.L[0]].rotation.set(a0,0,0); r.all[e.L[1]].rotation.set(a1,0,0); r.all[e.R[0]].rotation.set(-a0,0,0); r.all[e.R[1]].rotation.set(-a1,0,0); } }
+  if(e.C!=null){ const wv=(Math.sin(u*.9)>.55)?Math.sin(u*6)*.5:0; r.all[e.C].rotation.set(e.clawSide*wv*.3,0,Math.max(0,wv)*.6); }   // 招潮蟹一陣一陣舉起大螯揮動
   if(r.mode==='stiff'&&e.H!=null){ const gape=Math.max(0,Math.sin(u*.35))*(.05+.25*Math.min(1,r.uni.uAmp.value*4)); r.all[e.H].rotation.set(0,0,gape); }   // 殼慢慢張開一條縫再合上，被挖出來掙扎時開合更大
   if(r.mode==='mola'){ const a=Math.sin(u*.8)*.55*amp; r.all[e.D].rotation.set(a,0,0); r.all[e.A].rotation.set(a,0,0); } }
 // 有骨架的魚被複製時（水族箱、標本、烤魚、圖鑑…），複製成不帶骨架的普通網格：直接複製骨架網格會指向原本那副骨頭，畫不出來
@@ -3452,7 +3460,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
     const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
   try{ if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });
         const rg=autoRig(grp,'tail'); FRIGS.add({grp,uni,up:rg,idle:0}); } }
-    else { grp.userData.cutWhite=CUTWHITE.has(sp.id); rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); } cloneSafe(grp); }catch(e){ console.warn('fish rig',sp.id,e); }
+    else { grp.userData.cutWhite=CUTWHITE.has(sp.id); grp.userData.bigClaw=sp.id==='fiddler'; rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); } cloneSafe(grp); }catch(e){ console.warn('fish rig',sp.id,e); }
   return {group:grp,uni,sp,real:true}; }
 
 function measure(root){ root.updateMatrixWorld(true); const b=new T.Box3(), v=new T.Vector3();
@@ -5472,7 +5480,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261028235917'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029001042'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6119,7 +6127,7 @@ function createTide(W,c){
 'use strict';
 const T=THREE, rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const S=new T.Scene(), cam=new T.PerspectiveCamera(58,1,.05,400);
-const sky=new T.Color(0xb9c4c8); S.background=sky; S.fog=new T.Fog(sky,25,140);
+const sky=new T.Color(0xb9c4c8); S.background=sky; new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.encoding=T.sRGBEncoding; const dome=new T.Mesh(new T.SphereGeometry(300,48,24),new T.MeshBasicMaterial({map:t,side:T.BackSide,fog:false,depthWrite:false})); dome.renderOrder=-10; dome.onBeforeRender=()=>dome.position.copy(cam.position); S.add(dome); });   /* 實拍海邊陰天天空（360 度全景貼在大球內側） */ S.fog=new T.Fog(sky,40,260);
 S.add(new T.HemisphereLight(0xeef4f8,0x6a6050,2.3)); const sun=new T.DirectionalLight(0xfff2dc,1.6); sun.position.set(30,60,-20); S.add(sun);
 // 泥灘地面：實拍貼圖＋法線，一般重複（不鏡射，鏡射會出現對稱花紋）；再疊一層大尺度明暗起伏，打散重複感
 const TL=new T.TextureLoader(), tx=(f,r,srgb)=>{ const t=TL.load(f); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(r,r); t.rotation=.37; if(srgb) t.encoding=T.sRGBEncoding; t.anisotropy=8; return t; };
