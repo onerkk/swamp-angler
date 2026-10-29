@@ -63,12 +63,13 @@ float sandKf(vec2 p){ float e=34.+th(p*vec2(1.7,1.3))*7.+sin(p.x*.21)*2.5; retur
   .replace('#include <dithering_fragment>',`#include <dithering_fragment>
   if(uHoleOn>.5){ float wl=-.105, dep=wl-vWP2.y;   /* 只有地面算潮溝積水；挖掘洞裡的水由滲水處理 */                                            // 水深
     if(dep>-.02&&uHoleOn>.5){ vec3 V=normalize(cameraPosition-vWP2);   /* 挖掘面不套用潮溝積水（洞底原本被當成水面、反射天空變灰白） */ 
-      vec2 p=vWP2.xz; float t=uTW; vec3 n=normalize(vec3((sin(p.x*3.1+p.y*1.3+t*1.6)+sin(p.x*7.9-p.y*6.1+t*3.3)*.4)*.04,1.,(cos(p.x*2.3-p.y*3.7-t*1.4)+cos(p.x*5.3+p.y*2.9+t*2.6)*.5)*.04));
+      vec2 p=vWP2.xz; float t=uTW; vec3 n=normalize(vec3((sin(p.x*3.1+p.y*1.3+t*1.6)+sin(p.x*7.9-p.y*6.1+t*3.3)*.4+sin(p.x*17.-p.y*13.+t*5.)*.25)*.07,1.,(cos(p.x*2.3-p.y*3.7-t*1.4)+cos(p.x*5.3+p.y*2.9+t*2.6)*.5+cos(p.x*15.+p.y*19.-t*4.)*.25)*.07));
       float fr=.03+.97*pow(1.-max(dot(n,V),0.),5.);                            // 斜看反射多、正看透明
-      vec3 R=reflect(-V,n); float up=clamp(R.y,0.,1.); vec3 skyC=mix(vec3(.62,.66,.68),vec3(.42,.46,.5),up)*uSkyK;   // 天空反射（陰天灰）
+      vec3 R=reflect(-V,n); float up=clamp(R.y,0.,1.); vec3 skyC=mix(vec3(.4,.43,.46),vec3(.24,.27,.31),up)*uSkyK*(.85+.3*sin(p.x*1.7+p.y*1.1+t*.4));   /* 天空倒影暗一點、有起伏，不再像一團白霧 */   // 天空反射（陰天灰）
       vec3 under=gl_FragColor.rgb*mix(.85,.45,clamp(dep*8.,0.,1.));               // 淺水看得到泥，越深越暗
       float a=smoothstep(-.02,.012,dep);                                           // 水邊柔和過渡，不再是鋸齒多邊形
-      gl_FragColor.rgb=mix(gl_FragColor.rgb, mix(under,skyC,fr*.9)+pow(max(dot(R,normalize(vec3(.3,.8,-.5))),0.),120.)*.25, a); } }`);
+      float rim=smoothstep(.0,.01,dep)*(1.-smoothstep(.01,.03,dep));   /* 水邊一圈濕暗的泥線 */
+      gl_FragColor.rgb=mix(gl_FragColor.rgb*(1.-.35*rim), mix(under,skyC,fr*.7)+pow(max(dot(R,normalize(vec3(.3,.8,-.5))),0.),160.)*.18, a*(1.-.4*rim)); } }`);
 };
 gmat.customProgramCacheKey=()=>'tideGround';
 const ground=new T.Mesh(gg,gmat); S.add(ground);
