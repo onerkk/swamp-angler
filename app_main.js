@@ -1,4 +1,4 @@
-/*APPV:20261029110350*/
+/*APPV:20261029111139*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5498,7 +5498,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029110350'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029111139'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6418,8 +6418,32 @@ function crabModel(id){ const D=CRAB_DEF[id], group=new T.Group(), body=new T.Gr
     claws.forEach(c2=>{ if(D.wave&&c2.big){ const w=Math.sin(ph*.35)>.6?Math.sin(ph*3)*.5+.5:0; c2.arm.rotation.z=.35+w*.9; } else c2.arm.rotation.z=.35+Math.sin(ph*.8+c2.s)*.08*a; });
     body.position.y=Math.abs(Math.sin(ph*1.6))*.01*a; };
   return {group,uni,crab:true}; }
-const creaModel=sp=>SHELLS.has(sp.id)?shellModel(sp.id):sp.id==='razor'?razorModel():CRAB_DEF[sp.id]?crabModel(sp.id):window.__MDL.fish(sp);
-const creaReady=id=>SHELLS.has(id)||id==='razor'||!!CRAB_DEF[id]||!!(window.__MDL&&window.__MDL.fishReady(id));
+/* ---------- 寄居蟹（程式組裝）：立體螺殼（使用者的螺殼照片從側面投影）、從殼口探出的前半身、左右各兩隻三節腳；受驚會縮進殼裡 ---------- */
+function hermitModel(){ const group=new T.Group(), body=new T.Group(); group.add(body);
+  // 螺殼：沿 X 軸旋轉出來的殼形，殼口（大）在前、螺塔（尖）在後，表面有一圈圈起伏的螺肋
+  const prof=[]; for(let i=0;i<=40;i++){ const t=i/40, r=(.34*Math.pow(1-t,.85)+.015)*(1+.08*Math.sin(t*44)); prof.push(new T.Vector2(Math.max(.004,r),t)); }
+  const sg=new T.LatheGeometry(prof,36); sg.rotateZ(Math.PI/2); sg.translate(.1,0,0);   // 現在殼軸沿 -X：x=.1 是殼口，x=-.9 是螺塔
+  const P=sg.attributes.position, uv=sg.attributes.uv; for(let i=0;i<P.count;i++){ const x=P.getX(i), y=P.getY(i); uv.setXY(i,(.1-x)/1.0*.95+.02,.5+y/.8); }
+  sg.computeVertexNormals(); const shell=new T.Mesh(sg,new T.MeshStandardMaterial({map:crabTex('her_shell'),roughness:.5,side:T.DoubleSide})); shell.position.y=.22; body.add(shell);
+  const lip=new T.Mesh(new T.TorusGeometry(.33,.03,8,28),new T.MeshStandardMaterial({color:0xf2e6d8,roughness:.25})); lip.rotation.y=Math.PI/2; lip.position.set(.1,.22,0); body.add(lip);   // 殼口珍珠白的邊
+  // 從殼口探出來的前半身（眼柄、觸角、大小螯都在這張照片上）
+  const fr=new T.Group(); fr.position.set(.12,.2,0); body.add(fr);
+  const fg=new T.PlaneGeometry(.62,.49); const front=new T.Mesh(fg,partMat('her_front')); front.rotation.y=Math.PI/2; front.position.set(.02,.04,0); fr.add(front);
+  const front2=front.clone(); front2.rotation.set(-Math.PI/2+.5,0,Math.PI/2); front2.position.set(.08,-.02,0); front2.scale.set(.9,.7,1); fr.add(front2);   // 從上面看也看得到螯
+  // 走路的腳：左右各兩隻
+  const legs=[], L=.62;
+  for(const s of [-1,1]) for(let i=0;i<2;i++){ const hip=new T.Group(); hip.position.set(.08-i*.1,.12,s*.12); hip.rotation.y=-s*(Math.PI/2)+s*(i-.5)*.5;
+    const a=seg('her_leg',.08,.45,L*.42,.12*L); a.rotation.z=.4; hip.add(a); const k=new T.Group(); k.position.x=L*.42; a.add(k); const b=seg('her_leg',.45,.8,L*.34,.1*L); b.rotation.z=-1.2; k.add(b);
+    const k2=new T.Group(); k2.position.x=L*.34; b.add(k2); const c2=seg('her_leg',.8,1,L*.24,.08*L); c2.rotation.z=-.4; k2.add(c2); if(s<0) hip.scale.z=-1; fr.add(hip); legs.push({hip,a,s,i,y0:hip.rotation.y}); }
+  body.scale.setScalar(.9);
+  const uni={uSwim:{value:0},uAmp:{value:0}};
+  shell.onBeforeRender=()=>{ const ph=uni.uSwim.value, a=Math.min(1,uni.uAmp.value*4), hide=uni.hide||0;
+    fr.position.x=.12-.2*hide; fr.scale.setScalar(1-.5*hide);   // 縮進殼裡
+    legs.forEach(l=>{ const p=ph*1.4+(l.i?Math.PI:0)+(l.s>0?Math.PI/2:0), up=Math.max(0,Math.sin(p)); l.hip.rotation.y=l.y0+Math.sin(p)*.3*a*l.s; l.a.rotation.z=.4+up*.4*a; });
+    shell.rotation.x=Math.sin(ph*1.4)*.05*a; };   // 拖著殼走，殼左右晃
+  return {group,uni,crab:true}; }
+const creaModel=sp=>SHELLS.has(sp.id)?shellModel(sp.id):sp.id==='razor'?razorModel():sp.id==='hermit'?hermitModel():CRAB_DEF[sp.id]?crabModel(sp.id):window.__MDL.fish(sp);
+const creaReady=id=>SHELLS.has(id)||id==='razor'||id==='hermit'||!!CRAB_DEF[id]||!!(window.__MDL&&window.__MDL.fishReady(id));
 /* ---------- 挖掘（3D 實景）：蹲下來，用蛤耙在真的泥面上挖出一個洞 ----------
    ・點痕跡 → 鏡頭蹲低看著那塊泥面，先判斷要不要挖（顯示痕跡的線索），按「開挖」才開始
    ・手指在泥面上拖：蛤耙的齒跟著手指刮過，泥面真的被挖低（高解析度地形即時變形），挖出的泥堆在洞邊、泥塊噴起落下
