@@ -56,7 +56,27 @@ const ground=new T.Mesh(gg,gmat); S.add(ground);
 // 積水：一片略高於最低處的水面，只在低窪地方露出來；反射天空
 const pud=new T.Mesh(new T.PlaneGeometry(200,200).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x9aa6a8,roughness:.04,metalness:.9,transparent:true,opacity:.75}));
 pud.position.y=-.105; S.add(pud);
-const sandBand={position:new T.Vector3()};   // 舊程式相容用（沙地已併入地形）
+const sandBand={position:new T.Vector3()};
+// 泥面上的碎貝殼、小石頭：真的 3D 小物件（近看有厚度、有影子），只撒在鏡頭附近的範圍
+{ const shellG=new T.SphereGeometry(1,10,6,0,Math.PI*2,0,Math.PI/2); shellG.scale(1,.32,.8);   // 半顆蛋殼形＝碎貝殼
+  const stoneG=new T.IcosahedronGeometry(1,1); { const P=stoneG.attributes.position; for(let k=0;k<P.count;k++){ const f=.8+Math.random()*.35; P.setXYZ(k,P.getX(k)*f,P.getY(k)*f*.55,P.getZ(k)*f); } stoneG.computeVertexNormals(); }
+  const shellM=new T.MeshStandardMaterial({color:0xffffff,roughness:.55,side:T.DoubleSide}), stoneM=new T.MeshStandardMaterial({color:0xffffff,roughness:.85});
+  const NS=900, NT=260, IS=new T.InstancedMesh(shellG,shellM,NS), IT=new T.InstancedMesh(stoneG,stoneM,NT), m4=new T.Matrix4(), q=new T.Quaternion(), e=new T.Euler(), v=new T.Vector3(), sc=new T.Vector3(), col=new T.Color();
+  const SH=[0xe8dccb,0xd9c3a5,0xc9b8a8,0xf0e6da,0xb89a86,0xa8a092], ST=[0x5d574f,0x7a7066,0x4a4540,0x8b8174];
+  for(let i=0;i<NS;i++){ const x=(Math.random()-.5)*44, z=Math.random()*-46+22, r=.01+Math.pow(Math.random(),2.5)*.035;
+    e.set((Math.random()-.5)*.6+(Math.random()<.3?Math.PI:0),Math.random()*6.28,(Math.random()-.5)*.6); q.setFromEuler(e); v.set(x,hAt(x,z)+r*.1,z); sc.setScalar(r);
+    m4.compose(v,q,sc); IS.setMatrixAt(i,m4); IS.setColorAt(i,col.setHex(SH[i%SH.length]).multiplyScalar(.8+Math.random()*.3)); }
+  for(let i=0;i<NT;i++){ const x=(Math.random()-.5)*44, z=Math.random()*-46+22, r=.012+Math.pow(Math.random(),3)*.05;
+    e.set(Math.random()*.4,Math.random()*6.28,Math.random()*.4); q.setFromEuler(e); v.set(x,hAt(x,z)+r*.2,z); sc.setScalar(r);
+    m4.compose(v,q,sc); IT.setMatrixAt(i,m4); IT.setColorAt(i,col.setHex(ST[i%ST.length]).multiplyScalar(.85+Math.random()*.3)); }
+  S.add(IS); S.add(IT); }
+// 潮溝積水：表面有細細的流水波紋（不再是靜止的鏡子）
+pud.material.onBeforeCompile=sh=>{ sh.uniforms.uT={value:0}; pud.userData.sh=sh;
+  sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWQ;').replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWQ=(modelMatrix*vec4(transformed,1.0)).xyz;');
+  sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform float uT; varying vec3 vWQ;').replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+  { vec2 p=vWQ.xz; float a=sin(p.x*3.1+p.y*1.3+uT*1.6)+sin(p.x*-1.7+p.y*4.3-uT*2.1)*.7+sin(p.x*7.9-p.y*6.1+uT*3.3)*.3;
+    float b=cos(p.x*2.3-p.y*3.7-uT*1.4)+cos(p.x*5.3+p.y*2.9+uT*2.6)*.5; normal=normalize(normal+vec3(a*.035,0.,b*.035)); }`); };
+pud.material.customProgramCacheKey=()=>'tidePud';   // 舊程式相容用（沙地已併入地形）
 new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.mapping=T.EquirectangularReflectionMapping; t.encoding=T.sRGBEncoding; try{ const pm=new T.PMREMGenerator(W.renderer); const env=pm.fromEquirectangular(t).texture; gmat.envMap=env; gmat.envMapIntensity=.18; pud.material.envMap=env; pud.material.envMapIntensity=1.2; gmat.needsUpdate=pud.material.needsUpdate=true; pm.dispose(); }catch(e){} });
 // 海水：從遠處慢慢漲回來
 const sea=new T.Mesh(new T.PlaneGeometry(400,300).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x4d6a72,roughness:.12,metalness:.3,transparent:true,opacity:.92})); sea.position.set(0,.06,-200); S.add(sea);
@@ -237,7 +257,7 @@ function render(dt){ if(!on) return; t+=dt; if(!roamers.length&&(rspawn-=dt)<=0)
     const side=r.id==='fiddler'?Math.PI/2:0; r.g.position.x+=Math.sin(r.h)*sp*dt; r.g.position.z+=Math.cos(r.h)*sp*dt; r.g.rotation.y=r.h-Math.PI/2+side;
     r.g.position.x=clamp(r.g.position.x,-18,18); r.g.position.z=clamp(r.g.position.z,-30,20); r.g.position.y+=hAt(r.g.position.x,r.g.position.z)+.01; r.uni.uSwim.value+=dt*(4+sp*30); r.uni.uAmp.value=.05+sp*.4; });
   shown.forEach(s=>{ s.t+=dt; s.f.uni.uSwim.value+=dt*8; s.f.uni.uAmp.value=.08+.06*Math.sin(s.t*3); s.f.group.rotation.y+=dt*.6; });
-  digTick(dt); flagTick(performance.now()*.001);
+  digTick(dt); flagTick(performance.now()*.001); if(pud.userData.sh) pud.userData.sh.uniforms.uT.value=performance.now()*.001;
   pos.y=hAt(pos.x,pos.z)+1.55;   // 跟著地形高低走
   cam.position.copy(pos); cam.rotation.set(pitch,yaw,0,'YXZ'); cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix();
   W.renderer.render(S,cam); }
