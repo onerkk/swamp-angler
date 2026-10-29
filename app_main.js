@@ -1,4 +1,4 @@
-/*APPV:20261029150309*/
+/*APPV:20261029150900*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -4610,6 +4610,14 @@ box(RW,.12,.03,trimM,0,.06,ROOM.zb+.015); box(.03,.12,RD,trimM,-ROOM.x+.015,.06,
 const WIN={w:1.6,h:1.1,y:1.55,z:.5}, WINROT=+(new URLSearchParams(location.search).get('winrot')||1.2), winTex={}; ['day','dawn','night'].forEach(k=>{ const x=TL.load('env_'+k+'_band.jpg'); x.encoding=T.sRGBEncoding; winTex[k]=x; });
 const viewM=new T.MeshBasicMaterial({map:winTex.day,side:T.BackSide,fog:false});
 // 窗外：把湖景全景貼在房子外面一圈 60 公尺遠的大圓筒內側（比例與實景一致、遠近有視差），原本是一張貼在窗後 60 公分的平面照片，又近又被壓扁
+const rainGlass=(()=>{ const cv=document.createElement('canvas'); cv.width=256; cv.height=192; const g=cv.getContext('2d'), tex=new T.CanvasTexture(cv), drops=[];
+  for(let i=0;i<70;i++) drops.push({x:Math.random()*256,y:Math.random()*192,r:1+Math.random()*2.6,v:0});
+  const m=new T.Mesh(new T.PlaneGeometry(WIN.w,WIN.h),new T.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,opacity:0})); m.rotation.y=Math.PI/2; m.position.set(-ROOM.x+.03,WIN.y,WIN.z); scene.add(m);
+  return {m,tick(dt,k){ m.material.opacity=k; if(k<.02) return; g.clearRect(0,0,256,192); g.fillStyle='rgba(120,130,140,'+(.25*k)+')'; g.fillRect(0,0,256,192);   // 雨天窗外霧濛濛
+    drops.forEach(d=>{ if(d.r>2.4&&Math.random()<dt*.6*k) d.v=40+Math.random()*60; d.y+=d.v*dt; if(d.v){ g.strokeStyle='rgba(220,230,240,.35)'; g.lineWidth=d.r*.8; g.beginPath(); g.moveTo(d.x,d.y-14); g.lineTo(d.x,d.y); g.stroke(); d.v*=.985; if(d.v<5) d.v=0; }   // 大水珠會滑下來
+      if(d.y>196||Math.random()<dt*.05){ d.x=Math.random()*256; d.y=Math.random()*150; d.r=1+Math.random()*2.6; d.v=0; }
+      const gr=g.createRadialGradient(d.x-d.r*.3,d.y-d.r*.3,0,d.x,d.y,d.r); gr.addColorStop(0,'rgba(255,255,255,.75)'); gr.addColorStop(.6,'rgba(200,210,220,.35)'); gr.addColorStop(1,'rgba(60,70,80,.25)'); g.fillStyle=gr; g.beginPath(); g.arc(d.x,d.y,d.r,0,6.3); g.fill(); });
+    tex.needsUpdate=true; }}; })();
 const view=(()=>{ const R=60, Hh=2*Math.PI*R*1366/8192, g=new T.CylinderGeometry(R,R,Hh,96,1,true), uv=g.attributes.uv; for(let i=0;i<uv.count;i++) uv.setX(i,1-uv.getX(i));   // 從內側看要左右翻
   const m=new T.Mesh(g,viewM); m.position.set(0,1.45+.3*Hh,WIN.z);   /* 全景的地平線在圖的下方兩成：對齊到眼睛高度 */ m.rotation.y=WINROT; m.renderOrder=-1; scene.add(m);
   const gr=new T.Mesh(new T.CircleGeometry(R,48).rotateX(-Math.PI/2),new T.MeshBasicMaterial({color:0x4a3f33,fog:false})); gr.position.set(0,1.45+.3*Hh-Hh/2+.05,WIN.z); scene.add(gr); return m; })();
@@ -4643,7 +4651,7 @@ const tags=[];
 // 櫃子下方小檯面放一簇立體紫水晶和一顆水晶球，還有點點閃光——點任何一處都前往作者的蝦皮小店
 const shopParts=[], sparkles=[];
 { const cab=new T.Group(); cab.position.set(0,1.55,ROOM.zf-.12); cab.rotation.y=Math.PI; scene.add(cab);
-  const woodM=new T.MeshStandardMaterial({color:0x3a2416,roughness:.45,metalness:.05}), brass=new T.MeshStandardMaterial({color:0xc9a35a,roughness:.3,metalness:.85}), velvet=new T.MeshStandardMaterial({color:0x14101a,roughness:1});
+  const woodM=new T.MeshStandardMaterial({color:0x22140b,roughness:.38,metalness:.05}), brass=new T.MeshStandardMaterial({color:0xc9a35a,roughness:.3,metalness:.85}), velvet=new T.MeshStandardMaterial({color:0x14101a,roughness:1});
   const back=new T.Mesh(new T.BoxGeometry(1.7,1.32,.04),velvet); back.position.z=-.1; cab.add(back);
   for(const [w,h,d,x,y,z] of [[1.82,.09,.3,0,.7,0],[1.82,.09,.3,0,-.7,0],[.09,1.48,.3,-.87,0,0],[.09,1.48,.3,.87,0,0],[1.7,.035,.26,0,.22,-.01],[1.7,.035,.26,0,-.22,-.01]]){ const b=new T.Mesh(new T.BoxGeometry(w,h,d),woodM); b.position.set(x,y,z); cab.add(b); }
   // 頂冠＋招牌
@@ -5279,6 +5287,7 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
   updAct(dt); swingLamp(dt);
   furnTick-=dt; if(furnTick<=0){ furnTick=3; updFurnTags(); syncTime(); }
   updGrill(dt);   // 爐火劈啪聲，隨機間隔
+  { const rk=c.rain?Math.min(1,c.rain()*1.6):0; rainGlass.tick(dt,rk); viewM.color.setScalar(1-.35*rk); }   // 下雨：窗上有水珠、水痕往下滑，外面變暗變霧
   sparkles.forEach(q=>{ const k=Math.max(0,Math.sin(t*1.7+q.ph)); q.sp.material.opacity=Math.pow(k,8); q.sp.scale.setScalar(.03+.05*Math.pow(k,4)); if(k<.02&&Math.random()<.02) q.sp.position.set((Math.random()-.5)*1.5,(Math.random()-.5)*1.2,.0); });   // 水晶閃光
   updTanks(dt); R.setRenderTarget(null); R.render(scene,cam); }
 window.addEventListener('resize',()=>{ if(on) resize(); });
@@ -5530,7 +5539,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029150309'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029150900'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -7559,7 +7568,7 @@ function tideDone(bag0,forced){ const handled=bag0.filter(b=>b.done).length; let
   el.querySelector('#tdSell').onclick=()=>fin(false); const k=el.querySelector('#tdKeep'); if(k) k.onclick=()=>fin(true); }
 const HOME3D=createHomeScene(W,{openShop:()=>openShop(),save,home:()=>HOME,grillHeat:()=>HOME.grillHeat(),coin:()=>{ Snd.coin&&Snd.coin(); },toast:(...a)=>toastHome(...a),persist:()=>persist(),onGrilled,buy:(id,p)=>{ if(save.coins<p){ toast('金幣不夠','warn',1400); return false; } save.coins-=p; setCoins(); persist(); return true; },sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
-  crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(),
+  crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(), rain:()=>{ if(window.__rainTest!=null) return window.__rainTest; const wx=WL.wx?WL.wx():{}; return wx.r||0; },
   showFish:(rec,card)=>{ const sp=SPECIES.find(s=>s.id===rec.id)||{name:rec.id,rar:0}, r=RAR[sp.rar]; card.style.setProperty('--rc',r.col);
     card.innerHTML=`<b>${sp.name}</b><small>${r.name}${rec.g?'｜'+rec.g:''}</small><div class="fg"><span>長度</span><div>${(rec.L*100).toFixed(1)} 公分</div><span>重量</span><div>${rec.w<1?Math.round(rec.w*1000)+' 公克':rec.w.toFixed(2)+' 公斤'}</div><span>釣到地點</span><div>${rec.at||'—'}</div><span>釣到日期</span><div>${new Date(rec.d).toLocaleDateString('zh-TW')}</div></div>`;
     card.classList.remove('hidden'); }});
