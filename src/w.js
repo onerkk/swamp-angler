@@ -317,8 +317,10 @@ function syncFurn(){ const H=c.home&&c.home(); if(!H) return;
     else if(!want&&it.obj){ scene.remove(it.obj); dropObs(it.obj); it.obj=null; } } }
 put('mantel_clock_01',ROOM.x-.36,1.38,FP.z+.45,-Math.PI/2,1,o=>{ o.userData.furn='clock'; });  // 壁爐架上：時鐘與木燈籠
 put('wooden_lantern_01',ROOM.x-.36,1.38,FP.z-.5,0,.8);
-put('hanging_picture_frame_01',-ROOM.x+.02,1.95,-1.0,Math.PI/2,1);   // 掛畫：左牆、水族箱上方
-put('hanging_picture_frame_02',0,2.5,ROOM.zb+.02,0,1);
+// 美人魚的畫像：要真的釣到過美人魚，牆上才會掛出來
+const merArt=[], merSeen=()=>!!(c.save&&c.save.mer&&c.save.mer.n>0), merArtSync=()=>merArt.forEach(o=>{ o.visible=merSeen(); });
+put('hanging_picture_frame_01',-ROOM.x+.02,1.95,-1.0,Math.PI/2,1,o=>{ merArt.push(o); merArtSync(); });   // 掛畫：左牆、水族箱上方
+put('hanging_picture_frame_02',0,2.5,ROOM.zb+.02,0,1,o=>{ merArt.push(o); merArtSync(); });
 // 燈光：天花板鐵藝吊燈、水族箱兩側壁燈，夜裡全部點亮
 put('lantern_chandelier_01',0,H-.02,-1.6,0,1,o=>{ o.userData.furn='light'; lampObj=o; });
 const ceilL=new T.PointLight(0xffd9a8,2.4,14,1.0); ceilL.position.set(0,H-.95,-1.6); scene.add(ceilL);
@@ -780,7 +782,7 @@ function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
     if(D.s.position.y<.3){ D.s.visible=false; flare.visible=true; flare.position.set(D.s.position.x+.05,.36,D.s.position.z); sparkM.opacity=.95; fireL.intensity*=1.5; c.sizzle&&c.sizzle(.3+Math.random()*.35); } });
   if(flare.visible){ sparkM.opacity-=dt*2.2; flare.scale.setScalar(.35+(.9-sparkM.opacity)*.3); if(sparkM.opacity<=0) flare.visible=false; }
   spin.position.y=Math.sin(GR.t*1.3)*.003; }
-let prSaved=0; function enter(){ on=true; if(W.getPR&&W.setPR&&W.getPR()>1.6){ prSaved=W.getPR(); W.setPR(1.6); }   /* 小屋裡燈多、魚多：解析度上限 1.6 倍（肉眼幾乎看不出差別，效能差很多） */ yaw=yawT=0; pitch=pitchT=-.08; vb=0; pRoom.set(0,EYE,.9); resize(); for(const f of [syncTime,syncFish,syncMounts,exitView,syncFurn,updFurnTags,closeFurn]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
+let prSaved=0; function enter(){ on=true; merArtSync(); if(W.getPR&&W.setPR&&W.getPR()>1.6){ prSaved=W.getPR(); W.setPR(1.6); }   /* 小屋裡燈多、魚多：解析度上限 1.6 倍（肉眼幾乎看不出差別，效能差很多） */ yaw=yawT=0; pitch=pitchT=-.08; vb=0; pRoom.set(0,EYE,.9); resize(); for(const f of [syncTime,syncFish,syncMounts,exitView,syncFurn,updFurnTags,closeFurn]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
 function exit(){ on=false; if(prSaved&&W.setPR){ W.setPR(prSaved); prSaved=0; } drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
