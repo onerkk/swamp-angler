@@ -266,6 +266,12 @@ const m4=new T.Matrix4(), qI=new T.Quaternion(), vS=new T.Vector3();
 function spawnMud(p,dir,n,dark){ for(let i=0;i<n;i++){ const m=muds.find(q=>q.a<=0); if(!m) return; m.a=1.2; m.p.copy(p); m.v.set(dir.x*rand(.3,.9)+rand(-.25,.25),rand(.5,1.1),dir.z*rand(.3,.9)+rand(-.25,.25)); m.s=rand(.004,.011)*(dark?1.2:1); } }
 function mudTick(dt){ let any=false; muds.forEach((m,i)=>{ if(m.a>0){ any=true; m.a-=dt; m.v.y-=9.8*dt; m.p.addScaledVector(m.v,dt); const gy=dig?patchY(m.p.x,m.p.z):hAt(m.p.x,m.p.z); if(m.p.y<gy){ m.p.y=gy-.002; m.v.set(0,0,0); if(m.a>.25) m.a=.25; m.s*=1-dt*3; } }   // 落地就攤平、陷進泥裡消失
     m4.compose(m.p,qI,vS.setScalar(m.a>0?m.s:0)); mudIM.setMatrixAt(i,m4); }); mudIM.instanceMatrix.needsUpdate=true; }
+// 跺腳時看得到的水柱：細長的水柱往上噴 40～60 公分再落下，四周濺起水花
+const jets=[]; const jetM=new T.MeshStandardMaterial({color:0xe9f2f4,transparent:true,opacity:.75,roughness:.05,metalness:.2});
+function jet(p){ const m=new T.Mesh(new T.CylinderGeometry(.006,.012,1,8,1,true),jetM.clone()); m.position.copy(p); m.scale.set(1,.001,1); S.add(m); jets.push({m,t:0,h:rand(.35,.6),p:p.clone()}); }
+function jetTick(dt){ for(let i=jets.length-1;i>=0;i--){ const j=jets[i]; j.t+=dt; const k=j.t<.25?j.t/.25:Math.max(0,1-(j.t-.25)/.45), H=j.h*k; j.m.scale.y=Math.max(.001,H); j.m.position.y=j.p.y+H/2; j.m.material.opacity=.75*Math.min(1,k*1.5);
+    if(j.t>.2&&!j.spray){ j.spray=1; for(let n=0;n<16;n++){ const w=drops.find(q=>q.a<=0); if(!w) break; w.a=1.2; w.p.copy(j.p).setY(j.p.y+j.h*.9); w.v.set(rand(-.5,.5),rand(.2,.9),rand(-.5,.5)); w.s=rand(.006,.012); } }
+    if(j.t>.75){ S.remove(j.m); jets.splice(i,1); } } }
 // 水滴：文蛤受驚噴水、取出時滴水
 const WN=70, wIM=new T.InstancedMesh(new T.SphereGeometry(1,6,4),new T.MeshStandardMaterial({color:0xd8e6ea,roughness:.05,metalness:.3,transparent:true,opacity:.85}),WN); wIM.frustumCulled=false; S.add(wIM); const drops=[];
 for(let i=0;i<WN;i++) drops.push({a:0,p:new T.Vector3(),v:new T.Vector3(),s:0});
@@ -295,6 +301,7 @@ function startDig(s){ const k=s.k, cr=k?CR[k]:null, c0=s.m.position.clone();
   const patch=new T.Mesh(geo,mat); patch.position.copy(c0); S.add(patch); s.m.visible=false; if(s.m.userData.det) s.m.userData.det.visible=false; if(s.ring) s.ring.visible=false;
   let crea=null, size=cr?rand(cr.size[0],cr.size[1]):0, depth=cr?.015+cr.depth*.02:0, off=new T.Vector2(rand(-.03,.03),rand(-.03,.03));   // 就在痕跡正下方，深度 3～6 公分（真實的文蛤、赤嘴蛤大多埋在這個深度）
   if(cr){ try{ const sp=c.species(k); if(creaReady(k)){ const f=creaModel(sp); crea=f; const g=f.group; g.scale.setScalar(size); g.position.set(c0.x+off.x,0,c0.z+off.y);
+        g.scale.setScalar(size*1.6);   // 畫面上放大一點，挖到時一眼看得出來
         if(k==='razor'){ g.rotation.set(0,rand(0,6),Math.PI/2); } else if(k==='ragworm'){ g.rotation.set(0,rand(0,6),0); } else { g.rotation.set(0,rand(0,6),0); }   // 竹蟶直立，其他平躺
         S.add(g); } }catch(e){}
     if(!crea){ const sh=new T.Mesh(new T.SphereGeometry(.5,20,12),new T.MeshStandardMaterial({color:0xcdbb9c,roughness:.5})); sh.scale.set(1,.45,.8); const g=new T.Group(); g.add(sh); g.scale.setScalar(size); g.position.set(c0.x+off.x,0,c0.z+off.y); S.add(g);
@@ -337,7 +344,7 @@ function scrape3(p,spd,dir,dist){ const d=dig; if(!d||d.phase!=='dig') return; c
   if(d.found&&!d.fled){ const rv=reveal3(); if(rv>.62&&!d.ready){ d.ready=true; exposeCrea(); $('digInfo').innerHTML='<b>'+d.cr.n+'露出來了！</b><br><small>可以取出了，再多清一點周圍也可以</small>'; $('digBtns').innerHTML='<button id="dgTake" style="background:#ffcf66;color:#3a2600">✋ 取出</button><button id="dgNo" style="background:#333;color:#fff">放棄</button>'; $('dgTake').onclick=takeOut; $('dgNo').onclick=()=>endDig(false); }
     else if(!d.ready&&rv>.15&&now-(d.rvT||0)>600){ d.rvT=now; $('digInfo').innerHTML='露出 '+Math.round(rv*100)+'%<br><small>繼續沿著周圍清</small>'; } }
   if(!d.cr&&d.removed>.35&&!d.ready){ d.ready=true; $('digInfo').innerHTML='挖了一陣子，只有泥和碎貝殼<br><small>平坦的泥面多半是空的，看痕跡再挖比較準</small>'; $('digBtns').innerHTML='<button id="dgNo" style="background:#555;color:#fff">好吧</button>'; $('dgNo').onclick=()=>endDig(false); } }
-function exposeCrea(){ const d=dig; if(!d||!d.crea||!d.bx) return; const g={position:new T.Vector3(d.bx.cx,0,d.bx.cz)}, P=d.geo.attributes.position, C=d.geo.attributes.color, n=P.count, R=Math.max(d.bx.rx,d.bx.rz)*1.25+.015, want=d.bx.bot+(d.bx.top-d.bx.bot)*.3;   /* 把泥撥到身體七成都露出來 */
+function exposeCrea(){ const d=dig; if(!d||!d.crea||!d.bx) return; d.popRise=0;   /* 露出後牠會被泥擠得往上浮一點，整個看得到 */ const g={position:new T.Vector3(d.bx.cx,0,d.bx.cz)}, P=d.geo.attributes.position, C=d.geo.attributes.color, n=P.count, R=Math.max(d.bx.rx,d.bx.rz)*1.25+.015, want=d.bx.bot+(d.bx.top-d.bx.bot)*.3;   /* 把泥撥到身體七成都露出來 */
   for(let k=0;k<n;k++){ const x=P.getX(k)+d.c.x, z=P.getZ(k)+d.c.z, r=Math.hypot(x-g.position.x,z-g.position.z); if(r>R*1.6) continue; const f=r<R?1:1-(r-R)/(R*.6), target=d.base[k]-want; if(d.D[k]<target*f+(1-f)*d.D[k]) d.D[k]=Math.min(.17,target*f+(1-f)*d.D[k]); const dd=Math.max(0,d.D[k]); C.setXYZ(k,Math.min(1,dd/.006),layerOf(dd)/2,1-Math.min(.6,dd/.11*.6)); }
   d.dirty=true; spawnMud(g.position.clone(),vS.set(0,0,0),5,true); }   // 取出前把牠周圍的泥撥開：看得到牠躺在洞裡
 function reveal3(){ const d=dig; if(!d||!d.crea) return 0; const P=d.geo.attributes.position, n=PG+1; let tot=0,vis=0;
@@ -369,7 +376,7 @@ function saltTick(dt){ const d=dig; if(!d||d.phase!=='salt'||!d.crea) return; d.
     if(d.popUp>2.1){ d.phase='dig'; d.salted=1; d.depth+=.05; placeCrea(); $('digInfo').innerHTML='竹蟶縮回去了，而且鑽得更深<br><small>只能用挖的了──發現牠後要挖得又快又準</small>'; $('digBtns').innerHTML='<button id="dgNo" style="background:#333;color:#fff">放棄</button>'; $('dgNo').onclick=()=>endDig(false); } } }
 function nextInBed(){ const d=dig; d.left--; const cr=d.cr, k=d.k; S.remove(d.crea.group); d.crea=null;
   d.size=rand(cr.size[0],cr.size[1]); d.depth=.012+cr.depth*.015+rand(-.008,.01); const a=rand(0,6.28), r=rand(.08,.2); d.off.set(Math.cos(a)*r,Math.sin(a)*r);
-  try{ const f=creaModel(c.species(k)); const g=f.group; g.scale.setScalar(d.size); g.position.set(d.c.x+d.off.x,0,d.c.z+d.off.y); g.rotation.set(0,rand(0,6),k==='razor'?Math.PI/2:0); S.add(g); d.crea=f; }catch(e){ const sh=new T.Mesh(new T.SphereGeometry(.5,20,12),new T.MeshStandardMaterial({color:0xcdbb9c,roughness:.5})); sh.scale.set(1,.45,.8); const g=new T.Group(); g.add(sh); g.scale.setScalar(d.size); g.position.set(d.c.x+d.off.x,0,d.c.z+d.off.y); S.add(g); d.crea={group:g,uni:{uSwim:{value:0},uAmp:{value:0}},stub:true}; }
+  try{ const f=creaModel(c.species(k)); const g=f.group; g.scale.setScalar(d.size*1.6); g.position.set(d.c.x+d.off.x,0,d.c.z+d.off.y); g.rotation.set(0,rand(0,6),k==='razor'?Math.PI/2:0); S.add(g); d.crea=f; }catch(e){ const sh=new T.Mesh(new T.SphereGeometry(.5,20,12),new T.MeshStandardMaterial({color:0xcdbb9c,roughness:.5})); sh.scale.set(1,.45,.8); const g=new T.Group(); g.add(sh); g.scale.setScalar(d.size); g.position.set(d.c.x+d.off.x,0,d.c.z+d.off.y); S.add(g); d.crea={group:g,uni:{uSwim:{value:0},uAmp:{value:0}},stub:true}; }
   d.base0=null; d.liftFrom=null; d.found=false; d.ready=false; d.dmg=0; d.fled=false; d.esc=0; d.phase='dig'; d.t=0; d.mud=Math.random()<(k==='hardclam'||k==='gomphina'?.15:0); placeCrea(); rake.visible=false;
   $('digInfo').innerHTML='旁邊的泥裡還有動靜…<br><small>同一窩通常不只一個，把洞往周圍挖大</small>'; $('digBtns').innerHTML='<button id="dgNo" style="background:#333;color:#fff">夠了，站起來</button>'; $('dgNo').onclick=()=>endDig(true); }
 function endDig(got,skip){ const d=dig; if(!d) return; if(!skip){ d.s.done=true; } else { d.s.m.visible=true; if(d.s.m.userData.det) d.s.m.userData.det.visible=true; }
@@ -377,7 +384,7 @@ function endDig(got,skip){ const d=dig; if(!d) return; if(!skip){ d.s.done=true;
   if(d.crea){ S.remove(d.crea.group); }   /* 不再把生物丟在地上 */
   rake.visible=false; seep.visible=false; GU.uSeepY.value=-9; bucket.visible=false; dig=null; box.style.display='none'; ['tdHint','tdExit','tdStomp','tdCageB'].forEach(id=>{ const e=$(id); if(e) e.style.visibility=''; }); }
 // 竹蟶往下鑽、沙蟹想溜、滲水、取出的動畫、耙子跟著手指
-function digTick(dt){ mudTick(dt); dropTick(dt); saltTick(dt); if(typeof spdEl!=='undefined') spdEl.style.visibility=dig&&dig.phase==='dig'?'visible':'hidden'; if(bucket.visible) inBucket.forEach(f=>{ f.uni.uSwim.value+=dt*2; f.uni.uAmp.value=.03; }); const d=dig; if(!d) return; d.t+=dt; if(d.dirty){ d.dirty=false; d.geo.attributes.position.needsUpdate=true; d.geo.attributes.color.needsUpdate=true; d.geo.computeVertexNormals(); } d.camT=Math.min(1,d.camT+dt*1.6);
+function digTick(dt){ mudTick(dt); dropTick(dt); saltTick(dt); if(dig&&dig.ready&&dig.crea&&dig.popRise!==undefined&&dig.popRise<1&&dig.phase==='dig'){ const r0=dig.popRise; dig.popRise=Math.min(1,dig.popRise+dt*1.5); dig.crea.group.position.y+=(dig.popRise-r0)*dig.size*.55; if(Math.random()<dt*10) spawnMud(dig.crea.group.position.clone(),vS.set(0,0,0),1,true); } if(typeof spdEl!=='undefined') spdEl.style.visibility=dig&&dig.phase==='dig'?'visible':'hidden'; if(bucket.visible) inBucket.forEach(f=>{ f.uni.uSwim.value+=dt*2; f.uni.uAmp.value=.03; }); const d=dig; if(!d) return; d.t+=dt; if(d.dirty){ d.dirty=false; d.geo.attributes.position.needsUpdate=true; d.geo.attributes.color.needsUpdate=true; d.geo.computeVertexNormals(); } d.camT=Math.min(1,d.camT+dt*1.6);
   if(d.phase==='dig'&&d.cr&&d.crea&&!d.fled&&!d.crea.stub||d.phase==='dig'&&d.cr&&d.crea&&!d.fled){
     if(d.cr.dive&&d.found&&!d.ready){ d.depth+=dt*.012; placeCrea(); if(Math.random()<dt*3) squirt(vS.set(d.c.x,patchY(d.c.x,d.c.z)+.003,d.c.z).clone(),.25,3);   /* 孔裡冒泡：牠正在往下鑽 */ if(d.depth>.17){ d.fled=true; d.crea.group.visible=false; $('digInfo').innerHTML='竹蟶鑽到深處去了…<br><small>發現竹蟶後要挖得又快又準</small>'; $('digBtns').innerHTML='<button id="dgNo" style="background:#555;color:#fff">好吧</button>'; $('dgNo').onclick=()=>endDig(false); } }
     if(d.cr.flee&&!d.found&&d.t>14){ d.fled=true; const g=d.crea.group; g.position.y=patchY(g.position.x,g.position.z)+.01; d.esc=1; $('digInfo').innerHTML='沙蟹從旁邊鑽出來溜走了！<br><small>洞口有沙堆的要挖快一點</small>'; $('digBtns').innerHTML='<button id="dgNo" style="background:#555;color:#fff">可惜</button>'; $('dgNo').onclick=()=>endDig(false); } }
@@ -412,7 +419,7 @@ const spdEl=document.createElement('div'); spdEl.id='digSpd'; spdEl.innerHTML='<
 function digLim(){ const d=dig; return d&&d.cr?(d.cr.fragile?.8:d.cr.soft?.95:1.25):1.25; }   /* 公尺／秒：一般手指慢慢撥約 0.3～0.8 */
 function spdShow(v){ const b=spdEl.querySelector('b'), lim=digLim(), f=Math.min(1,v/(lim*1.4)); b.style.width=(f*100)+'%'; b.style.background=v<lim*.7?'#5fd38a':v<lim?'#f4c542':'#ff5b4a'; }
 window.addEventListener('pointermove',e=>{ if(!dig||dig.phase!=='dig') return; const p=digPoint(e); if(!p) return;
-  rake.visible=false; dig.handP=p.clone().setY(patchY(p.x,p.z)+.025);
+  rake.visible=false; dig.handP=p.clone().setY(patchY(p.x,p.z)+.025); scoop=Math.min(1,scoop+.25);
   if(!dig.ptr||!dig.ptr.p){ if(dig.ptr) dig.ptr.p=p; return; }
   const now=performance.now(), dt=Math.max(8,now-dig.ptr.t)/1000, dist=p.distanceTo(dig.ptr.p), raw=Math.min(3,dist/dt); spdS+=(raw-spdS)*.18; spdShow(spdS);   // 真實速度（公尺／秒），平滑過
   if(dist<.002) return; const dir=vS.subVectors(p,dig.ptr.p).normalize().clone(); const steps=Math.max(1,Math.ceil(dist/.008));
@@ -420,7 +427,8 @@ window.addEventListener('pointermove',e=>{ if(!dig||dig.phase!=='dig') return; c
   // 耙子跟著手指：耙頭貼著泥面、齒插進泥裡，柄朝你，順著拖的方向；拖越快越往前傾
   rake.position.copy(p).setY(patchY(p.x,p.z)+.012); rake.rotation.y=yaw+Math.max(-.35,Math.min(.35,(p.x-dig.c.x)*-1.2));   /* 柄永遠朝著你（你握著），左右挖時柄跟著轉一點 */ rakeHead.rotation.x=-Math.min(.35,spdS*.6); rakeHead.children.forEach((m,i)=>{ if(i>0) m.material.color.setRGB(.43-.2*rakeMud,.42-.22*rakeMud,.41-.24*rakeMud); });   /* 鐵齒越挖越沾泥 */
   dig.ptr={p,t:now}; });
-window.addEventListener('pointerup',()=>{ if(dig) { dig.ptr=null; rakeHead.rotation.x=0; spdS=0; spdShow(0); const fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw); const x=dig.c.x+rx*.2-fx*.12, z=dig.c.z+rz*.2-fz*.12; rake.position.set(x,patchY(x,z)+.012,z); } });   /* 放開手：耙子放到洞的右前方，不擋住洞裡的東西 */
+window.addEventListener('pointerup',()=>{ if(dig) { if(dig.ptr&&dig.ptr.p&&dig.phase==='dig'&&scoop>.3){ const p=dig.ptr.p.clone(); p.y=patchY(p.x,p.z)+.01; spawnMud(p,vS.set(Math.cos(yaw)*.8,0,-Math.sin(yaw)*.8).clone(),7,true); flick=1; noise(.1,350,2,.12); }   /* 放手的瞬間：手往上一撈，把一把泥甩到洞外 */
+    scoop=0; dig.ptr=null; rakeHead.rotation.x=0; spdS=0; spdShow(0); const fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw); const x=dig.c.x+rx*.2-fx*.12, z=dig.c.z+rz*.2-fz*.12; rake.position.set(x,patchY(x,z)+.012,z); } });   /* 放開手：耙子放到洞的右前方，不擋住洞裡的東西 */
 
 /* ---------- 拖籠（嘉義布袋好美里的挖法）：把籠子插進泥沙裡，倒退著拖，到有水的地方搖晃淘洗，泥沙洗掉就剩下蛤 ----------
    ・按「🧺 拖籠」拿出籠子，籠子在你前面插進泥裡；手指往下拖＝倒退走，籠子跟著被拉動，後面留下一道刮痕
@@ -432,10 +440,15 @@ const cage={on:false,fill:0,items:[],dist:0,g:new T.Group(),wash:0,shake:0,trail
   const W2=.42,H2=.2,D2=.32, fr=[[-W2/2,0,0,W2/2,0,0],[-W2/2,H2,0,W2/2,H2,0],[-W2/2,0,0,-W2/2,H2,0],[W2/2,0,0,W2/2,H2,0],[-W2/2,H2,0,-W2/2,H2*.7,D2],[W2/2,H2,0,W2/2,H2*.7,D2],[-W2/2,0,0,-W2/2,0,D2],[W2/2,0,0,W2/2,0,D2],[-W2/2,0,D2,W2/2,0,D2],[-W2/2,H2*.7,D2,W2/2,H2*.7,D2]];
   fr.forEach(([a,b,c2,d,e,f])=>{ const v1=new T.Vector3(a,b,c2), v2=new T.Vector3(d,e,f), L=v1.distanceTo(v2), m=new T.Mesh(new T.CylinderGeometry(.006,.006,L,6),iron); m.position.copy(v1).add(v2).multiplyScalar(.5); m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),v2.clone().sub(v1).normalize()); cage.g.add(m); });
   for(let i=0;i<12;i++){ const t=new T.Mesh(new T.CylinderGeometry(.003,.002,.07,5),iron); t.position.set(-W2/2+.02+i*(W2-.04)/11,-.03,-.01); t.rotation.x=-.5; cage.g.add(t); }   // 前緣一排插進泥裡的鐵齒
-  const bottom=new T.Mesh(new T.PlaneGeometry(W2,D2,10,8).rotateX(-Math.PI/2),net); bottom.position.set(0,.002,D2/2); cage.g.add(bottom);
-  const back=new T.Mesh(new T.PlaneGeometry(W2,H2*.7,10,4),net); back.position.set(0,H2*.35,D2); cage.g.add(back);
+  // 籠底與籠背：一根根實心鋼條（間距約 1.5 公分，泥沙漏得出去、蛤留在裡面），不是線框
+  const rodG=new T.CylinderGeometry(.0028,.0028,1,6), NR=60, rods=new T.InstancedMesh(rodG,iron,NR); let ri=0; const M4=new T.Matrix4(), Q=new T.Quaternion(), Vp=new T.Vector3(), Vs=new T.Vector3(), upV=new T.Vector3(0,1,0);
+  const rod=(a,b)=>{ const L=a.distanceTo(b); Q.setFromUnitVectors(upV,Vp.subVectors(b,a).normalize()); M4.compose(Vp.addVectors(a,b).multiplyScalar(.5),Q,Vs.set(1,L,1)); rods.setMatrixAt(ri++,M4); };
+  for(let i=0;i<27;i++){ const x=-W2/2+.015+i*(W2-.03)/26; rod(new T.Vector3(x,.004,0),new T.Vector3(x,.004,D2)); }   // 底部縱向鋼條
+  for(let i=0;i<4;i++){ const z=.03+i*(D2-.06)/3; rod(new T.Vector3(-W2/2,.008,z),new T.Vector3(W2/2,.008,z)); }       // 底部橫向補強
+  for(let i=0;i<22;i++){ const x=-W2/2+.02+i*(W2-.04)/21; rod(new T.Vector3(x,.004,D2),new T.Vector3(x,H2*.7,D2)); }  // 籠背直條
+  rods.count=ri; cage.g.add(rods);
   const pole=new T.Mesh(new T.CylinderGeometry(.014,.016,1.5,8),wood); pole.position.set(0,.5,D2+.86); pole.rotation.x=1.1; pole.scale.y=1.3; cage.g.add(pole);   // 長竿伸到你手上
-  cage.inside=new T.Group(); cage.g.add(cage.inside); cage.sand=new T.Mesh(new T.BoxGeometry(W2-.02,.01,D2-.02),new T.MeshStandardMaterial({color:0x3b3127,roughness:.45})); cage.sand.position.set(0,.005,D2/2); cage.g.add(cage.sand); }
+  cage.inside=new T.Group(); cage.g.add(cage.inside); cage.sand=new T.Mesh(new T.SphereGeometry(.5,24,10,0,Math.PI*2,0,Math.PI/2),new T.MeshStandardMaterial({color:0x2c241c,roughness:.3})); cage.sand.scale.set(W2-.03,.004,D2-.04); cage.sand.position.set(0,.004,D2/2); cage.g.add(cage.sand);   /* 籠裡越積越高的一坨濕泥 */ }
 cage.g.visible=false; S.add(cage.g);
 // 籠子拖過的刮痕：一條翻開的濕泥帶，上面有一道道鐵齒刮出的細溝，會慢慢積水反光、很久之後被抹平
 const trailTex=(()=>{ const c2=document.createElement('canvas'); c2.width=64; c2.height=32; const g=c2.getContext('2d'); g.fillStyle='rgba(28,22,16,.62)'; g.fillRect(0,0,64,32);
@@ -455,15 +468,15 @@ function cageUI(){ const b=cageEl.querySelector('b'); b.style.width=Math.round(c
 function cageOn(){ if(dig) return; cage.on=true; cage.g.visible=true; cageEl.style.display='flex'; ['tdHint','tdStomp'].forEach(id=>{ const e=$(id); if(e) e.style.visibility='hidden'; }); cageUI(); }
 function cageOff(){ cage.on=false; pitch=-.32; cage.g.visible=false; cageEl.style.display='none'; ['tdHint','tdStomp'].forEach(id=>{ const e=$(id); if(e) e.style.visibility=''; }); }
 function cageTick(dt){ if(!cage.on) return; pitch+=(-.5-pitch)*Math.min(1,dt*3); const fx=-Math.sin(yaw), fz=-Math.cos(yaw), x=pos.x+fx*1.9, z=pos.z+fz*1.9;   /* 低頭看著前面的籠子 */
-  cage.g.position.set(x,hAt(x,z)-.02,z); cage.g.rotation.set(0,yaw,Math.sin(cage.shake*1.3)*.12*Math.min(1,cage.wash*4));   /* 籠口朝前、竿子朝你 */
+  cage.g.position.set(x,hAt(x,z)-.028,z);   // 籠底和鐵齒陷在泥裡 cage.g.rotation.set(0,yaw,Math.sin(cage.shake*1.3)*.12*Math.min(1,cage.wash*4));   /* 籠口朝前、竿子朝你 */
   if(cage.wash===0&&walkV<-.05&&cage.fill<1){ const dd=-walkV*dt; cage.dist+=dd; trailAcc+=dd; if(trailAcc>.2){ trailAcc=0; trailStamp(x-fx*.05,z-fz*.05); } cage.fill=Math.min(1,cage.fill+dd*.06);   // 倒退拖：約 17 公尺裝滿
     if(Math.random()<dt*6){ spawnMud(cage.g.position.clone().add(vS.set(fx*.05,.02,fz*.05)),vS.set(-fx,0,-fz).clone(),2,true); noise(.05,700+Math.random()*400,2,.05); }
     let near=null,nd=2.5; signs.forEach(s=>{ if(s.done||!s.k||!CR[s.k]||s.k==='ghostcrab'||s.k==='ragworm') return;   /* 拖籠拖得到文蛤、赤嘴蛤、海瓜子、竹蟶 */ const d=Math.hypot(s.m.position.x-x,s.m.position.z-z); if(d<nd){ nd=d; near=s; } });
     const p=near?dt*3:dt*.7;   // 拖籠比較費工，收穫要多：痕跡附近幾乎一直有、空地平均一秒多也有一個
     if(Math.random()<p){ const k=near?near.k:['hardclam','hardclam','gomphina','tellin','tellin','razor'][Math.floor(Math.random()*6)]; const cr=CR[k]; cage.items.push({k,size:rand(cr.size[0],cr.size[1])}); if(near&&Math.random()<.45) { near.done=true; near.m.visible=false; if(near.m.userData.det) near.m.userData.det.visible=false; if(near.ring) near.ring.visible=false; }
       vib([15,25,15]); noise(.04,1900,7,.2); c.toast('喀啦！有東西進籠子了','',900); }
-    cage.sand.scale.y=1+cage.fill*6; cage.sand.position.y=.005+cage.fill*.03; if(cage.fill>=1){ walkReq=0; } if(Math.random()<dt*2) cageUI(); }
-  if(cage.wash>0){ cage.sand.scale.y=Math.max(.1,(1-cage.wash)*(1+cage.fill*6)); if(Math.random()<dt*10) squirt(cage.g.position.clone().add(vS.set(rand(-.15,.15),.05,rand(-.1,.1))),.6,3); } }
+    cage.sand.scale.y=.004+cage.fill*.12; if(cage.fill>=1){ walkReq=0; } if(Math.random()<dt*2) cageUI(); }
+  if(cage.wash>0){ cage.sand.scale.y=Math.max(.002,(1-cage.wash)*(.004+cage.fill*.12)); if(Math.random()<dt*10) squirt(cage.g.position.clone().add(vS.set(rand(-.15,.15),.05,rand(-.1,.1))),.6,3); } }
 // 淘洗：左右快速滑動
 let lastSX=null, lastDir=0;
 window.addEventListener('pointermove',e=>{ if(!cage.on||!(cage.wash>0)||cage.wash>=1) return; if(lastSX===null){ lastSX=e.clientX; return; } const dx=e.clientX-lastSX; if(Math.abs(dx)>25){ const d=Math.sign(dx); if(d!==lastDir){ lastDir=d; cage.wash=Math.min(1,cage.wash+.09); cage.shake+=1.4; noise(.15,500,1.5,.12); vib(12); cageUI();
@@ -476,9 +489,9 @@ function cageReveal(){ cage.inside.clear(); cage.sand.visible=false; const shown
   const tot=cage.items.reduce((a,it)=>a+Math.round(CR[it.k].price*(.6+it.size*6)),0);
   $('cgBtns').innerHTML='<button id="cgPour" style="background:#ffcf66;color:#3a2600">'+(cage.items.length?'🪣 倒進桶子':'倒掉')+'</button>'+(cage.items.length?'<button id="cgSell" style="background:#2e8b57;color:#fff">🪙 全部賣掉 '+tot+'</button>':'');
   const sl=$('cgSell'); if(sl) sl.onclick=()=>{ if(c.sellNow) c.sellNow(tot); cage.items.forEach(it=>{ if(c.dex) c.dex(it.k,it.size); bag.push({id:it.k,v:0,L:+it.size.toFixed(3),done:true}); }); bagText(); c.toast('賣了 🪙'+tot,'good',1500);
-    cage.items=[]; cage.fill=0; cage.dist=0; cage.wash=0; cage.inside.clear(); cage.sand.visible=true; cage.sand.scale.y=1; cageUI(); };   // 桶子裡的回岸時再決定烤、養或賣
+    cage.items=[]; cage.fill=0; cage.dist=0; cage.wash=0; cage.inside.clear(); cage.sand.visible=true; cage.sand.scale.y=.004; cageUI(); };   // 桶子裡的回岸時再決定烤、養或賣
   $('cgPour').onclick=()=>{ cage.items.forEach(it=>{ const cr=CR[it.k], v=Math.round(cr.price*(.6+it.size*6)); bag.push({id:it.k,v,L:+it.size.toFixed(3),broken:false}); bucketAdd(it.k,it.size); }); if(cage.items.length){ bagText(); vib([20,30,60]); noise(.25,600,2,.2); c.toast('倒進桶子了：'+cage.items.length+' 個','good',1600); }
-    cage.items=[]; cage.fill=0; cage.dist=0; cage.wash=0; cage.inside.clear(); cage.sand.visible=true; cage.sand.scale.y=1; cageUI(); }; }
+    cage.items=[]; cage.fill=0; cage.dist=0; cage.wash=0; cage.inside.clear(); cage.sand.visible=true; cage.sand.scale.y=.004; cageUI(); }; }
 
 /* ---------- 握著工具的手：沿用遊戲裡第一人稱的手臂模型（戴手套），右手握住手耙的柄／拖籠的竹竿 ---------- */
 const hand={ready:false,grp:new T.Group(),fing:[],pl:null,ld:null,L0:1};
@@ -500,7 +513,12 @@ function handTo(tg,grip,sx,sy,sz,cap){ sx=sx??.2; sy=sy??-.62; sz=sz??.18; cap=c
   hup.set(0,1,0).applyQuaternion(hq); hand.grp.position.copy(tg).sub(htmp.copy(hand.pl).multiplyScalar(s).applyQuaternion(hq)).addScaledVector(hup,.016);
   hand.fing.forEach(f=>{ f.b.rotation.x=f.x0-grip*f.k; }); }
 const gripW=new T.Vector3();
-function handTick(){ if(dig&&dig.phase==='dig'&&dig.handP){ handTo(dig.handP,.35+.4*Math.min(1,spdS),.16,-.22,.02,.42); }   /* 徒手挖：手指半彎像在撥泥，撥得越快握得越緊 */
+const handCur=new T.Vector3(), handGoal=new T.Vector3(); let scoop=0, flick=0;
+function handTick(){ if(dig&&(dig.phase==='dig'||dig.phase==='ask'&&false)&&dig.c){ const d=dig, fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw);
+    if(d.ptr&&d.handP){ handGoal.copy(d.handP); handGoal.y-=.012*Math.min(1,scoop); }   // 手指插進泥裡往後撥
+    else { const x=d.c.x+rx*.14-fx*.1, z=d.c.z+rz*.14-fz*.1; handGoal.set(x,patchY(x,z)+.05+.04*flick,z); }   // 沒在撥：手停在洞的右前方邊緣
+    if(!handCur.lengthSq()) handCur.copy(handGoal); handCur.lerp(handGoal,.35); flick=Math.max(0,flick-.06);
+    handTo(handCur,d.ptr?.55+.35*Math.min(1,spdS):.25,.16,-.22,.02,.42); return; }   /* 徒手挖：手指半彎像在撥泥，撥得越快握得越緊 */
   else if(false){ rake.updateMatrixWorld(true); const hm=rake.children.find(m=>m.geometry&&m.geometry.parameters&&m.geometry.parameters.height===.3); if(hm){ gripW.set(0,.13,0); hm.localToWorld(gripW); handTo(gripW,.95,.34,-.36,.42,.4); }   /* 跪著挖時鏡頭很近：手從右下角伸進來、比例縮小，不擋住洞 */ else hand.grp.visible=false; }   // 握住手耙木柄的尾端
   else if(cage.on){ cage.g.updateMatrixWorld(); const pole=cage.g.children.find(m=>m.geometry&&m.geometry.parameters&&m.geometry.parameters.height===1.5); if(pole){ gripW.set(0,-.2,0); pole.localToWorld(gripW); handTo(gripW,.9); } else hand.grp.visible=false; }
   else hand.grp.visible=false; }
@@ -535,7 +553,7 @@ $('tdCageB').onclick=()=>{ if(cage.on) cageOff(); else cageOn(); };
 // 跺腳：附近 5 公尺內埋著的貝類受到震動，縮回水管、噴出一道水（真實挖蛤的人就是這樣找的）
 $('tdStomp').onclick=()=>{ if(!on||dig) return; vib([40,30,60]); noise(.18,120,1,.35); sink=Math.min(.12,sink+.05); let n=0;
   signs.forEach(s=>{ if(s.done||!s.k) return; const d=Math.hypot(s.m.position.x-pos.x,s.m.position.z-pos.z); if(d>5) return;
-    const sq=s.k==='hardclam'||s.k==='gomphina'||s.k==='razor'; setTimeout(()=>{ const p=s.m.position.clone(); if(sq){ squirt(p,1.5+Math.random()*.6,14); noise(.1,2800,2,.05); } if(s.ring){ s.ring.material.opacity=1; } },200+d*120+Math.random()*250); if(sq) n++; });
+    const sq=s.k==='hardclam'||s.k==='gomphina'||s.k==='razor'; setTimeout(()=>{ const p=s.m.position.clone(); if(sq){ jet(p); squirt(p,1.5+Math.random()*.6,14); noise(.12,2800,2,.09); } if(s.ring){ s.ring.material.opacity=1; } },200+d*120+Math.random()*250); if(sq) n++; });
   setTimeout(()=>{ c.toast(n?'噗！附近有 '+n+' 道水柱噴出來──底下有東西':'附近沒什麼反應，換個地方再跺跺看','',1600); },700); };
 /* ---------- 操作：拖曳轉頭與前進、點痕跡或活生物 ---------- */
 const canvas=W.renderer.domElement;
@@ -548,7 +566,7 @@ let walkReq=0, walkV=0, stepAcc=0, stepSide=1, bobT=0, sink=0;
 const fpG=new T.PlaneGeometry(.13,.3).rotateX(-Math.PI/2);
 const fpTex=(()=>{ const c=document.createElement('canvas'); c.width=32; c.height=64; const g=c.getContext('2d'); const r=g.createRadialGradient(16,22,2,16,26,16); r.addColorStop(0,'rgba(30,24,18,.75)'); r.addColorStop(1,'rgba(30,24,18,0)'); g.fillStyle=r; g.beginPath(); g.ellipse(16,22,11,18,0,0,7); g.fill(); g.beginPath(); g.ellipse(16,52,9,10,0,0,7); g.fill(); return new T.CanvasTexture(c); })();
 const prints=[];
-function footprint(x,z,ang,soft){ const m=new T.Mesh(fpG,new T.MeshStandardMaterial({map:fpTex,transparent:true,depthWrite:false,roughness:.25,metalness:.2,color:soft?0x6a6a70:0x8a8070,opacity:.9}));
+function footprint(x,z,ang,soft){ const m=new T.Mesh(fpG,new T.MeshStandardMaterial({map:fpTex,transparent:true,depthWrite:false,roughness:.25,metalness:.1,color:soft?0x3a3632:0x4a433b,opacity:.85}));
   m.position.set(x,hAt(x,z)+.006,z); m.rotation.y=ang; S.add(m); prints.push({m,t:0,soft}); if(prints.length>40){ const o=prints.shift(); S.remove(o.m); } }
 function stepSound(soft,sandy){ const a=ac(); if(!a) return; if(sandy){ noise(.12,2600,1.2,.06); return; }
   noise(.09,500,2,.16); if(soft) setTimeout(()=>{ noise(.22,320,5,.14); noise(.06,1400,3,.05); },120); }   // 泥：落腳的悶響＋拔腳的吸附聲
@@ -592,7 +610,7 @@ window.addEventListener('pointerdown',e=>{ if(!on||dig) return; const t=e.target
 /* ---------- 每一格 ---------- */
 let t=0;
 let rspawn=0;
-function render(dt){ if(!on) return; if(!dig) dropTick(dt); t+=dt; if(!roamers.length&&(rspawn-=dt)<=0){ rspawn=2; spawnRoamers(); } /* 模型下載好就放出泥面上的生物 */ const h=c.hour(), left=(endH-h)*60;   // 剩下幾分鐘（遊戲時間）
+function render(dt){ if(!on) return; if(!dig) dropTick(dt); jetTick(dt); t+=dt; if(!roamers.length&&(rspawn-=dt)<=0){ rspawn=2; spawnRoamers(); } /* 模型下載好就放出泥面上的生物 */ const h=c.hour(), left=(endH-h)*60;   // 剩下幾分鐘（遊戲時間）
   $('tdClock').innerHTML=left>40?`🌊 退潮中・離漲潮還有 ${Math.floor(left)} 分`:`<span style="color:#ffb39a">⚠️ 漲潮倒數 ${Math.max(0,Math.floor(left))} 分</span>`;
   if(left<=40&&warned<1){ warned=1; warnEl.innerHTML='🌊 潮水開始回漲了！<br><small>跟著地上發亮的箭頭往岸邊走</small>'; warnEl.style.display='block'; setTimeout(()=>warnEl.style.display='none',3800); vib([80,60,80]); /* 不再插旗子 */ }
   if(left<=20&&warned<2){ warned=2; warnEl.innerHTML='⚠️ 二十分鐘後滿潮！立刻撤離<br><small>真實的泥灘：漲潮速度常比走路快，泥灘也會陷住腳。一定要先查潮汐表、結伴、提早離開</small>'; warnEl.style.display='block'; setTimeout(()=>warnEl.style.display='none',5200); vib([120,80,120,80,120]); }
