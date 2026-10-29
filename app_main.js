@@ -1,4 +1,4 @@
-/*APPV:20261029003100*/
+/*APPV:20261029004609*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5480,7 +5480,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029003100'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029004609'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6146,10 +6146,10 @@ const GN=220, gg=new T.PlaneGeometry(200,200,GN,GN).rotateX(-Math.PI/2), gp=gg.a
 for(let k=0;k<gp.count;k++) gp.setY(k,hAt(gp.getX(k),gp.getZ(k)));
 gg.computeVertexNormals();
 const gmat=new T.MeshStandardMaterial({color:0xb8aea0,map:mudT,normalMap:mudN,normalScale:new T.Vector2(1.1,1.1),roughness:.42,metalness:0});
-gmat.onBeforeCompile=sh=>{ sh.uniforms.tSand={value:sandT}; sh.uniforms.tSandN={value:sandN};
+gmat.onBeforeCompile=sh=>{ sh.uniforms.tSand={value:sandT}; sh.uniforms.tSandN={value:sandN}; sh.uniforms.uTW={value:0}; sh.uniforms.uSkyK={value:1}; gmat.userData.sh=sh;
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP2;').replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWP2=(modelMatrix*vec4(transformed,1.0)).xyz;');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
-uniform sampler2D tSand; uniform sampler2D tSandN; varying vec3 vWP2;
+uniform sampler2D tSand; uniform sampler2D tSandN; uniform float uTW; uniform float uSkyK; varying vec3 vWP2;
 float th(vec2 p){ return sin(p.x*.13+sin(p.y*.07)*1.7)*.5+sin(p.y*.11-p.x*.05)*.5; }
 float sandKf(vec2 p){ float e=34.+th(p*vec2(1.7,1.3))*7.+sin(p.x*.21)*2.5; return clamp((p.y-(e-4.))/8.,0.,1.); }`)
   .replace('#include <map_fragment>',`
@@ -6168,13 +6168,26 @@ float sandKf(vec2 p){ float e=34.+th(p*vec2(1.7,1.3))*7.+sin(p.x*.21)*2.5; retur
     normal=perturbNormal2Arb(-vViewPosition,normal,nm,faceDirection);
     #endif
   }`)
-  .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n roughnessFactor=mix(.5,.9,clamp(sandKf(vWP2.xz),0.,1.));   // 泥濕亮、沙乾霧');
+  .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
+  { float skR=clamp(sandKf(vWP2.xz),0.,1.); float wetR=1.-smoothstep(-.12,.02,vWP2.y);
+    roughnessFactor=mix(mix(.3,.16,wetR),.88,skR);   // 泥：濕亮（越靠水越像抹了一層水）；沙：乾霧
+    roughnessFactor+= (texture2D(map,vWP2.xz*1.7).r-.5)*.25; }`)
+  .replace('#include <dithering_fragment>',`#include <dithering_fragment>
+  { float wl=-.105, dep=wl-vWP2.y;                                            // 水深
+    if(dep>-.02){ vec3 V=normalize(cameraPosition-vWP2); 
+      vec2 p=vWP2.xz; float t=uTW; vec3 n=normalize(vec3((sin(p.x*3.1+p.y*1.3+t*1.6)+sin(p.x*7.9-p.y*6.1+t*3.3)*.4)*.04,1.,(cos(p.x*2.3-p.y*3.7-t*1.4)+cos(p.x*5.3+p.y*2.9+t*2.6)*.5)*.04));
+      float fr=.03+.97*pow(1.-max(dot(n,V),0.),5.);                            // 斜看反射多、正看透明
+      vec3 R=reflect(-V,n); float up=clamp(R.y,0.,1.); vec3 skyC=mix(vec3(.62,.66,.68),vec3(.42,.46,.5),up)*uSkyK;   // 天空反射（陰天灰）
+      vec3 under=gl_FragColor.rgb*mix(.85,.45,clamp(dep*8.,0.,1.));               // 淺水看得到泥，越深越暗
+      float a=smoothstep(-.02,.012,dep);                                           // 水邊柔和過渡，不再是鋸齒多邊形
+      gl_FragColor.rgb=mix(gl_FragColor.rgb, mix(under,skyC,fr*.9)+pow(max(dot(R,normalize(vec3(.3,.8,-.5))),0.),120.)*.25, a); } }`);
 };
 gmat.customProgramCacheKey=()=>'tideGround';
 const ground=new T.Mesh(gg,gmat); S.add(ground);
+gmat.envMapIntensity=.45;
 // 積水：一片略高於最低處的水面，只在低窪地方露出來；反射天空
 const pud=new T.Mesh(new T.PlaneGeometry(200,200).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x9aa6a8,roughness:.04,metalness:.9,transparent:true,opacity:.75}));
-pud.position.y=-.105; S.add(pud);
+pud.position.y=-.105; pud.visible=false; S.add(pud);   /* 水改在地面著色器裡算（水邊柔和），這片平面不再顯示 */
 const sandBand={position:new T.Vector3()};
 // 泥面上的碎貝殼、小石頭：真的 3D 小物件（近看有厚度、有影子），只撒在鏡頭附近的範圍
 { const shellG=new T.SphereGeometry(1,10,6,0,Math.PI*2,0,Math.PI/2); shellG.scale(1,.32,.8);   // 半顆蛋殼形＝碎貝殼
@@ -6196,7 +6209,7 @@ pud.material.onBeforeCompile=sh=>{ sh.uniforms.uT={value:0}; pud.userData.sh=sh;
   { vec2 p=vWQ.xz; float a=sin(p.x*3.1+p.y*1.3+uT*1.6)+sin(p.x*-1.7+p.y*4.3-uT*2.1)*.7+sin(p.x*7.9-p.y*6.1+uT*3.3)*.3;
     float b=cos(p.x*2.3-p.y*3.7-uT*1.4)+cos(p.x*5.3+p.y*2.9+uT*2.6)*.5; normal=normalize(normal+vec3(a*.035,0.,b*.035)); }`); };
 pud.material.customProgramCacheKey=()=>'tidePud';   // 舊程式相容用（沙地已併入地形）
-new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.mapping=T.EquirectangularReflectionMapping; t.encoding=T.sRGBEncoding; try{ const pm=new T.PMREMGenerator(W.renderer); const env=pm.fromEquirectangular(t).texture; gmat.envMap=env; gmat.envMapIntensity=.18; pud.material.envMap=env; pud.material.envMapIntensity=1.2; gmat.needsUpdate=pud.material.needsUpdate=true; pm.dispose(); }catch(e){} });
+new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.mapping=T.EquirectangularReflectionMapping; t.encoding=T.sRGBEncoding; try{ const pm=new T.PMREMGenerator(W.renderer); const env=pm.fromEquirectangular(t).texture; gmat.envMap=env; gmat.envMapIntensity=.45; pud.material.envMap=env; pud.material.envMapIntensity=1.2; gmat.needsUpdate=pud.material.needsUpdate=true; pm.dispose(); }catch(e){} });
 // 海水：從遠處慢慢漲回來
 const sea=new T.Mesh(new T.PlaneGeometry(400,300).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x4d6a72,roughness:.12,metalness:.3,transparent:true,opacity:.92})); sea.position.set(0,.06,-200); S.add(sea);
 // 撤離路線：竹竿＋褪色的布旗（漲潮警告時亮起），布會隨風飄
@@ -6238,10 +6251,12 @@ function decal(kind){ const cv=document.createElement('canvas'); cv.width=cv.hei
   const t=new T.CanvasTexture(cv); return new T.MeshBasicMaterial({map:t,transparent:true,depthWrite:false}); }
 const DEC={}; ['hole','key','slit','pellet','burrow','cast','flat'].forEach(k=>DEC[k]=decal(k));
 let signs=[];
-function spawnSigns(){ signs.forEach(s=>S.remove(s.m)); signs=[]; const kinds=Object.keys(CR);
+const ringG=new T.RingGeometry(.42,.5,32).rotateX(-Math.PI/2), ringM=new T.MeshBasicMaterial({color:0xfff2b0,transparent:true,opacity:0,depthWrite:false});
+function spawnSigns(){ signs.forEach(s=>{ S.remove(s.m); if(s.ring) S.remove(s.ring); }); signs=[]; const kinds=Object.keys(CR);
   for(let i=0;i<22;i++){ const k=Math.random()<.22?null:kinds[Math.floor(Math.random()*kinds.length)];
     const sign=k?CR[k].sign:'flat', m=new T.Mesh(new T.PlaneGeometry(.9,.9).rotateX(-Math.PI/2),DEC[sign]); m.position.set(rand(-14,14),0,rand(-26,12)); m.position.y=hAt(m.position.x,m.position.z)+.015; m.rotation.y=rand(0,6.28); S.add(m);
-    signs.push({m,k,sign,done:false,spurt:rand(2,6)}); } }
+    const ring=new T.Mesh(ringG,ringM.clone()); ring.position.copy(m.position); ring.position.y+=.01; S.add(ring);
+    signs.push({m,k,sign,ring,done:false,spurt:rand(2,6)}); } }
 /* ---------- 泥面上的活生物（3D 模型＋骨架） ---------- */
 let roamers=[];
 function spawnRoamers(){ roamers.forEach(r=>S.remove(r.g)); roamers=[];
@@ -6254,12 +6269,15 @@ const LOW=[[4.5,7.5],[16.5,19.5]];
 function lowWin(h){ for(const w of LOW) if(h>=w[0]&&h<w[1]) return w; return null; }
 function nextLow(h){ for(const w of LOW) if(h<w[0]) return w[0]; return LOW[0][0]+24; }
 /* ---------- HUD ---------- */
-const hud=document.createElement('div'); hud.id='tideHud'; hud.innerHTML=`<div id="tdClock"></div><div id="tdBag"></div><div id="tdHint">看泥面的痕跡判斷底下是什麼，點痕跡開挖・拖曳轉頭・兩指或上下拖曳前進</div><button id="tdExit">⬅ 回岸上</button>`;
+const hud=document.createElement('div'); hud.id='tideHud'; hud.innerHTML=`<div id="tdClock"></div><div id="tdBag"></div><div id="tdShore"><span id="tdArr">⬆</span> 岸邊 <b id="tdDist"></b></div><div id="tdHint">看泥面的痕跡判斷底下是什麼，點痕跡開挖・拖曳轉頭・兩指或上下拖曳前進</div><button id="tdExit">⬅ 回岸上</button>`;
 document.body.appendChild(hud);
 const st=document.createElement('style'); st.textContent=`body.attide #top,body.attide #top2,body.attide #act,body.attide #joy,body.attide #hint,body.attide #magWin{display:none!important}
 #tideHud{position:fixed;inset:0;pointer-events:none;z-index:6;display:none;font-family:inherit}
 #tideHud>div,#tideHud>button{position:absolute;pointer-events:auto}
 #tdClock{left:12px;max-width:52vw!important;top:calc(env(safe-area-inset-top,0px) + 12px);background:rgba(10,20,24,.72);color:#fff;border-radius:14px;padding:8px 12px;font-weight:700;font-size:14px;max-width:62vw}
+#tdShore{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 70px);background:rgba(10,20,24,.72);color:#fff;border-radius:999px;padding:6px 14px;font-size:14px;font-weight:700;z-index:6}
+#tdShore.warn{background:#c0392b;font-size:16px;animation:tdp 1s infinite}@keyframes tdp{50%{transform:translateX(-50%) scale(1.08)}}
+#tdArr{display:inline-block;transition:transform .15s}
 #tdBag{right:12px;top:calc(env(safe-area-inset-top,0px) + 12px);background:rgba(10,20,24,.72);color:#fff;border-radius:14px;padding:8px 12px;font-size:13px}
 #tdHint{left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 74px);text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-size:13px}
 #tdExit{left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 18px);border:0;border-radius:999px;padding:12px 22px;background:#ffcf66;color:#3a2600;font-weight:800;font-size:15px}
@@ -6355,8 +6373,10 @@ function up(e){ if(!on||!drag||dig) return; const was=drag; drag=null; if(was.mo
   const rh=ray.intersectObjects(roamers.map(r=>r.g),true); if(rh.length){ let o=rh[0].object; const r=roamers.find(q=>{ let x=o; while(x){ if(x===q.g) return true; x=x.parent; } return false; });
       if(r&&r.g.position.distanceTo(pos)<6){ if(Math.random()<.55){ const sp=c.species(r.id); bag.push({id:r.id,v:SURF[r.id].price+Math.round(Math.random()*30),L:r.L}); bagText(); S.remove(r.g); roamers.splice(roamers.indexOf(r),1); vib(30); c.toast('抓到'+SURF[r.id].n+'了！','good',1400); }
         else { r.flee=2; r.h=Math.atan2(r.g.position.x-pos.x,r.g.position.z-pos.z); c.toast(SURF[r.id].n+'溜走了，慢慢靠近再試','',1400); } return; } }
-  const hits=ray.intersectObjects(signs.filter(s=>!s.done).map(s=>s.m)); if(hits.length){ const s=signs.find(q=>q.m===hits[0].object); if(s.m.position.distanceTo(pos)>7){ c.toast('走近一點才能挖','',1200); return; } startDig(s); } }
-canvas.addEventListener('pointerdown',down); window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+  let hits=ray.intersectObjects(signs.filter(s=>!s.done).map(s=>s.m));
+  if(!hits.length){ const gh=ray.intersectObject(ground); if(gh.length){ const p=gh[0].point; let best=null,bd=1.3; signs.forEach(s=>{ if(s.done) return; const d=Math.hypot(s.m.position.x-p.x,s.m.position.z-p.z); if(d<bd){ bd=d; best=s; } }); if(best) hits=[{object:best.m}]; else { c.toast('這裡看不出痕跡，找找泥面上的小孔、凹痕或沙堆（附近的會微微發亮）','',1800); return; } } }
+  if(hits.length){ const s=signs.find(q=>q.m===hits[0].object); if(s.m.position.distanceTo(pos)>7){ c.toast('走近一點才能挖','',1200); return; } startDig(s); } }
+window.addEventListener('pointerdown',e=>{ if(!on||dig) return; const t=e.target; if(t&&t.closest&&t.closest('button,#tdDig,#tdBag,#tdClock,.sheet,#sheet')) return; down(e); });   /* 原本只聽 3D 畫布，畫布上面還蓋著遊戲的其他觸控層，點了沒反應 */ window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
 /* ---------- 每一格 ---------- */
 let t=0;
 let rspawn=0;
@@ -6376,8 +6396,11 @@ function render(dt){ if(!on) return; t+=dt; if(!roamers.length&&(rspawn-=dt)<=0)
     const side=r.id==='fiddler'?Math.PI/2:0; r.g.position.x+=Math.sin(r.h)*sp*dt; r.g.position.z+=Math.cos(r.h)*sp*dt; r.g.rotation.y=r.h-Math.PI/2+side;
     r.g.position.x=clamp(r.g.position.x,-18,18); r.g.position.z=clamp(r.g.position.z,-30,20); r.g.position.y+=hAt(r.g.position.x,r.g.position.z)+.01; r.uni.uSwim.value+=dt*(4+sp*30); r.uni.uAmp.value=.05+sp*.4; });
   shown.forEach(s=>{ s.t+=dt; s.f.uni.uSwim.value+=dt*8; s.f.uni.uAmp.value=.08+.06*Math.sin(s.t*3); s.f.group.rotation.y+=dt*.6; });
-  digTick(dt); flagTick(performance.now()*.001); if(pud.userData.sh) pud.userData.sh.uniforms.uT.value=performance.now()*.001;
-  pos.y=hAt(pos.x,pos.z)+1.55;   // 跟著地形高低走
+  digTick(dt); flagTick(performance.now()*.001); if(gmat.userData.sh){ gmat.userData.sh.uniforms.uTW.value=performance.now()*.001; gmat.userData.sh.uniforms.uSkyK.value=Math.min(1.2,.35+.8*(S.children.find(o=>o.isHemisphereLight)||{intensity:1.7}).intensity/1.7); }
+  pos.y=hAt(pos.x,pos.z)+1.55;
+  { const fx=-Math.sin(yaw), fz=-Math.cos(yaw), rel=Math.atan2(0,1)-Math.atan2(fx,fz); const ar=document.getElementById('tdArr'); if(ar) ar.style.transform='rotate('+(-rel)+'rad)';   // 岸在 +z 方向
+    const dd=document.getElementById('tdDist'); if(dd) dd.textContent=Math.max(0,Math.round(34-pos.z))+' m'; const sh=document.getElementById('tdShore'); if(sh) sh.classList.toggle('warn',!!warned); }
+  signs.forEach(s=>{ if(!s.ring) return; const d=Math.hypot(s.m.position.x-pos.x,s.m.position.z-pos.z); s.ring.visible=!s.done; s.ring.material.opacity=s.done?0:Math.max(0,1-d/7)*(.35+.25*Math.sin(performance.now()*.004+s.m.position.x)); });   // 跟著地形高低走
   cam.position.copy(pos); cam.rotation.set(pitch,yaw,0,'YXZ'); cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix();
   W.renderer.render(S,cam); }
 return {showRoute:v=>{ route.visible=v; },testDig:k=>{ const s=signs.find(q=>q.k===k&&!q.done)||signs.find(q=>q.k); if(s) startDig(s); return !!s; },enter,exit,render,active:()=>on,low:h=>!!lowWin(h),nextLow,CR,SURF,ALL};
