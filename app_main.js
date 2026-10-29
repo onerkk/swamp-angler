@@ -1,4 +1,4 @@
-/*APPV:20261029035323*/
+/*APPV:20261029040738*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5480,7 +5480,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029035323'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029040738'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6387,7 +6387,7 @@ function startDig(s){ const k=s.k, cr=k?CR[k]:null, c0=s.m.position.clone();
   $('digInfo').innerHTML='<b>'+(CLUE[s.sign]||'')+'</b><br><small>要在這裡挖嗎？</small>';
   $('digBtns').innerHTML='<button id="dgGo" style="background:#ffcf66;color:#3a2600">🪏 開挖</button><button id="dgNo" style="background:#333;color:#fff">不挖，換個地方</button>';
   $('dgGo').onclick=()=>{ dig.phase='dig'; rake.visible=true; $('digInfo').innerHTML='手指在泥面上來回拖，用蛤耙把泥刮開<br><small>碰到硬物就放慢，沿著周圍清</small>'; $('digBtns').innerHTML='<button id="dgNo" style="background:#333;color:#fff">放棄</button>'; $('dgNo').onclick=()=>endDig(false); };
-  $('dgNo').onclick=()=>endDig(false,true); box.style.display='flex'; ['tdHint','tdExit','tdStomp'].forEach(id=>{ const e=$(id); if(e) e.style.visibility='hidden'; }); }
+  $('dgNo').onclick=()=>endDig(false,true); box.style.display='flex'; ['tdHint','tdExit','tdStomp','tdCageB'].forEach(id=>{ const e=$(id); if(e) e.style.visibility='hidden'; }); }
 function placeCrea(){ const d=dig; if(!d||!d.crea) return; const g=d.crea.group, x=g.position.x, z=g.position.z; const top=hAt(x,z)-d.depth; g.position.y=top-(d.k==='razor'?d.size*.5:d.size*.12); }
 // 生物的上緣在哪裡（用來判斷耙子有沒有碰到、露出多少）
 function creaTopAt(x,z){ const d=dig; if(!d||!d.crea||d.fled) return null; const g=d.crea.group, r=Math.max(.022,d.k==='razor'?d.size*.18:d.k==='ragworm'?d.size*.12:d.size*.5); const dx=x-g.position.x, dz=z-g.position.z; if(dx*dx+dz*dz>r*r) return null; return hAt(g.position.x,g.position.z)-d.depth; }
@@ -6432,7 +6432,7 @@ function nextInBed(){ const d=dig; d.left--; const cr=d.cr, k=d.k; S.remove(d.cr
 function endDig(got,skip){ const d=dig; if(!d) return; if(!skip){ d.s.done=true; } else { d.s.m.visible=true; }
   if(!skip||d.removed>.01){ /* 挖過的洞留在泥面上 */ d.patch.userData.left=true; } else S.remove(d.patch);
   if(d.crea){ if(got&&d.phase!=='bucket') showCatch(d.k,d.c); S.remove(d.crea.group); }
-  rake.visible=false; seep.visible=false; GU.uSeepY.value=-9; bucket.visible=false; dig=null; box.style.display='none'; ['tdHint','tdExit','tdStomp'].forEach(id=>{ const e=$(id); if(e) e.style.visibility=''; }); }
+  rake.visible=false; seep.visible=false; GU.uSeepY.value=-9; bucket.visible=false; dig=null; box.style.display='none'; ['tdHint','tdExit','tdStomp','tdCageB'].forEach(id=>{ const e=$(id); if(e) e.style.visibility=''; }); }
 // 竹蟶往下鑽、沙蟹想溜、滲水、取出的動畫、耙子跟著手指
 function digTick(dt){ mudTick(dt); dropTick(dt); if(typeof spdEl!=='undefined') spdEl.style.visibility=dig&&dig.phase==='dig'?'visible':'hidden'; if(bucket.visible) inBucket.forEach(f=>{ f.uni.uSwim.value+=dt*2; f.uni.uAmp.value=.03; }); const d=dig; if(!d) return; d.t+=dt; if(d.dirty){ d.dirty=false; d.geo.attributes.position.needsUpdate=true; d.geo.attributes.color.needsUpdate=true; d.geo.computeVertexNormals(); } d.camT=Math.min(1,d.camT+dt*1.6);
   if(d.phase==='dig'&&d.cr&&d.crea&&!d.fled&&!d.crea.stub||d.phase==='dig'&&d.cr&&d.crea&&!d.fled){
@@ -6532,6 +6532,30 @@ function cageReveal(){ cage.inside.clear(); cage.sand.visible=false; const shown
   $('cgPour').onclick=()=>{ cage.items.forEach(it=>{ const cr=CR[it.k], v=Math.round(cr.price*(.6+it.size*6)); bag.push({id:it.k,v,L:+it.size.toFixed(3),broken:false}); bucketAdd(it.k,it.size); }); if(cage.items.length){ bagText(); vib([20,30,60]); noise(.25,600,2,.2); c.toast('倒進桶子了：'+cage.items.length+' 個','good',1600); }
     cage.items=[]; cage.fill=0; cage.dist=0; cage.wash=0; cage.inside.clear(); cage.sand.visible=true; cage.sand.scale.y=1; cageUI(); }; }
 
+/* ---------- 握著工具的手：沿用遊戲裡第一人稱的手臂模型（戴手套），右手握住手耙的柄／拖籠的竹竿 ---------- */
+const hand={ready:false,grp:new T.Group(),fing:[],pl:null,ld:null,L0:1};
+if(T.GLTFLoader) new T.GLTFLoader().load('models/arms.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene.clone(true); let wrist=null,root=null,palm=null,other=null;
+  o.traverse(b=>{ if(!b.isBone) return; const n=b.name; if(n.indexOf('R_wrist')===0) wrist=b; if(n.indexOf('R_arm')===0) root=b; if(n.indexOf('R_palm')===0) palm=b; if(n.indexOf('L_arm')===0) other=b;
+    const m=n.match(/^R_(point|middle|ring|pink)([123])/); if(m) hand.fing.push({b,k:[.7,1,.8][+m[2]-1],x0:b.rotation.x}); const th=n.match(/^R_thumb([123])/); if(th) hand.fing.push({b,k:[.45,.6,.5][+th[1]-1],x0:b.rotation.x}); });
+  if(!wrist||!root) return; if(other) other.scale.setScalar(1e-4);
+  o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.3; mm.roughness=.95; mm.metalness=0; }); } });
+  hand.grp.add(o); hand.grp.updateMatrixWorld(true); const wl=new T.Vector3().setFromMatrixPosition(wrist.matrixWorld), rl=new T.Vector3().setFromMatrixPosition(root.matrixWorld);
+  hand.pl=palm?new T.Vector3().setFromMatrixPosition(palm.matrixWorld):wl.clone(); hand.ld=new T.Vector3().subVectors(wl,rl); hand.L0=hand.ld.length(); hand.ld.normalize(); hand.ready=true; });
+hand.grp.visible=false; S.add(hand.grp);
+const hq=new T.Quaternion(), hq2=new T.Quaternion(), hsh=new T.Vector3(), hwd=new T.Vector3(), hup=new T.Vector3(), hupW=new T.Vector3(), htmp=new T.Vector3(), hcq=new T.Quaternion();
+// tg：手要握的點（世界座標）；肩膀在鏡頭右下後方
+function handTo(tg,grip){ if(!hand.ready){ hand.grp.visible=false; return; } hand.grp.visible=true; cam.updateMatrixWorld(); cam.getWorldQuaternion(hcq);
+  cam.localToWorld(hsh.set(.2,-.62,.18)); hwd.subVectors(tg,hsh).normalize(); hq.setFromUnitVectors(hand.ld,hwd);
+  hup.set(0,1,0).applyQuaternion(hq); hupW.set(0,1,0).applyQuaternion(hcq); hup.addScaledVector(hwd,-hup.dot(hwd)).normalize(); hupW.addScaledVector(hwd,-hupW.dot(hwd)).normalize();
+  const roll=Math.atan2(htmp.crossVectors(hup,hupW).dot(hwd),hup.dot(hupW))-.35; hq2.setFromAxisAngle(hwd,roll); hq.premultiply(hq2);
+  const s=Math.min(.7,hsh.distanceTo(tg)*1.02)/hand.L0; hand.grp.scale.setScalar(s); hand.grp.quaternion.copy(hq);
+  hup.set(0,1,0).applyQuaternion(hq); hand.grp.position.copy(tg).sub(htmp.copy(hand.pl).multiplyScalar(s).applyQuaternion(hq)).addScaledVector(hup,.016);
+  hand.fing.forEach(f=>{ f.b.rotation.x=f.x0-grip*f.k; }); }
+const gripW=new T.Vector3();
+function handTick(){ if(dig&&dig.phase==='dig'&&rake.visible){ rake.updateMatrixWorld(true); const hm=rake.children.find(m=>m.geometry&&m.geometry.parameters&&m.geometry.parameters.height===.3); if(hm){ gripW.set(0,.24,0); hm.localToWorld(gripW); handTo(gripW,.95); } else hand.grp.visible=false; }   // 握住手耙木柄的尾端
+  else if(cage.on){ cage.g.updateMatrixWorld(); const pole=cage.g.children.find(m=>m.geometry&&m.geometry.parameters&&m.geometry.parameters.height===1.5); if(pole){ gripW.set(0,-.2,0); pole.localToWorld(gripW); handTo(gripW,.9); } else hand.grp.visible=false; }
+  else hand.grp.visible=false; }
+
 /* ---------- 挖出來的生物：在洞旁邊用 3D 模型＋骨架動一下 ---------- */
 const shown=[];
 function showCatch(id,p){ const sp=c.species(id); if(!sp) return; try{ if(!window.__MDL||!window.__MDL.fishReady(id)) return; const f=window.__MDL.fish(sp); f.group.scale.setScalar(Math.max(.06,(sp.len[0]+sp.len[1])/200)*1.5); f.group.position.set(p.x+.3,hAt(p.x+.3,p.z)+.05,p.z); S.add(f.group); shown.push({f,t:0}); }catch(e){} }
@@ -6622,8 +6646,8 @@ function render(dt){ if(!on) return; if(!dig) dropTick(dt); t+=dt; if(!roamers.l
     const dd=document.getElementById('tdDist'); if(dd) dd.textContent=Math.max(0,Math.round(34-pos.z))+' m'; const sh=document.getElementById('tdShore'); if(sh) sh.classList.toggle('warn',!!warned); }
   signs.forEach(s=>{ if(!s.ring) return; const d=Math.hypot(s.m.position.x-pos.x,s.m.position.z-pos.z); s.ring.visible=!s.done&&!dig; s.ring.material.opacity=s.done?0:Math.max(0,1-d/12)*(.55+.4*Math.sin(performance.now()*.005+s.m.position.x)); const sc=1+.12*Math.sin(performance.now()*.005+s.m.position.x); s.ring.scale.set(sc,1,sc); });   // 12 公尺內的痕跡發光、呼吸，越近越亮   // 跟著地形高低走
   if(dig) digCam(); else { if(cam.fov!==58){ cam.fov=58; cam.updateProjectionMatrix(); }  cam.position.copy(pos); cam.rotation.set(pitch+Math.sin(bobT*2)*.006*Math.min(1,Math.abs(walkV)),yaw,Math.sin(bobT)*.01*Math.min(1,Math.abs(walkV)),'YXZ'); cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); }
-  W.renderer.render(S,cam); }
-return {testInfo:()=>{ const d=dig; if(!d) return null; const g=d.crea&&d.crea.group; return {depth:d.depth,k:d.k,stub:!!(d.crea&&d.crea.stub),gy:g&&g.position.y,surf:g&&patchY(g.position.x,g.position.z),hA:g&&hAt(g.position.x,g.position.z),maxD:Math.max(...d.D),found:d.found}; },testTake:()=>{ if(dig&&dig.crea){ dig.phase='dig'; dig.found=true; dig.ready=true; for(let i=0;i<dig.D.length;i++) dig.D[i]=Math.max(dig.D[i],0); takeOut(); return true; } return false; },showRoute:v=>{ route.visible=v; },testDig:k=>{ const s=signs.find(q=>q.k===k&&!q.done)||signs.find(q=>q.k); if(s) startDig(s); return !!s; },enter,exit,render,active:()=>on,low:h=>!!lowWin(h),nextLow,CR,SURF,ALL};
+  handTick(); W.renderer.render(S,cam); }
+return {handInfo:()=>({ready:hand.ready,vis:hand.grp.visible,pos:hand.grp.position.toArray().map(v=>+v.toFixed(2)),s:+hand.grp.scale.x.toFixed(3),cam:cam.position.toArray().map(v=>+v.toFixed(2))}),testInfo:()=>{ const d=dig; if(!d) return null; const g=d.crea&&d.crea.group; return {depth:d.depth,k:d.k,stub:!!(d.crea&&d.crea.stub),gy:g&&g.position.y,surf:g&&patchY(g.position.x,g.position.z),hA:g&&hAt(g.position.x,g.position.z),maxD:Math.max(...d.D),found:d.found}; },testTake:()=>{ if(dig&&dig.crea){ dig.phase='dig'; dig.found=true; dig.ready=true; for(let i=0;i<dig.D.length;i++) dig.D[i]=Math.max(dig.D[i],0); takeOut(); return true; } return false; },showRoute:v=>{ route.visible=v; },testDig:k=>{ const s=signs.find(q=>q.k===k&&!q.done)||signs.find(q=>q.k); if(s) startDig(s); return !!s; },enter,exit,render,active:()=>on,low:h=>!!lowWin(h),nextLow,CR,SURF,ALL};
 }
 /* ===== 第 1 段 · 遊戲邏輯、操作、介面、音效 ===== */
 function startGame(W, P){
