@@ -1,4 +1,4 @@
-/*APPV:20261029082202*/
+/*APPV:20261029083809*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5480,7 +5480,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029082202'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029083809'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6466,7 +6466,7 @@ function scrape3(p,spd,dir,dist){ const d=dig; if(!d||d.phase!=='dig') return; c
   const k=Math.min(1,dist/.012);  // 刮多少泥取決於拖動的距離，不是速度：慢慢刮也一樣挖得動
   brush(d,p.x,p.z,.065,.0062*k,info);   // 手掌把一層泥撥開（加快：一般 10～20 次來回就碰到）
   for(let t=0;t<4;t++){ const o=-.03+t*.02; brush(d,p.x+px*o,p.z+pz*o,.012,.009*k,info); }   // 四根手指各劃出一道溝
-  d.dirty=true; d.removed+=info.moved; rakeMud=Math.min(1,rakeMud+info.moved*6);
+  d.dirty=true; d.removed+=info.moved; { const H=d.useL?handL:hand; H.mud=Math.min(1,(H.mud||0)+info.moved*4); } rakeMud=Math.min(1,rakeMud+info.moved*6);
   if(info.moved>.0004) spawnMud(p.clone().setY(patchY(p.x,p.z)+.006),dir,Math.min(5,1+Math.round(info.moved*300)),info.layer>0);
   const now=performance.now(); if(now-d.lastSnd>90&&info.moved>.0002){ d.lastSnd=now; LAYER[info.layer].snd(); vib(LAYER[info.layer].vib); }
   if(info.touch&&d.cr){ d.touchT=0; d.poke=Math.min(1,(d.poke||0)+.35); if(!d.found){ d.found=true; tut('found'); if(d.mud){ vib(25); noise(.07,500,3,.22); } else { vib([30,40,30]); noise(.05,1600,8,.25); } $('digInfo').innerHTML=d.cr.soft?'碰到軟軟的東西了<br><small>輕一點，把周圍的泥撥開</small>':'喀！手指碰到硬硬的東西了<br><small>放慢速度（看下面的力道條），沿著周圍把泥清掉</small>'; }
@@ -6576,13 +6576,13 @@ window.addEventListener('pointerup',()=>{ if(dig) { if(dig.ptr&&dig.ptr.p&&dig.p
    ・拖過有蛤的地方（痕跡附近）會「喀啦」一聲、手機震一下，表示有東西進籠子了
    ・籠子滿了（或你想洗了）走到低窪有水的地方，左右快速滑動搖晃，泥沙被水沖掉，籠裡的收穫露出來，倒進桶子 */
 const cage={on:false,fill:0,items:[],dist:0,g:new T.Group(),wash:0,shake:0,trail:[]};
-{ const iron=new T.MeshStandardMaterial({color:0x5d5b57,metalness:.8,roughness:.4}), wood=new T.MeshStandardMaterial({color:0x8d6e47,roughness:.7});
+{ const iron=new T.MeshStandardMaterial({color:0x8f8d88,metalness:.75,roughness:.35}), wood=new T.MeshStandardMaterial({color:0x8d6e47,roughness:.7});
   const net=new T.MeshStandardMaterial({color:0x4a4a46,metalness:.5,roughness:.5,wireframe:true});
   const W2=.42,H2=.2,D2=.32, fr=[[-W2/2,0,0,W2/2,0,0],[-W2/2,H2,0,W2/2,H2,0],[-W2/2,0,0,-W2/2,H2,0],[W2/2,0,0,W2/2,H2,0],[-W2/2,H2,0,-W2/2,H2*.7,D2],[W2/2,H2,0,W2/2,H2*.7,D2],[-W2/2,0,0,-W2/2,0,D2],[W2/2,0,0,W2/2,0,D2],[-W2/2,0,D2,W2/2,0,D2],[-W2/2,H2*.7,D2,W2/2,H2*.7,D2]];
   fr.forEach(([a,b,c2,d,e,f])=>{ const v1=new T.Vector3(a,b,c2), v2=new T.Vector3(d,e,f), L=v1.distanceTo(v2), m=new T.Mesh(new T.CylinderGeometry(.006,.006,L,6),iron); m.position.copy(v1).add(v2).multiplyScalar(.5); m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),v2.clone().sub(v1).normalize()); cage.g.add(m); });
   for(let i=0;i<12;i++){ const t=new T.Mesh(new T.CylinderGeometry(.003,.002,.07,5),iron); t.position.set(-W2/2+.02+i*(W2-.04)/11,-.03,-.01); t.rotation.x=-.5; cage.g.add(t); }   // 前緣一排插進泥裡的鐵齒
   // 籠底與籠背：一根根實心鋼條（間距約 1.5 公分，泥沙漏得出去、蛤留在裡面），不是線框
-  const rodG=new T.CylinderGeometry(.0028,.0028,1,6), NR=60, rods=new T.InstancedMesh(rodG,iron,NR); let ri=0; const M4=new T.Matrix4(), Q=new T.Quaternion(), Vp=new T.Vector3(), Vs=new T.Vector3(), upV=new T.Vector3(0,1,0);
+  const rodG=new T.CylinderGeometry(.0042,.0042,1,6), NR=60, rods=new T.InstancedMesh(rodG,iron,NR); let ri=0; const M4=new T.Matrix4(), Q=new T.Quaternion(), Vp=new T.Vector3(), Vs=new T.Vector3(), upV=new T.Vector3(0,1,0);
   const rod=(a,b)=>{ const L=a.distanceTo(b); Q.setFromUnitVectors(upV,Vp.subVectors(b,a).normalize()); M4.compose(Vp.addVectors(a,b).multiplyScalar(.5),Q,Vs.set(1,L,1)); rods.setMatrixAt(ri++,M4); };
   for(let i=0;i<27;i++){ const x=-W2/2+.015+i*(W2-.03)/26; rod(new T.Vector3(x,.004,0),new T.Vector3(x,.004,D2)); }   // 底部縱向鋼條
   for(let i=0;i<4;i++){ const z=.03+i*(D2-.06)/3; rod(new T.Vector3(-W2/2,.008,z),new T.Vector3(W2/2,.008,z)); }       // 底部橫向補強
@@ -6620,7 +6620,7 @@ function cageTick(dt){ if(!cage.on) return; pitch+=(-.5-pitch)*Math.min(1,dt*3);
   if(cage.wash>0){ cage.sand.scale.y=Math.max(.002,(1-cage.wash)*(.004+cage.fill*.12)); if(Math.random()<dt*10) squirt(cage.g.position.clone().add(vS.set(rand(-.15,.15),.05,rand(-.1,.1))),.6,3); } }
 // 淘洗：左右快速滑動
 let lastSX=null, lastDir=0;
-window.addEventListener('pointermove',e=>{ if(!cage.on||!(cage.wash>0)||cage.wash>=1) return; if(lastSX===null){ lastSX=e.clientX; return; } const dx=e.clientX-lastSX; if(Math.abs(dx)>25){ const d=Math.sign(dx); if(d!==lastDir){ lastDir=d; cage.wash=Math.min(1,cage.wash+.09); cage.shake+=1.4; noise(.15,500,1.5,.12); vib(12); cageUI();
+window.addEventListener('pointermove',e=>{ if(!cage.on||!(cage.wash>0)||cage.wash>=1) return; if(lastSX===null){ lastSX=e.clientX; return; } const dx=e.clientX-lastSX; if(Math.abs(dx)>25){ const d=Math.sign(dx); if(d!==lastDir){ lastDir=d; cage.wash=Math.min(1,cage.wash+.09); hand.mud=Math.max(0,(hand.mud||0)-.04); handL.mud=Math.max(0,(handL.mud||0)-.04); cage.shake+=1.4; noise(.15,500,1.5,.12); vib(12); cageUI();
       if(cage.wash>=1) cageReveal(); } lastSX=e.clientX; } });
 window.addEventListener('pointerup',()=>{ lastSX=null; });
 function cageReveal(){ cage.inside.clear(); cage.sand.visible=false; const shown=cage.items.slice(0,14);
@@ -6643,8 +6643,8 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/arms.glb',g=>{ for(const h of [
   o.traverse(b=>{ if(!b.isBone) return; const n=b.name; if(n.indexOf(sd+'_wrist')===0) wrist=b; if(n.indexOf(sd+'_arm')===0) root=b; if(n.indexOf(sd+'_palm')===0) palm=b; if(n.indexOf(os+'_arm')===0) other=b;
     const m=n.match(new RegExp('^'+sd+'_(point|middle|ring|pink)([123])')); if(m) h.fing.push({b,k:[.7,1,.8][+m[2]-1],x0:b.rotation.x}); const th=n.match(new RegExp('^'+sd+'_thumb([123])')); if(th) h.fing.push({b,k:[.45,.6,.5][+th[1]-1],x0:b.rotation.x}); });
   if(!wrist||!root) continue; if(other) other.scale.setScalar(1e-4);
-  o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.3; mm.roughness=.95; mm.metalness=0; }); } });
-  h.grp.add(o); h.grp.updateMatrixWorld(true); const wl=new T.Vector3().setFromMatrixPosition(wrist.matrixWorld), rl=new T.Vector3().setFromMatrixPosition(root.matrixWorld);
+  o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ m.material=(Array.isArray(m.material)?m.material:[m.material]).map(mm=>{ const c2=mm.clone(); c2.envMapIntensity=.3; c2.roughness=.95; c2.metalness=0; h.mats=(h.mats||[]).concat(c2); return c2; }); if(m.material.length===1) m.material=m.material[0]; } });   // 每隻手自己的材質（才能各自沾泥）
+  h.mud=0; h.grp.add(o); h.grp.updateMatrixWorld(true); const wl=new T.Vector3().setFromMatrixPosition(wrist.matrixWorld), rl=new T.Vector3().setFromMatrixPosition(root.matrixWorld);
   h.pl=palm?new T.Vector3().setFromMatrixPosition(palm.matrixWorld):wl.clone(); h.ld=new T.Vector3().subVectors(wl,rl); h.L0=h.ld.length(); h.ld.normalize(); h.ready=true; } });
 hand.grp.visible=false; handL.grp.visible=false; S.add(hand.grp); S.add(handL.grp);
 const hq=new T.Quaternion(), hq2=new T.Quaternion(), hsh=new T.Vector3(), hwd=new T.Vector3(), hup=new T.Vector3(), hupW=new T.Vector3(), htmp=new T.Vector3(), hcq=new T.Quaternion();
@@ -6655,7 +6655,8 @@ function handTo(tg,grip,sx,sy,sz,cap,H){ H=H||hand; sx=sx??.2; sy=sy??-.62; sz=s
   const roll=Math.atan2(htmp.crossVectors(hup,hupW).dot(hwd),hup.dot(hupW))+(H.side==='R'?-.35:.35); hq2.setFromAxisAngle(hwd,roll); hq.premultiply(hq2);
   const s=Math.min(cap,hsh.distanceTo(tg)*1.02)/H.L0; H.grp.scale.setScalar(s); H.grp.quaternion.copy(hq);
   hup.set(0,1,0).applyQuaternion(hq); H.grp.position.copy(tg).sub(htmp.copy(H.pl).multiplyScalar(s).applyQuaternion(hq)).addScaledVector(hup,.016);
-  H.fing.forEach(f=>{ f.b.rotation.x=f.x0-grip*f.k; }); }
+  H.fing.forEach(f=>{ f.b.rotation.x=f.x0-grip*f.k; });
+  if(H.mats&&Math.abs((H.mudShown||0)-H.mud)>.01){ H.mudShown=H.mud; const k=Math.min(.7,H.mud*.7); H.mats.forEach(m=>{ m.color.setRGB(1-k*.55,1-k*.62,1-k*.7); m.roughness=.95-.5*k; }); } }   // 手套越挖越沾泥：變成濕濕的泥褐色、帶一點水光
 
 const gripW=new T.Vector3();
 const handCur=new T.Vector3(), handGoal=new T.Vector3(); let scoop=0, flick=0;
@@ -6710,7 +6711,7 @@ const TUT=[
   ['done','<b>⑥ 取出</b><br>露出來就按「✋ 取出」，再選帶回家烤、帶回家養、賣掉或放回去。<br><small>同一窩通常不只一個，把洞往周圍挖大還有。</small>']];
 function tutShow(){ if(!on||tutStep>=TUT.length){ coach.style.display='none'; return; } coach.innerHTML=TUT[tutStep][1]+'<button id="tdCoachX">略過教學</button>'; coach.style.display='block';
   $('tdCoachX').onclick=()=>{ tutStep=TUT.length; localStorage.setItem(TUT_K,tutStep); tutShow(); }; }
-function tut(ev){ if(tutStep>=TUT.length) return; if(TUT[tutStep][0]===ev){ tutStep++; localStorage.setItem(TUT_K,tutStep); vib(10); setTimeout(tutShow,250); } }
+function tut(ev){ if(tutStep>=TUT.length) return; const i=TUT.findIndex(t=>t[0]===ev); if(i>=tutStep){ tutStep=i+1; localStorage.setItem(TUT_K,tutStep); vib(10); setTimeout(tutShow,250); } }   // 玩家跳過某步（例如沒跺腳就直接挖）也會跟上目前的進度
 $('tdCageB').onclick=()=>{ if(cage.on) cageOff(); else cageOn(); };
 // 跺腳：附近 5 公尺內埋著的貝類受到震動，縮回水管、噴出一道水（真實挖蛤的人就是這樣找的）
 $('tdStomp').onclick=()=>{ if(!on||dig) return;
