@@ -240,8 +240,49 @@ function razorModel(){ if(!shellTex.razor){ const t=new T.TextureLoader().load('
   const foot=new T.Mesh(new T.SphereGeometry(.5,12,8),new T.MeshStandardMaterial({color:0xefe2cf,roughness:.55})); foot.scale.set(.14,.1,.12); foot.position.x=-.5; body.add(foot);   // 白色的斧足
   const uni={uSwim:{value:0},uAmp:{value:0}}; top.onBeforeRender=()=>{ const k=Math.min(1,uni.uAmp.value*5); foot.scale.x=.08+.12*k*(.5+.5*Math.sin(uni.uSwim.value*2)); foot.position.x=-.5-foot.scale.x*.4; };
   return {group,uni,shell:true}; }
-const creaModel=sp=>SHELLS.has(sp.id)?shellModel(sp.id):sp.id==='razor'?razorModel():window.__MDL.fish(sp);
-const creaReady=id=>SHELLS.has(id)||id==='razor'||!!(window.__MDL&&window.__MDL.fishReady(id));
+/* ---------- 螃蟹（程式組裝）：背甲、眼柄、8 隻三節腳、一對螯，各部位貼使用者提供的實拍分件照片 ----------
+   每隻腳都有髖、膝、腳尖三個關節，走路時左右交替抬腳；招潮蟹雄蟹的大螯會舉起來揮 */
+const CRAB_TEX={}, crabTex=f=>{ if(!CRAB_TEX[f]){ const t=new T.TextureLoader().load('models/tide/crab/'+f+'.webp'); t.encoding=T.sRGBEncoding; t.anisotropy=8; CRAB_TEX[f]=t; } return CRAB_TEX[f]; };
+const CRAB_DEF={ghostcrab:{cara:'ghost_cara',leg:'ghost_leg',clawR:'ghost_claw',clawL:'ghost_claw',cl:.86,cw:1,ch:.26,legL:1.25,clawRS:.62,clawLS:.62,eye:.34,eyeTall:1},
+  fiddler:{cara:'fid_cara',leg:'fid_leg',clawR:'fid_major',clawL:'fid_minor',cl:.72,cw:1,ch:.22,legL:1.05,clawRS:1.35,clawLS:.42,eye:.4,eyeTall:.85,wave:1}};
+function partMat(f){ return new T.MeshStandardMaterial({map:crabTex(f),alphaTest:.45,side:T.DoubleSide,roughness:.55,metalness:0}); }
+// 一段腳／螯：照片中某一段（u0～u1）貼在十字交叉的兩片上（從上面、側面看都有形狀）
+function seg(f,u0,u1,len,thick){ const g=new T.Group(), mat=partMat(f);
+  const mk=(rx)=>{ const pg=new T.PlaneGeometry(len,thick); const uv=pg.attributes.uv; for(let i=0;i<uv.count;i++) uv.setX(i,u0+(u1-u0)*uv.getX(i)); pg.translate(len/2,0,0); const m=new T.Mesh(pg,mat); m.rotation.x=rx; return m; };
+  g.add(mk(0)); g.add(mk(Math.PI/2)); return g; }
+function crabModel(id){ const D=CRAB_DEF[id], group=new T.Group(), body=new T.Group(); group.add(body);
+  // 背甲：拱起的殼，殼面照片從正上方投影；照片上方＝前（+X）
+  const cg=new T.SphereGeometry(.5,40,16,0,Math.PI*2,0,Math.PI/2), P=cg.attributes.position, uv=cg.attributes.uv;
+  for(let i=0;i<P.count;i++){ const x=P.getX(i)*D.cl, y=P.getY(i)*D.ch*2, z=P.getZ(i)*D.cw; P.setXYZ(i,x,y,z); uv.setXY(i,.5-z/D.cw,.5+x/D.cl); }
+  cg.computeVertexNormals(); const cara=new T.Mesh(cg,partMat(D.cara)); cara.position.y=.16; body.add(cara);
+  const belly=new T.Mesh(new T.CircleGeometry(.5,24).rotateX(Math.PI/2),new T.MeshStandardMaterial({color:0xd9cbb0,roughness:.7})); belly.scale.set(D.cl*.92,1,D.cw*.92); belly.position.y=.15; body.add(belly);
+  // 眼柄＋眼睛
+  const eyeM=new T.MeshStandardMaterial({color:0x111111,roughness:.15}), stalkM=new T.MeshStandardMaterial({color:id==='fiddler'?0xc8b48a:0xe0cfa8,roughness:.6});
+  for(const s of [-1,1]){ const st=new T.Mesh(new T.CylinderGeometry(.022,.028,D.eye,8),stalkM); st.position.set(D.cl*.44,.2+D.eye*.42*D.eyeTall,s*.13); st.rotation.z=-.25; st.rotation.x=s*.12; body.add(st);
+    const e=new T.Mesh(new T.SphereGeometry(.045,12,8),eyeM); e.scale.set(1,1.5,1); e.position.set(D.cl*.44+.04,.2+D.eye*.9*D.eyeTall,s*.15); body.add(e); }
+  // 8 隻腳：左右各 4，沿殼的側緣從前到後排開，向外張開
+  const legs=[], L=D.legL;
+  for(const s of [-1,1]) for(let i=0;i<4;i++){ const hip=new T.Group(); const ax=D.cl*(.22-i*.17); hip.position.set(ax,.13,s*D.cw*.44); hip.rotation.y=-s*(Math.PI/2)+s*(i-1.5)*.32;
+    const thigh=seg(D.leg,.06,.45,L*.42,.13*L); thigh.rotation.z=.5; hip.add(thigh);   // 大腿往上抬
+    const knee=new T.Group(); knee.position.x=L*.42; thigh.add(knee); const shin=seg(D.leg,.45,.8,L*.34,.11*L); shin.rotation.z=-1.25; knee.add(shin);   // 小腿往下彎
+    const ank=new T.Group(); ank.position.x=L*.34; shin.add(ank); const tip=seg(D.leg,.8,1,L*.24,.09*L); tip.rotation.z=-.45; ank.add(tip);
+    if(s<0) hip.scale.z=-1; body.add(hip); legs.push({hip,thigh,shin,tip,s,i,y0:hip.rotation.y}); }
+  // 一對螯（右邊大、左邊小；沙蟹兩邊一樣）
+  const claws=[];
+  for(const s of [-1,1]){ const f=s>0?D.clawR:D.clawL, sc=s>0?D.clawRS:D.clawLS, root=new T.Group(); root.position.set(D.cl*.4,.12,s*D.cw*.26); root.rotation.y=s*.55;
+    const arm=seg(f,0,.35,.42*sc,.2*sc), hand=seg(f,.35,1,.78*sc,.36*sc); arm.rotation.z=.35; root.add(arm); const wr=new T.Group(); wr.position.x=.42*sc; arm.add(wr); hand.rotation.z=-.55; hand.rotation.y=-s*1.2; wr.add(hand);
+    body.add(root); claws.push({root,arm,hand,s,big:sc>1}); }
+  // 正規化：整體長度約 1（跟其他生物模型一樣的尺寸慣例）
+  body.scale.setScalar(.8);
+  const uni={uSwim:{value:0},uAmp:{value:0}};
+  cara.onBeforeRender=()=>{ const ph=uni.uSwim.value, a=Math.min(1,uni.uAmp.value*4);
+    legs.forEach(l=>{ const p=ph*1.6+(l.i%2?Math.PI:0)+(l.s>0?Math.PI/2:0), up=Math.max(0,Math.sin(p));   // 左右交替、前後錯開
+      l.hip.rotation.y=l.y0+Math.sin(p)*.28*a*l.s; l.thigh.rotation.z=.5+up*.45*a; l.shin.rotation.z=-1.25-up*.2*a; });
+    claws.forEach(c2=>{ if(D.wave&&c2.big){ const w=Math.sin(ph*.35)>.6?Math.sin(ph*3)*.5+.5:0; c2.arm.rotation.z=.35+w*.9; } else c2.arm.rotation.z=.35+Math.sin(ph*.8+c2.s)*.08*a; });
+    body.position.y=Math.abs(Math.sin(ph*1.6))*.01*a; };
+  return {group,uni,crab:true}; }
+const creaModel=sp=>SHELLS.has(sp.id)?shellModel(sp.id):sp.id==='razor'?razorModel():CRAB_DEF[sp.id]?crabModel(sp.id):window.__MDL.fish(sp);
+const creaReady=id=>SHELLS.has(id)||id==='razor'||!!CRAB_DEF[id]||!!(window.__MDL&&window.__MDL.fishReady(id));
 /* ---------- 挖掘（3D 實景）：蹲下來，用蛤耙在真的泥面上挖出一個洞 ----------
    ・點痕跡 → 鏡頭蹲低看著那塊泥面，先判斷要不要挖（顯示痕跡的線索），按「開挖」才開始
    ・手指在泥面上拖：蛤耙的齒跟著手指刮過，泥面真的被挖低（高解析度地形即時變形），挖出的泥堆在洞邊、泥塊噴起落下
