@@ -398,7 +398,7 @@ function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classLi
 </script>
 <script>
 /* 主程式載入器：先試 CDN（快），檢查版本號一致才執行；不一致或失敗就改從本站下載。依序執行兩個檔案 */
-(function(){ var V='20261029230131', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@f88bf99d6dc737132d0b71acfa5d741a78eca2de/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
+(function(){ var V='20261029233128', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
   var note=function(t){ var e=document.getElementById('loadTip'); if(e&&t) e.textContent=t; };
   function run(code){ var b=new Blob([code],{type:'text/javascript'}), s=document.createElement('script'); s.src=URL.createObjectURL(b); return new Promise(function(ok){ s.onload=ok; s.onerror=ok; document.body.appendChild(s); }); }
   function get(u){ return fetch(u,{cache:'no-cache'}).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }); }
