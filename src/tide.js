@@ -286,8 +286,10 @@ function hermitModel(){ const group=new T.Group(), body=new T.Group(); group.add
   // 螺殼：沿 X 軸旋轉出來的殼形，殼口（大）在前、螺塔（尖）在後，表面有一圈圈起伏的螺肋
   const prof=[]; for(let i=0;i<=40;i++){ const t=i/40, r=(.34*Math.pow(1-t,.85)+.015)*(1+.08*Math.sin(t*44)); prof.push(new T.Vector2(Math.max(.004,r),t)); }
   const sg=new T.LatheGeometry(prof,36); sg.rotateZ(Math.PI/2); sg.translate(.1,0,0);   // 現在殼軸沿 -X：x=.1 是殼口，x=-.9 是螺塔
-  const P=sg.attributes.position, uv=sg.attributes.uv; for(let i=0;i<P.count;i++){ const x=P.getX(i), y=P.getY(i); uv.setXY(i,(.1-x)/1.0*.95+.02,.5+y/.8); }
-  sg.computeVertexNormals(); const shell=new T.Mesh(sg,new T.MeshStandardMaterial({map:crabTex('her_shell'),roughness:.5,side:T.DoubleSide})); shell.position.y=.22; body.add(shell);
+  const P=sg.attributes.position, uv=sg.attributes.uv; for(let i=0;i<P.count;i++){ const x=P.getX(i), y=P.getY(i); uv.setXY(i,.3+(.1-x)/1.0*.62,.5+y/.34*.3); }   // 只取照片中螺殼外表的部分（避開殼口與透明邊緣，原本取到透明處變成黑色破圖）
+  sg.computeVertexNormals(); const shell=new T.Mesh(sg,new T.MeshStandardMaterial({map:crabTex('her_shell'),roughness:.5,side:T.FrontSide})); shell.position.y=.22; body.add(shell);
+  const inner=new T.Mesh(sg,new T.MeshStandardMaterial({color:0xefe2d4,roughness:.2,metalness:.1,side:T.BackSide})); inner.position.y=.22; body.add(inner);   // 殼內側是珍珠白，從殼口看進去不會是黑的
+  const cap=new T.Mesh(new T.CircleGeometry(.31,24),new T.MeshStandardMaterial({color:0x5a3424,roughness:.7})); cap.rotation.y=Math.PI/2; cap.position.set(.06,.22,0); body.add(cap);   // 殼口深處：蟹身的暗紅色（不是透空）
   const lip=new T.Mesh(new T.TorusGeometry(.33,.03,8,28),new T.MeshStandardMaterial({color:0xf2e6d8,roughness:.25})); lip.rotation.y=Math.PI/2; lip.position.set(.1,.22,0); body.add(lip);   // 殼口珍珠白的邊
   // 從殼口探出來的前半身（眼柄、觸角、大小螯都在這張照片上）
   const fr=new T.Group(); fr.position.set(.12,.2,0); body.add(fr);

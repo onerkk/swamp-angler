@@ -1,4 +1,4 @@
-/*APPV:20261029114137*/
+/*APPV:20261029115250*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5498,7 +5498,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029114137'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029115250'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6423,8 +6423,10 @@ function hermitModel(){ const group=new T.Group(), body=new T.Group(); group.add
   // 螺殼：沿 X 軸旋轉出來的殼形，殼口（大）在前、螺塔（尖）在後，表面有一圈圈起伏的螺肋
   const prof=[]; for(let i=0;i<=40;i++){ const t=i/40, r=(.34*Math.pow(1-t,.85)+.015)*(1+.08*Math.sin(t*44)); prof.push(new T.Vector2(Math.max(.004,r),t)); }
   const sg=new T.LatheGeometry(prof,36); sg.rotateZ(Math.PI/2); sg.translate(.1,0,0);   // 現在殼軸沿 -X：x=.1 是殼口，x=-.9 是螺塔
-  const P=sg.attributes.position, uv=sg.attributes.uv; for(let i=0;i<P.count;i++){ const x=P.getX(i), y=P.getY(i); uv.setXY(i,(.1-x)/1.0*.95+.02,.5+y/.8); }
-  sg.computeVertexNormals(); const shell=new T.Mesh(sg,new T.MeshStandardMaterial({map:crabTex('her_shell'),roughness:.5,side:T.DoubleSide})); shell.position.y=.22; body.add(shell);
+  const P=sg.attributes.position, uv=sg.attributes.uv; for(let i=0;i<P.count;i++){ const x=P.getX(i), y=P.getY(i); uv.setXY(i,.3+(.1-x)/1.0*.62,.5+y/.34*.3); }   // 只取照片中螺殼外表的部分（避開殼口與透明邊緣，原本取到透明處變成黑色破圖）
+  sg.computeVertexNormals(); const shell=new T.Mesh(sg,new T.MeshStandardMaterial({map:crabTex('her_shell'),roughness:.5,side:T.FrontSide})); shell.position.y=.22; body.add(shell);
+  const inner=new T.Mesh(sg,new T.MeshStandardMaterial({color:0xefe2d4,roughness:.2,metalness:.1,side:T.BackSide})); inner.position.y=.22; body.add(inner);   // 殼內側是珍珠白，從殼口看進去不會是黑的
+  const cap=new T.Mesh(new T.CircleGeometry(.31,24),new T.MeshStandardMaterial({color:0x5a3424,roughness:.7})); cap.rotation.y=Math.PI/2; cap.position.set(.06,.22,0); body.add(cap);   // 殼口深處：蟹身的暗紅色（不是透空）
   const lip=new T.Mesh(new T.TorusGeometry(.33,.03,8,28),new T.MeshStandardMaterial({color:0xf2e6d8,roughness:.25})); lip.rotation.y=Math.PI/2; lip.position.set(.1,.22,0); body.add(lip);   // 殼口珍珠白的邊
   // 從殼口探出來的前半身（眼柄、觸角、大小螯都在這張照片上）
   const fr=new T.Group(); fr.position.set(.12,.2,0); body.add(fr);
