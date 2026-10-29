@@ -436,6 +436,9 @@ function digLim(){ const d=dig; return d&&d.cr?(d.cr.fragile?.8:d.cr.soft?.95:1.
 function spdShow(v){ const b=spdEl.querySelector('b'), lim=digLim(), f=Math.min(1,v/(lim*1.4)); b.style.width=(f*100)+'%'; b.style.background=v<lim*.7?'#5fd38a':v<lim?'#f4c542':'#ff5b4a'; }
 window.addEventListener('pointermove',e=>{ if(!dig||dig.phase!=='dig') return; const p=digPoint(e); if(!p) return;
   rake.visible=false; dig.handP=p.clone().setY(patchY(p.x,p.z)+.025); scoop=Math.min(1,scoop+.25);
+  { const ld=dig.lastDir; if(dig.ptr&&dig.ptr.p){ const nd=vS.subVectors(p,dig.ptr.p); if(nd.lengthSq()>1e-6){ nd.normalize(); if(ld&&ld.dot(nd)<-.3&&flick<.2&&dig.removed>.002){   // 換方向：把手裡那把泥甩到洞外
+          flick=1; scoop=0; const out=vS.set(Math.cos(yaw),.0,-Math.sin(yaw)).clone(); spawnMud(p.clone().setY(patchY(p.x,p.z)+.02),out,6,true); noise(.09,380,2,.12); vib(8); }
+        dig.lastDir=(dig.lastDir||new T.Vector3()).copy(nd); } } }
   if(!dig.ptr||!dig.ptr.p){ if(dig.ptr) dig.ptr.p=p; return; }
   const now=performance.now(), dt=Math.max(8,now-dig.ptr.t)/1000, dist=p.distanceTo(dig.ptr.p), raw=Math.min(3,dist/dt); spdS+=(raw-spdS)*.18; spdShow(spdS);   // 真實速度（公尺／秒），平滑過
   if(dist<.002) return; const dir=vS.subVectors(p,dig.ptr.p).normalize().clone(); const steps=Math.max(1,Math.ceil(dist/.008));
@@ -531,9 +534,9 @@ function handTo(tg,grip,sx,sy,sz,cap){ sx=sx??.2; sy=sy??-.62; sz=sz??.18; cap=c
 const gripW=new T.Vector3();
 const handCur=new T.Vector3(), handGoal=new T.Vector3(); let scoop=0, flick=0;
 function handTick(){ if(dig&&(dig.phase==='dig'||dig.phase==='ask'&&false)&&dig.c){ const d=dig, fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw);
-    if(d.ptr&&d.handP){ handGoal.copy(d.handP); handGoal.y-=.012*Math.min(1,scoop); }   // 手指插進泥裡往後撥
+    if(d.ptr&&d.handP&&!d.ready){ handGoal.copy(d.handP); handGoal.y-=.016*Math.min(1,scoop); handGoal.y+=.05*flick*flick; }   // 拖的時候手指插進泥裡往後扒；換方向時手往上一抬（把泥撈出來）
     else { const x=d.c.x+rx*.24-fx*.14, z=d.c.z+rz*.24-fz*.14; handGoal.set(x,patchY(x,z)+.06+.04*flick,z); }   // 沒在撥：手退到右邊，不擋住洞   // 沒在撥：手停在洞的右前方邊緣
-    if(!handCur.lengthSq()) handCur.copy(handGoal); handCur.lerp(handGoal,.35); flick=Math.max(0,flick-.06);
+    if(!handCur.lengthSq()) handCur.copy(handGoal); handCur.lerp(handGoal,.35); flick=Math.max(0,flick-.045);
     handTo(handCur,d.ptr?.55+.35*Math.min(1,spdS):.25,.3,-.26,.06,.36); return; }   /* 肩膀在畫面右下外側：只有手和前臂從右邊伸進來 */   /* 徒手挖：手指半彎像在撥泥，撥得越快握得越緊 */
   else if(false){ rake.updateMatrixWorld(true); const hm=rake.children.find(m=>m.geometry&&m.geometry.parameters&&m.geometry.parameters.height===.3); if(hm){ gripW.set(0,.13,0); hm.localToWorld(gripW); handTo(gripW,.95,.34,-.36,.42,.4); }   /* 跪著挖時鏡頭很近：手從右下角伸進來、比例縮小，不擋住洞 */ else hand.grp.visible=false; }   // 握住手耙木柄的尾端
   else if(cage.on){ cage.g.updateMatrixWorld(); const pole=cage.g.children.find(m=>m.geometry&&m.geometry.parameters&&m.geometry.parameters.height===1.5); if(pole){ gripW.set(0,-.2,0); pole.localToWorld(gripW); handTo(gripW,.9); } else hand.grp.visible=false; }
