@@ -396,7 +396,7 @@ function buildTank(water,spec,x){
 
 // 把水族箱裡記錄的魚做成會游的模型（用遊戲同一個魚模型，按實際體長縮放）
 function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null;
-  if(window.__TIDE&&window.__TIDE.makeModel&&['hardclam','gomphina','tellin','razor'].includes(rec.id)){ const m=window.__TIDE.makeModel(rec.id); if(m){ m.group.userData.uni=m.uni; return m.group; } }   // 貝類用兩片真殼的模型
+  if(window.__TIDE&&window.__TIDE.makeModel&&BENTHIC[rec.id]){ const m=window.__TIDE.makeModel(rec.id); if(m){ m.group.userData.uni=m.uni; return m.group; } }   // 貝類用兩片真殼的模型
   const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
   src.traverse(o=>{ o.visible=true; o.frustumCulled=false; if(o.isMesh&&o.material){ const mats=Array.isArray(o.material)?o.material:[o.material];
       const nm=mats.map(m=>{ const k=m.clone(); k.onBeforeCompile=()=>{}; k.customProgramCacheKey=()=>'tank'; const see=m.transparent&&m.opacity<.95; k.transparent=see; k.opacity=see?m.opacity:1; k.depthWrite=!see; k.needsUpdate=true; return k; });   // 半透明的幽靈魚保持半透明
@@ -454,7 +454,8 @@ const tv=new T.Vector3();
 // 底棲生物：貝類躺在沙上不動（偶爾微微張殼）、竹蟶半埋直立、螃蟹在缸底橫著走、沙蠶在沙上爬、彈塗魚趴著偶爾一跳——不會像魚一樣在水中游
 const BENTHIC={hardclam:'shell',gomphina:'shell',tellin:'shell',razor:'razor',ghostcrab:'crab',fiddler:'crab',hermit:'crab',ragworm:'worm',mudskip:'skip'};
 function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.rec.L), sc=o.scale.x, u=f.uni||{}; f.t=(f.t||0)+dt;
-  if(!f.bInit){ f.bInit=1; f.yaw=Math.random()*6.28; o.rotation.set(0,f.yaw,0); f.bt=0; }
+  if(!f.bInit){ f.bInit=1; f.yaw=Math.random()*6.28; o.rotation.set(0,f.yaw,0); f.bt=0; o.scale.multiplyScalar(1.6);
+    o.position.x=b.x0+Math.random()*(b.x1-b.x0); o.position.z=(Math.random()-.5)*tk.spec.d*.6; f.wait=Math.random()*3; }   // 一開始散在缸底各處（原本全疊在同一點），畫面上放大一點
   const floorY=(x,z)=>tk.y+tk.hAt(x,z);
   if(kind==='shell'){ o.position.y=floorY(o.position.x,o.position.z)+sc*.05; o.rotation.set(0,f.yaw,0); if(u.uAmp){ u.uAmp.value=Math.max(0,Math.sin(f.t*.25+f.ph))*.12; u.uSwim.value+=dt*.5; } return; }
   if(kind==='razor'){ o.position.y=floorY(o.position.x,o.position.z)+sc*.18; o.rotation.set(0,f.yaw,Math.PI/2); return; }
@@ -466,7 +467,7 @@ function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.re
       else { let dy=head-f.yaw; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2; f.yaw+=dy*Math.min(1,dt*2); }
       o.position.x+=dx/dd*sp*dt; o.position.z+=dz/dd*sp*dt; if(u.uAmp){ u.uAmp.value=kind==='crab'?.18:kind==='worm'?.15:.06; u.uSwim.value+=dt*(kind==='crab'?10:6); } } }
   let hop=0; if(kind==='skip'){ f.hp=(f.hp||0)-dt; if(f.hp<=0&&Math.random()<dt*.3){ f.hp=.5; } if(f.hp>0) hop=Math.sin((1-f.hp/.5)*Math.PI)*.04; }
-  o.position.y=floorY(o.position.x,o.position.z)+sc*(kind==='crab'?.12:.06)+hop; o.rotation.set(0,f.yaw,0); }
+  o.position.y=floorY(o.position.x,o.position.z)+(kind==='crab'?0:sc*.02)+hop; o.rotation.set(0,f.yaw,0); }   /* 貼著缸底，不浮在水中 */
 function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
   tk.plants.forEach(p=>{ p.o.rotation.z=Math.sin(t*1.2+p.ph)*.06; p.o.rotation.x=Math.sin(t*.9+p.ph)*.04; });
   causList.forEach(c2=>{ c2.m.map.offset.set(t*.012,t*.009); c2.m.map.repeat.set(c2.s*1.6,1.2); });
