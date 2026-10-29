@@ -1,4 +1,4 @@
-/*APPV:20261029072316*/
+/*APPV:20261029073119*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5480,7 +5480,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029072316'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029073119'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6402,7 +6402,7 @@ function jetTick(dt){ for(let i=jets.length-1;i>=0;i--){ const j=jets[i]; j.t+=d
     if(j.t>.2&&!j.spray){ j.spray=1; for(let n=0;n<16;n++){ const w=drops.find(q=>q.a<=0); if(!w) break; w.a=1.2; w.p.copy(j.p).setY(j.p.y+j.h*.9); w.v.set(rand(-.5,.5),rand(.2,.9),rand(-.5,.5)); w.s=rand(.006,.012); } }
     if(j.t>.75){ S.remove(j.m); jets.splice(i,1); } } }
 // 水滴：文蛤受驚噴水、取出時滴水
-const WN=70, wIM=new T.InstancedMesh(new T.SphereGeometry(1,6,4),new T.MeshStandardMaterial({color:0x8a9497,roughness:.04,metalness:.5,transparent:true,opacity:.55,envMapIntensity:.6}),WN); wIM.frustumCulled=false; S.add(wIM); const drops=[];
+const WN=70, wIM=new T.InstancedMesh(new T.SphereGeometry(1,6,4),new T.MeshStandardMaterial({color:0x8a9497,roughness:.04,metalness:.5,transparent:true,opacity:.32,envMapIntensity:.6,depthWrite:false}),WN); wIM.frustumCulled=false; S.add(wIM); const drops=[];
 for(let i=0;i<WN;i++) drops.push({a:0,p:new T.Vector3(),v:new T.Vector3(),s:0});
 function squirt(p,up,n){ for(let i=0;i<n;i++){ const w=drops.find(q=>q.a<=0); if(!w) return; w.a=1; w.p.copy(p); w.v.set(rand(-.12,.12),up*rand(.75,1.1),rand(-.12,.12)); w.s=rand(.0025,.005); } }
 function drip(p,n){ for(let i=0;i<n;i++){ const w=drops.find(q=>q.a<=0); if(!w) return; w.a=.8; w.p.copy(p).add(vS.set(rand(-.02,.02),rand(-.01,0),rand(-.02,.02))); w.v.set(0,-.1,0); w.s=rand(.002,.0035); } }
@@ -6632,34 +6632,42 @@ function cageReveal(){ cage.inside.clear(); cage.sand.visible=false; const shown
     cage.items=[]; cage.fill=0; cage.dist=0; cage.wash=0; cage.inside.clear(); cage.sand.visible=true; cage.sand.scale.y=.004; cageUI(); }; }
 
 /* ---------- 握著工具的手：沿用遊戲裡第一人稱的手臂模型（戴手套），右手握住手耙的柄／拖籠的竹竿 ---------- */
-const hand={ready:false,grp:new T.Group(),fing:[],pl:null,ld:null,L0:1};
-if(T.GLTFLoader) new T.GLTFLoader().load('models/arms.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene.clone(true); let wrist=null,root=null,palm=null,other=null;
-  o.traverse(b=>{ if(!b.isBone) return; const n=b.name; if(n.indexOf('R_wrist')===0) wrist=b; if(n.indexOf('R_arm')===0) root=b; if(n.indexOf('R_palm')===0) palm=b; if(n.indexOf('L_arm')===0) other=b;
-    const m=n.match(/^R_(point|middle|ring|pink)([123])/); if(m) hand.fing.push({b,k:[.7,1,.8][+m[2]-1],x0:b.rotation.x}); const th=n.match(/^R_thumb([123])/); if(th) hand.fing.push({b,k:[.45,.6,.5][+th[1]-1],x0:b.rotation.x}); });
-  if(!wrist||!root) return; if(other) other.scale.setScalar(1e-4);
+// 兩隻手：右手、左手各一份（同一個手臂模型，各自只留那一側）；挖洞時哪一邊近就用哪隻手，不會一隻手橫過整個畫面
+function mkHand(side){ return {side,ready:false,grp:new T.Group(),fing:[],pl:null,ld:null,L0:1}; }
+const hand=mkHand('R'), handL=mkHand('L');
+if(T.GLTFLoader) new T.GLTFLoader().load('models/arms.glb',g=>{ for(const h of [hand,handL]){ const sd=h.side, os=sd==='R'?'L':'R';
+  const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene.clone(true); let wrist=null,root=null,palm=null,other=null;
+  o.traverse(b=>{ if(!b.isBone) return; const n=b.name; if(n.indexOf(sd+'_wrist')===0) wrist=b; if(n.indexOf(sd+'_arm')===0) root=b; if(n.indexOf(sd+'_palm')===0) palm=b; if(n.indexOf(os+'_arm')===0) other=b;
+    const m=n.match(new RegExp('^'+sd+'_(point|middle|ring|pink)([123])')); if(m) h.fing.push({b,k:[.7,1,.8][+m[2]-1],x0:b.rotation.x}); const th=n.match(new RegExp('^'+sd+'_thumb([123])')); if(th) h.fing.push({b,k:[.45,.6,.5][+th[1]-1],x0:b.rotation.x}); });
+  if(!wrist||!root) continue; if(other) other.scale.setScalar(1e-4);
   o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.3; mm.roughness=.95; mm.metalness=0; }); } });
-  hand.grp.add(o); hand.grp.updateMatrixWorld(true); const wl=new T.Vector3().setFromMatrixPosition(wrist.matrixWorld), rl=new T.Vector3().setFromMatrixPosition(root.matrixWorld);
-  hand.pl=palm?new T.Vector3().setFromMatrixPosition(palm.matrixWorld):wl.clone(); hand.ld=new T.Vector3().subVectors(wl,rl); hand.L0=hand.ld.length(); hand.ld.normalize(); hand.ready=true; });
-hand.grp.visible=false; S.add(hand.grp);
+  h.grp.add(o); h.grp.updateMatrixWorld(true); const wl=new T.Vector3().setFromMatrixPosition(wrist.matrixWorld), rl=new T.Vector3().setFromMatrixPosition(root.matrixWorld);
+  h.pl=palm?new T.Vector3().setFromMatrixPosition(palm.matrixWorld):wl.clone(); h.ld=new T.Vector3().subVectors(wl,rl); h.L0=h.ld.length(); h.ld.normalize(); h.ready=true; } });
+hand.grp.visible=false; handL.grp.visible=false; S.add(hand.grp); S.add(handL.grp);
 const hq=new T.Quaternion(), hq2=new T.Quaternion(), hsh=new T.Vector3(), hwd=new T.Vector3(), hup=new T.Vector3(), hupW=new T.Vector3(), htmp=new T.Vector3(), hcq=new T.Quaternion();
-// tg：手要握的點（世界座標）；肩膀在鏡頭右下後方
-function handTo(tg,grip,sx,sy,sz,cap){ sx=sx??.2; sy=sy??-.62; sz=sz??.18; cap=cap??.7; if(!hand.ready){ hand.grp.visible=false; return; } hand.grp.visible=true; cam.updateMatrixWorld(); cam.getWorldQuaternion(hcq);
-  cam.localToWorld(hsh.set(sx,sy,sz)); hwd.subVectors(tg,hsh).normalize(); hq.setFromUnitVectors(hand.ld,hwd);
+// tg：手要到的點（世界座標）；sx,sy,sz：肩膀相對鏡頭的位置
+function handTo(tg,grip,sx,sy,sz,cap,H){ H=H||hand; sx=sx??.2; sy=sy??-.62; sz=sz??.18; cap=cap??.7; if(!H.ready){ H.grp.visible=false; return; } H.grp.visible=true; cam.updateMatrixWorld(); cam.getWorldQuaternion(hcq);
+  cam.localToWorld(hsh.set(sx,sy,sz)); hwd.subVectors(tg,hsh).normalize(); hq.setFromUnitVectors(H.ld,hwd);
   hup.set(0,1,0).applyQuaternion(hq); hupW.set(0,1,0).applyQuaternion(hcq); hup.addScaledVector(hwd,-hup.dot(hwd)).normalize(); hupW.addScaledVector(hwd,-hupW.dot(hwd)).normalize();
-  const roll=Math.atan2(htmp.crossVectors(hup,hupW).dot(hwd),hup.dot(hupW))-.35; hq2.setFromAxisAngle(hwd,roll); hq.premultiply(hq2);
-  const s=Math.min(cap,hsh.distanceTo(tg)*1.02)/hand.L0; hand.grp.scale.setScalar(s); hand.grp.quaternion.copy(hq);
-  hup.set(0,1,0).applyQuaternion(hq); hand.grp.position.copy(tg).sub(htmp.copy(hand.pl).multiplyScalar(s).applyQuaternion(hq)).addScaledVector(hup,.016);
-  hand.fing.forEach(f=>{ f.b.rotation.x=f.x0-grip*f.k; }); }
+  const roll=Math.atan2(htmp.crossVectors(hup,hupW).dot(hwd),hup.dot(hupW))+(H.side==='R'?-.35:.35); hq2.setFromAxisAngle(hwd,roll); hq.premultiply(hq2);
+  const s=Math.min(cap,hsh.distanceTo(tg)*1.02)/H.L0; H.grp.scale.setScalar(s); H.grp.quaternion.copy(hq);
+  hup.set(0,1,0).applyQuaternion(hq); H.grp.position.copy(tg).sub(htmp.copy(H.pl).multiplyScalar(s).applyQuaternion(hq)).addScaledVector(hup,.016);
+  H.fing.forEach(f=>{ f.b.rotation.x=f.x0-grip*f.k; }); }
+
 const gripW=new T.Vector3();
 const handCur=new T.Vector3(), handGoal=new T.Vector3(); let scoop=0, flick=0;
 function handTick(){ if(dig&&(dig.phase==='dig'||dig.phase==='ask'&&false)&&dig.c){ const d=dig, fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw);
     if(d.ptr&&d.handP&&!d.ready){ handGoal.copy(d.handP); handGoal.y-=.016*Math.min(1,scoop); handGoal.y+=.05*flick*flick; }   // 拖的時候手指插進泥裡往後扒；換方向時手往上一抬（把泥撈出來）
     else { const x=d.c.x+rx*.24-fx*.14, z=d.c.z+rz*.24-fz*.14; handGoal.set(x,patchY(x,z)+.06+.04*flick,z); }   // 沒在撥：手退到右邊，不擋住洞   // 沒在撥：手停在洞的右前方邊緣
     if(!handCur.lengthSq()) handCur.copy(handGoal); handCur.lerp(handGoal,.35); flick=Math.max(0,flick-.045);
-    handTo(handCur,d.ptr?.55+.35*Math.min(1,spdS):.25,.3,-.26,.06,.36); return; }   /* 肩膀在畫面右下外側：只有手和前臂從右邊伸進來 */   /* 徒手挖：手指半彎像在撥泥，撥得越快握得越緊 */
+    { const side=((handCur.x-d.c.x)*rx+(handCur.z-d.c.z)*rz)<-.03?'L':'R'; if(d.useL===undefined) d.useL=false; if(side==='L'&&!d.useL) d.useL=true; else if(side==='R'&&d.useL&&((handCur.x-d.c.x)*rx+(handCur.z-d.c.z)*rz)>.03) d.useL=false;   // 洞的左邊用左手、右邊用右手（有一點緩衝，不會一直換）
+      const act=d.useL?handL:hand, rest=d.useL?hand:handL, rsx=d.useL?.24:-.24, rx2=d.c.x+rx*rsx-fx*.16, rz2=d.c.z+rz*rsx-fz*.16;
+      handTo(handCur,d.ptr?.55+.35*Math.min(1,spdS):.25,d.useL?-.3:.3,-.26,.06,.36,act);
+      vS.set(rx2,patchY(rx2,rz2)+.07,rz2); handTo(vS.clone(),.3,d.useL?.3:-.3,-.26,.06,.36,rest); }   // 另一隻手撐在洞的另一邊
+    return; }   /* 肩膀在畫面右下外側：只有手和前臂從右邊伸進來 */   /* 徒手挖：手指半彎像在撥泥，撥得越快握得越緊 */
   else if(false){ rake.updateMatrixWorld(true); const hm=rake.children.find(m=>m.geometry&&m.geometry.parameters&&m.geometry.parameters.height===.3); if(hm){ gripW.set(0,.13,0); hm.localToWorld(gripW); handTo(gripW,.95,.34,-.36,.42,.4); }   /* 跪著挖時鏡頭很近：手從右下角伸進來、比例縮小，不擋住洞 */ else hand.grp.visible=false; }   // 握住手耙木柄的尾端
-  else if(cage.on){ cage.g.updateMatrixWorld(); const pole=cage.g.children.find(m=>m.geometry&&m.geometry.parameters&&m.geometry.parameters.height===1.5); if(pole){ gripW.set(0,-.2,0); pole.localToWorld(gripW); handTo(gripW,.9); } else hand.grp.visible=false; }
-  else hand.grp.visible=false; }
+  else if(cage.on){ handL.grp.visible=false; cage.g.updateMatrixWorld(); const pole=cage.g.children.find(m=>m.geometry&&m.geometry.parameters&&m.geometry.parameters.height===1.5); if(pole){ gripW.set(0,-.2,0); pole.localToWorld(gripW); handTo(gripW,.9); } else hand.grp.visible=false; }
+  else { hand.grp.visible=false; handL.grp.visible=false; } }
 
 let hold=null;
 function holdCatch(id,L,r){ const sp=c.species(id); let f=null; try{ if(creaReady(id)) f=creaModel(sp); }catch(e){} if(!f) return;
