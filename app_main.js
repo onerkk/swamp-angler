@@ -1,4 +1,4 @@
-/*APPV:20261029142948*/
+/*APPV:20261029144051*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -4703,7 +4703,7 @@ function put(name,x,y,z,ry,sc,fn){ const place=g=>{ const o=g.scene.clone(true);
         if(/_lamp$/.test(mm.name)){ const nm=mm.clone(); nm.emissive=new T.Color(0xffd080); nm.emissiveIntensity=1.2; if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; glowM.push(nm); } }); });
     scene.add(o); addObs(o); if(fn) fn(o); };
   if(mcache[name]) place(mcache[name]); else GL.load('models/home/'+name+'.glb',g=>{ mcache[name]=g; place(g); },undefined,()=>console.warn('home model',name)); }
-const LV={x:-.9,z:-1.9};
+const LV={x:-.9,z:-.45};   /* 客廳區往前移：魚缸前留 1.4 公尺走道，可以走到玻璃前面看 */
 // 碰撞：落地的家具用實際模型的外框當障礙（升級換模型也自動跟著變），走路時不能穿過去
 const OBS=[];
 function addObs(o){ o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o); if(b.isEmpty()||b.min.y>.25||b.max.y-b.min.y<.12) return;
@@ -4725,15 +4725,15 @@ const FITEMS=[
  {f:'shelf',lv:[0,1],m:'wooden_bookshelf_worn',p:[-ROOM.x+.32,0,-2.2,Math.PI/2,1]},
  {f:'shelf',lv:[1,1],m:'book_encyclopedia_set_01',p:[-ROOM.x+.32,2.06,-2.2,Math.PI/2,.8]},
  {f:'shelf',lv:[2,2],m:'vintage_cabinet_01',p:[-ROOM.x+.3,0,-2.25,Math.PI/2,.8]},
- {f:'rock',lv:[0,2],m:'Rockingchair_01',p:[1.7,-.1,-1.6,-Math.PI/2+.4,1]},
- {f:'rock',lv:[1,2],m:'side_table_01',p:[2.35,0,-1.0,-.3,.85],tint:0x8a6448},
- {f:'rock',lv:[2,2],m:'wicker_basket_01',p:[2.3,0,-2.3,.4,1.7]},
- {f:'herb',lv:[0,2],m:'potted_plant_01',p:[-2.5,0,ROOM.zb+.5,0,.9]},
+ {f:'rock',lv:[0,2],m:'Rockingchair_01',p:[1.7,-.1,-.2,-Math.PI/2+.4,1]},
+ {f:'rock',lv:[1,2],m:'side_table_01',p:[2.4,0,.55,-.3,.85],tint:0x8a6448},
+ {f:'rock',lv:[2,2],m:'wicker_basket_01',p:[2.5,0,-1.0,.4,1.7]},
+ {f:'herb',lv:[0,2],m:'potted_plant_01',p:[-ROOM.x+.5,0,ROOM.zf-.55,0,.9]},
  {f:'herb',lv:[1,2],m:'planter_box_01',p:[-ROOM.x+.24,0,-.15,Math.PI/2,1],herbs:.46},
  {f:'herb',lv:[2,2],m:'planter_box_02',p:[-ROOM.x+.25,0,1.0,Math.PI/2,1],herbs:.62},
- {f:'chest',lv:[0,2],m:'treasure_chest',p:[2.4,0,ROOM.zb+.45,-.5,.8]},
- {f:'chest',lv:[1,2],m:'wooden_crate_01',p:[ROOM.x-.22,0,-3.0,Math.PI/2,.75]},
- {f:'chest',lv:[2,2],m:'wooden_crate_02',p:[ROOM.x-.32,0,-2.0,0,1]},
+ {f:'chest',lv:[0,2],m:'treasure_chest',p:[ROOM.x-.5,0,-2.55,-Math.PI/2,.8]},   /* 漁具箱：原本被升級變大的海水缸蓋住，移到右牆邊 */
+ {f:'chest',lv:[1,2],m:'wooden_crate_01',p:[ROOM.x-.25,0,-1.75,Math.PI/2,.75]},
+ {f:'chest',lv:[2,2],m:'wooden_crate_02',p:[ROOM.x-.35,0,-1.15,0,1]},
  {f:'fire',lv:[1,2],m:'pot_enamel_01',p:[ROOM.x-.35,0,FP.z+1.55,0,1.4]},
  {f:'fire',lv:[2,2],m:'brass_pan_01',p:[ROOM.x-.3,0,FP.z-1.05,.8,1.4]}];
 // 香草箱裡種真實的蕁麻草模型（Poly Haven nettle_plant），沿著木箱長邊排一排
@@ -4758,7 +4758,7 @@ put('lantern_chandelier_01',0,H-.02,-1.6,0,1,o=>{ o.userData.furn='light'; lampO
 const ceilL=new T.PointLight(0xffd9a8,2.4,14,1.0); ceilL.position.set(0,H-.95,-1.6); scene.add(ceilL);
 const wallLs=[];
 for(const x of [-2.85,2.85]){ put('industrial_wall_lamp',x,2.05,ROOM.zb+.06,0,1); const wl=new T.PointLight(0xffe2b8,1.3,7,1.2); wl.position.set(x,1.9,ROOM.zb+.4); wl.visible=false; scene.add(wl); wallLs.push(wl); }
-const fillL=new T.AmbientLight(0xffe2c4,.32); scene.add(fillL);   // 用一盞不花效能的環境補光，取代兩盞壁燈＋煤油燈＋展示櫃燈的即時光
+const fillL=new T.AmbientLight(0xffe2c4,.6); scene.add(fillL);   // 用一盞不花效能的環境補光，取代兩盞壁燈＋煤油燈＋展示櫃燈的即時光
 const lampL=new T.PointLight(0xffd8a0,1.2,5,1.4); lampL.position.set(LV.x+.2,.9,LV.z-.3); lampL.visible=false; scene.add(lampL);   // 煤油燈
 
 // 水族箱：尺寸跟著等級變；淡水缸在後牆中央，有海水缸時放在右側
@@ -5043,7 +5043,7 @@ function actFor(id){ if(ACT) return; const H=c.home(), lv=H.furnLv(id), toastR=r
   if(id==='sofa'){ playAct({pos:[LV.x-.78,1.0,LV.z+.05],look:[0,1.3,ROOM.zb+.4],hold:3.4,txt:'窩在沙發上，看魚游來游去……',mid:()=>toastR(H.furnUse('sofa')),
     anim:(t)=>{ cam.position.y=1.0+Math.sin(t*1.6)*.006; }}); return; }
   if(id==='rock'){ const ch=objOf('Rockingchair_01'), ry=ch?ch.rotation.y:0; if(ch) ch.rotation.order='YXZ';
-    let res=null; playAct({pos:[1.72,1.06,-1.55],look:[ROOM.x-.3,.55,FP.z],hold:5.2,txt:'搖著搖著，眼皮越來越重……',midAt:2.4,mid:()=>{ res=H.furnUse('rock',ACT.opt); syncTime(); actFade.textContent='💤'; },opt:ACT_OPT,
+    let res=null; playAct({pos:[1.72,1.06,-.15],look:[ROOM.x-.3,.55,FP.z],hold:5.2,txt:'搖著搖著，眼皮越來越重……',midAt:2.4,mid:()=>{ res=H.furnUse('rock',ACT.opt); syncTime(); actFade.textContent='💤'; },opt:ACT_OPT,
       anim:(t,dt,back)=>{ const a=back?.12*Math.max(0,1-(t-5.2)/.8):.12; const sw=Math.sin(t*2.1)*a; if(ch){ ch.rotation.x=sw; ch.rotation.y=ry; } if(!back){ cam.position.y=1.06+sw*.25; cam.rotateX(sw*.35); }
         const f=t<1?0:t<2.3?(t-1)/1.3:t<3.6?1:t<4.8?1-(t-3.6)/1.2:0; actFade.style.opacity=back?0:f; if(t>=3.6&&actFade.textContent) actFade.textContent=''; },
       end:()=>{ if(ch) ch.rotation.x=0; toastR(res); }}); return; }
@@ -5051,7 +5051,7 @@ function actFor(id){ if(ACT) return; const H=c.home(), lv=H.furnLv(id), toastR=r
       notePg.innerHTML=`<div style="font-size:13px;letter-spacing:.2em;opacity:.7;margin-bottom:8px">— 老漁人的手記 —</div><div>${m[0]||''}</div><div style="margin-top:14px;font-size:14px;color:#7a4a10;font-family:sans-serif">✨ ${m[1]||''}</div><div style="margin-top:12px;font-size:12px;opacity:.6;font-family:sans-serif;text-align:right">點一下闔上手記</div>`;
       notePg.classList.remove('hidden'); }}); return; }
   if(id==='chest'){ const ch=objOf('treasure_chest'), lid=ch&&ch.getObjectByName('treasure_chest_lid'), cur=H.furnInfo('chest').cur, IC={shrimp:'🦐',live:'🐟',moon:'🌙'};
-    playAct({pos:[1.55,1.38,-2.7],look:[2.4,.42,ROOM.zb+.45],hold:2.8,txt:'打開老漁人的漁具箱……',midAt:.7,mid:()=>{ toastR(H.furnUse('chest')); popIcons(Object.keys(cur.g).map(k=>IC[k]||'🎣'),2.4,.85,ROOM.zb+.45); },
+    playAct({pos:[ROOM.x-1.75,1.38,-2.35],look:[ROOM.x-.5,.42,-2.55],hold:2.8,txt:'打開老漁人的漁具箱……',midAt:.7,mid:()=>{ toastR(H.furnUse('chest')); popIcons(Object.keys(cur.g).map(k=>IC[k]||'🎣'),ROOM.x-.5,.85,-2.55); },
       anim:(t,dt,back)=>{ if(lid) lid.rotation.x=back?-1.15*(1-ease((t-2.8)/.6)):-1.15*ease(t/.6); }, end:()=>{ if(lid) lid.rotation.x=0; }}); return; }
   if(id==='herb'){ const sp=lv>0, pl=FITEMS.filter(it=>it.f==='herb'&&it.obj).map(it=>it.obj), F=H.furnInfo('herb').st;
     const pos=sp?[-1.85,1.32,.4]:[-1.7,1.35,-2.75], look=sp?[-ROOM.x+.25,.38,.4]:[-2.5,.7,ROOM.zb+.5];
@@ -5095,7 +5095,7 @@ furnUI.addEventListener('click',e=>{ const b=e.target.closest('[data-f]'); if(!b
   if(a==='use'){ const id=furnId, st=H.furnInfo(id).st; if(!st.ok&&id!=='rock'){ c.toast&&c.toast(st.txt,'warn',1800); return; }
     ACT_OPT=b.dataset.o!=null?+b.dataset.o:null; actFor(id); } });
 // 每件能點的家具上方都有提示標籤；有東西可以領、可以採、可以用時變成金色
-const FTAG=[['sofa',[LV.x-1.0,1.3,LV.z]],['rock',[1.7,1.48,-1.6]],['shelf',[-ROOM.x+.35,2.45,-2.2]],['chest',[2.4,1.32,ROOM.zb+.45]],['herb',[-2.75,1.05,.35]],['light',[0,2.52,-1.15]],['clock',[ROOM.x-.4,2.0,FP.z+.6]],['mount',[ROOM.x-.12,2.62,-2.45]]];
+const FTAG=[['sofa',[LV.x-1.0,1.3,LV.z]],['rock',[1.7,1.48,-.2]],['shelf',[-ROOM.x+.35,2.45,-2.2]],['chest',[ROOM.x-.5,1.32,-2.55]],['herb',[-2.75,1.05,.35]],['light',[0,2.52,-1.15]],['clock',[ROOM.x-.4,2.0,FP.z+.6]],['mount',[ROOM.x-.12,2.62,-2.45]]];
 const furnTags=FTAG.map(([f,pos])=>{ const tg=makeTag(''); tg.position.set(...pos); scene.add(tg); const r={s:tg,y:pos[1],k:'f_'+f,f,ready:false}; tags.push(r); return r; });
 function tagTxt(f,H){ if(f==='light') return [lightsOff()?'💡 點吊燈開燈':'💡 點吊燈關燈',false];
   if(f==='clock') return ['🕰 點時鐘看時間',false];
@@ -5222,7 +5222,7 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
   vb+=((mode!=='room'&&mode!=='act'?1:0)-vb)*Math.min(1,dt*4); dYaw+=(dYawT-dYaw)*Math.min(1,dt*6); dPitch+=(dPitchT-dPitch)*Math.min(1,dt*6);
   // 在房間裡用搖桿走動：前進／後退、左右轉；不能走進水族箱、壁爐和牆
   if(mode==='room'&&c.joy){ const j=c.joy(); if(Math.abs(j.thr)>.05||Math.abs(j.turn)>.05){ yawT-=j.turn*dt*1.7; const sp=1.3*j.thr*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw); let nx=pRoom.x+fx*sp, nz=pRoom.z+fz*sp;
-      nx=Math.max(-ROOM.x+.5,Math.min(ROOM.x-.5,nx)); nz=Math.max(ROOM.zb+1.6,Math.min(ROOM.zf-.5,nz)); if(nx>ROOM.x-1.3&&Math.abs(nz-FP.z)<1.2) nx=ROOM.x-1.3;
+      nx=Math.max(-ROOM.x+.5,Math.min(ROOM.x-.5,nx)); nz=Math.max(ROOM.zb+1.12,Math.min(ROOM.zf-.5,nz)); if(nx>ROOM.x-1.3&&Math.abs(nz-FP.z)<1.2) nx=ROOM.x-1.3;
       // 撞到家具：先試沿 x、再試沿 z 滑過去，都不行就停住
       if(blocked(nx,nz)){ if(!blocked(nx,pRoom.z)) nz=pRoom.z; else if(!blocked(pRoom.x,nz)) nx=pRoom.x; else { nx=pRoom.x; nz=pRoom.z; } }
       pRoom.x=nx; pRoom.z=nz; bobT.v+=dt*7; } pRoom.y=EYE+Math.sin(bobT.v)*.012; }
@@ -5500,7 +5500,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029142948'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029144051'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
