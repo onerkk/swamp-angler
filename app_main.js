@@ -1,4 +1,4 @@
-/*APPV:20261029121406*/
+/*APPV:20261029134205*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5499,7 +5499,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029121406'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029134205'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -6303,8 +6303,9 @@ function spawnSigns(){ signs.forEach(s=>{ S.remove(s.m); if(s.m.userData.det) S.
     for(let r=0;r<kinds.length;r++) for(let q=0;q<6;q++){ const k=kinds[r], sign=CR[k].sign, m=new T.Mesh(new T.PlaneGeometry(.9,.9).rotateX(-Math.PI/2),DEC[sign]); const x=-7.5+q*3+(r%2)*1.5, z=14-r*3.2;
       m.position.set(x,hAt(x,z)+.015,z); m.rotation.y=rand(0,6.28); m.scale.setScalar(1.35); S.add(m); const det=signDetail(sign); if(det){ det.position.copy(m.position); det.position.y=m.position.y-.012; det.rotation.y=m.rotation.y; S.add(det); m.userData.det=det; }
       signs.push({m,k,sign,ring:null,done:false,spurt:rand(2,6)}); n++; } return; }
-  for(let i=0;i<36;i++){ const k=Math.random()<.18?null:kinds[Math.floor(Math.random()*kinds.length)];
-    const sign=k?CR[k].sign:'flat', m=new T.Mesh(new T.PlaneGeometry(.9,.9).rotateX(-Math.PI/2),DEC[sign]); m.position.set(rand(-14,14),0,rand(-26,12)); m.position.y=hAt(m.position.x,m.position.z)+.015; m.rotation.y=rand(0,6.28); S.add(m);
+  const beds=[]; for(let b=0;b<16;b++) beds.push([rand(-15,15),rand(-30,13),kinds[Math.floor(Math.random()*kinds.length)]]);   // 一片片的生物床：同一區常是同一種
+  for(let i=0;i<110;i++){ const bd=beds[i%beds.length], k=Math.random()<.12?null:(Math.random()<.65?bd[2]:kinds[Math.floor(Math.random()*kinds.length)]);
+    const sign=k?CR[k].sign:'flat', m=new T.Mesh(new T.PlaneGeometry(.9,.9).rotateX(-Math.PI/2),DEC[sign]); m.position.set(bd[0]+rand(-3.5,3.5),0,bd[1]+rand(-3.5,3.5)); m.position.y=hAt(m.position.x,m.position.z)+.015; m.rotation.y=rand(0,6.28); S.add(m);
     const ring=null; m.scale.setScalar(1.35);   // 不再用提示光圈：痕跡本身放大、做成立體的
     const det=signDetail(sign); if(det){ det.position.copy(m.position); det.position.y=m.position.y-.012; det.rotation.y=m.rotation.y; S.add(det); m.userData.det=det; }
     signs.push({m,k,sign,ring,done:false,spurt:rand(2,6)}); } }
@@ -6696,7 +6697,7 @@ window.addEventListener('pointerup',()=>{ if(dig) { if(dig.ptr&&dig.ptr.p&&dig.p
    ・拖過有蛤的地方（痕跡附近）會「喀啦」一聲、手機震一下，表示有東西進籠子了
    ・籠子滿了（或你想洗了）走到低窪有水的地方，左右快速滑動搖晃，泥沙被水沖掉，籠裡的收穫露出來，倒進桶子 */
 const cage={on:false,fill:0,items:[],dist:0,g:new T.Group(),wash:0,shake:0,trail:[]};
-{ const iron=new T.MeshStandardMaterial({color:0x8f8d88,metalness:.75,roughness:.35}), wood=new T.MeshStandardMaterial({color:0x8d6e47,roughness:.7});
+{ const texMud=null; const iron=new T.MeshStandardMaterial({color:0x8f8d88,metalness:.75,roughness:.35}), wood=new T.MeshStandardMaterial({color:0x8d6e47,roughness:.7});
   const net=new T.MeshStandardMaterial({color:0x4a4a46,metalness:.5,roughness:.5,wireframe:true});
   const W2=.42,H2=.2,D2=.32, fr=[[-W2/2,0,0,W2/2,0,0],[-W2/2,H2,0,W2/2,H2,0],[-W2/2,0,0,-W2/2,H2,0],[W2/2,0,0,W2/2,H2,0],[-W2/2,H2,0,-W2/2,H2*.7,D2],[W2/2,H2,0,W2/2,H2*.7,D2],[-W2/2,0,0,-W2/2,0,D2],[W2/2,0,0,W2/2,0,D2],[-W2/2,0,D2,W2/2,0,D2],[-W2/2,H2*.7,D2,W2/2,H2*.7,D2]];
   fr.forEach(([a,b,c2,d,e,f])=>{ const v1=new T.Vector3(a,b,c2), v2=new T.Vector3(d,e,f), L=v1.distanceTo(v2), m=new T.Mesh(new T.CylinderGeometry(.006,.006,L,6),iron); m.position.copy(v1).add(v2).multiplyScalar(.5); m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),v2.clone().sub(v1).normalize()); cage.g.add(m); });
@@ -6709,7 +6710,7 @@ const cage={on:false,fill:0,items:[],dist:0,g:new T.Group(),wash:0,shake:0,trail
   for(let i=0;i<22;i++){ const x=-W2/2+.02+i*(W2-.04)/21; rod(new T.Vector3(x,.004,D2),new T.Vector3(x,H2*.7,D2)); }  // 籠背直條
   rods.count=ri; cage.g.add(rods);
   const pole=new T.Mesh(new T.CylinderGeometry(.014,.016,1.5,8),wood); pole.position.set(0,.5,D2+.86); pole.rotation.x=1.1; pole.scale.y=1.3; cage.g.add(pole);   // 長竿伸到你手上
-  cage.inside=new T.Group(); cage.g.add(cage.inside); cage.sand=new T.Mesh(new T.SphereGeometry(.5,24,10,0,Math.PI*2,0,Math.PI/2),new T.MeshStandardMaterial({color:0x2c241c,roughness:.3})); cage.sand.scale.set(W2-.03,.004,D2-.04); cage.sand.position.set(0,.004,D2/2); cage.g.add(cage.sand);   /* 籠裡越積越高的一坨濕泥 */ }
+  cage.inside=new T.Group(); cage.g.add(cage.inside); cage.sand=new T.Mesh((()=>{ const g=new T.SphereGeometry(.5,28,12,0,Math.PI*2,0,Math.PI/2), P=g.attributes.position; for(let i=0;i<P.count;i++){ const x=P.getX(i), y=P.getY(i), z=P.getZ(i), n=1+.18*Math.sin(x*37+z*21)*Math.sin(z*29-x*13)+.1*Math.sin(x*71+z*53); P.setXYZ(i,x*(1+.06*Math.sin(z*40)),y*n,z); } g.computeVertexNormals(); return g; })(),new T.MeshStandardMaterial({map:texMud||null,color:texMud?0x5a4a3a:0x2c241c,roughness:.55}));   /* 一坨坑坑疤疤的濕泥（不是平滑的盤子） */ cage.sand.scale.set(W2-.03,.004,D2-.04); cage.sand.position.set(0,.004,D2/2); cage.g.add(cage.sand);   /* 籠裡越積越高的一坨濕泥 */ }
 cage.g.visible=false; S.add(cage.g);
 // 籠子拖過的刮痕：一條翻開的濕泥帶，上面有一道道鐵齒刮出的細溝，會慢慢積水反光、很久之後被抹平
 const trailTex=(()=>{ const c2=document.createElement('canvas'); c2.width=64; c2.height=32; const g=c2.getContext('2d'); g.fillStyle='rgba(28,22,16,.62)'; g.fillRect(0,0,64,32);
