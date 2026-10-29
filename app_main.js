@@ -1,4 +1,4 @@
-/*APPV:20261029140936*/
+/*APPV:20261029142948*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -4644,7 +4644,7 @@ const shopParts=[];
   for(let i=0;i<9;i++){ const tx=TL.load('shop'+(i+1)+'.jpg'); tx.encoding=T.sRGBEncoding; const r=Math.floor(i/3), cI=i%3;
     const ph=new T.Mesh(new T.PlaneGeometry(.42,.34),new T.MeshStandardMaterial({map:tx,roughness:.5,emissive:0xffffff,emissiveMap:tx,emissiveIntensity:.25})); ph.position.set((cI-1)*.5,(1-r)*.4,-.045); cab.add(ph); shopParts.push(ph); }
   const glass=new T.Mesh(new T.PlaneGeometry(1.56,1.2),new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.08,roughness:.05,metalness:.3,depthWrite:false})); glass.position.z=.1; cab.add(glass); shopParts.push(glass);
-  const lamp=new T.SpotLight(0xfff0d8,1.4,3.2,.7,.5,1.2); lamp.position.set(0,1.0,.6); lamp.target=back; cab.add(lamp);
+  const lamp=new T.SpotLight(0xfff0d8,1.4,3.2,.7,.5,1.2); lamp.position.set(0,1.0,.6); lamp.target=back; lamp.visible=false; cab.add(lamp);   /* 省效能：不用即時光 */
   const tg=makeTag('💎 靜月之光 水晶'); tg.position.set(0,2.32,ROOM.zf-.2); scene.add(tg); tags.push({s:tg,y:2.32,k:'shop'}); }
 box(.55,1.3,.32,stoneM,FX,.65,FP.z-.66); box(.55,1.3,.32,stoneM,FX,.65,FP.z+.66);
 box(.55,.5,1.0,stoneM,FX,1.05,FP.z); box(.45,1.6,1.0,stoneM,ROOM.x-.22,2.1,FP.z);
@@ -4757,8 +4757,9 @@ put('hanging_picture_frame_02',0,2.5,ROOM.zb+.02,0,1);
 put('lantern_chandelier_01',0,H-.02,-1.6,0,1,o=>{ o.userData.furn='light'; lampObj=o; });
 const ceilL=new T.PointLight(0xffd9a8,2.4,14,1.0); ceilL.position.set(0,H-.95,-1.6); scene.add(ceilL);
 const wallLs=[];
-for(const x of [-2.85,2.85]){ put('industrial_wall_lamp',x,2.05,ROOM.zb+.06,0,1); const wl=new T.PointLight(0xffe2b8,1.3,7,1.2); wl.position.set(x,1.9,ROOM.zb+.4); scene.add(wl); wallLs.push(wl); }
-const lampL=new T.PointLight(0xffd8a0,1.2,5,1.4); lampL.position.set(LV.x+.2,.9,LV.z-.3); scene.add(lampL);   // 煤油燈
+for(const x of [-2.85,2.85]){ put('industrial_wall_lamp',x,2.05,ROOM.zb+.06,0,1); const wl=new T.PointLight(0xffe2b8,1.3,7,1.2); wl.position.set(x,1.9,ROOM.zb+.4); wl.visible=false; scene.add(wl); wallLs.push(wl); }
+const fillL=new T.AmbientLight(0xffe2c4,.32); scene.add(fillL);   // 用一盞不花效能的環境補光，取代兩盞壁燈＋煤油燈＋展示櫃燈的即時光
+const lampL=new T.PointLight(0xffd8a0,1.2,5,1.4); lampL.position.set(LV.x+.2,.9,LV.z-.3); lampL.visible=false; scene.add(lampL);   // 煤油燈
 
 // 水族箱：尺寸跟著等級變；淡水缸在後牆中央，有海水缸時放在右側
 const TSPEC=[{w:1.2,h:.6,d:.45,st:.85},{w:1.8,h:.75,d:.55,st:.85},{w:2.6,h:1.0,d:.7,st:.7},{w:3.4,h:1.2,d:.8,st:.55}], SEA_SPEC={w:1.25,h:.62,d:.5,st:.85}, SEA_SPECS=TSPEC;   /* 海水缸每一級的尺寸和淡水缸相同 */
@@ -4860,7 +4861,7 @@ function buildTank(water,spec,x){
   add(new T.PlaneGeometry(W*.88,Math.min(.14,D*.36)).rotateX(Math.PI/2),new T.MeshBasicMaterial({color:water==='sea'?0xd6eeff:0xfff6e6}),0,ly-.012,0);
   for(const sx of [-1,1]){ add(new T.BoxGeometry(.012,.17,.012),metalBlack,sx*(W*.45-.01),ly-.08,D*.12); add(new T.BoxGeometry(.012,.17,.012),metalBlack,sx*(W*.45-.01),ly-.08,-D*.12); }
   if(!tags.some(q=>q.k==='tank_'+water)){ const tg=makeTag(water==='sea'?'👆 點海水缸觀賞':'👆 點水族箱觀賞'); tg.position.set(x,ly+.2,z); scene.add(tg); tags.push({s:tg,y:ly+.2,k:'tank_'+water}); } else { const tg=tags.find(q=>q.k==='tank_'+water); tg.s.position.set(x,ly+.2,z); tg.y=ly+.2; }
-  if(W>2.5){ const L2=new T.PointLight(0x9ad8ff,.6,3,1.4); L2.position.set(-W*.3,y+Hh-.05,0); g.add(L2); const L3=L2.clone(); L3.position.x=W*.3; g.add(L3); }
+  if(false&&W>2.5){ const L2=new T.PointLight(0x9ad8ff,.6,3,1.4); L2.position.set(-W*.3,y+Hh-.05,0); g.add(L2); const L3=L2.clone(); L3.position.x=W*.3; g.add(L3); }
   const L=new T.PointLight(water==='sea'?0x8ad0ff:0x9ad8ff,.75,3,1.4); L.position.set(0,y+Hh-.05,0); g.add(L);
   tanks[water]={g,spec,x,y,z,fish:[],plants,bub,glass:gl,sig:'',hAt};
 }
@@ -5213,8 +5214,8 @@ function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
     if(D.s.position.y<.3){ D.s.visible=false; flare.visible=true; flare.position.set(D.s.position.x+.05,.36,D.s.position.z); sparkM.opacity=.95; fireL.intensity*=1.5; c.sizzle&&c.sizzle(.3+Math.random()*.35); } });
   if(flare.visible){ sparkM.opacity-=dt*2.2; flare.scale.setScalar(.35+(.9-sparkM.opacity)*.3); if(sparkM.opacity<=0) flare.visible=false; }
   spin.position.y=Math.sin(GR.t*1.3)*.003; }
-function enter(){ on=true; yaw=yawT=0; pitch=pitchT=-.08; vb=0; pRoom.set(0,EYE,.9); resize(); for(const f of [syncTime,syncFish,syncMounts,exitView,syncFurn,updFurnTags,closeFurn]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
-function exit(){ on=false; drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
+let prSaved=0; function enter(){ on=true; if(W.getPR&&W.setPR&&W.getPR()>1.6){ prSaved=W.getPR(); W.setPR(1.6); }   /* 小屋裡燈多、魚多：解析度上限 1.6 倍（肉眼幾乎看不出差別，效能差很多） */ yaw=yawT=0; pitch=pitchT=-.08; vb=0; pRoom.set(0,EYE,.9); resize(); for(const f of [syncTime,syncFish,syncMounts,exitView,syncFurn,updFurnTags,closeFurn]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
+function exit(){ on=false; if(prSaved&&W.setPR){ W.setPR(prSaved); prSaved=0; } drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
 function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
@@ -5499,7 +5500,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261029140936'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261029142948'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -7507,7 +7508,7 @@ const TIDE=createTide(W,{species:id=>SPECIES.find(q=>q.id===id),hour:()=>G.hour,
 window.__P_splash=(x,y,z)=>{ try{ P.splash(x,.02,z,8,.25); }catch(e){} };
 function goTide(){ if(G.state!=='idle'){ toast('先收線再下灘','warn'); return; } MDL.preload('tide'); G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ if(TIDE.enter()) G.state='tide'; else G.state='idle'; fadeEl.classList.remove('on'); },650); }
-window.__goTide=goTide;
+window.__W=W; window.__HS=()=>HOME3D; window.__goTide=goTide;
 function tideDone(bag0,forced){ const handled=bag0.filter(b=>b.done).length; let bag=bag0.filter(b=>!b.done); if(!bag.length&&handled){ persist(); toast(forced?'被救回岸邊':'回到岸上了，這次處理了 '+handled+' 個收穫','good',2000); G.state='idle'; return; } G.state='idle';
   // 圖鑑：挖到的都算發現
   bag.forEach(b=>{ const r=save.dex[b.id]; save.dex[b.id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,b.L),bl:Math.max(r?r.bl||0:0,b.L),md:r?r.md||0:0,f:r?r.f:Date.now()}; });
