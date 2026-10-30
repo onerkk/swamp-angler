@@ -23,7 +23,7 @@ const ov=document.getElementById('scare'), face=ov&&ov.querySelector('img');
 // 條件：第六章（月潮）完成後、夜晚、湖區、沒關閉驚嚇效果、正在閒置或等魚
 // 測試模式：網址加上 ghost 測試參數，不看章節、時段、次數，閒置或等魚約 5 秒出現、間隔 30 秒（只影響開這一頁的人）
 const TEST=/[?&]ghost=(1|glide|peek|behind|jump|grab|creep|bow|stalk)/.test(location.search), TEST_MODE=(location.search.match(/[?&]ghost=(glide|peek|behind|jump|grab|creep|bow|stalk)/)||[])[1]; let testLast=0;
-function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wait')&&!ev&&performance.now()-testLast>30000&&performance.now()-sessionStart>5000; }
+function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wait')&&!ev&&performance.now()-testLast>4000&&performance.now()-sessionStart>5000; }   /* 測試：上一段結束 4 秒後就再出現 */
   if(S.noScare) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
   if(c.period()!=='night'||c.loc()!=='lake') return false; const st=c.state(); if(st!=='idle'&&st!=='wait') return false;
   // 隱藏章節進行中：還沒遇滿 3 次時她出現得更勤（任務才過得了）；遇滿 3 次後就不再嚇人
@@ -98,7 +98,7 @@ function fxTick(dt){
   const m=model; const inWater=m&&m.visible&&m.position.y<-.05&&m.position.y>-1.75;
   foam.visible=!!inWater; if(inWater){ foam.position.set(m.position.x,.03,m.position.z); const f=.35+.12*Math.sin(performance.now()*.006); foam.material.opacity=f; foam.scale.setScalar(1+.06*Math.sin(performance.now()*.004));
     wakeT-=dt; if(wakeT<=0){ wakeT=.45; ring(m.position,.35,1.8,2.2,.4); } } }
-function endEv(){ croak(false); muteAll(false); if(model) model.visible=false; if(ov) ov.classList.remove('on'); if(ev&&ev.wail){ try{ ev.wail.pause(); }catch(e){} } ev=null; }
+function endEv(){ if(TEST) testLast=performance.now(); croak(false); muteAll(false); if(model) model.visible=false; if(ov) ov.classList.remove('on'); if(ev&&ev.wail){ try{ ev.wail.pause(); }catch(e){} } ev=null; }
 // 跟著環境亮度：越暗越只剩月光般的微光；腳下（水面交界）有一圈水紋
 let ripT=0;
 function blend(dt){ if(!model||!model.visible) return; const lt=W.info?W.info.light:1; mats.forEach(m=>{ if(m.emissiveIntensity!==undefined) m.emissiveIntensity=.1+Math.max(0,.5-lt)*.7; });
