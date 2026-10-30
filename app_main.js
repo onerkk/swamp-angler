@@ -1,4 +1,4 @@
-/*APPV:20261030071607*/
+/*APPV:20261030072117*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -762,7 +762,7 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
         if(v.y<ly+.05*H&&v.y>ly-.42*H){ const nm=['up'+s,'fo'+s,'ha'+s][k], soft=Math.min(1,Math.max(0,(ax-.3)/.1)), body=f<.5?'chest':'hips';
           out=k===0&&t<.35?[[nm,soft*(.35+t*1.85)],['chest',1-soft*(.35+t*1.85)]]:[[nm,soft],[body,1-soft]]; } }
       // 長髮
-      if(!out&&v.z<B.neck.userData.w.z-.045&&f>.12&&f<.58&&ax<.24){ const k=Math.min(3,Math.max(0,(f-.13)/.12)), a=Math.floor(Math.min(2.999,k)); out=[['hr'+(a+1),1-(k-a)],['hr'+(a+2),k-a]]; if(f>.5){ const g=(f-.5)/.08; out=[[out[0][0],out[0][1]*(1-g)],[out[1][0],out[1][1]*(1-g)],['hips',g]]; } }
+      if(!out&&v.z<B.neck.userData.w.z-.045&&f>.12&&f<(opt.hairMax??.58)&&ax<.24){   /* 頭髮的長度依角色：短髮的小女孩、老漁人不能把背部衣服當成頭髮 */ const k=Math.min(3,Math.max(0,(f-.13)/.12)), a=Math.floor(Math.min(2.999,k)); out=[['hr'+(a+1),1-(k-a)],['hr'+(a+2),k-a]]; if(f>.5){ const g=(f-.5)/.08; out=[[out[0][0],out[0][1]*(1-g)],[out[1][0],out[1][1]*(1-g)],['hips',g]]; } }
       // 下半身：裙子跟著左右腿擺動（越往下越跟腿，中間兩腿混合）
       if(!out&&f>.5){ const s=v.x<cx?'L':'R', o=s==='L'?'R':'L', side=Math.min(1,ax/.18), g=Math.min(1,(f-.5)/.12); const leg=f<.74?'th':(f<.95?'kn':'an');
         const wl=g*(.5+.5*side); out=[['hips',1-g],[leg+s,wl],[leg+o,g-wl]]; }
@@ -797,7 +797,7 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
     sk.onBeforeRender=tick;
     return {mesh:sk,bones:B,set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
   // 其他角色：小女孩（生前的林秋月）、老漁人
-  const PRESET={girl:{faceA:'girl_face.jpg',rect:null,relax:-.55},old:{faceA:'old_face.jpg',rect:null,relax:-.55}};
+  const PRESET={girl:{faceA:'girl_face.jpg',rect:[.1424,.0638,.1964,.1641],relax:-.55,hairMax:.27},old:{faceA:'old_face.jpg',rect:[.1479,.0451,.1937,.1292],relax:-.12,hairMax:.12}};
   return {rig,preset:(name,root,o)=>rig(root,Object.assign({},PRESET[name]||{},o||{})),PRESET};
 })();
 const SCAN_TINT=`#include <map_fragment>
@@ -5728,7 +5728,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030071607'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030072117'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -5808,7 +5808,9 @@ function startShot(i){ si=i; st=0; cur=shots[i]; if(!cur){ finish(false); return
   blk.style.opacity=cur.fadeIn===false?blk.style.opacity:0; }
 function tick(dt){ if(!on) return; st+=dt; const s=cur; if(!s) return; const k=ease(st/s.d);
   // 字幕依鏡頭時間觸發（畫面卡頓時字幕和畫面仍然對得上）
-  const sl=s.subs||[]; while(s.subI<sl.length&&st>=sl[s.subI][0]){ const x=sl[s.subI++]; say(x[1],x[2],x[3]); { const lc=window.__linCtlE; if(lc&&/^林秋月|^秋月|^她：/.test(x[1])){ lc.talk(Math.min(4,(x[3]||3)*.8)); } if(lc&&/謝謝|笑|燈火|天亮|放下/.test(x[1])){ lc.ghost(0); lc.expr(4); } }   /* 結局她被放下執念時，臉慢慢變回生前的樣子並微笑 */
+  const sl=s.subs||[]; while(s.subI<sl.length&&st>=sl[s.subI][0]){ const x=sl[s.subI++]; say(x[1],x[2],x[3]); { const gc=window.__girlCtlE; if(gc&&gc.isVis&&gc.isVis()&&/^林秋月/.test(x[1])){ gc.talk(Math.min(4,(x[3]||3)*.8)); gc.expr(/謝謝|喜歡|回家|好開心|笑/.test(x[1])?4:/對不起|怕|等|冷|一個人/.test(x[1])?5:-1); } }   /* 生前的小女孩：說話、開心時笑、難過時想哭 */
+  { const oc=window.__oldCtlE; if(oc&&oc.isVis&&oc.isVis()){ oc.expr(4); } }
+  { const lc=window.__linCtlE; if(lc&&/^林秋月|^秋月|^她：/.test(x[1])){ lc.talk(Math.min(4,(x[3]||3)*.8)); } if(lc&&/謝謝|笑|燈火|天亮|放下/.test(x[1])){ lc.ghost(0); lc.expr(4); } }   /* 結局她被放下執念時，臉慢慢變回生前的樣子並微笑 */
   { const kc=window.__kingCtlE; if(kc&&/^滄淵/.test(x[1])){ kc.talk(Math.min(5,(x[3]||3)*.85)); if(/好|謝|回來|原諒/.test(x[1])) kc.smile((x[3]||3)+1); } }   /* 滄淵說話時鬍子下的嘴巴跟著動 */
   { const mc=window.__merCtlE; if(mc&&/^霜汐/.test(x[1])){ mc.talk(Math.min(4,(x[3]||3)*.8)); if(/謝謝|喜歡|回來|很好|燈/.test(x[1])) mc.smile((x[3]||3)+1); if(/再見|保重|下次|走了/.test(x[1])) mc.wave(); } } }   /* 霜汐說話時嘴巴跟著動，溫暖的話會微笑、道別會揮手 */
   tA.fromArray(s.from[0]).lerp(tB.fromArray(s.to[0]),k); camP.copy(tA); camL.fromArray(s.from[1]).lerp(tB.fromArray(s.to[1]),k);
@@ -5996,10 +5998,12 @@ function endingShots(E,c){
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar((hgt||1.62)/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); dst.add(o); dst.updateMatrixWorld(true);
     if(url==='models/lin_v1.glb'&&window.__HUMAN){ const hc=window.__HUMAN.rig(o,{ghost:true}); window.__linCtlE=hc; hc.expr(5); rigs.push({k:'ghost',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.4); hc.set('hr',p.headRoll||0); }}}); return; }   /* 結局的她：新模型、哀傷的女鬼臉 */
+    if((url==='models/girl_v2.glb'||url==='models/old_v2.glb')&&window.__HUMAN){ const nm=url.indexOf('girl')>=0?'girl':'old', hc=window.__HUMAN.preset(nm,o); window['__'+nm+'CtlE']=hc; hc.mesh.visible=true; hc.isVis=()=>{ let o2=dst; while(o2){ if(!o2.visible) return false; o2=o2.parent; } return true; };
+      rigs.push({k:key||'heng',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.2); hc.set('hr',p.headRoll||0); }}}); return; }   /* 生前的小女孩、老漁人：新模型與表情 */
     rigs.push({k:key||(dst===hGhost?'ghost':'heng'),rig:autoRig(o,'human')}); }); }
-  loadHuman(window.__HUMAN?'models/lin_v1.glb':'models/ghost.glb',hGhost,0xb8c8d8); loadHuman('models/girl.glb',hAlive,0xf0e8dc,'heng',1.35);   // 生前的林秋月：十歲的小女孩
+  loadHuman(window.__HUMAN?'models/lin_v1.glb':'models/ghost.glb',hGhost,0xb8c8d8); loadHuman(window.__HUMAN?'models/girl_v2.glb':'models/girl.glb',hAlive,0xf0e8dc,'heng',1.35);   // 生前的林秋月：十歲的小女孩
   // 老漁人（使用者提供設定圖生成）：只在最後的晨光裡出現
-  const oldG=new T.Group(); loadHuman('models/oldman.glb',oldG,0xfff0d8,'old');
+  const oldG=new T.Group(); loadHuman(window.__HUMAN?'models/old_v2.glb':'models/oldman.glb',oldG,0xfff0d8,'old');
   // 林秋月的舊髮簪：天亮時留在老漁人的椅子上
   const pin=new T.Group(); load('item_hairpin.glb',g=>{ const o=g.scene.clone(true); o.traverse(m=>{ m.frustumCulled=false; }); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(.2/Math.max(sz.x,sz.y,sz.z,1e-6)); pin.add(o); });
   const hengLook=(x,z)=>Math.atan2(x-heng.position.x,z-heng.position.z);
