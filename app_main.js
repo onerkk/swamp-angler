@@ -1,4 +1,4 @@
-/*APPV:20261030044852*/
+/*APPV:20261030050134*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -753,13 +753,13 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
     const segD=(p,a,b)=>{ const ab=b.clone().sub(a), t=Math.max(0,Math.min(1,p.clone().sub(a).dot(ab)/ab.lengthSq())); return [a.clone().addScaledVector(ab,t).distanceTo(p),t,a.clone().addScaledVector(ab,t)]; };
     const spineC=['head','neck','chest','spine','hips'];
     for(let i=0;i<n;i++){ v.fromBufferAttribute(P,i); const f=(top-v.y)/H, ax=Math.abs(v.x-cx)/Wd; let out=null;
-      // 手臂與垂掛的寬袖：肩膀以外、在手臂線下方 0.3H 以內
-      if(f>.19&&f<.8&&ax>.26){ const s=v.x<cx?'L':'R', segs=[['up'+s,'fo'+s],['fo'+s,'ha'+s],['ha'+s,'he'+s]]; let best=9,bi=0,bt=0;
-        segs.forEach((sg,k)=>{ const A=B[sg[0]].userData.w, Bb=B[sg[1]].userData.w; const q=v.clone(); const [d0,t]=segD(new T.Vector3(q.x,A.y+(Bb.y-A.y)*Math.max(0,Math.min(1,(q.x-A.x)/(Bb.x-A.x||1e-4))),q.z),A,Bb); const drop=Math.max(0,(A.y+(Bb.y-A.y)*t)-q.y); const d=d0+Math.max(0,drop-.3*H)+Math.max(0,q.y-(A.y+(Bb.y-A.y)*t)-.05*H); if(d<best){ best=d; bi=k; bt=t; } });
-        if(best<.05*H){ const a=segs[bi][0], soft=Math.min(1,Math.max(0,(ax-.24)/.14)), body=f<.5?'chest':'hips';   // 靠近身體的袖子內側慢慢過渡到身體，手臂動時不會拉出一大片
-          out=bi===0&&bt<.3?[['up'+s,(.3+bt*2.33)*soft],['chest',1-(.3+bt*2.33)*soft]]:[[a,soft],[body,1-soft]]; } }
+      // 手臂與垂掛的寬袖：從正面看，在手臂線上方一點到下方 0.3H 之間、肩膀以外的部分（只看 x、y，不看前後）
+      if(f>.19&&f<.86&&ax>.3){ const s=v.x<cx?'L':'R', ch=['up'+s,'fo'+s,'ha'+s,'he'+s].map(nm=>B[nm].userData.w), dx=Math.abs(v.x-cx);
+        let k=0; while(k<2&&dx>Math.abs(ch[k+1].x-cx)) k++; const A=ch[k], Bb=ch[k+1], t=Math.max(0,Math.min(1,(dx-Math.abs(A.x-cx))/Math.max(1e-4,Math.abs(Bb.x-cx)-Math.abs(A.x-cx)))), ly=A.y+(Bb.y-A.y)*t;
+        if(v.y<ly+.05*H&&v.y>ly-.42*H){ const nm=['up'+s,'fo'+s,'ha'+s][k], soft=Math.min(1,Math.max(0,(ax-.3)/.1)), body=f<.5?'chest':'hips';
+          out=k===0&&t<.35?[[nm,soft*(.35+t*1.85)],['chest',1-soft*(.35+t*1.85)]]:[[nm,soft],[body,1-soft]]; } }
       // 長髮
-      if(!out&&v.z<cz-.03&&f>.12&&f<.58&&ax<.22){ const k=Math.min(3,Math.max(0,(f-.13)/.12)), a=Math.floor(Math.min(2.999,k)); out=[['hr'+(a+1),1-(k-a)],['hr'+(a+2),k-a]]; if(f>.5){ const g=(f-.5)/.08; out=[[out[0][0],out[0][1]*(1-g)],[out[1][0],out[1][1]*(1-g)],['hips',g]]; } }
+      if(!out&&v.z<B.neck.userData.w.z-.045&&f>.12&&f<.58&&ax<.24){ const k=Math.min(3,Math.max(0,(f-.13)/.12)), a=Math.floor(Math.min(2.999,k)); out=[['hr'+(a+1),1-(k-a)],['hr'+(a+2),k-a]]; if(f>.5){ const g=(f-.5)/.08; out=[[out[0][0],out[0][1]*(1-g)],[out[1][0],out[1][1]*(1-g)],['hips',g]]; } }
       // 下半身：裙子跟著左右腿擺動（越往下越跟腿，中間兩腿混合）
       if(!out&&f>.5){ const s=v.x<cx?'L':'R', o=s==='L'?'R':'L', side=Math.min(1,ax/.18), g=Math.min(1,(f-.5)/.12); const leg=f<.74?'th':(f<.95?'kn':'an');
         const wl=g*(.5+.5*side); out=[['hips',1-g],[leg+s,wl],[leg+o,g-wl]]; }
@@ -767,6 +767,7 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       out.slice(0,4).forEach(([b,w],k)=>{ si[i*4+k]=idx(b); sw[i*4+k]=Math.max(0,w); }); const s2=sw[i*4]+sw[i*4+1]+sw[i*4+2]+sw[i*4+3]||1; for(let k=0;k<4;k++) sw[i*4+k]/=s2; }
     geo.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); geo.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
     const mat=src.material.clone(); mat.skinning=true; faceMat(mat,U);
+    if(opt.debugW){ const col=new Float32Array(n*3); for(let i=0;i<n;i++){ const nm=list[si[i*4]].name; const c=/^(up|fo|ha|he[LR]|sh)/.test(nm)?[1,.1,.1]:/^hr/.test(nm)?[.2,.3,1]:/^(th|kn|an)/.test(nm)?[.1,1,.2]:[1,1,1]; col.set(c,i*3); } geo.setAttribute('color',new T.Float32BufferAttribute(col,3)); mat.vertexColors=true; mat.map=null; mat.emissiveMap=null; mat.onBeforeCompile=()=>{}; }
     const sk=new T.SkinnedMesh(geo,mat); sk.frustumCulled=false; src.parent.remove(src); root.add(sk); sk.add(B.root); sk.updateMatrixWorld(true); sk.bind(new T.Skeleton(list));
     const rest={}; list.forEach(b=>rest[b.name]=b.quaternion.clone()); const q=new T.Quaternion(), e=new T.Euler(0,0,0,'YXZ');
     const rot=(b,x,y,z)=>{ e.set(x,y,z,'YXZ'); q.setFromEuler(e); B[b].quaternion.copy(rest[b]).multiply(q); };
@@ -784,8 +785,8 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       const br=Math.sin(t*1.6)*.02;
       rot('hips',st.crawl*1.35,0,0); rot('spine',st.lean*.25+br*.5+jit(),jit(),jit()); rot('chest',br+st.crawl*-.2+jit(),0,jit());
       rot('neck',st.hp*.4+jit(),st.hy*.45,st.hr*.5); rot('head',st.hp*.6+Math.sin(t*.5)*.03*(1-tw)+jit(),st.hy*.55+jit(),st.hr*.7+jit());
-      for(const [s,k] of [['L',-1],['R',1]]){ const relax=-.45*(1-st.reach)*(1-st.armUp);
-        rot('up'+s,-st.reach*1.3-st.crawl*1.2+jit(),0,k*(relax+st.armUp*.9+.03*Math.sin(t*.8+k))+jit());   // 伸手往前抓／爬行時手撐地
+      for(const [s,k] of [['L',-1],['R',1]]){ const relax=0;   /* 寬袖和洋裝是連在一起的：手臂只微微放下（女鬼略張的雙手），避免把布料拉開 */
+        rot('up'+s,-st.reach*.9-st.crawl*1.0+jit(),0,k*(relax+st.armUp*.9+.03*Math.sin(t*.8+k))+jit());   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
         rot('fo'+s,0,-k*(.15+st.reach*.1),k*(st.reach*.35+st.crawl*.6)+jit()); rot('ha'+s,st.reach*.4,0,k*.1+jit());
         rot('th'+s,-st.crawl*1.4,0,0); rot('kn'+s,st.crawl*2.0,0,0); rot('an'+s,0,0,0); }
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.05+Math.sin(t*.9-i*.6)*.04*(i+1)-st.hairFace*(i===0?2.6:.25),Math.sin(t*.5-i*.4)*.05,0));   // 頭髮垂到臉前
@@ -5683,7 +5684,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030044852'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030050134'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
