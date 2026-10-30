@@ -1,4 +1,4 @@
-/*APPV:20261030052941*/
+/*APPV:20261030054427*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -661,17 +661,19 @@ return { setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), 
    用法：window.__MER.rig(載入的模型根節點) → 回傳控制器（自己跟著畫面更新；可呼叫 talk(秒)、wave()、smile(秒)、look(秒)、swim(0~1)） */
 window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能比這段程式晚載好：用到時才取用，不能在載入時就碰 THREE */
   const init=()=>{ if(!T){ T=window.THREE; FACE_RECT=new T.Vector4(.16929,.05296,.20686,.10781); } };   // 臉在模型貼圖上的位置（u0,v0,u1,v1；v 由上往下）
-  let faceTex=null; const faceT=()=>{ init(); if(!faceTex){ faceTex=new T.TextureLoader().load('mer_face2.jpg'); faceTex.encoding=T.sRGBEncoding; faceTex.anisotropy=8; } return faceTex; };
-  function faceMat(mat,W){ mat.onBeforeCompile=sh=>{ sh.uniforms.tFace={value:faceT()}; sh.uniforms.uRect={value:FACE_RECT}; sh.uniforms.uFW=W.a; sh.uniforms.uFW2=W.b;
+  const faceTexs={}; const faceT=(u)=>{ init(); u=u||'mer_face2.jpg'; if(!faceTexs[u]){ const t=new T.TextureLoader().load(u); t.encoding=T.sRGBEncoding; t.anisotropy=8; faceTexs[u]=t; } return faceTexs[u]; };
+  function faceMat(mat,W){ mat.onBeforeCompile=sh=>{ sh.uniforms.tFace={value:faceT(W.face)}; sh.uniforms.uRect={value:W.rect||FACE_RECT}; sh.uniforms.uFW=W.a; sh.uniforms.uFW2=W.b;
     sh.fragmentShader=sh.fragmentShader.replace('#include <map_pars_fragment>','#include <map_pars_fragment>\nuniform sampler2D tFace; uniform vec4 uRect, uFW, uFW2;\nvec3 cellC(int i, vec2 f){ float cx=float(i-3*(i/3)), cy=float(i/3); return sRGBToLinear(texture2D(tFace,vec2((cx+f.x)/3.,1.-(cy+f.y)/2.))).rgb; }')
       .replace('#include <map_fragment>',`#include <map_fragment>
   { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(f.x>0.&&f.x<1.&&f.y>0.&&f.y<1.){ float m=smoothstep(0.,.2,f.x)*smoothstep(1.,.8,f.x)*smoothstep(0.,.16,f.y)*smoothstep(1.,.84,f.y);
       float wsum=uFW.x+uFW.y+uFW.z+uFW.w+uFW2.x; vec3 c=cellC(0,f)*max(0.,1.-wsum)+cellC(1,f)*uFW.x+cellC(2,f)*uFW.y+cellC(3,f)*uFW.z+cellC(4,f)*uFW.w+cellC(5,f)*uFW2.x;
       diffuseColor.rgb=mix(diffuseColor.rgb,c,m*.96); } }`); };
-    mat.customProgramCacheKey=()=>'merFace'; mat.needsUpdate=true; }
-  function rig(root,opt){ init(); opt=opt||{}; faceT(); root.updateMatrixWorld(true);   /* 表情貼圖一開始就下載（第一次畫到臉之前要載好，否則那塊會是黑的） */ let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
+    mat.customProgramCacheKey=()=>'merFace'+(W&&W.face||''); mat.needsUpdate=true; }
+  function rig(root,opt){ init(); opt=opt||{}; faceT(opt.face); root.updateMatrixWorld(true);   /* 表情貼圖一開始就下載（第一次畫到臉之前要載好，否則那塊會是黑的） */ let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
     const geo=src.geometry.clone(); geo.applyMatrix4(new T.Matrix4().copy(root.matrixWorld).invert().multiply(src.matrixWorld)); geo.computeBoundingBox();
     const bb=geo.boundingBox, H=bb.max.y-bb.min.y, top=bb.max.y, Y=f=>top-f*H, Wd=(bb.max.x-bb.min.x)/2, cx=(bb.max.x+bb.min.x)/2, cz=(bb.max.z+bb.min.z)/2;
+    if(geo.index){ const I=geo.index.array, P0=geo.attributes.position, a1=new T.Vector3(), b1=new T.Vector3(), c1=new T.Vector3(), keep=[];   /* 清掉生成工具留下的異常拉長薄面（滄淵手到尾巴的那條細線） */
+      for(let k=0;k<I.length;k+=3){ a1.fromBufferAttribute(P0,I[k]); b1.fromBufferAttribute(P0,I[k+1]); c1.fromBufferAttribute(P0,I[k+2]); if(Math.max(a1.distanceTo(b1),b1.distanceTo(c1),c1.distanceTo(a1))>H*.12) continue; keep.push(I[k],I[k+1],I[k+2]); } geo.setIndex(keep); }
     // 骨頭（位置用設定圖的身體比例）
     const B={}, mk=(n,p,x,f,z)=>{ const b=new T.Bone(); b.name=n; b.userData.w=new T.Vector3(cx+x*Wd,Y(f),cz+(z||0)); B[n]=b; if(p) B[p].add(b); return b; };
     mk('root',null,0,.36); mk('hips','root',0,.36); mk('spine','hips',0,.29); mk('chest','spine',0,.21); mk('neck','chest',0,.155); mk('head','neck',0,.125);
@@ -685,14 +687,14 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
     const v=new T.Vector3(); const chain=['head','neck','chest','spine','hips','t1','t2','t3','t4','t5','t6','fin'];
     for(let i=0;i<n;i++){ v.fromBufferAttribute(P,i); const f=(top-v.y)/H, ax=Math.abs(v.x-cx)/Wd; let out=null;
       // 手臂：A 字張開的手臂離身體中線夠遠
-      if(f>.15&&f<.42&&ax>.23){ const s=v.x<cx?'L':'R'; const segs=[['up'+s,'fo'+s],['fo'+s,'ha'+s],['ha'+s,'he'+s]]; let best=9,bi=0,bt=0; segs.forEach((sg,k)=>{ const [d,t]=segD(v,B[sg[0]].userData.w,B[sg[1]].userData.w); if(d<best){ best=d; bi=k; bt=t; } });
-        if(best<.04*H){ const a=segs[bi][0], b=segs[bi][1]; out=bt>.85&&bi<2?[[a,1-(bt-.85)/.3],[segs[bi+1][0],(bt-.85)/.3]]:bt<.15&&bi>0?[[a,.5+bt/.3],[segs[bi-1][0],.5-bt/.3]]:[[a,1]]; if(bi===0&&bt<.3) out=[['up'+s,.3+bt*2.33],['chest',.7-bt*2.33]]; } }   // 肩膀附近和胸部平滑過渡，舉手時腋下不會拉出一大片
+      if(f>.15&&f<.46&&ax>.23){ const s=v.x<cx?'L':'R'; const segs=[['up'+s,'fo'+s],['fo'+s,'ha'+s],['ha'+s,'he'+s]]; let best=9,bi=0,bt=0; segs.forEach((sg,k)=>{ const [d,t]=segD(v,B[sg[0]].userData.w,B[sg[1]].userData.w); if(d<best){ best=d; bi=k; bt=t; } });
+        if(best<(ax>.75?.1:.04)*H){   /* 手掌、手指離骨頭線比較遠，也要算進手臂 */ const a=segs[bi][0], b=segs[bi][1]; out=bt>.85&&bi<2?[[a,1-(bt-.85)/.3],[segs[bi+1][0],(bt-.85)/.3]]:bt<.15&&bi>0?[[a,.5+bt/.3],[segs[bi-1][0],.5-bt/.3]]:[[a,1]]; if(bi===0&&bt<.3) out=[['up'+s,.3+bt*2.33],['chest',.7-bt*2.33]]; } }   // 肩膀附近和胸部平滑過渡，舉手時腋下不會拉出一大片
       // 頭髮：頭後面垂下來的長髮
       if(!out&&v.z<cz-(f>.3?.055:.02)&&f>.13&&f<.43&&ax<.24){ const k=Math.min(3,Math.max(0,(f-.14)/.09)), a=Math.floor(Math.min(2.999,k)); out=[['hr'+(a+1),1-(k-a)],['hr'+(a+2),k-a]]; if(f>.37){ const g=(f-.37)/.06; out=[[out[0][0],out[0][1]*(1-g)],[out[1][0],out[1][1]*(1-g)],['hips',g]]; } }   // 長髮到腰，髮尾和腰慢慢過渡
       if(!out){ const ys=chain.map(c2=>B[c2].userData.w.y); let a=0; while(a<chain.length-2&&v.y<ys[a+1]) a++; const t=Math.max(0,Math.min(1,(ys[a]-v.y)/Math.max(1e-4,ys[a]-ys[a+1]))); out=[[chain[a],1-t],[chain[a+1],t]]; }
       out.slice(0,4).forEach(([b,w],k)=>{ si[i*4+k]=idx(b); sw[i*4+k]=Math.max(0,w); }); const s2=sw[i*4]+sw[i*4+1]+sw[i*4+2]+sw[i*4+3]||1; for(let k=0;k<4;k++) sw[i*4+k]/=s2; }
     geo.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); geo.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
-    const W={a:{value:new T.Vector4()},b:{value:new T.Vector4()}}, mat=src.material.clone(); mat.skinning=true; faceMat(mat,W);   /* r128 要明確開啟 skinning */
+    const W={a:{value:new T.Vector4()},b:{value:new T.Vector4()},face:opt.face,rect:opt.rect?new T.Vector4(...opt.rect):null}, mat=src.material.clone(); mat.skinning=true; faceMat(mat,W);   /* r128 要明確開啟 skinning */
     const sk=new T.SkinnedMesh(geo,mat); sk.frustumCulled=false; src.parent.remove(src); root.add(sk);   // 幾何已轉到根節點座標，蒙皮網格直接掛在根節點下
     sk.add(B.root); sk.updateMatrixWorld(true); sk.bind(new T.Skeleton(list));   // 先放好位置再綁定，綁定姿勢才正確
     // 控制
@@ -715,12 +717,13 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.08+Math.sin(ph-1.5-i*.6)*.12*(i+1)*.5,Math.sin(t*.7-i*.5)*.08,0));
       st.wave=Math.max(0,st.wave-dt); const wv=st.wave>0?Math.min(1,Math.min(st.wave,2.4-st.wave)*2.5):0;
       for(const [s,k] of [['L',-1],['R',1]]){ const paddle=Math.sin(ph*.6+(k>0?0:Math.PI))*(.15+sw2*.25), w=k>0?wv:0;
-        const relax=(window.__MERARM??-.62)*(1-w), stream=Math.max(0,sw2-.55)/.45;   // 手臂從 A 字放下到身體兩側；游得快時手往後收貼著身體
-        rot('up'+s,stream*.5,0,k*(relax-stream*.25+paddle*.35+.04*Math.sin(t*.9+k))+k*w*1.6); rot('fo'+s,0,-k*(.25+paddle*.25+.1*Math.sin(t*.7))*(1-w),k*w*(.6+Math.sin(t*9)*.35)+k*.08*Math.sin(t*.6)); rot('ha'+s,0,k*.15*Math.sin(t*1.1+k),k*(paddle*.3+.15)); }   // 右手揮手時舉起來左右擺
+        const relax=(opt.relax??-.62)*(1-w), stream=Math.max(0,sw2-.55)/.45;   // 手臂從 A 字放下到身體兩側；游得快時手往後收貼著身體
+        rot('up'+s,stream*.5,0,k*(relax-stream*.25+paddle*.35+.04*Math.sin(t*.9+k))+k*w*1.6); rot('fo'+s,0,-k*(.25+paddle*.25+.1*Math.sin(t*.7))*(1-w)*(opt.bend??1),k*w*(.6+Math.sin(t*9)*.35)+k*.08*Math.sin(t*.6)); rot('ha'+s,0,k*.15*Math.sin(t*1.1+k)*(opt.bend??1),k*(paddle*.3+.15)*(opt.bend??1)); }   // 右手揮手時舉起來左右擺
     };
     sk.onBeforeRender=tick;
     return {head:(y,p)=>{ st.hy=y; st.hp=p; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } },mesh:sk,bones:B,talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },smile:s=>{ st.smile=Math.max(st.smile,s||3); },wave:()=>{ st.wave=2.4; },look:()=>{ st.look=1.6; },swim:k=>{ st.swim=k; }}; }
-  return {rig};
+  const KING={face:'king_face.jpg',rect:[.1656,.0633,.1999,.1164],relax:-.25,bend:.25};   /* 滄淵的表情貼圖與臉的位置 */
+  return {rig,king:(root,o)=>rig(root,Object.assign({},KING,o||{}))};
 })();
 /* ===== 人形角色（林秋月／女鬼）的骨架與表情 =====
    骨架：臀→腰→胸→頸→頭；左右肩→上臂→前臂→手（寬袖跟著手臂垂掛）；左右大腿→小腿（長裙跟著擺）；長髮 4 節
@@ -3485,7 +3488,7 @@ const REAL_DIR='models/';
 // 魚：[檔名, 模型裡頭朝哪個軸, 選項]
 const RFISH={bluegill:['bluegill','+x'],crappie:['crappie','+z'],lmbass:['lmbass','+z'],smbass:['smbass','+z'],channel:['channel','+z'],flathead:['flathead','+z'],
   gar:['gar','+z'],barra:['barra','+x'],golden:['koi','-x',{gold:1}],ghost:['koi','-x',{ghost:1}],grouper:['grouper','-x'],tuna:['tuna','+z'],marlin:['marlin','-z'],
-  ribbon:['ribbon','+z',{one:1}],seaking:['seaking','up',{king:1}],mermaid:['mermaid_v2','up',{mer:1}],trout:['trout','+z'],pike:['pike','+z'],reba:['fish_reba','+z'],bowfin:['fish_bowfin','+z'],perch:['fish_mandarin','+z'],amber:['fish_amber','+z'],mahi:['fish_mahi','+z'],sail:['fish_sail','+z'],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z'],
+  ribbon:['ribbon','+z',{one:1}],seaking:['king_v2','up',{king:1}],mermaid:['mermaid_v2','up',{mer:1}],trout:['trout','+z'],pike:['pike','+z'],reba:['fish_reba','+z'],bowfin:['fish_bowfin','+z'],perch:['fish_mandarin','+z'],amber:['fish_amber','+z'],mahi:['fish_mahi','+z'],sail:['fish_sail','+z'],moonkoi:['koi','-x',{moon:1}],shark:['tigershark','+z'],gwhite:['gwhite','+z'],
   crucian:['fish_crucian','+z'],tilapia:['fish_tilapia','+z'],snakehead:['fish_snakehead','+z'],peacock:['fish_peacock','+z'],
   clarias:['fish_clarias','+z'],spgar:['fish_spgar','+z'],carp:['fish_carp','+z'],silvercarp:['fish_silvercarp','+z'],grasscarp:['fish_grasscarp','+z'],blackcarp:['fish_blackcarp','+z'],arapaima:['fish_arapaima','+z'],
   char:['fish_char','+z'],burbot:['fish_burbot','+z'],porgy:['fish_porgy','+z'],parrot:['fish_parrot','+z'],redbream:['fish_redbream','+z'],emperor:['fish_emperor','+z'],cobia:['fish_cobia','+z'],hardclam:['fish_hardclam','+z'],gomphina:['fish_gomphina','+z'],tellin:['fish_tellin','+z'],razor:['fish_razor','+z'],ghostcrab:['fish_ghostcrab','+z'],fiddler:['fish_fiddler','+z'],mudskip:['fish_mudskip','+z'],ragworm:['fish_ragworm','+z'],hermit:['fish_hermit','+z'],barracuda:['fish_barracuda','+z'],grouper2:['fish_grouper2','+z'],bigeye:['fish_bigeye','+z'],stingray:['fish_stingray','+z'],amberjack:['fish_amberjack','+z'],knifejaw:['fish_knifejaw','+z'],halibut:['fish_halibut','+z'],sunfish:['fish_sunfish','+z'],wrasse:['fish_wrasse','+z'],skipjack:['fish_skipjack','+z'],sawara:['fish_sawara','+z'],yellowfin:['fish_yellowfin','+z'],
@@ -3495,7 +3498,7 @@ const RHEAD={gwhite:'+z',tigershark:'+z',dolphin:'+z',whale:'+z',gator:'+x',eagl
 const RSETS={lake:['mermaid_v2','fish_bowfin','fish_reba','fish_mandarin','bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
   ice:['trout','pike','bluegill','crappie'],
   tide:['fish_hardclam','fish_gomphina','fish_tellin','fish_razor','fish_ghostcrab','fish_fiddler','fish_mudskip','fish_ragworm','fish_hermit'],
-  sea:['mermaid_v2','fish_amber','fish_barracuda','fish_grouper2','fish_bigeye','fish_stingray','fish_amberjack','fish_knifejaw','fish_halibut','fish_sunfish','fish_mahi','fish_sail','yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','seaking']};
+  sea:['mermaid_v2','fish_amber','fish_barracuda','fish_grouper2','fish_bigeye','fish_stingray','fish_amberjack','fish_knifejaw','fish_halibut','fish_sunfish','fish_mahi','fish_sail','yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','king_v2']};
 const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger Shark','ra_in_coat'],['海豚','Bottlenose Dolphin','popcornbag'],['座頭鯨','Humpback Whale','ostapblendercg'],
   ['鱷魚','American Alligator','JeremyGrayson'],['白頭海鵰','Bald Eagle','ucdavisterc'],['海鷗','Seagull','Dayvable'],['遊艇',"Frickie's yacht",'dannzjs'],
   ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
@@ -3504,7 +3507,7 @@ const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger 
   ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚・弓鰭魚・鯽魚・吳郭魚・線鱧・孔雀鱸・塘蝨・斑點雀鱔・鯉魚・鰱魚・草魚・青魚・巨骨舌魚・北極紅點鮭・江鱈・黑鯛・鸚哥魚・真鯛・青嘴龍占・海鱺・曲紋唇魚・正鰹・土魠・黃鰭鮪・鱸鰻・湄公河巨鯰・黃金鱸・白鮭・湖紅點鮭・哲羅鮭・浪人鰺・劍旗魚・公子小丑魚・擬刺尾鯛・鬚鳚・神仙魚・長吻蝴蝶魚・絲鰺・海馬・神話海馬獸・原木獨木舟','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['霜汐（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['滄淵','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
 
 const GLOW=[];
-const BAKED=new Set(['fish_clownfish','fish_bluetang','fish_blenny','fish_angelfish','fish_copperband','fish_threadfin','fish_seabeast','fish_seahorse','fish_eel','fish_mekong','fish_yperch','fish_whitefish','fish_laketrout','fish_taimen','fish_gt','fish_swordfish','fish_char','fish_burbot','fish_porgy','fish_parrot','fish_redbream','fish_emperor','fish_cobia','fish_wrasse','fish_skipjack','fish_sawara','fish_yellowfin','fish_clarias','fish_spgar','fish_carp','fish_silvercarp','fish_grasscarp','fish_blackcarp','fish_arapaima','fish_crucian','fish_tilapia','fish_snakehead','fish_peacock','fish_reba','fish_mandarin','fish_amber','fish_mahi','fish_sail','fish_bowfin','mermaid_v2','seaking']);   // 依設定圖烘焙貼圖的模型
+const BAKED=new Set(['fish_clownfish','fish_bluetang','fish_blenny','fish_angelfish','fish_copperband','fish_threadfin','fish_seabeast','fish_seahorse','fish_eel','fish_mekong','fish_yperch','fish_whitefish','fish_laketrout','fish_taimen','fish_gt','fish_swordfish','fish_char','fish_burbot','fish_porgy','fish_parrot','fish_redbream','fish_emperor','fish_cobia','fish_wrasse','fish_skipjack','fish_sawara','fish_yellowfin','fish_clarias','fish_spgar','fish_carp','fish_silvercarp','fish_grasscarp','fish_blackcarp','fish_arapaima','fish_crucian','fish_tilapia','fish_snakehead','fish_peacock','fish_reba','fish_mandarin','fish_amber','fish_mahi','fish_sail','fish_bowfin','mermaid_v2','seaking','king_v2']);   // 依設定圖烘焙貼圖的模型
 function createModels(W){
 'use strict';
 const T=THREE, loader=new T.GLTFLoader(), files={}, waiters={}, mixers=[];
@@ -3598,7 +3601,8 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
       if(opt.ghost){ n.color=new T.Color(0xbfe6ff); n.transparent=true; n.opacity=.38; n.emissive=new T.Color(0x4ab8ff); n.emissiveIntensity=.55; n.depthWrite=false; n.side=T.DoubleSide; }   // 幽靈魚：真的半透明，看得到後面的水草
       bendify(n,uni,opt.king||opt.mer?.15:1); return n; };
     const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
-  try{ if(opt.mer&&window.__MER){ const ctl=window.__MER.rig(grp,{uni,horiz:()=>!!window.__UWON&&!(window.__G&&window.__G.merShow)}); grp.userData.merCtl=ctl; }   // 美人魚：完整骨架＋表情（眨眼、說話、微笑、揮手、尾巴波浪、頭髮）
+  try{ if(opt.king&&window.__MER){ const ctl=window.__MER.king(grp,{uni}); grp.userData.merCtl=ctl; }   /* 滄淵：完整骨架與表情 */
+    else if(opt.mer&&window.__MER){ const ctl=window.__MER.rig(grp,{uni,horiz:()=>!!window.__UWON&&!(window.__G&&window.__G.merShow)}); grp.userData.merCtl=ctl; }   // 美人魚：完整骨架＋表情（眨眼、說話、微笑、揮手、尾巴波浪、頭髮）
     else if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });
         const rg=autoRig(grp,'tail'); FRIGS.add({grp,uni,up:rg,idle:0}); } }
     else { grp.userData.cutWhite=CUTWHITE.has(sp.id); grp.userData.bigClaw=sp.id==='fiddler'; rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); } cloneSafe(grp); }catch(e){ console.warn('fish rig',sp.id,e); }
@@ -5722,7 +5726,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030052941'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030054427'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -5802,7 +5806,8 @@ function startShot(i){ si=i; st=0; cur=shots[i]; if(!cur){ finish(false); return
   blk.style.opacity=cur.fadeIn===false?blk.style.opacity:0; }
 function tick(dt){ if(!on) return; st+=dt; const s=cur; if(!s) return; const k=ease(st/s.d);
   // 字幕依鏡頭時間觸發（畫面卡頓時字幕和畫面仍然對得上）
-  const sl=s.subs||[]; while(s.subI<sl.length&&st>=sl[s.subI][0]){ const x=sl[s.subI++]; say(x[1],x[2],x[3]); { const mc=window.__merCtlE; if(mc&&/^霜汐/.test(x[1])){ mc.talk(Math.min(4,(x[3]||3)*.8)); if(/謝謝|喜歡|回來|很好|燈/.test(x[1])) mc.smile((x[3]||3)+1); if(/再見|保重|下次|走了/.test(x[1])) mc.wave(); } } }   /* 霜汐說話時嘴巴跟著動，溫暖的話會微笑、道別會揮手 */
+  const sl=s.subs||[]; while(s.subI<sl.length&&st>=sl[s.subI][0]){ const x=sl[s.subI++]; say(x[1],x[2],x[3]); { const kc=window.__kingCtlE; if(kc&&/^滄淵/.test(x[1])){ kc.talk(Math.min(5,(x[3]||3)*.85)); if(/好|謝|回來|原諒/.test(x[1])) kc.smile((x[3]||3)+1); } }   /* 滄淵說話時鬍子下的嘴巴跟著動 */
+  { const mc=window.__merCtlE; if(mc&&/^霜汐/.test(x[1])){ mc.talk(Math.min(4,(x[3]||3)*.8)); if(/謝謝|喜歡|回來|很好|燈/.test(x[1])) mc.smile((x[3]||3)+1); if(/再見|保重|下次|走了/.test(x[1])) mc.wave(); } } }   /* 霜汐說話時嘴巴跟著動，溫暖的話會微笑、道別會揮手 */
   tA.fromArray(s.from[0]).lerp(tB.fromArray(s.to[0]),k); camP.copy(tA); camL.fromArray(s.from[1]).lerp(tB.fromArray(s.to[1]),k);
   if(frameHook) try{ frameHook(st,si); }catch(e){}
   let hold=false; if(s.tick) try{ hold=s.tick(st,k,camP,camL)==='hold'; }catch(e){ console.warn('ending tick',e); }
@@ -5914,7 +5919,9 @@ function endingShots(E,c){
   load('models/lantern.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene.clone(true); o.scale.setScalar(.26); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xffc070); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lampG.add(o); });
   // 滄淵：深淵之王的模型（約 9 公尺高），面向漁船
   const king=new T.Group(); // 滄淵模型有骨架（SkinnedMesh），要用 SkeletonUtils 複製，骨頭才會跟著搬到新位置
-  load('models/seaking.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material=m.material.clone(); m.material.emissive=new T.Color(0x000000); m.material.color.setScalar(.82); } } }); o.scale.setScalar(5); king.add(o); king.updateMatrixWorld(true); rigs.push({k:'king',rig:autoRig(o,'tail')}); });
+  load(window.__MER?'models/king_v2.glb':'models/seaking.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material=m.material.clone(); m.material.emissive=new T.Color(0x000000); m.material.color.setScalar(.82); } } }); o.scale.setScalar(5); king.add(o); king.updateMatrixWorld(true);
+    if(window.__MER){ const ctl=window.__MER.king(o); window.__kingCtlE=ctl; rigs.push({k:'king',rig:{pose:p=>{ ctl.swim(Math.min(.7,(p.tail||.1)*2)); ctl.head(p.headYaw||0,p.headPitch||0); }}}); }   /* 滄淵：依新設定圖重做的模型，完整骨架與表情 */
+    else rigs.push({k:'king',rig:autoRig(o,'tail')}); });
   const kingEye=new T.PointLight(0x9fe8ff,0,14,2); kingEye.position.set(0,4.2,1.2); king.add(kingEye);
   // 月光海路：從月亮正下方一路鋪到船邊的碎銀光，隨浪閃爍
   const glitTex=(()=>{ const cv=document.createElement('canvas'); cv.width=256; cv.height=512; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,256,512);

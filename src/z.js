@@ -51,7 +51,8 @@ function startShot(i){ si=i; st=0; cur=shots[i]; if(!cur){ finish(false); return
   blk.style.opacity=cur.fadeIn===false?blk.style.opacity:0; }
 function tick(dt){ if(!on) return; st+=dt; const s=cur; if(!s) return; const k=ease(st/s.d);
   // 字幕依鏡頭時間觸發（畫面卡頓時字幕和畫面仍然對得上）
-  const sl=s.subs||[]; while(s.subI<sl.length&&st>=sl[s.subI][0]){ const x=sl[s.subI++]; say(x[1],x[2],x[3]); { const mc=window.__merCtlE; if(mc&&/^霜汐/.test(x[1])){ mc.talk(Math.min(4,(x[3]||3)*.8)); if(/謝謝|喜歡|回來|很好|燈/.test(x[1])) mc.smile((x[3]||3)+1); if(/再見|保重|下次|走了/.test(x[1])) mc.wave(); } } }   /* 霜汐說話時嘴巴跟著動，溫暖的話會微笑、道別會揮手 */
+  const sl=s.subs||[]; while(s.subI<sl.length&&st>=sl[s.subI][0]){ const x=sl[s.subI++]; say(x[1],x[2],x[3]); { const kc=window.__kingCtlE; if(kc&&/^滄淵/.test(x[1])){ kc.talk(Math.min(5,(x[3]||3)*.85)); if(/好|謝|回來|原諒/.test(x[1])) kc.smile((x[3]||3)+1); } }   /* 滄淵說話時鬍子下的嘴巴跟著動 */
+  { const mc=window.__merCtlE; if(mc&&/^霜汐/.test(x[1])){ mc.talk(Math.min(4,(x[3]||3)*.8)); if(/謝謝|喜歡|回來|很好|燈/.test(x[1])) mc.smile((x[3]||3)+1); if(/再見|保重|下次|走了/.test(x[1])) mc.wave(); } } }   /* 霜汐說話時嘴巴跟著動，溫暖的話會微笑、道別會揮手 */
   tA.fromArray(s.from[0]).lerp(tB.fromArray(s.to[0]),k); camP.copy(tA); camL.fromArray(s.from[1]).lerp(tB.fromArray(s.to[1]),k);
   if(frameHook) try{ frameHook(st,si); }catch(e){}
   let hold=false; if(s.tick) try{ hold=s.tick(st,k,camP,camL)==='hold'; }catch(e){ console.warn('ending tick',e); }
@@ -163,7 +164,9 @@ function endingShots(E,c){
   load('models/lantern.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene.clone(true); o.scale.setScalar(.26); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xffc070); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lampG.add(o); });
   // 滄淵：深淵之王的模型（約 9 公尺高），面向漁船
   const king=new T.Group(); // 滄淵模型有骨架（SkinnedMesh），要用 SkeletonUtils 複製，骨頭才會跟著搬到新位置
-  load('models/seaking.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material=m.material.clone(); m.material.emissive=new T.Color(0x000000); m.material.color.setScalar(.82); } } }); o.scale.setScalar(5); king.add(o); king.updateMatrixWorld(true); rigs.push({k:'king',rig:autoRig(o,'tail')}); });
+  load(window.__MER?'models/king_v2.glb':'models/seaking.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material=m.material.clone(); m.material.emissive=new T.Color(0x000000); m.material.color.setScalar(.82); } } }); o.scale.setScalar(5); king.add(o); king.updateMatrixWorld(true);
+    if(window.__MER){ const ctl=window.__MER.king(o); window.__kingCtlE=ctl; rigs.push({k:'king',rig:{pose:p=>{ ctl.swim(Math.min(.7,(p.tail||.1)*2)); ctl.head(p.headYaw||0,p.headPitch||0); }}}); }   /* 滄淵：依新設定圖重做的模型，完整骨架與表情 */
+    else rigs.push({k:'king',rig:autoRig(o,'tail')}); });
   const kingEye=new T.PointLight(0x9fe8ff,0,14,2); kingEye.position.set(0,4.2,1.2); king.add(kingEye);
   // 月光海路：從月亮正下方一路鋪到船邊的碎銀光，隨浪閃爍
   const glitTex=(()=>{ const cv=document.createElement('canvas'); cv.width=256; cv.height=512; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,256,512);

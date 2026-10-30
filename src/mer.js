@@ -4,17 +4,19 @@
    用法：window.__MER.rig(載入的模型根節點) → 回傳控制器（自己跟著畫面更新；可呼叫 talk(秒)、wave()、smile(秒)、look(秒)、swim(0~1)） */
 window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能比這段程式晚載好：用到時才取用，不能在載入時就碰 THREE */
   const init=()=>{ if(!T){ T=window.THREE; FACE_RECT=new T.Vector4(.16929,.05296,.20686,.10781); } };   // 臉在模型貼圖上的位置（u0,v0,u1,v1；v 由上往下）
-  let faceTex=null; const faceT=()=>{ init(); if(!faceTex){ faceTex=new T.TextureLoader().load('mer_face2.jpg'); faceTex.encoding=T.sRGBEncoding; faceTex.anisotropy=8; } return faceTex; };
-  function faceMat(mat,W){ mat.onBeforeCompile=sh=>{ sh.uniforms.tFace={value:faceT()}; sh.uniforms.uRect={value:FACE_RECT}; sh.uniforms.uFW=W.a; sh.uniforms.uFW2=W.b;
+  const faceTexs={}; const faceT=(u)=>{ init(); u=u||'mer_face2.jpg'; if(!faceTexs[u]){ const t=new T.TextureLoader().load(u); t.encoding=T.sRGBEncoding; t.anisotropy=8; faceTexs[u]=t; } return faceTexs[u]; };
+  function faceMat(mat,W){ mat.onBeforeCompile=sh=>{ sh.uniforms.tFace={value:faceT(W.face)}; sh.uniforms.uRect={value:W.rect||FACE_RECT}; sh.uniforms.uFW=W.a; sh.uniforms.uFW2=W.b;
     sh.fragmentShader=sh.fragmentShader.replace('#include <map_pars_fragment>','#include <map_pars_fragment>\nuniform sampler2D tFace; uniform vec4 uRect, uFW, uFW2;\nvec3 cellC(int i, vec2 f){ float cx=float(i-3*(i/3)), cy=float(i/3); return sRGBToLinear(texture2D(tFace,vec2((cx+f.x)/3.,1.-(cy+f.y)/2.))).rgb; }')
       .replace('#include <map_fragment>',`#include <map_fragment>
   { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(f.x>0.&&f.x<1.&&f.y>0.&&f.y<1.){ float m=smoothstep(0.,.2,f.x)*smoothstep(1.,.8,f.x)*smoothstep(0.,.16,f.y)*smoothstep(1.,.84,f.y);
       float wsum=uFW.x+uFW.y+uFW.z+uFW.w+uFW2.x; vec3 c=cellC(0,f)*max(0.,1.-wsum)+cellC(1,f)*uFW.x+cellC(2,f)*uFW.y+cellC(3,f)*uFW.z+cellC(4,f)*uFW.w+cellC(5,f)*uFW2.x;
       diffuseColor.rgb=mix(diffuseColor.rgb,c,m*.96); } }`); };
-    mat.customProgramCacheKey=()=>'merFace'; mat.needsUpdate=true; }
-  function rig(root,opt){ init(); opt=opt||{}; faceT(); root.updateMatrixWorld(true);   /* 表情貼圖一開始就下載（第一次畫到臉之前要載好，否則那塊會是黑的） */ let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
+    mat.customProgramCacheKey=()=>'merFace'+(W&&W.face||''); mat.needsUpdate=true; }
+  function rig(root,opt){ init(); opt=opt||{}; faceT(opt.face); root.updateMatrixWorld(true);   /* 表情貼圖一開始就下載（第一次畫到臉之前要載好，否則那塊會是黑的） */ let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
     const geo=src.geometry.clone(); geo.applyMatrix4(new T.Matrix4().copy(root.matrixWorld).invert().multiply(src.matrixWorld)); geo.computeBoundingBox();
     const bb=geo.boundingBox, H=bb.max.y-bb.min.y, top=bb.max.y, Y=f=>top-f*H, Wd=(bb.max.x-bb.min.x)/2, cx=(bb.max.x+bb.min.x)/2, cz=(bb.max.z+bb.min.z)/2;
+    if(geo.index){ const I=geo.index.array, P0=geo.attributes.position, a1=new T.Vector3(), b1=new T.Vector3(), c1=new T.Vector3(), keep=[];   /* 清掉生成工具留下的異常拉長薄面（滄淵手到尾巴的那條細線） */
+      for(let k=0;k<I.length;k+=3){ a1.fromBufferAttribute(P0,I[k]); b1.fromBufferAttribute(P0,I[k+1]); c1.fromBufferAttribute(P0,I[k+2]); if(Math.max(a1.distanceTo(b1),b1.distanceTo(c1),c1.distanceTo(a1))>H*.12) continue; keep.push(I[k],I[k+1],I[k+2]); } geo.setIndex(keep); }
     // 骨頭（位置用設定圖的身體比例）
     const B={}, mk=(n,p,x,f,z)=>{ const b=new T.Bone(); b.name=n; b.userData.w=new T.Vector3(cx+x*Wd,Y(f),cz+(z||0)); B[n]=b; if(p) B[p].add(b); return b; };
     mk('root',null,0,.36); mk('hips','root',0,.36); mk('spine','hips',0,.29); mk('chest','spine',0,.21); mk('neck','chest',0,.155); mk('head','neck',0,.125);
@@ -28,14 +30,14 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
     const v=new T.Vector3(); const chain=['head','neck','chest','spine','hips','t1','t2','t3','t4','t5','t6','fin'];
     for(let i=0;i<n;i++){ v.fromBufferAttribute(P,i); const f=(top-v.y)/H, ax=Math.abs(v.x-cx)/Wd; let out=null;
       // 手臂：A 字張開的手臂離身體中線夠遠
-      if(f>.15&&f<.42&&ax>.23){ const s=v.x<cx?'L':'R'; const segs=[['up'+s,'fo'+s],['fo'+s,'ha'+s],['ha'+s,'he'+s]]; let best=9,bi=0,bt=0; segs.forEach((sg,k)=>{ const [d,t]=segD(v,B[sg[0]].userData.w,B[sg[1]].userData.w); if(d<best){ best=d; bi=k; bt=t; } });
-        if(best<.04*H){ const a=segs[bi][0], b=segs[bi][1]; out=bt>.85&&bi<2?[[a,1-(bt-.85)/.3],[segs[bi+1][0],(bt-.85)/.3]]:bt<.15&&bi>0?[[a,.5+bt/.3],[segs[bi-1][0],.5-bt/.3]]:[[a,1]]; if(bi===0&&bt<.3) out=[['up'+s,.3+bt*2.33],['chest',.7-bt*2.33]]; } }   // 肩膀附近和胸部平滑過渡，舉手時腋下不會拉出一大片
+      if(f>.15&&f<.46&&ax>.23){ const s=v.x<cx?'L':'R'; const segs=[['up'+s,'fo'+s],['fo'+s,'ha'+s],['ha'+s,'he'+s]]; let best=9,bi=0,bt=0; segs.forEach((sg,k)=>{ const [d,t]=segD(v,B[sg[0]].userData.w,B[sg[1]].userData.w); if(d<best){ best=d; bi=k; bt=t; } });
+        if(best<(ax>.75?.1:.04)*H){   /* 手掌、手指離骨頭線比較遠，也要算進手臂 */ const a=segs[bi][0], b=segs[bi][1]; out=bt>.85&&bi<2?[[a,1-(bt-.85)/.3],[segs[bi+1][0],(bt-.85)/.3]]:bt<.15&&bi>0?[[a,.5+bt/.3],[segs[bi-1][0],.5-bt/.3]]:[[a,1]]; if(bi===0&&bt<.3) out=[['up'+s,.3+bt*2.33],['chest',.7-bt*2.33]]; } }   // 肩膀附近和胸部平滑過渡，舉手時腋下不會拉出一大片
       // 頭髮：頭後面垂下來的長髮
       if(!out&&v.z<cz-(f>.3?.055:.02)&&f>.13&&f<.43&&ax<.24){ const k=Math.min(3,Math.max(0,(f-.14)/.09)), a=Math.floor(Math.min(2.999,k)); out=[['hr'+(a+1),1-(k-a)],['hr'+(a+2),k-a]]; if(f>.37){ const g=(f-.37)/.06; out=[[out[0][0],out[0][1]*(1-g)],[out[1][0],out[1][1]*(1-g)],['hips',g]]; } }   // 長髮到腰，髮尾和腰慢慢過渡
       if(!out){ const ys=chain.map(c2=>B[c2].userData.w.y); let a=0; while(a<chain.length-2&&v.y<ys[a+1]) a++; const t=Math.max(0,Math.min(1,(ys[a]-v.y)/Math.max(1e-4,ys[a]-ys[a+1]))); out=[[chain[a],1-t],[chain[a+1],t]]; }
       out.slice(0,4).forEach(([b,w],k)=>{ si[i*4+k]=idx(b); sw[i*4+k]=Math.max(0,w); }); const s2=sw[i*4]+sw[i*4+1]+sw[i*4+2]+sw[i*4+3]||1; for(let k=0;k<4;k++) sw[i*4+k]/=s2; }
     geo.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); geo.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
-    const W={a:{value:new T.Vector4()},b:{value:new T.Vector4()}}, mat=src.material.clone(); mat.skinning=true; faceMat(mat,W);   /* r128 要明確開啟 skinning */
+    const W={a:{value:new T.Vector4()},b:{value:new T.Vector4()},face:opt.face,rect:opt.rect?new T.Vector4(...opt.rect):null}, mat=src.material.clone(); mat.skinning=true; faceMat(mat,W);   /* r128 要明確開啟 skinning */
     const sk=new T.SkinnedMesh(geo,mat); sk.frustumCulled=false; src.parent.remove(src); root.add(sk);   // 幾何已轉到根節點座標，蒙皮網格直接掛在根節點下
     sk.add(B.root); sk.updateMatrixWorld(true); sk.bind(new T.Skeleton(list));   // 先放好位置再綁定，綁定姿勢才正確
     // 控制
@@ -58,10 +60,11 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.08+Math.sin(ph-1.5-i*.6)*.12*(i+1)*.5,Math.sin(t*.7-i*.5)*.08,0));
       st.wave=Math.max(0,st.wave-dt); const wv=st.wave>0?Math.min(1,Math.min(st.wave,2.4-st.wave)*2.5):0;
       for(const [s,k] of [['L',-1],['R',1]]){ const paddle=Math.sin(ph*.6+(k>0?0:Math.PI))*(.15+sw2*.25), w=k>0?wv:0;
-        const relax=(window.__MERARM??-.62)*(1-w), stream=Math.max(0,sw2-.55)/.45;   // 手臂從 A 字放下到身體兩側；游得快時手往後收貼著身體
-        rot('up'+s,stream*.5,0,k*(relax-stream*.25+paddle*.35+.04*Math.sin(t*.9+k))+k*w*1.6); rot('fo'+s,0,-k*(.25+paddle*.25+.1*Math.sin(t*.7))*(1-w),k*w*(.6+Math.sin(t*9)*.35)+k*.08*Math.sin(t*.6)); rot('ha'+s,0,k*.15*Math.sin(t*1.1+k),k*(paddle*.3+.15)); }   // 右手揮手時舉起來左右擺
+        const relax=(opt.relax??-.62)*(1-w), stream=Math.max(0,sw2-.55)/.45;   // 手臂從 A 字放下到身體兩側；游得快時手往後收貼著身體
+        rot('up'+s,stream*.5,0,k*(relax-stream*.25+paddle*.35+.04*Math.sin(t*.9+k))+k*w*1.6); rot('fo'+s,0,-k*(.25+paddle*.25+.1*Math.sin(t*.7))*(1-w)*(opt.bend??1),k*w*(.6+Math.sin(t*9)*.35)+k*.08*Math.sin(t*.6)); rot('ha'+s,0,k*.15*Math.sin(t*1.1+k)*(opt.bend??1),k*(paddle*.3+.15)*(opt.bend??1)); }   // 右手揮手時舉起來左右擺
     };
     sk.onBeforeRender=tick;
     return {head:(y,p)=>{ st.hy=y; st.hp=p; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } },mesh:sk,bones:B,talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },smile:s=>{ st.smile=Math.max(st.smile,s||3); },wave:()=>{ st.wave=2.4; },look:()=>{ st.look=1.6; },swim:k=>{ st.swim=k; }}; }
-  return {rig};
+  const KING={face:'king_face.jpg',rect:[.1656,.0633,.1999,.1164],relax:-.25,bend:.25};   /* 滄淵的表情貼圖與臉的位置 */
+  return {rig,king:(root,o)=>rig(root,Object.assign({},KING,o||{}))};
 })();
