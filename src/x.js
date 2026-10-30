@@ -36,7 +36,7 @@ let hc=null; window.__GHOSTDBG=()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t
 function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=true;
   if(window.__HUMAN){ GL.load('models/lin_v1.glb',g=>{ const o=g.scene; o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
       const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); o.updateMatrixWorld(true);
-      try{ hc=window.__HUMAN.rig(o,{ghost:true}); const mt=hc.mesh.material; mt.transparent=true; mt.opacity=.95; mt.fog=true;
+      try{ hc=window.__HUMAN.rig(o,{ghost:true,relax:-.18}); const mt=hc.mesh.material; mt.transparent=true; mt.opacity=.95; mt.fog=true;
         mt.emissive=new T.Color(0x1f6b45); mt.emissiveMap=null; mt.emissiveIntensity=1;   /* 綠光用純色疊加：不能用原貼圖當發光圖，否則烘焙在模型上的活人臉會蓋過女鬼臉與表情 */   /* 身上自帶幽幽的綠光：夜裡也看得清楚身體和臉 */
         W.renderer.localClippingEnabled=true; mt.clippingPlanes=[new T.Plane(new T.Vector3(0,1,0),.02)]; mats.push(mt); }catch(e){ console.warn('lin rig',e); }   /* 水面以下切掉：沉下去時真的像沒入水中 */
       model=new T.Group(); model.add(o); { const gl=new T.PointLight(0x6dffa8,1.6,5,1.6); gl.position.set(0,1.35,.55); model.add(gl); const gl2=new T.PointLight(0x6dffa8,.8,3,2); gl2.position.set(0,.8,-.4); model.add(gl2); }

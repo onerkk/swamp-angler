@@ -1,4 +1,4 @@
-/*APPV:20261030091410*/
+/*APPV:20261030093738*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -778,7 +778,7 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       // 手臂與垂掛的寬袖：從正面看，在手臂線上方一點到下方 0.3H 之間、肩膀以外的部分（只看 x、y，不看前後）
       if(f>.19&&f<.86&&ax>.3){ const s=v.x<cx?'L':'R', ch=['up'+s,'fo'+s,'ha'+s,'he'+s].map(nm=>B[nm].userData.w), dx=Math.abs(v.x-cx);
         let k=0; while(k<2&&dx>Math.abs(ch[k+1].x-cx)) k++; const A=ch[k], Bb=ch[k+1], t=Math.max(0,Math.min(1,(dx-Math.abs(A.x-cx))/Math.max(1e-4,Math.abs(Bb.x-cx)-Math.abs(A.x-cx)))), ly=A.y+(Bb.y-A.y)*t;
-        if(v.y<ly+.05*H&&v.y>ly-.42*H){ const nm=['up'+s,'fo'+s,'ha'+s][k], soft=Math.min(1,Math.max(0,(ax-.3)/.1)), body=f<.5?'chest':'hips';
+        if(v.y<ly+.05*H&&v.y>ly-(ax>.68?Math.max(opt.sleeve??.42,.2):(opt.sleeve??.42))*H){   /* 垂下的袖子長度依角色：短袖的小女孩、老漁人只算手臂附近，不會把裙子或褲子當成袖子 */ const nm=['up'+s,'fo'+s,'ha'+s][k], soft=Math.min(1,Math.max(0,(ax-.3)/.1)), body=f<.5?'chest':'hips';
           out=k===0&&t<.35?[[nm,soft*(.35+t*1.85)],['chest',1-soft*(.35+t*1.85)]]:[[nm,soft],[body,1-soft]]; } }
       // 長髮
       if(!out&&v.z<B.neck.userData.w.z-.045&&f>.12&&f<(opt.hairMax??.58)&&ax<.24){   /* 頭髮的長度依角色：短髮的小女孩、老漁人不能把背部衣服當成頭髮 */ const k=Math.min(3,Math.max(0,(f-.13)/.12)), a=Math.floor(Math.min(2.999,k)); out=[['hr'+(a+1),1-(k-a)],['hr'+(a+2),k-a]]; if(f>.5){ const g=(f-.5)/.08; out=[[out[0][0],out[0][1]*(1-g)],[out[1][0],out[1][1]*(1-g)],['hips',g]]; } }
@@ -814,15 +814,15 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       rot('hips',st.crawl*1.35,0,0); rot('spine',(st.lean+st.reach*.6)*.25+br*.5+jit(),jit(),jit()); rot('chest',br+st.crawl*-.2+jit(),0,jit());
       rot('neck',st.hp*.35+jit(),st.hy*.3,st.hr*.35); rot('head',st.hp*.65+Math.sin(t*.5)*.03*(1-tw)+jit(),st.hy*.7+jit(),st.hr*.65+jit());
       for(const [s,k] of [['L',-1],['R',1]]){ const relax=(opt.relax||0)*(1-st.reach)*(1-st.armUp);   /* 寬袖和洋裝是連在一起的：手臂只微微放下（女鬼略張的雙手），避免把布料拉開 */
-        rot('up'+s,-st.reach*.25-st.crawl*1.0+jit(),0,k*(relax+st.armUp*.9+.03*Math.sin(t*.8+k))+jit());   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
-        rot('fo'+s,-st.reach*1.1,-k*.15,k*st.crawl*.6+jit()); rot('ha'+s,-st.reach*.5,0,k*.1+jit()+k*st.reach*.3*Math.sin(t*14));   /* 手指一抓一抓 */
+        const sw=(opt.sway??.07)*(1-st.reach)*(1-st.walk*.5); rot('up'+s,-st.reach*.25-st.crawl*1.0+sw*Math.sin(t*.85+(k>0?2.2:0))+jit(),0,k*(relax+st.armUp*.9+.035*Math.sin(t*.8+k))+jit());   /* 雙手隨呼吸自然前後輕擺 */   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
+        rot('fo'+s,-st.reach*1.1-sw*.6*Math.max(0,Math.sin(t*.85+(k>0?2.2:0)-.6)),-k*(opt.bend??.15),k*st.crawl*.6+jit()); rot('ha'+s,-st.reach*.5,0,k*.1+jit()+k*st.reach*.3*Math.sin(t*14));   /* 手指一抓一抓 */
         const wl=st.walk*Math.sin(st.wph+(k>0?Math.PI:0)); rot('th'+s,-st.crawl*1.4-wl*.12,0,0); rot('kn'+s,st.crawl*2.0+Math.max(0,-wl)*.15*st.walk,0,0);   /* 走路：兩腿交替跨步 */ rot('an'+s,0,0,0); }
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.05+Math.sin(t*.9-i*.6)*.04*(i+1)-st.hairFace*(i===0?2.6:.25),Math.sin(t*.5-i*.4)*.05,0));   /* 頭歪時長髮仍然往下垂，不會跟著頭橫出去 */   // 頭髮垂到臉前
     };
     sk.onBeforeRender=tick;
     return {mesh:sk,bones:B,step:d=>{ st.wph+=d; },set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },veil:k=>{ U.veil.value=k; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
   // 其他角色：小女孩（生前的林秋月）、老漁人
-  const PRESET={girl:{faceA:'girl_face.jpg',rect:[.1424,.0638,.1964,.1641],relax:-.55,hairMax:.27,chin:.155},old:{faceA:'old_face.jpg',rect:[.1479,.0451,.1937,.1292],relax:-.12,hairMax:.12,chin:.13}};
+  const PRESET={girl:{faceA:'girl_face.jpg',rect:[.1424,.0638,.1964,.1641],relax:-.6,hairMax:.27,chin:.155,bend:.03,sway:.09,sleeve:.09},old:{faceA:'old_face.jpg',rect:[.1479,.0451,.1937,.1292],relax:-.12,hairMax:.12,chin:.13,bend:.06,sleeve:.07}};
   return {rig,preset:(name,root,o)=>rig(root,Object.assign({},PRESET[name]||{},o||{})),PRESET};
 })();
 const SCAN_TINT=`#include <map_fragment>
@@ -5507,7 +5507,7 @@ let hc=null; window.__GHOSTDBG=()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t
 function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=true;
   if(window.__HUMAN){ GL.load('models/lin_v1.glb',g=>{ const o=g.scene; o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
       const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); o.updateMatrixWorld(true);
-      try{ hc=window.__HUMAN.rig(o,{ghost:true}); const mt=hc.mesh.material; mt.transparent=true; mt.opacity=.95; mt.fog=true;
+      try{ hc=window.__HUMAN.rig(o,{ghost:true,relax:-.18}); const mt=hc.mesh.material; mt.transparent=true; mt.opacity=.95; mt.fog=true;
         mt.emissive=new T.Color(0x1f6b45); mt.emissiveMap=null; mt.emissiveIntensity=1;   /* 綠光用純色疊加：不能用原貼圖當發光圖，否則烘焙在模型上的活人臉會蓋過女鬼臉與表情 */   /* 身上自帶幽幽的綠光：夜裡也看得清楚身體和臉 */
         W.renderer.localClippingEnabled=true; mt.clippingPlanes=[new T.Plane(new T.Vector3(0,1,0),.02)]; mats.push(mt); }catch(e){ console.warn('lin rig',e); }   /* 水面以下切掉：沉下去時真的像沒入水中 */
       model=new T.Group(); model.add(o); { const gl=new T.PointLight(0x6dffa8,1.6,5,1.6); gl.position.set(0,1.35,.55); model.add(gl); const gl2=new T.PointLight(0x6dffa8,.8,3,2); gl2.position.set(0,.8,-.4); model.add(gl2); }
@@ -5784,7 +5784,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030091410'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030093738'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -5954,8 +5954,8 @@ function createEndingWorld(W,c){
   let built=false, mem=null, lamp=null, lampL=null, tide=null, tideM=null, t=0;
   // 平常釣魚時椅子往碼頭右側挪一點，不要擋在正前方的拋竿視線上
   function build(){ built=true; mem=makeMemorial(load); mem.g.position.x=.45; S.add(mem.g);
-    lamp=new T.Group(); lampL=new T.PointLight(0xcfe0ff,1.6,7,1.6); lampL.position.y=.22; lamp.add(lampL); lamp.position.set(-.05,.86,-2.75); mem.g.add(lamp);
-    load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.26); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xcfe0ff); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp.add(o); });
+    lamp=new T.Group(); lampL=new T.PointLight(0xcfe0ff,1.6,7,1.6); lampL.position.y=.22; lamp.add(lampL); lamp.position.set(-.05,.8,-2.75); mem.g.add(lamp);
+    load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.2); o.position.y=1.003*.2;   /* 燈的原點在正中央：往上抬半個燈高，底部剛好坐在木板上（原本沉進木板裡） */ o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xcfe0ff); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp.add(o); });
     tideM=new T.MeshBasicMaterial({map:makeTideTex(),transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,color:0xcfe0ff,fog:false}); tideM.map.repeat.set(7,7);
     tide=new T.Mesh(new T.PlaneGeometry(80,80).rotateX(-Math.PI/2),tideM); tide.position.set(-8,.27,-28); tide.renderOrder=3; S.add(tide); }
   function update(dt){ const done=c.done(); if(!done&&!built) return; if(!built) build(); t+=dt;
@@ -6053,7 +6053,7 @@ function endingShots(E,c){
   function loadHuman(url,dst,glow,key,hgt){ load(url,g=>{ const o=g.scene.clone(true); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ m.material=mt.clone(); if(mt.map){ m.material.emissive=new T.Color(glow); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.55; } } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar((hgt||1.62)/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); dst.add(o); dst.updateMatrixWorld(true);
-    if(url==='models/lin_v1.glb'&&window.__HUMAN){ const hc=window.__HUMAN.rig(o,{ghost:true}); window.__linCtlE=hc; hc.expr(5); rigs.push({k:'ghost',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.4); hc.set('hr',p.headRoll||0); }}}); return; }   /* 結局的她：新模型、哀傷的女鬼臉 */
+    if(url==='models/lin_v1.glb'&&window.__HUMAN){ const hc=window.__HUMAN.rig(o,{ghost:true,relax:-.18}); window.__linCtlE=hc; hc.expr(5); rigs.push({k:'ghost',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.4); hc.set('hr',p.headRoll||0); }}}); return; }   /* 結局的她：新模型、哀傷的女鬼臉 */
     if((url==='models/girl_v2.glb'||url==='models/old_v2.glb')&&window.__HUMAN){ const nm=url.indexOf('girl')>=0?'girl':'old', hc=window.__HUMAN.preset(nm,o); window['__'+nm+'CtlE']=hc; hc.mesh.visible=true; hc.isVis=()=>{ let o2=dst; while(o2){ if(!o2.visible) return false; o2=o2.parent; } return true; };
       rigs.push({k:key||'heng',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.2); hc.set('hr',p.headRoll||0); }}}); return; }   /* 生前的小女孩、老漁人：新模型與表情 */
     rigs.push({k:key||(dst===hGhost?'ghost':'heng'),rig:autoRig(o,'human')}); }); }
@@ -6064,7 +6064,7 @@ function endingShots(E,c){
   const pin=new T.Group(); load('item_hairpin.glb',g=>{ const o=g.scene.clone(true); o.traverse(m=>{ m.frustumCulled=false; }); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(.2/Math.max(sz.x,sz.y,sz.z,1e-6)); pin.add(o); });
   const hengLook=(x,z)=>Math.atan2(x-heng.position.x,z-heng.position.z);
   const lamp2=new T.Group(), lamp2L=new T.PointLight(0xffb866,0,8,1.6); lamp2.add(lamp2L);
-  load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.24); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xffc070); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp2.add(o); });
+  load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.15);   /* 小女孩提的燈：約 30 公分（原本快半公尺） */ o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xffc070); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp2.add(o); });
   // 第三幕：月光灣的岩石與霜汐（玩家設定圖生成的 3D 模型），夜裡用自己的貼圖微微發光
   const BAY=new T.Vector3(-12,0,-44), merG=new T.Group(), merW=new T.Group(); merG.add(merW); merG.position.copy(BAY);
   // 只取石組裡的一顆石頭，半露出水面放在她身後，不要整組散在鏡頭前
@@ -6168,7 +6168,7 @@ function endingShots(E,c){
         setOp(met?hAlive:hGhost,a); heng.position.y=.12+Math.sin(t*1.2)*.02; const rk=met?'heng':'ghost'; RP[rk].headPitch=t>4.5&&t<7?.32*Math.sin((t-4.5)/2.5*Math.PI):0; RP[rk].headYaw=t>8&&t<10?-.5*Math.sin((t-8)/2*Math.PI):0; RP[rk].skirt=.03;
         // 她轉身，朝月光灣的方向走去
         if(t>8){ heng.rotation.y=hengLook(-1.6,-8.5)+Math.min(1,(t-8)/2)*2.4; heng.position.z=-17.9-Math.max(0,t-9.5)*.35; }
-        if(met){ lamp2.position.set(heng.position.x+.25,.9+heng.position.y-.12,heng.position.z+.2); lamp2L.intensity=1.4*a; lamp2.visible=a>.02; } },
+        if(met){ lamp2.position.set(heng.position.x+.24,.46+heng.position.y,heng.position.z+.12); lamp2L.intensity=1.4*a; lamp2.visible=a>.02; } },
       subs:met?[[1,'浮萍灣的水面上，站著一個提燈的女孩（林秋月）。','',4.4],[6.4,'她（林秋月）朝你點點頭，提著燈，\n往月光灣的方向走去。','',4.8]]
               :[[1,'浮萍灣的水面上，站著一個白衣的女孩（林秋月）。','',4.4],[6.2,'三十年來，她（林秋月）一直在這裡，\n等一盞燈。','',4.6],[11.2,'她（林秋月）轉過身，往月光灣的方向走去。','',4]]},
     // 第三幕一：月光灣——霜汐坐在岩石上，等你
@@ -6185,7 +6185,7 @@ function endingShots(E,c){
       enter:()=>{ keep(heng); heng.position.set(BAY.x+3.4,.12,BAY.z+5.2); setOp(hGhost,met?0:0); setOp(hAlive,0); if(met){ keep(lamp2); } sc.ha=0; },
       tick:(t)=>{ merW.position.y=Math.sin(t*.9)*.015; const u=Math.min(1,Math.max(0,(t-6)/7)), a=Math.min(1,Math.max(0,(t-6)/2));
         heng.position.set(BAY.x+3.4-2.2*u,.12+Math.sin(t*1.2)*.02,BAY.z+5.2-3.6*u); heng.rotation.y=hengLook(BAY.x,BAY.z); setOp(met?hAlive:hGhost,a);
-        if(met){ lamp2.position.set(heng.position.x+.25,.9,heng.position.z+.15); lamp2L.intensity=1.4*a; }
+        if(met){ lamp2.position.set(heng.position.x+.24,.46+heng.position.y,heng.position.z+.12); lamp2L.intensity=1.4*a; }
         merW.rotation.y=merFace()+Math.min(1,Math.max(0,(t-7)/3))*.9; },
       subs:[[1,'霜汐：「那個女孩叫林秋月，是他（老漁人）的女兒。」','q',4.2],[5.4,'霜汐：「三十年前的颱風夜，是她（林秋月）的生日。\n他（老漁人）答應過，那天會早點回家。」','q',5.4],[11.2,'霜汐：「可是那一夜，我被倒下的樹困住了。\n他（老漁人）冒著雨，划來救我……」','q',5.4]]},
     // 回憶一：三十年前，颱風夜。林秋月提著燈站在浮萍灣的小棧橋上，等著湖上的船

@@ -43,7 +43,7 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       // 手臂與垂掛的寬袖：從正面看，在手臂線上方一點到下方 0.3H 之間、肩膀以外的部分（只看 x、y，不看前後）
       if(f>.19&&f<.86&&ax>.3){ const s=v.x<cx?'L':'R', ch=['up'+s,'fo'+s,'ha'+s,'he'+s].map(nm=>B[nm].userData.w), dx=Math.abs(v.x-cx);
         let k=0; while(k<2&&dx>Math.abs(ch[k+1].x-cx)) k++; const A=ch[k], Bb=ch[k+1], t=Math.max(0,Math.min(1,(dx-Math.abs(A.x-cx))/Math.max(1e-4,Math.abs(Bb.x-cx)-Math.abs(A.x-cx)))), ly=A.y+(Bb.y-A.y)*t;
-        if(v.y<ly+.05*H&&v.y>ly-.42*H){ const nm=['up'+s,'fo'+s,'ha'+s][k], soft=Math.min(1,Math.max(0,(ax-.3)/.1)), body=f<.5?'chest':'hips';
+        if(v.y<ly+.05*H&&v.y>ly-(ax>.68?Math.max(opt.sleeve??.42,.2):(opt.sleeve??.42))*H){   /* 垂下的袖子長度依角色：短袖的小女孩、老漁人只算手臂附近，不會把裙子或褲子當成袖子 */ const nm=['up'+s,'fo'+s,'ha'+s][k], soft=Math.min(1,Math.max(0,(ax-.3)/.1)), body=f<.5?'chest':'hips';
           out=k===0&&t<.35?[[nm,soft*(.35+t*1.85)],['chest',1-soft*(.35+t*1.85)]]:[[nm,soft],[body,1-soft]]; } }
       // 長髮
       if(!out&&v.z<B.neck.userData.w.z-.045&&f>.12&&f<(opt.hairMax??.58)&&ax<.24){   /* 頭髮的長度依角色：短髮的小女孩、老漁人不能把背部衣服當成頭髮 */ const k=Math.min(3,Math.max(0,(f-.13)/.12)), a=Math.floor(Math.min(2.999,k)); out=[['hr'+(a+1),1-(k-a)],['hr'+(a+2),k-a]]; if(f>.5){ const g=(f-.5)/.08; out=[[out[0][0],out[0][1]*(1-g)],[out[1][0],out[1][1]*(1-g)],['hips',g]]; } }
@@ -79,14 +79,14 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       rot('hips',st.crawl*1.35,0,0); rot('spine',(st.lean+st.reach*.6)*.25+br*.5+jit(),jit(),jit()); rot('chest',br+st.crawl*-.2+jit(),0,jit());
       rot('neck',st.hp*.35+jit(),st.hy*.3,st.hr*.35); rot('head',st.hp*.65+Math.sin(t*.5)*.03*(1-tw)+jit(),st.hy*.7+jit(),st.hr*.65+jit());
       for(const [s,k] of [['L',-1],['R',1]]){ const relax=(opt.relax||0)*(1-st.reach)*(1-st.armUp);   /* 寬袖和洋裝是連在一起的：手臂只微微放下（女鬼略張的雙手），避免把布料拉開 */
-        rot('up'+s,-st.reach*.25-st.crawl*1.0+jit(),0,k*(relax+st.armUp*.9+.03*Math.sin(t*.8+k))+jit());   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
-        rot('fo'+s,-st.reach*1.1,-k*.15,k*st.crawl*.6+jit()); rot('ha'+s,-st.reach*.5,0,k*.1+jit()+k*st.reach*.3*Math.sin(t*14));   /* 手指一抓一抓 */
+        const sw=(opt.sway??.07)*(1-st.reach)*(1-st.walk*.5); rot('up'+s,-st.reach*.25-st.crawl*1.0+sw*Math.sin(t*.85+(k>0?2.2:0))+jit(),0,k*(relax+st.armUp*.9+.035*Math.sin(t*.8+k))+jit());   /* 雙手隨呼吸自然前後輕擺 */   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
+        rot('fo'+s,-st.reach*1.1-sw*.6*Math.max(0,Math.sin(t*.85+(k>0?2.2:0)-.6)),-k*(opt.bend??.15),k*st.crawl*.6+jit()); rot('ha'+s,-st.reach*.5,0,k*.1+jit()+k*st.reach*.3*Math.sin(t*14));   /* 手指一抓一抓 */
         const wl=st.walk*Math.sin(st.wph+(k>0?Math.PI:0)); rot('th'+s,-st.crawl*1.4-wl*.12,0,0); rot('kn'+s,st.crawl*2.0+Math.max(0,-wl)*.15*st.walk,0,0);   /* 走路：兩腿交替跨步 */ rot('an'+s,0,0,0); }
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.05+Math.sin(t*.9-i*.6)*.04*(i+1)-st.hairFace*(i===0?2.6:.25),Math.sin(t*.5-i*.4)*.05,0));   /* 頭歪時長髮仍然往下垂，不會跟著頭橫出去 */   // 頭髮垂到臉前
     };
     sk.onBeforeRender=tick;
     return {mesh:sk,bones:B,step:d=>{ st.wph+=d; },set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },veil:k=>{ U.veil.value=k; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
   // 其他角色：小女孩（生前的林秋月）、老漁人
-  const PRESET={girl:{faceA:'girl_face.jpg',rect:[.1424,.0638,.1964,.1641],relax:-.55,hairMax:.27,chin:.155},old:{faceA:'old_face.jpg',rect:[.1479,.0451,.1937,.1292],relax:-.12,hairMax:.12,chin:.13}};
+  const PRESET={girl:{faceA:'girl_face.jpg',rect:[.1424,.0638,.1964,.1641],relax:-.6,hairMax:.27,chin:.155,bend:.03,sway:.09,sleeve:.09},old:{faceA:'old_face.jpg',rect:[.1479,.0451,.1937,.1292],relax:-.12,hairMax:.12,chin:.13,bend:.06,sleeve:.07}};
   return {rig,preset:(name,root,o)=>rig(root,Object.assign({},PRESET[name]||{},o||{})),PRESET};
 })();

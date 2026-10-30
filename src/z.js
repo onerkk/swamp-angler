@@ -141,8 +141,8 @@ function createEndingWorld(W,c){
   let built=false, mem=null, lamp=null, lampL=null, tide=null, tideM=null, t=0;
   // 平常釣魚時椅子往碼頭右側挪一點，不要擋在正前方的拋竿視線上
   function build(){ built=true; mem=makeMemorial(load); mem.g.position.x=.45; S.add(mem.g);
-    lamp=new T.Group(); lampL=new T.PointLight(0xcfe0ff,1.6,7,1.6); lampL.position.y=.22; lamp.add(lampL); lamp.position.set(-.05,.86,-2.75); mem.g.add(lamp);
-    load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.26); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xcfe0ff); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp.add(o); });
+    lamp=new T.Group(); lampL=new T.PointLight(0xcfe0ff,1.6,7,1.6); lampL.position.y=.22; lamp.add(lampL); lamp.position.set(-.05,.8,-2.75); mem.g.add(lamp);
+    load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.2); o.position.y=1.003*.2;   /* 燈的原點在正中央：往上抬半個燈高，底部剛好坐在木板上（原本沉進木板裡） */ o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xcfe0ff); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp.add(o); });
     tideM=new T.MeshBasicMaterial({map:makeTideTex(),transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,color:0xcfe0ff,fog:false}); tideM.map.repeat.set(7,7);
     tide=new T.Mesh(new T.PlaneGeometry(80,80).rotateX(-Math.PI/2),tideM); tide.position.set(-8,.27,-28); tide.renderOrder=3; S.add(tide); }
   function update(dt){ const done=c.done(); if(!done&&!built) return; if(!built) build(); t+=dt;
@@ -240,7 +240,7 @@ function endingShots(E,c){
   function loadHuman(url,dst,glow,key,hgt){ load(url,g=>{ const o=g.scene.clone(true); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ m.material=mt.clone(); if(mt.map){ m.material.emissive=new T.Color(glow); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.55; } } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar((hgt||1.62)/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); dst.add(o); dst.updateMatrixWorld(true);
-    if(url==='models/lin_v1.glb'&&window.__HUMAN){ const hc=window.__HUMAN.rig(o,{ghost:true}); window.__linCtlE=hc; hc.expr(5); rigs.push({k:'ghost',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.4); hc.set('hr',p.headRoll||0); }}}); return; }   /* 結局的她：新模型、哀傷的女鬼臉 */
+    if(url==='models/lin_v1.glb'&&window.__HUMAN){ const hc=window.__HUMAN.rig(o,{ghost:true,relax:-.18}); window.__linCtlE=hc; hc.expr(5); rigs.push({k:'ghost',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.4); hc.set('hr',p.headRoll||0); }}}); return; }   /* 結局的她：新模型、哀傷的女鬼臉 */
     if((url==='models/girl_v2.glb'||url==='models/old_v2.glb')&&window.__HUMAN){ const nm=url.indexOf('girl')>=0?'girl':'old', hc=window.__HUMAN.preset(nm,o); window['__'+nm+'CtlE']=hc; hc.mesh.visible=true; hc.isVis=()=>{ let o2=dst; while(o2){ if(!o2.visible) return false; o2=o2.parent; } return true; };
       rigs.push({k:key||'heng',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.2); hc.set('hr',p.headRoll||0); }}}); return; }   /* 生前的小女孩、老漁人：新模型與表情 */
     rigs.push({k:key||(dst===hGhost?'ghost':'heng'),rig:autoRig(o,'human')}); }); }
@@ -251,7 +251,7 @@ function endingShots(E,c){
   const pin=new T.Group(); load('item_hairpin.glb',g=>{ const o=g.scene.clone(true); o.traverse(m=>{ m.frustumCulled=false; }); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(.2/Math.max(sz.x,sz.y,sz.z,1e-6)); pin.add(o); });
   const hengLook=(x,z)=>Math.atan2(x-heng.position.x,z-heng.position.z);
   const lamp2=new T.Group(), lamp2L=new T.PointLight(0xffb866,0,8,1.6); lamp2.add(lamp2L);
-  load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.24); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xffc070); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp2.add(o); });
+  load('models/lantern.glb',g=>{ const o=g.scene.clone(true); o.scale.setScalar(.15);   /* 小女孩提的燈：約 30 公分（原本快半公尺） */ o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt&&mt.map){ m.material=mt.clone(); m.material.emissive=new T.Color(0xffc070); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.5; } } }); lamp2.add(o); });
   // 第三幕：月光灣的岩石與霜汐（玩家設定圖生成的 3D 模型），夜裡用自己的貼圖微微發光
   const BAY=new T.Vector3(-12,0,-44), merG=new T.Group(), merW=new T.Group(); merG.add(merW); merG.position.copy(BAY);
   // 只取石組裡的一顆石頭，半露出水面放在她身後，不要整組散在鏡頭前
@@ -355,7 +355,7 @@ function endingShots(E,c){
         setOp(met?hAlive:hGhost,a); heng.position.y=.12+Math.sin(t*1.2)*.02; const rk=met?'heng':'ghost'; RP[rk].headPitch=t>4.5&&t<7?.32*Math.sin((t-4.5)/2.5*Math.PI):0; RP[rk].headYaw=t>8&&t<10?-.5*Math.sin((t-8)/2*Math.PI):0; RP[rk].skirt=.03;
         // 她轉身，朝月光灣的方向走去
         if(t>8){ heng.rotation.y=hengLook(-1.6,-8.5)+Math.min(1,(t-8)/2)*2.4; heng.position.z=-17.9-Math.max(0,t-9.5)*.35; }
-        if(met){ lamp2.position.set(heng.position.x+.25,.9+heng.position.y-.12,heng.position.z+.2); lamp2L.intensity=1.4*a; lamp2.visible=a>.02; } },
+        if(met){ lamp2.position.set(heng.position.x+.24,.46+heng.position.y,heng.position.z+.12); lamp2L.intensity=1.4*a; lamp2.visible=a>.02; } },
       subs:met?[[1,'浮萍灣的水面上，站著一個提燈的女孩（林秋月）。','',4.4],[6.4,'她（林秋月）朝你點點頭，提著燈，\n往月光灣的方向走去。','',4.8]]
               :[[1,'浮萍灣的水面上，站著一個白衣的女孩（林秋月）。','',4.4],[6.2,'三十年來，她（林秋月）一直在這裡，\n等一盞燈。','',4.6],[11.2,'她（林秋月）轉過身，往月光灣的方向走去。','',4]]},
     // 第三幕一：月光灣——霜汐坐在岩石上，等你
@@ -372,7 +372,7 @@ function endingShots(E,c){
       enter:()=>{ keep(heng); heng.position.set(BAY.x+3.4,.12,BAY.z+5.2); setOp(hGhost,met?0:0); setOp(hAlive,0); if(met){ keep(lamp2); } sc.ha=0; },
       tick:(t)=>{ merW.position.y=Math.sin(t*.9)*.015; const u=Math.min(1,Math.max(0,(t-6)/7)), a=Math.min(1,Math.max(0,(t-6)/2));
         heng.position.set(BAY.x+3.4-2.2*u,.12+Math.sin(t*1.2)*.02,BAY.z+5.2-3.6*u); heng.rotation.y=hengLook(BAY.x,BAY.z); setOp(met?hAlive:hGhost,a);
-        if(met){ lamp2.position.set(heng.position.x+.25,.9,heng.position.z+.15); lamp2L.intensity=1.4*a; }
+        if(met){ lamp2.position.set(heng.position.x+.24,.46+heng.position.y,heng.position.z+.12); lamp2L.intensity=1.4*a; }
         merW.rotation.y=merFace()+Math.min(1,Math.max(0,(t-7)/3))*.9; },
       subs:[[1,'霜汐：「那個女孩叫林秋月，是他（老漁人）的女兒。」','q',4.2],[5.4,'霜汐：「三十年前的颱風夜，是她（林秋月）的生日。\n他（老漁人）答應過，那天會早點回家。」','q',5.4],[11.2,'霜汐：「可是那一夜，我被倒下的樹困住了。\n他（老漁人）冒著雨，划來救我……」','q',5.4]]},
     // 回憶一：三十年前，颱風夜。林秋月提著燈站在浮萍灣的小棧橋上，等著湖上的船
