@@ -36,8 +36,11 @@ let hc=null; window.__GHOSTDBG=()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t
 function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=true;
   if(window.__HUMAN){ GL.load('models/lin_v1.glb',g=>{ const o=g.scene; o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
       const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); o.updateMatrixWorld(true);
-      try{ hc=window.__HUMAN.rig(o,{ghost:true}); hc.mesh.material.transparent=true; hc.mesh.material.opacity=.93; hc.mesh.material.fog=true; }catch(e){ console.warn('lin rig',e); }
-      model=new T.Group(); model.add(o); model.visible=false; W.scene.add(model); loading=false; fn(model); },undefined,()=>{ loading=false; }); return; }
+      try{ hc=window.__HUMAN.rig(o,{ghost:true}); const mt=hc.mesh.material; mt.transparent=true; mt.opacity=.95; mt.fog=true;
+        mt.emissive=new T.Color(0x7dffb0); mt.emissiveMap=mt.map; mt.emissiveIntensity=.55;   /* 身上自帶幽幽的綠光：夜裡也看得清楚身體和臉 */
+        W.renderer.localClippingEnabled=true; mt.clippingPlanes=[new T.Plane(new T.Vector3(0,1,0),.02)]; mats.push(mt); }catch(e){ console.warn('lin rig',e); }   /* 水面以下切掉：沉下去時真的像沒入水中 */
+      model=new T.Group(); model.add(o); { const gl=new T.PointLight(0x6dffa8,1.6,5,1.6); gl.position.set(0,1.35,.55); model.add(gl); const gl2=new T.PointLight(0x6dffa8,.8,3,2); gl2.position.set(0,.8,-.4); model.add(gl2); }
+      model.visible=false; W.scene.add(model); loading=false; fn(model); },undefined,()=>{ loading=false; }); return; }
   GL.load('models/ghost.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ mt.fog=true; mt.transparent=true; mt.opacity=.88; mt.depthWrite=true; mt.roughness=1; mt.metalness=0; if(mt.map){ mt.emissive=new T.Color(0x8fa0b8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.12; } mats.push(mt); } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); o.updateMatrixWorld(true); try{ ghostRig=autoRig(o,'human'); }catch(e){ console.warn('ghost rig',e); }
@@ -48,11 +51,23 @@ const SFX={}; function sfx(name,vol){ try{ let a=SFX[name]; if(!a){ a=new Audio(
 ['scream_main','scream_b','wail','gasp'].forEach(n=>{ try{ const a=new Audio(n+'.mp3'); a.preload='auto'; SFX[n]=a; }catch(e){} });
 // 喉嚨的「呃呃呃」：低頻鋸齒波＋一頓一頓的音量（咒怨伽椰子的聲音），脖子的喀喀聲，嚇人前把環境音壓到幾乎無聲
 let AC=null, croakN=null; const actx=()=>{ try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} return AC; };
-function croak(on){ const a=actx(); if(!a) return; if(croakN){ try{ croakN.g.gain.setTargetAtTime(0,a.currentTime,.05); const n=croakN; setTimeout(()=>{ try{ n.o.stop(); n.l.stop(); }catch(e){} },400); }catch(e){} croakN=null; } if(!on) return;
+function croakOld(on){ const a=actx(); if(!a) return; if(croakN){ try{ croakN.g.gain.setTargetAtTime(0,a.currentTime,.05); const n=croakN; setTimeout(()=>{ try{ n.o.stop(); n.l.stop(); }catch(e){} },400); }catch(e){} croakN=null; } if(!on) return;
   const o=a.createOscillator(), g=a.createGain(), f=a.createBiquadFilter(), l=a.createOscillator(), lg=a.createGain(); o.type='sawtooth'; o.frequency.value=62; f.type='bandpass'; f.frequency.value=480; f.Q.value=1.6;
   l.type='square'; l.frequency.value=13; lg.gain.value=.5; l.connect(lg); lg.connect(g.gain); g.gain.value=.5; o.connect(f); f.connect(g); g.connect(a.destination); o.start(); l.start();
   o.frequency.setValueAtTime(62,a.currentTime); o.frequency.linearRampToValueAtTime(74,a.currentTime+3); croakN={o,g,l}; }
-function croakVol(v){ try{ if(croakN&&AC) croakN.g.gain.setTargetAtTime(v,AC.currentTime,.2); }catch(e){} }
+// 咒怨式的喉音：不規則的聲門摩擦聲（一顆一顆的短促氣音、間隔忽快忽慢），經過喉嚨共鳴，加上低沉的嗡鳴
+let rattle=null;
+function croak(on){ const a=actx(); if(!a) return; if(rattle){ rattle.stop=true; const r=rattle; try{ r.g.gain.setTargetAtTime(0,a.currentTime,.08); }catch(e){} setTimeout(()=>{ try{ r.drone.stop(); }catch(e){} },500); rattle=null; } if(!on) return;
+  const g=a.createGain(); g.gain.value=.08; const f1=a.createBiquadFilter(); f1.type='bandpass'; f1.frequency.value=650; f1.Q.value=4; const f2=a.createBiquadFilter(); f2.type='bandpass'; f2.frequency.value=1500; f2.Q.value=6;
+  const mix=a.createGain(); mix.gain.value=1; f1.connect(mix); f2.connect(mix); mix.connect(g); g.connect(a.destination);
+  const drone=a.createOscillator(), dg=a.createGain(); drone.type='sine'; drone.frequency.value=38; dg.gain.value=.18; drone.connect(dg); dg.connect(g); drone.start();
+  const nb=a.createBuffer(1,Math.floor(a.sampleRate*.012),a.sampleRate), d=nb.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2.5);
+  const R={g,drone,stop:false}; rattle=R; let tNext=a.currentTime+.05, phase=0;
+  const pump=()=>{ if(R.stop) return; while(tNext<a.currentTime+.25){ phase+=1; const gap=(Math.sin(phase*.31)>.2?.022:.045)+Math.random()*.03;   // 一串密、一串疏，像卡在喉嚨的氣
+      const s=a.createBufferSource(), sg=a.createGain(); s.buffer=nb; s.playbackRate.value=.7+Math.random()*.5; sg.gain.value=.6+Math.random()*.6; s.connect(sg); sg.connect(f1); sg.connect(f2); s.start(tNext); tNext+=gap;
+      if(Math.random()<.04) tNext+=.25+Math.random()*.35; }   // 偶爾停一下，像在吸氣
+    setTimeout(pump,120); }; pump(); }
+function croakVol(v){ try{ if(rattle&&AC) rattle.g.gain.setTargetAtTime(Math.min(1,v*1.6),AC.currentTime,.2); }catch(e){} }
 function crack(){ const a=actx(); if(!a) return; const b=a.createBuffer(1,a.sampleRate*.06,a.sampleRate), d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,6);
   const s=a.createBufferSource(), f=a.createBiquadFilter(), g=a.createGain(); f.type='highpass'; f.frequency.value=1800; g.gain.value=.9; s.buffer=b; s.connect(f); f.connect(g); g.connect(a.destination); s.start(); }
 function muteAll(on){ try{ if(c.mute) c.mute(on); }catch(e){} }

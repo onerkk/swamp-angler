@@ -671,7 +671,7 @@ function updateKayak(dt){
   if(keys.KeyW) thr=1; if(keys.KeyS) thr=-.6; if(keys.KeyA) turn=-1; if(keys.KeyD) turn=1;
   if(!can){ thr=0; turn=0; }
   if(!s.kayak&&!s.yacht){ KY.v=0; KY.w=0; WL.paddle(dt,0); stowRod(WL.padOn()); return; }
-  KY.v+=(thr*(s.yacht?4:1.5)-KY.v*.65)*dt; KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
+  KY.v+=(thr*(s.yacht?9:1.5)-KY.v*(s.yacht?.6:.65))*dt;   /* 漁船靠引擎：最高約每秒 15 公尺（約 29 節），獨木舟約 2.3 公尺 */ KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
   WL.paddle(dt,s.yacht?0:clamp(Math.max(Math.abs(thr),Math.abs(turn)*.7),0,1),AT.ring);   // 遊艇靠引擎，不划槳
   stowRod(WL.padOn());
   if(Math.abs(KY.v)<.002&&Math.abs(KY.w)<.002) return;
