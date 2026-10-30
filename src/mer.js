@@ -12,7 +12,7 @@ window.__MER=(()=>{ const T=THREE;
       float wsum=uFW.x+uFW.y+uFW.z+uFW.w+uFW2.x; vec3 c=cellC(0,f)*max(0.,1.-wsum)+cellC(1,f)*uFW.x+cellC(2,f)*uFW.y+cellC(3,f)*uFW.z+cellC(4,f)*uFW.w+cellC(5,f)*uFW2.x;
       diffuseColor.rgb=mix(diffuseColor.rgb,c,m*.96); } }`); };
     mat.customProgramCacheKey=()=>'merFace'; mat.needsUpdate=true; }
-  function rig(root){ faceT(); root.updateMatrixWorld(true);   /* 表情貼圖一開始就下載（第一次畫到臉之前要載好，否則那塊會是黑的） */ let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
+  function rig(root,opt){ opt=opt||{}; faceT(); root.updateMatrixWorld(true);   /* 表情貼圖一開始就下載（第一次畫到臉之前要載好，否則那塊會是黑的） */ let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
     const geo=src.geometry.clone(); geo.applyMatrix4(new T.Matrix4().copy(root.matrixWorld).invert().multiply(src.matrixWorld)); geo.computeBoundingBox();
     const bb=geo.boundingBox, H=bb.max.y-bb.min.y, top=bb.max.y, Y=f=>top-f*H, Wd=(bb.max.x-bb.min.x)/2, cx=(bb.max.x+bb.min.x)/2, cz=(bb.max.z+bb.min.z)/2;
     // 骨頭（位置用設定圖的身體比例）
@@ -41,7 +41,7 @@ window.__MER=(()=>{ const T=THREE;
     // 控制
     const st={t:0,blink:0,nextBlink:2,talk:0,smile:0,look:0,lookT:6,wave:0,swim:.5,last:performance.now()}, rest={}; list.forEach(b=>rest[b.name]=b.quaternion.clone());
     const q=new T.Quaternion(), e=new T.Euler(), rot=(b,x,y,z)=>{ e.set(x,y,z); q.setFromEuler(e); B[b].quaternion.copy(rest[b]).multiply(q); };
-    const tick=()=>{ const now=performance.now(), dt=Math.min(.05,(now-st.last)/1000); st.last=now; if(dt<=0) return; st.t+=dt; const t=st.t, sw2=st.swim;
+    const tick=()=>{ const now=performance.now(), dt=Math.min(.05,(now-st.last)/1000); st.last=now; if(dt<=0) return; st.t+=dt; if(opt.uni) st.swim=Math.min(1,.25+opt.uni.uAmp.value*3); const t=st.t, sw2=st.swim;   /* 跟著遊戲裡的掙扎／游動強度 */
       // 眨眼：每 2～5 秒一次，約 0.15 秒
       st.nextBlink-=dt; if(st.nextBlink<=0){ st.blink=.16; st.nextBlink=2+Math.random()*3; } st.blink=Math.max(0,st.blink-dt); const bl=st.blink>0?Math.sin((1-st.blink/.16)*Math.PI):0;
       // 說話：嘴巴在「啊」「喔」之間開合

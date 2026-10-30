@@ -397,7 +397,7 @@ function showCard(){
   $('bGrill').classList.toggle('hidden',!canGrill(fd)||!HOME.unlocked()); $('bGrill').textContent='🔥 放進保冷箱，帶回去烤（'+((save.cooler||[]).length)+'/5）';
   { const hr=HOME.check(fd), b=$('bHome'); b.classList.toggle('hidden',!!hr.hide||!HOME.unlocked()); b.textContent=hr.mount?'🖼 '+hr.short+'，做成標本 🪙'+hr.cost.toLocaleString():'🏠 帶回家';
     b.dataset.mode=hr.ok?'keep':hr.mount?'mount':'no'; b.dataset.why=hr.why||''; b.classList.toggle('dim',!hr.ok&&!hr.mount); }
-  FUN.medalBadge(fd); FUN.goalsDot(); if(sp.special==='mermaid'){ G.fish.group.visible=false; FUN.mermaidScene(); }
+  FUN.medalBadge(fd); FUN.goalsDot(); if(sp.special==='mermaid'){ const ctl=G.fish.group.userData.merCtl; if(ctl){ G.merShow={t:0,ctl}; G.fish.group.visible=true; FUN.mermaidScene(true); ctl.smile(6); setTimeout(()=>ctl.talk(3.2),900); } else { G.fish.group.visible=false; FUN.mermaidScene(); } }
   const nb=$('cNew'); nb.textContent=isNew?'新魚種':'新紀錄'; nb.classList.toggle('hidden',!(isNew||isRec));
   const tag=$('tag'); tag.style.animation='none'; void tag.offsetWidth; tag.style.animation='';
   ui.catch.classList.remove('hidden'); document.body.classList.add('catching'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden');
@@ -422,6 +422,16 @@ window.__goHome=goHome;
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
+// 釣到美人魚：她從船前方的水裡浮上來（腰以上露出水面），轉向你、眨眼、微笑、說話；送她回家時揮手、慢慢沉回水裡
+function merPresent(dt){ const m=G.merShow; if(!m) return; const g=G.fish.group; if(!g||!m.ctl){ G.merShow=null; return; } m.t+=dt;
+  const cam=W.camera; cam.updateMatrixWorld(true); const hp=cam.getWorldPosition(new THREE.Vector3()), dv=cam.getWorldDirection(new THREE.Vector3()); dv.y=0; dv.normalize(); const yaw=Math.atan2(-dv.x,-dv.z);   /* 用真正的鏡頭方向（不是頭部節點） */
+  const fx=dv.x, fz=dv.z, D=4.6, H=1.75;   // 約 1.75 公尺高，離船 4.6 公尺（太近會被下方的魚卡擋住）
+  if(g.parent!==W.scene) W.scene.attach(g); g.scale.setScalar(H);   /* 模型正規化成長度 1、中心在原點 */
+  const rise=m.leave?Math.max(0,1-m.leave/2.2):Math.min(1,m.t/1.6), sink=(1-rise)*1.1;
+  g.position.set(hp.x+fx*D,-.17*H+.32-sink+Math.sin(m.t*1.3)*.04,hp.z+fz*D);   // 上半身和臀部浮出水面
+  g.rotation.set(0,yaw,0); m.ctl.swim(.25);
+  if(m.leave){ m.leave+=dt; if(m.leave>2.4){ g.visible=false; G.merShow=null; } }
+  if(Math.random()<dt*.15&&!m.leave) m.ctl.look(); }
 function finishCatch(sell){
   const keep=sell==='keep'; if(keep) sell=false;   // 帶回家：不賣、也不算放生
   if(sell&&G.fd&&G.fd.sp&&(G.fd.sp.noSell||G.fd.sp.special==='mermaid')) sell=false;   // 保育類、美人魚：任何途徑都不能賣
@@ -430,7 +440,7 @@ function finishCatch(sell){
   if(G.fd.item) FUN.itemEffect(G.fd.item);
   if(sell){ const v=Math.round(G.fd.value*(1+(save.mer&&save.mer.n>=15?.2:save.mer&&save.mer.n>=8?.1:0))); save.coins+=v; persist(); Snd.coin(); coinFly(v); }
   else if(keep){ Snd.coin(); }
-  else { META.onRelease(); if(G.fd.sp.special==='mermaid'){ const v=G.fd.value; save.coins+=v; persist(); Snd.coin(); coinFly(v); G.luck=.25; FUN.merMeet(); } else { G.luck=Math.min(.25,G.luck+.08); toast('放生了，下一竿稀有魚機率提高','good',1800); } }
+  else { META.onRelease(); if(G.fd.sp.special==='mermaid'){ if(G.merShow){ G.merShow.leave=.01; G.merShow.ctl.wave(); G.merShow.ctl.smile(3); } const v=G.fd.value; save.coins+=v; persist(); Snd.coin(); coinFly(v); G.luck=.25; FUN.merMeet(); } else { G.luck=Math.min(.25,G.luck+.08); toast('放生了，下一竿稀有魚機率提高','good',1800); } }
   W.scene.attach(g); G.state='post'; G.stT=0; G.postSell=sell||keep; G.from.copy(g.position);
 }
 function coinFly(v){ const el=document.createElement('div'); el.className='fly'; el.textContent='+'+v.toLocaleString()+' 🪙';
@@ -562,7 +572,7 @@ const TIDE=createTide(W,{species:id=>SPECIES.find(q=>q.id===id),hour:()=>G.hour,
 window.__P_splash=(x,y,z)=>{ try{ P.splash(x,.02,z,8,.25); }catch(e){} };
 function goTide(){ if(G.state!=='idle'){ toast('先收線再下灘','warn'); return; } MDL.preload('tide'); G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ if(TIDE.enter()) G.state='tide'; else G.state='idle'; fadeEl.classList.remove('on'); },650); }
-window.__W=W; window.__HS=()=>HOME3D; window.__goTide=goTide;
+window.__W=W; window.__testMer=()=>{ const sp=SPECIES.find(q=>q.special==='mermaid'); G.sp=sp; G.fd={sp,L:1.7,w:55,lvl:1,value:500,xpMul:1,grade:'A',u:.5}; const fish=P.getFish(sp); G.fish=fish; if(!fish.group.parent) W.scene.add(fish.group); G.state='catch'; try{ showCard(); }catch(e){ return 'card '+e.message; } if(G.merShow) G.merShow.t=2; return !!fish.group.userData.merCtl; }; window.__HS=()=>HOME3D; window.__goTide=goTide;
 function tideDone(bag0,forced){ const handled=bag0.filter(b=>b.done).length; let bag=bag0.filter(b=>!b.done); if(!bag.length&&handled){ persist(); toast(forced?'被救回岸邊':'回到岸上了，這次處理了 '+handled+' 個收穫','good',2000); G.state='idle'; return; } G.state='idle';
   // 圖鑑：挖到的都算發現
   bag.forEach(b=>{ const r=save.dex[b.id]; save.dex[b.id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,b.L),bl:Math.max(r?r.bl||0:0,b.L),md:r?r.md||0:0,f:r?r.f:Date.now()}; });
@@ -971,7 +981,7 @@ W.setTime(G.hour,true);
 let last=performance.now(), prAcc=0, prN=0, prChecks=0;
 function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
-  try{ update(dt); if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
+  try{ update(dt); merPresent(dt); if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
   if(prAcc>2){ const fps=prN/prAcc, mode=save.gfx||'auto', ready=window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden;
     if(ready){ G.gfxWarm=(G.gfxWarm||0)+1; }
