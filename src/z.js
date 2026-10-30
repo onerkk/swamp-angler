@@ -54,7 +54,7 @@ function tick(dt){ if(!on) return; st+=dt; const s=cur; if(!s) return; const k=e
   const sl=s.subs||[]; while(s.subI<sl.length&&st>=sl[s.subI][0]){ const x=sl[s.subI++]; say(x[1],x[2],x[3]); { const gc=window.__girlCtlE; if(gc&&gc.isVis&&gc.isVis()&&/^林秋月/.test(x[1])){ gc.talk(Math.min(4,(x[3]||3)*.8)); gc.expr(/謝謝|喜歡|回家|好開心|笑/.test(x[1])?4:/對不起|怕|等|冷|一個人/.test(x[1])?5:-1); } }   /* 生前的小女孩：說話、開心時笑、難過時想哭 */
   { const oc=window.__oldCtlE; if(oc&&oc.isVis&&oc.isVis()){ oc.expr(4); } }
   { const lc=window.__linCtlE; if(lc&&/^林秋月|^秋月|^她：/.test(x[1])){ lc.talk(Math.min(4,(x[3]||3)*.8)); } if(lc&&/謝謝|笑|燈火|天亮|放下/.test(x[1])){ lc.ghost(0); lc.expr(4); } }   /* 結局她被放下執念時，臉慢慢變回生前的樣子並微笑 */
-  { const kc=window.__kingCtlE; if(kc&&/^滄淵/.test(x[1])){ kc.talk(Math.min(5,(x[3]||3)*.85)); if(/好|謝|回來|原諒/.test(x[1])) kc.smile((x[3]||3)+1); } }   /* 滄淵說話時鬍子下的嘴巴跟著動 */
+  { const kc=window.__kingCtlE; if(kc&&/^滄淵/.test(x[1])){ kc.talk(Math.min(5,(x[3]||3)*.85)); if(/不好|對不起|四十年|錯/.test(x[1])) kc.sad((x[3]||3)+1); if(/還給我|滾|誰准/.test(x[1])) kc.roar(1.6); if(/好|謝|回來|原諒/.test(x[1])) kc.smile((x[3]||3)+1); } }   /* 滄淵說話時鬍子下的嘴巴跟著動 */
   { const mc=window.__merCtlE; if(mc&&/^霜汐/.test(x[1])){ mc.talk(Math.min(4,(x[3]||3)*.8)); if(/謝謝|喜歡|回來|很好|燈/.test(x[1])) mc.smile((x[3]||3)+1); if(/再見|保重|下次|走了/.test(x[1])) mc.wave(); } } }   /* 霜汐說話時嘴巴跟著動，溫暖的話會微笑、道別會揮手 */
   tA.fromArray(s.from[0]).lerp(tB.fromArray(s.to[0]),k); camP.copy(tA); camL.fromArray(s.from[1]).lerp(tB.fromArray(s.to[1]),k);
   if(frameHook) try{ frameHook(st,si); }catch(e){}

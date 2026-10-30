@@ -48,10 +48,12 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
       // 眨眼：每 2～5 秒一次，約 0.15 秒
       st.nextBlink-=dt; if(st.nextBlink<=0){ st.blink=.16; st.nextBlink=2+Math.random()*3; } st.blink=Math.max(0,st.blink-dt); const bl=st.blink>0?Math.sin((1-st.blink/.16)*Math.PI):0;
       // 說話：嘴巴在「啊」「喔」之間開合
-      st.talk=Math.max(0,st.talk-dt); const tk=st.talk>0?1:0, ah=tk*Math.max(0,Math.sin(t*11)*.5+Math.sin(t*7.3)*.5), oo=tk*Math.max(0,Math.sin(t*5.1+1))*.6;
-      st.smile=Math.max(0,st.smile-dt); st.lookT-=dt; if(st.lookT<=0){ st.look=1.6; st.lookT=7+Math.random()*8; } st.look=Math.max(0,st.look-dt); const lk=st.look>0?Math.min(1,Math.min(st.look,1.6-st.look)*3):0;
+      st.talk=Math.max(0,st.talk-dt); const tk=st.talk>0?1:0, ah=tk*Math.max(0,Math.sin(t*11)*.5+Math.sin(t*7.3)*.5), oo=opt.king?0:tk*Math.max(0,Math.sin(t*5.1+1))*.6;   /* 滄淵的第 4 格是怒吼，說話時不能混進去 */
+      st.roar=Math.max(0,(st.roar||0)-dt); st.sad=Math.max(0,(st.sad||0)-dt); st.rcd=Math.max(0,(st.rcd||0)-dt);
+      if(opt.king&&opt.uni&&opt.uni.uAmp.value>.22&&st.rcd<=0){ st.roar=1.5; st.rcd=5+Math.random()*3; }   /* Boss 戰：掙扎得猛時滄淵怒吼 */
+      st.smile=Math.max(0,st.smile-dt); if(!opt.king) st.lookT-=dt; if(st.lookT<=0){ st.look=1.6; st.lookT=7+Math.random()*8; } st.look=Math.max(0,st.look-dt); const lk=st.look>0?Math.min(1,Math.min(st.look,1.6-st.look)*3):0;
       const sm=Math.min(1,st.smile*2)*(1-tk);
-      W.a.value.set(bl,ah*.9,oo,sm*(1-bl)); W.b.value.set(lk*(1-bl)*(1-tk),0,0,0);
+      const rr=opt.king?Math.min(1,st.roar*3):0, sd=opt.king?Math.min(1,st.sad*2):0; W.a.value.set(bl*(1-rr),ah*.9*(1-rr),Math.max(oo,rr),sm*(1-bl)*(1-rr)); W.b.value.set(opt.king?sd*(1-rr):lk*(1-bl)*(1-tk),0,0,0);
       // 身體：尾巴由上往下的波浪、頭髮慢慢跟著飄、雙手輕輕划水
       const ph=t*(1.6+sw2*2.2), A=.08+sw2*.18;
       ['t1','t2','t3','t4','t5','t6','fin'].forEach((nm,i)=>rot(nm,Math.sin(ph-i*.7)*A*(.35+i*.18),0,0));
@@ -64,7 +66,7 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
         rot('up'+s,stream*.5,0,k*(relax-stream*.25+paddle*.35+.04*Math.sin(t*.9+k))+k*w*1.6); rot('fo'+s,0,-k*(.25+paddle*.25+.1*Math.sin(t*.7))*(1-w)*(opt.bend??1),k*w*(.6+Math.sin(t*9)*.35)+k*.08*Math.sin(t*.6)); rot('ha'+s,0,k*.15*Math.sin(t*1.1+k)*(opt.bend??1),k*(paddle*.3+.15)*(opt.bend??1)); }   // 右手揮手時舉起來左右擺
     };
     sk.onBeforeRender=tick;
-    return {head:(y,p)=>{ st.hy=y; st.hp=p; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } },mesh:sk,bones:B,talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },smile:s=>{ st.smile=Math.max(st.smile,s||3); },wave:()=>{ st.wave=2.4; },look:()=>{ st.look=1.6; },swim:k=>{ st.swim=k; }}; }
-  const KING={face:'king_face.jpg',rect:[.1656,.0633,.1999,.1164],relax:-.25,bend:.25};   /* 滄淵的表情貼圖與臉的位置 */
+    return {head:(y,p)=>{ st.hy=y; st.hp=p; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } },mesh:sk,bones:B,talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },smile:s=>{ st.smile=Math.max(st.smile,s||3); },wave:()=>{ st.wave=2.4; },look:()=>{ st.look=1.6; },roar:s=>{ st.roar=s||1.5; },sad:s=>{ st.sad=s||3; },swim:k=>{ st.swim=k; }}; }
+  const KING={face:'king_face.jpg',rect:[.1656,.0633,.1999,.1164],relax:-.25,bend:.25,king:1};   /* 滄淵的表情貼圖與臉的位置 */
   return {rig,king:(root,o)=>rig(root,Object.assign({},KING,o||{}))};
 })();
