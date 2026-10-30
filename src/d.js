@@ -5,6 +5,8 @@ const T=THREE, $=id=>document.getElementById(id);
 const clamp=(x,a,b)=>x<a?a:x>b?b:x, lerp=(a,b,t)=>a+(b-a)*t, rand=(a,b)=>a+Math.random()*(b-a);
 const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const RAR=P.RAR, SPECIES=P.SPECIES, MAX_LINE=80;
+// 捲線器的線量：湖、冰湖 80 公尺；出海用大型捲線器 250 公尺（旗魚、鮪魚一衝就是上百公尺，80 公尺根本留不住，最後一章的旗魚因此釣不到）
+const maxLine=()=>G.loc==='sea'?250:MAX_LINE;
 
 /* ---------- 存檔 ---------- */
 // 測試帳號：網址加 test 參數，存檔另開一份（只限擁有者 Google 帳號，驗證在 y.js）
@@ -786,7 +788,8 @@ function updateFight(dt){
   if(f.abr>=1){ if(window.__ECO&&window.__ECO.useLeader()){ f.abr=.4; f.cover=.2; toast('⛓️ 鋼絲前導線擋住了磨擦！','good',1600); vib(60); } else return lose('rub'); }
   if(f.slk>=1) return lose('slack');
   if(f.lostWhy) return lose(f.lostWhy);
-  if(f.d>MAX_LINE) return lose('spool');
+  if(f.d>maxLine()*.7) f.stam=Math.max(0,f.stam-dt*(f.d/maxLine())*8);   /* 線快放光時捲線器剩下的線越少、阻力越大，魚衝不動、體力掉得快 */
+  if(f.d>maxLine()) return lose('spool');
   if(f.d<(G.spot===0?4.0:2.6)){
     // 魚還有力氣就拉不上來：靠近時再衝出去，要遛到沒力才能收進來
     // 衝出去會消耗魚的體力，最多衝兩次；體力低於 45% 或衝過兩次就拉得上來

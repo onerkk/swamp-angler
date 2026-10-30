@@ -1,4 +1,4 @@
-/*APPV:20261030020215*/
+/*APPV:20261030020804*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5610,7 +5610,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030020215'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030020804'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -7061,6 +7061,8 @@ const T=THREE, $=id=>document.getElementById(id);
 const clamp=(x,a,b)=>x<a?a:x>b?b:x, lerp=(a,b,t)=>a+(b-a)*t, rand=(a,b)=>a+Math.random()*(b-a);
 const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const RAR=P.RAR, SPECIES=P.SPECIES, MAX_LINE=80;
+// 捲線器的線量：湖、冰湖 80 公尺；出海用大型捲線器 250 公尺（旗魚、鮪魚一衝就是上百公尺，80 公尺根本留不住，最後一章的旗魚因此釣不到）
+const maxLine=()=>G.loc==='sea'?250:MAX_LINE;
 
 /* ---------- 存檔 ---------- */
 // 測試帳號：網址加 test 參數，存檔另開一份（只限擁有者 Google 帳號，驗證在 y.js）
@@ -7842,7 +7844,8 @@ function updateFight(dt){
   if(f.abr>=1){ if(window.__ECO&&window.__ECO.useLeader()){ f.abr=.4; f.cover=.2; toast('⛓️ 鋼絲前導線擋住了磨擦！','good',1600); vib(60); } else return lose('rub'); }
   if(f.slk>=1) return lose('slack');
   if(f.lostWhy) return lose(f.lostWhy);
-  if(f.d>MAX_LINE) return lose('spool');
+  if(f.d>maxLine()*.7) f.stam=Math.max(0,f.stam-dt*(f.d/maxLine())*8);   /* 線快放光時捲線器剩下的線越少、阻力越大，魚衝不動、體力掉得快 */
+  if(f.d>maxLine()) return lose('spool');
   if(f.d<(G.spot===0?4.0:2.6)){
     // 魚還有力氣就拉不上來：靠近時再衝出去，要遛到沒力才能收進來
     // 衝出去會消耗魚的體力，最多衝兩次；體力低於 45% 或衝過兩次就拉得上來
