@@ -10,7 +10,12 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       .replace('#include <map_fragment>',`#include <map_fragment>
   { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(f.x>0.&&f.x<1.&&f.y>0.&&f.y<1.){ float m=smoothstep(0.,.2,f.x)*smoothstep(1.,.8,f.x)*smoothstep(0.,.14,f.y)*smoothstep(1.,.86,f.y);
       vec3 c=mix(faceOf(tA,f),faceOf(tB,f),uMix); diffuseColor.rgb=mix(diffuseColor.rgb,c,m*.96); } }
-  diffuseColor.rgb=mix(diffuseColor.rgb,vec3(dot(diffuseColor.rgb,vec3(.3,.55,.15)))*vec3(.86,.9,.95),uPale);   /* 變成女鬼：全身失去血色、偏青灰 */`); };
+  diffuseColor.rgb=mix(diffuseColor.rgb,vec3(dot(diffuseColor.rgb,vec3(.3,.55,.15)))*vec3(.86,.9,.95),uPale);   /* 變成女鬼：全身失去血色、偏青灰 */`)
+      .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+  #ifdef USE_EMISSIVEMAP
+  { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(f.x>0.&&f.x<1.&&f.y>0.&&f.y<1.){ float m=smoothstep(0.,.2,f.x)*smoothstep(1.,.8,f.x)*smoothstep(0.,.14,f.y)*smoothstep(1.,.86,f.y);
+      totalEmissiveRadiance=mix(totalEmissiveRadiance,mix(faceOf(tA,f),faceOf(tB,f),uMix)*emissive,m*.96); } }   /* 發光圖也換成表情臉，否則烘焙的臉會從發光層透出來 */
+  #endif`); };
     mat.customProgramCacheKey=()=>'humanFace'+(U.key||''); mat.needsUpdate=true; }
   function rig(root,opt){ init(); opt=opt||{}; const U={tA:{value:faceT(opt.faceA||'lin_face_alive.jpg')},tB:{value:faceT(opt.faceB||opt.faceA||'lin_face_ghost.jpg')},rect:opt.rect?new T.Vector4(...opt.rect):null,key:opt.faceA||'',mix:{value:opt.ghost?1:0},w1:{value:new T.Vector4()},w2:{value:new T.Vector4()},pale:{value:opt.ghost?.55:0}};
     root.updateMatrixWorld(true); let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
@@ -20,10 +25,10 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
     if(geo.index){ const I=geo.index.array, P0=geo.attributes.position, a=new T.Vector3(), b=new T.Vector3(), c=new T.Vector3(), keep=[];
       for(let k=0;k<I.length;k+=3){ a.fromBufferAttribute(P0,I[k]); b.fromBufferAttribute(P0,I[k+1]); c.fromBufferAttribute(P0,I[k+2]); if(Math.max(a.distanceTo(b),b.distanceTo(c),c.distanceTo(a))>H*.12) continue; keep.push(I[k],I[k+1],I[k+2]); } geo.setIndex(keep); }
     const B={}, mk=(n,p,x,f,z)=>{ const b=new T.Bone(); b.name=n; b.userData.w=new T.Vector3(cx+x*Wd,Y(f),cz+(z||0)); B[n]=b; if(p) B[p].add(b); return b; };
-    mk('root',null,0,.5); mk('hips','root',0,.5); mk('spine','hips',0,.42); mk('chest','spine',0,.3); mk('neck','chest',0,.2); mk('head','neck',0,.165);
+    mk('root',null,0,.5); mk('hips','root',0,.5); mk('spine','hips',0,.42); mk('chest','spine',0,.3); const CH=opt.chin??.14; mk('neck','chest',0,CH+.04); mk('head','neck',0,CH);   /* 下巴的位置依角色（臉的大小不同） */
     for(const [s,k] of [['L',-1],['R',1]]){ mk('sh'+s,'chest',k*.16,.215); mk('up'+s,'sh'+s,k*.3,.225); mk('fo'+s,'up'+s,k*.6,.35); mk('ha'+s,'fo'+s,k*.86,.47); mk('he'+s,'ha'+s,k*.98,.5);
       mk('th'+s,'hips',k*.11,.52); mk('kn'+s,'th'+s,k*.12,.74); mk('an'+s,'kn'+s,k*.12,.95); }
-    mk('hr1','head',0,.13,-.09); mk('hr2','hr1',0,.25,-.1); mk('hr3','hr2',0,.38,-.09); mk('hr4','hr3',0,.5,-.08);
+    mk('hr1','chest',0,.13,-.09);   /* 長髮掛在身體上，不掛在頭上：轉頭、歪頭時背後的頭髮和洋裝不會被甩出去 */ mk('hr2','hr1',0,.25,-.1); mk('hr3','hr2',0,.38,-.09); mk('hr4','hr3',0,.5,-.08);
     const list=Object.values(B); list.forEach(b=>{ const pw=b.parent&&b.parent.isBone?b.parent.userData.w:new T.Vector3(); b.position.copy(b.userData.w).sub(pw); });
     const P=geo.attributes.position, n=P.count, si=new Uint16Array(n*4), sw=new Float32Array(n*4), idx=nm=>list.indexOf(B[nm]), v=new T.Vector3();
     const segD=(p,a,b)=>{ const ab=b.clone().sub(a), t=Math.max(0,Math.min(1,p.clone().sub(a).dot(ab)/ab.lengthSq())); return [a.clone().addScaledVector(ab,t).distanceTo(p),t,a.clone().addScaledVector(ab,t)]; };
@@ -39,6 +44,12 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       // 下半身：裙子跟著左右腿擺動（越往下越跟腿，中間兩腿混合）
       if(!out&&f>.5){ const s=v.x<cx?'L':'R', o=s==='L'?'R':'L', side=Math.min(1,ax/.18), g=Math.min(1,(f-.5)/.12); const leg=f<.74?'th':(f<.95?'kn':'an');
         const wl=g*(.5+.5*side); out=[['hips',1-g],[leg+s,wl],[leg+o,g-wl]]; }
+      // 頭與兩側垂下的頭髮整塊跟頭走：轉頭、歪頭時臉和頭髮不會被扯開（原本兩側頭髮綁在脖子和胸口，頭一轉就拉出長長的貼圖）
+      if(!out&&f<(opt.headMax??.3)){ const hx=Math.abs(v.x-cx)/Wd, chinF=CH;
+        if(f<chinF) out=[['head',1]];
+        
+        else if(f<CH+.05&&hx<.06){ const k=(f-chinF)/.05; out=[['head',1-k],['neck',k]]; }   // 脖子本身：短短一段過渡
+        else if(f<CH+.05){ out=[['chest',1]]; } }   /* 脖子以外（領口、肩膀）一律跟身體，轉頭時不會撕開洋裝 */
       if(!out){ const ys=spineC.map(c2=>B[c2].userData.w.y); let a=0; while(a<spineC.length-2&&v.y<ys[a+1]) a++; const t=Math.max(0,Math.min(1,(ys[a]-v.y)/Math.max(1e-4,ys[a]-ys[a+1]))); out=[[spineC[a],1-t],[spineC[a+1],t]]; }
       out.slice(0,4).forEach(([b,w],k)=>{ si[i*4+k]=idx(b); sw[i*4+k]=Math.max(0,w); }); const s2=sw[i*4]+sw[i*4+1]+sw[i*4+2]+sw[i*4+3]||1; for(let k=0;k<4;k++) sw[i*4+k]/=s2; }
     geo.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); geo.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
@@ -60,16 +71,16 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       const tw=st.twitch, jit=()=>tw*(Math.random()-.5)*.35;   // 抽搐：關節突然一跳一跳
       const br=Math.sin(t*1.6)*.02;
       rot('hips',st.crawl*1.35,0,0); rot('spine',(st.lean+st.reach*.6)*.25+br*.5+jit(),jit(),jit()); rot('chest',br+st.crawl*-.2+jit(),0,jit());
-      rot('neck',st.hp*.4+jit(),st.hy*.45,st.hr*.5); rot('head',st.hp*.6+Math.sin(t*.5)*.03*(1-tw)+jit(),st.hy*.55+jit(),st.hr*.7+jit());
+      rot('neck',st.hp*.35+jit(),st.hy*.3,st.hr*.35); rot('head',st.hp*.65+Math.sin(t*.5)*.03*(1-tw)+jit(),st.hy*.7+jit(),st.hr*.65+jit());
       for(const [s,k] of [['L',-1],['R',1]]){ const relax=(opt.relax||0)*(1-st.reach)*(1-st.armUp);   /* 寬袖和洋裝是連在一起的：手臂只微微放下（女鬼略張的雙手），避免把布料拉開 */
         rot('up'+s,-st.reach*.25-st.crawl*1.0+jit(),0,k*(relax+st.armUp*.9+.03*Math.sin(t*.8+k))+jit());   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
         rot('fo'+s,-st.reach*1.1,-k*.15,k*st.crawl*.6+jit()); rot('ha'+s,-st.reach*.5,0,k*.1+jit()+k*st.reach*.3*Math.sin(t*14));   /* 手指一抓一抓 */
         const wl=st.walk*Math.sin(st.wph+(k>0?Math.PI:0)); rot('th'+s,-st.crawl*1.4-wl*.12,0,0); rot('kn'+s,st.crawl*2.0+Math.max(0,-wl)*.15*st.walk,0,0);   /* 走路：兩腿交替跨步 */ rot('an'+s,0,0,0); }
-      ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.05+Math.sin(t*.9-i*.6)*.04*(i+1)-st.hairFace*(i===0?2.6:.25),Math.sin(t*.5-i*.4)*.05,0));   // 頭髮垂到臉前
+      ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.05+Math.sin(t*.9-i*.6)*.04*(i+1)-st.hairFace*(i===0?2.6:.25),Math.sin(t*.5-i*.4)*.05,0));   /* 頭歪時長髮仍然往下垂，不會跟著頭橫出去 */   // 頭髮垂到臉前
     };
     sk.onBeforeRender=tick;
     return {mesh:sk,bones:B,step:d=>{ st.wph+=d; },set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
   // 其他角色：小女孩（生前的林秋月）、老漁人
-  const PRESET={girl:{faceA:'girl_face.jpg',rect:[.1424,.0638,.1964,.1641],relax:-.55,hairMax:.27},old:{faceA:'old_face.jpg',rect:[.1479,.0451,.1937,.1292],relax:-.12,hairMax:.12}};
+  const PRESET={girl:{faceA:'girl_face.jpg',rect:[.1424,.0638,.1964,.1641],relax:-.55,hairMax:.27,chin:.155},old:{faceA:'old_face.jpg',rect:[.1479,.0451,.1937,.1292],relax:-.12,hairMax:.12,chin:.13}};
   return {rig,preset:(name,root,o)=>rig(root,Object.assign({},PRESET[name]||{},o||{})),PRESET};
 })();

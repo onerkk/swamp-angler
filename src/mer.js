@@ -10,7 +10,13 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
       .replace('#include <map_fragment>',`#include <map_fragment>
   { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(f.x>0.&&f.x<1.&&f.y>0.&&f.y<1.){ float m=smoothstep(0.,.2,f.x)*smoothstep(1.,.8,f.x)*smoothstep(0.,.16,f.y)*smoothstep(1.,.84,f.y);
       float wsum=uFW.x+uFW.y+uFW.z+uFW.w+uFW2.x; vec3 c=cellC(0,f)*max(0.,1.-wsum)+cellC(1,f)*uFW.x+cellC(2,f)*uFW.y+cellC(3,f)*uFW.z+cellC(4,f)*uFW.w+cellC(5,f)*uFW2.x;
-      diffuseColor.rgb=mix(diffuseColor.rgb,c,m*.96); } }`); };
+      diffuseColor.rgb=mix(diffuseColor.rgb,c,m*.96); } }`)
+      .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+  #ifdef USE_EMISSIVEMAP
+  { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(f.x>0.&&f.x<1.&&f.y>0.&&f.y<1.){ float m=smoothstep(0.,.2,f.x)*smoothstep(1.,.8,f.x)*smoothstep(0.,.16,f.y)*smoothstep(1.,.84,f.y);
+      float wsum=uFW.x+uFW.y+uFW.z+uFW.w+uFW2.x; vec3 c=cellC(0,f)*max(0.,1.-wsum)+cellC(1,f)*uFW.x+cellC(2,f)*uFW.y+cellC(3,f)*uFW.z+cellC(4,f)*uFW.w+cellC(5,f)*uFW2.x;
+      totalEmissiveRadiance=mix(totalEmissiveRadiance,c*emissive,m*.96); } }   /* 發光層也換成表情：結局、月光劇情裡會自發光的角色，表情才看得到 */
+  #endif`); };
     mat.customProgramCacheKey=()=>'merFace'+(W&&W.face||''); mat.needsUpdate=true; }
   function rig(root,opt){ init(); opt=opt||{}; faceT(opt.face); root.updateMatrixWorld(true);   /* 表情貼圖一開始就下載（第一次畫到臉之前要載好，否則那塊會是黑的） */ let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
     const geo=src.geometry.clone(); geo.applyMatrix4(new T.Matrix4().copy(root.matrixWorld).invert().multiply(src.matrixWorld)); geo.computeBoundingBox();
