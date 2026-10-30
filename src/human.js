@@ -59,11 +59,11 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       U.w1.value.set(bl*(st.expr===3?0:1),ah*.9*(1-ek),Math.max(tk*.25*Math.max(0,Math.sin(t*5.1)),E[2]),E[3]); U.w2.value.set(E[4],0,0,0);
       const tw=st.twitch, jit=()=>tw*(Math.random()-.5)*.35;   // 抽搐：關節突然一跳一跳
       const br=Math.sin(t*1.6)*.02;
-      rot('hips',st.crawl*1.35,0,0); rot('spine',st.lean*.25+br*.5+jit(),jit(),jit()); rot('chest',br+st.crawl*-.2+jit(),0,jit());
+      rot('hips',st.crawl*1.35,0,0); rot('spine',(st.lean+st.reach*.6)*.25+br*.5+jit(),jit(),jit()); rot('chest',br+st.crawl*-.2+jit(),0,jit());
       rot('neck',st.hp*.4+jit(),st.hy*.45,st.hr*.5); rot('head',st.hp*.6+Math.sin(t*.5)*.03*(1-tw)+jit(),st.hy*.55+jit(),st.hr*.7+jit());
       for(const [s,k] of [['L',-1],['R',1]]){ const relax=0;   /* 寬袖和洋裝是連在一起的：手臂只微微放下（女鬼略張的雙手），避免把布料拉開 */
-        rot('up'+s,-st.reach*.9-st.crawl*1.0+jit(),0,k*(relax+st.armUp*.9+.03*Math.sin(t*.8+k))+jit());   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
-        rot('fo'+s,0,-k*(.15+st.reach*.1),k*(st.reach*.35+st.crawl*.6)+jit()); rot('ha'+s,st.reach*.4,0,k*.1+jit());
+        rot('up'+s,-st.reach*.25-st.crawl*1.0+jit(),0,k*(relax+st.armUp*.9+.03*Math.sin(t*.8+k))+jit());   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
+        rot('fo'+s,-st.reach*1.1,-k*.15,k*st.crawl*.6+jit()); rot('ha'+s,-st.reach*.5,0,k*.1+jit()+k*st.reach*.3*Math.sin(t*14));   /* 手指一抓一抓 */
         rot('th'+s,-st.crawl*1.4,0,0); rot('kn'+s,st.crawl*2.0,0,0); rot('an'+s,0,0,0); }
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.05+Math.sin(t*.9-i*.6)*.04*(i+1)-st.hairFace*(i===0?2.6:.25),Math.sin(t*.5-i*.4)*.05,0));   // 頭髮垂到臉前
     };
