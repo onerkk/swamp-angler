@@ -425,7 +425,7 @@ function goHome(){ if(G.state==='home') return; if(G.state!=='idle'){ toast('先
   setTimeout(()=>{ try{ HOME3D.enter(); }catch(err){ console.error('goHome',err); } G.state='home'; document.body.classList.add('athome'); fadeEl.classList.remove('on'); toast('回到老漁人的小屋','good',1400); },650); }
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit(); document.body.classList.remove('athome'); G.state='idle'; fadeEl.classList.remove('on'); if(then) then(); else if(G.spot!==0) goSpot(0); },650); }
-window.__goHome=goHome;
+window.__goHome=goHome; window.__HOMEOK=()=>HOME.unlocked();
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });

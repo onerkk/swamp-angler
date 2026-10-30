@@ -1,4 +1,4 @@
-/*APPV:20261030095357*/
+/*APPV:20261030101009*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -1965,6 +1965,8 @@ function render(){
     if(!save.yacht){ const ok=window.__STORY&&window.__STORY.done('c5'), m=save.mat||{}, need=BOAT_COST, have=k=>(m[k]||0)>=need[k];
       h+=ok?row('🛥️ 修復老漁人的漁船',`停在河口船塢的舊漁船，修好就能出海。需要 🪙 ${need.coins.toLocaleString()}、魚鱗 ${need.scale}（有 ${m.scale||0}）、魚骨 ${need.bone}（有 ${m.bone||0}）、珍珠 ${need.pearl}（有 ${m.pearl||0}）`,`<button class="sbtn pri" data-a="yacht"${save.coins>=need.coins&&have('scale')&&have('bone')&&have('pearl')?'':' disabled'}>修復</button>`)
           :row('🔒 ？？？的漁船','完成主線第六章「月潮」後，霜汐會告訴你它在哪裡','<span class="lk">第六章後</span>'); }
+    { const G2=window.__G, atHome=G2&&G2.state==='home', ok=!window.__HOMEOK||window.__HOMEOK();   /* 地圖第一列：回老漁人的小屋（任何釣點都能直接回去） */
+      h+=row('🏠 老漁人的小屋',ok?'魚缸、標本牆、壁爐、烤魚，還有老漁人留下的東西':'完成主線第一章後就能回來整理',atHome?'<span class="eqd">目前位置</span>':ok?'<button class="sbtn pri" data-a="home">回家</button>':'<span class="lk">第一章後</span>'); }
     { const tl=window.__TIDE, hh=(window.__G&&window.__G.hour)||0, low=tl&&tl.low(hh), nx=tl?tl.nextLow(hh):0;   // 潮間帶：退潮時才能去
       h+=row('🦀 蚵仔寮潮間帶',low?'退潮中！看泥面痕跡，挖文蛤、赤嘴蛤、竹蟶、海瓜子、沙蟹':'滿潮中，下次退潮 '+String(Math.floor(nx%24)).padStart(2,'0')+':'+(nx%1?'30':'00'),low?'<button class="sbtn pri" data-a="tide">下灘</button>':'<span class="lk">等退潮</span>'); }
     h+=SPOTS.map((s,i)=>{ const why=window.__STORY?window.__STORY.lock(i):null, lock=window.__STORY?!!why:(save.lv<s.lv||(s.req==='mer1'&&!(save.mer&&save.mer.n>=1))), need=(s.kayak&&!save.kayak)||(s.yacht&&!save.yacht), here=c.curSpot()===i;
@@ -2115,6 +2117,7 @@ shB.addEventListener('click',e=>{
     save.coins-=need.coins; m.scale-=need.scale; m.bone-=need.bone; m.pearl-=need.pearl; save.yacht=true; persist(); setCoins(); Snd.coin(); toast('🛥️ 老漁人的漁船修好了！可以出海了','good',3000); }
   else if(a==='go'){ close(); c.goSpot(+v); return; }
   else if(a==='tide'){ close(); if(window.__goTide) window.__goTide(); return; }
+  else if(a==='home'){ close(); if(window.__goHome) window.__goHome(); return; }
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
   else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
@@ -5784,7 +5787,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030095357'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030101009'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -7678,7 +7681,7 @@ function goHome(){ if(G.state==='home') return; if(G.state!=='idle'){ toast('先
   setTimeout(()=>{ try{ HOME3D.enter(); }catch(err){ console.error('goHome',err); } G.state='home'; document.body.classList.add('athome'); fadeEl.classList.remove('on'); toast('回到老漁人的小屋','good',1400); },650); }
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit(); document.body.classList.remove('athome'); G.state='idle'; fadeEl.classList.remove('on'); if(then) then(); else if(G.spot!==0) goSpot(0); },650); }
-window.__goHome=goHome;
+window.__goHome=goHome; window.__HOMEOK=()=>HOME.unlocked();
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
