@@ -1,4 +1,4 @@
-/*APPV:20261030082845*/
+/*APPV:20261030083557*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5605,7 +5605,12 @@ function update(dt){ { const tt=performance.now()/1000; if(ghostRig&&!hc) ghostR
     else if(ev.phase==='stare'){ faceMe(m); m.position.y=-1.42+Math.sin(t*1.1)*.015; if(c.state()!==ev.st0||t>8){ ev.phase='down'; ev.fast=c.state()!==ev.st0; if(ev.fast){ sfx('gasp',.6); c.vib&&c.vib(40); } waterFx(m.position,ev.fast); } }
     else { m.position.y-=dt*(ev.fast?2.4:.7); bubbles(m.position,dt,.1); if(m.position.y<-2.2){ c.ripple&&c.ripple(m.position.x,m.position.z,.4); endEv(); } } return; }
   if(ev.mode==='creep'&&hc){ const b=c.base(); tv.set(b.x-m.position.x,0,b.z-m.position.z); const dist=tv.length(); m.position.y=-.05; faceMe(m);
-    if(ev.phase==='creep'){ const look=lookingAt(m.position,.5); if(look){ ev.away=0; ev.seen=(ev.seen||0)+dt; } else ev.away+=dt;   // 看著她：一動也不動
+    if(ev.phase==='creep'){ const look=lookingAt(m.position,.5); if(look){ ev.away=0; ev.seen=(ev.seen||0)+dt; ev.act=(ev.act??2)-dt; } else ev.away+=dt;
+      if(look&&ev.act<=0&&dist>2.4){ ev.act=1.6+Math.random()*1.8; const r=Math.random();   // 你一直盯著她，她也不會乾站著：每隔一兩秒就有令人發毛的小動作
+        if(r<.3){ hc.now('hr',(Math.random()<.5?-1:1)*(.6+Math.random()*.8)); hc.now('twitch',1); setTimeout(()=>hc&&hc.set('twitch',0),160); crack(); c.vib&&c.vib(20); }   // 頭猛然歪向一邊
+        else if(r<.55){ let n=0; const fl=setInterval(()=>{ if(!model||!ev){ clearInterval(fl); return; } model.visible=!model.visible; if(++n>=6){ clearInterval(fl); model.visible=true; tv.set(c.base().x-model.position.x,0,c.base().z-model.position.z); model.position.addScaledVector(tv.normalize(),Math.min(2.5,tv.length()-2)); faceMe(model); crack(); } },70); ev.jumps++; croakVol(Math.min(.6,.1+ev.jumps*.1)); }   // 一閃一閃，閃完就更近了
+        else if(r<.75){ hc.set('reach',.55); hc.talk(1.8); setTimeout(()=>hc&&hc.set('reach',0),1800); }   // 慢慢抬手指向你、嘴巴無聲地動
+        else { hc.expr(4); hc.now('hp',-.2); setTimeout(()=>{ if(hc){ hc.expr(-1); hc.now('hp',.35); } },1200); } }   // 突然咧嘴笑一下又收起來
       if(ev.away>.9&&dist>1.8){ ev.away=0; ev.jumps++; const step=Math.min(dist-1.4,2.2+Math.random()*1.4); m.position.addScaledVector(tv.normalize(),step); hc.now('hr',(Math.random()-.5)*.9); hc.now('hp',.2+Math.random()*.5); hc.expr(ev.jumps>3?4:-1); crack(); croakVol(Math.min(.6,.1+ev.jumps*.1)); c.vib&&c.vib(18); }   // 轉開視線再轉回來：她更近了、頭的角度也變了
       if(dist<2.1){ ev.phase='face'; ev.tf=0; placeRel(m,.75,0,-.05); faceMe(m); hc.now('hp',0); hc.now('hr',0); hc.expr(3); hc.set('reach',1); croak(false); sfx('scream_main',1); if(ov) ov.classList.add('on'); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3); }
       if(t>45){ croak(false); endEv(); } }
@@ -5634,7 +5639,8 @@ function update(dt){ { const tt=performance.now()/1000; if(ghostRig&&!hc) ghostR
       if(ev.ts>3.0){ hc.now('reach',0); hc.expr(-1); hc.now('hy',0); muteAll(false); endEv(); } }
     return; }
   if(ev.mode==='behind'){ if(ev.phase==='wait'){ faceMe(m); m.position.y=-.28+Math.sin(t*1.2)*.01; if(Math.random()<dt*.6) c.ripple&&c.ripple(m.position.x,m.position.z,.2);
-      if(lookingAt(m.position,.6)||t>14){ ev.phase='drop'; ev.fast=t<14; if(ev.fast){ sfx('gasp',.7); c.vib&&c.vib([60,30,60]); } waterFx(m.position,ev.fast); } }
+      if(!ev.br&&t>5){ ev.br=1; croak(true); croakVol(.35); c.vib&&c.vib([20,40,20]); c.shake&&c.shake(.5); }   /* 一直沒回頭：耳邊傳來喉音、頸後一陣寒意 */
+      if(lookingAt(m.position,.6)||t>9){ croak(false); ev.phase='drop'; ev.fast=t<9; if(ev.fast){ sfx('gasp',.7); c.vib&&c.vib([60,30,60]); } waterFx(m.position,ev.fast); } }
     else { m.position.y-=dt*(ev.fast?3:.8); bubbles(m.position,dt,.08); if(m.position.y<-2.1) endEv(); } return; }
 }
 // 拍到她：遠處飄過時按 📷，手記多一頁
@@ -5772,7 +5778,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030082845'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030083557'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
