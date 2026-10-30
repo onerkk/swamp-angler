@@ -1,4 +1,4 @@
-/*APPV:20261030072910*/
+/*APPV:20261030073422*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -777,8 +777,8 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
     const rest={}; list.forEach(b=>rest[b.name]=b.quaternion.clone()); const q=new T.Quaternion(), e=new T.Euler(0,0,0,'YXZ');
     const rot=(b,x,y,z)=>{ e.set(x,y,z,'YXZ'); q.setFromEuler(e); B[b].quaternion.copy(rest[b]).multiply(q); };
     // 狀態：可由劇情設定的姿勢參數（0～1 平滑過渡）
-    const st={t:0,last:performance.now(),blink:0,nb:2,talk:0,hy:0,hp:0,hr:0,reach:0,hairFace:0,twitch:0,crawl:0,expr:-1,exprK:0,lean:0,armUp:0},
-      tg={hy:0,hp:0,hr:0,reach:0,hairFace:0,twitch:0,crawl:0,lean:0,armUp:0};
+    const st={t:0,last:performance.now(),blink:0,nb:2,talk:0,hy:0,hp:0,hr:0,reach:0,hairFace:0,twitch:0,crawl:0,expr:-1,exprK:0,lean:0,armUp:0,walk:0,wph:0},
+      tg={hy:0,hp:0,hr:0,reach:0,hairFace:0,twitch:0,crawl:0,lean:0,armUp:0,walk:0};
     const tick=()=>{ const now=performance.now(), dt=Math.min(.05,(now-st.last)/1000); st.last=now; if(dt<=0) return; st.t+=dt; const t=st.t;
       for(const k in tg){ const sp=k==='hy'?(opt.snap?40:3):k==='twitch'?20:4; st[k]+=(tg[k]-st[k])*Math.min(1,dt*sp); }
       st.nb-=dt; if(st.nb<=0){ st.blink=.15; st.nb=2+Math.random()*4; } st.blink=Math.max(0,st.blink-dt); const bl=st.blink>0?Math.sin((1-st.blink/.15)*Math.PI):0;
@@ -793,11 +793,11 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       for(const [s,k] of [['L',-1],['R',1]]){ const relax=(opt.relax||0)*(1-st.reach)*(1-st.armUp);   /* 寬袖和洋裝是連在一起的：手臂只微微放下（女鬼略張的雙手），避免把布料拉開 */
         rot('up'+s,-st.reach*.25-st.crawl*1.0+jit(),0,k*(relax+st.armUp*.9+.03*Math.sin(t*.8+k))+jit());   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
         rot('fo'+s,-st.reach*1.1,-k*.15,k*st.crawl*.6+jit()); rot('ha'+s,-st.reach*.5,0,k*.1+jit()+k*st.reach*.3*Math.sin(t*14));   /* 手指一抓一抓 */
-        rot('th'+s,-st.crawl*1.4,0,0); rot('kn'+s,st.crawl*2.0,0,0); rot('an'+s,0,0,0); }
+        const wl=st.walk*Math.sin(st.wph+(k>0?Math.PI:0)); rot('th'+s,-st.crawl*1.4-wl*.12,0,0); rot('kn'+s,st.crawl*2.0+Math.max(0,-wl)*.15*st.walk,0,0);   /* 走路：兩腿交替跨步 */ rot('an'+s,0,0,0); }
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.05+Math.sin(t*.9-i*.6)*.04*(i+1)-st.hairFace*(i===0?2.6:.25),Math.sin(t*.5-i*.4)*.05,0));   // 頭髮垂到臉前
     };
     sk.onBeforeRender=tick;
-    return {mesh:sk,bones:B,set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
+    return {mesh:sk,bones:B,step:d=>{ st.wph+=d; },set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
   // 其他角色：小女孩（生前的林秋月）、老漁人
   const PRESET={girl:{faceA:'girl_face.jpg',rect:[.1424,.0638,.1964,.1641],relax:-.55,hairMax:.27},old:{faceA:'old_face.jpg',rect:[.1479,.0451,.1937,.1292],relax:-.12,hairMax:.12}};
   return {rig,preset:(name,root,o)=>rig(root,Object.assign({},PRESET[name]||{},o||{})),PRESET};
@@ -5470,7 +5470,7 @@ let tt=0;
 const ov=document.getElementById('scare'), face=ov&&ov.querySelector('img');
 // 條件：第六章（月潮）完成後、夜晚、湖區、沒關閉驚嚇效果、正在閒置或等魚
 // 測試模式：網址加上 ghost 測試參數，不看章節、時段、次數，閒置或等魚約 5 秒出現、間隔 30 秒（只影響開這一頁的人）
-const TEST=/[?&]ghost=(1|glide|peek|behind|jump|grab|creep|bow)/.test(location.search), TEST_MODE=(location.search.match(/[?&]ghost=(glide|peek|behind|jump|grab|creep|bow)/)||[])[1]; let testLast=0;
+const TEST=/[?&]ghost=(1|glide|peek|behind|jump|grab|creep|bow|stalk)/.test(location.search), TEST_MODE=(location.search.match(/[?&]ghost=(glide|peek|behind|jump|grab|creep|bow|stalk)/)||[])[1]; let testLast=0;
 function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wait')&&!ev&&performance.now()-testLast>30000&&performance.now()-sessionStart>5000; }
   if(S.noScare) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
   if(c.period()!=='night'||c.loc()!=='lake') return false; const st=c.state(); if(st!=='idle'&&st!=='wait') return false;
@@ -5504,10 +5504,10 @@ function croakVol(v){ try{ if(croakN&&AC) croakN.g.gain.setTargetAtTime(v,AC.cur
 function crack(){ const a=actx(); if(!a) return; const b=a.createBuffer(1,a.sampleRate*.06,a.sampleRate), d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,6);
   const s=a.createBufferSource(), f=a.createBiquadFilter(), g=a.createGain(); f.type='highpass'; f.frequency.value=1800; g.gain.value=.9; s.buffer=b; s.connect(f); f.connect(g); g.connect(a.destination); s.start(); }
 function muteAll(on){ try{ if(c.mute) c.mute(on); }catch(e){} }
-const MODES=['glide','peek','behind','jump','grab','creep','bow']; let testIdx=0;
+const MODES=['glide','peek','behind','jump','grab','creep','bow','stalk']; let testIdx=0;
 function pickMode(){ if(TEST){ if(TEST_MODE) return TEST_MODE; const m=MODES[testIdx%MODES.length]; testIdx++; return m; }
   const st=c.state(), c5=S.story&&S.story.done&&S.story.done.includes('c5');
-  const w={glide:40,peek:st==='wait'?30:0,behind:18,jump:c5?22:6,grab:hc?(c5?16:6):0,creep:hc?12:0,bow:hc?12:0}; let tot=0; for(const k in w) tot+=w[k]; let r=Math.random()*tot; for(const k in w){ r-=w[k]; if(r<=0) return k; } return 'glide'; }
+  const w={glide:40,peek:st==='wait'?30:0,behind:18,jump:c5?22:6,grab:hc?(c5?16:6):0,creep:hc?12:0,bow:hc?12:0,stalk:hc?12:0}; let tot=0; for(const k in w) tot+=w[k]; let r=Math.random()*tot; for(const k in w){ r-=w[k]; if(r<=0) return k; } return 'glide'; }
 function placeRel(m,fw,rt,y){ const b=c.base(), h=c.head(), f=new T.Vector3(-Math.sin(h),0,-Math.cos(h)), r=new T.Vector3(Math.cos(h),0,-Math.sin(h));
   const p=new T.Vector3(b.x,0,b.z).addScaledVector(f,fw).addScaledVector(r,rt); m.position.set(p.x,y,p.z); return p; }
 function faceMe(m){ const b=c.base(); m.rotation.y=Math.atan2(b.x-m.position.x,b.z-m.position.z); }
@@ -5520,6 +5520,7 @@ function trigger(force){ if(ev) return false; if(!force&&!eligible()) return fal
     else if(mode==='glide'){ const side=Math.random()<.5?-1:1, dist=9+Math.random()*3; const p=placeRel(m,dist,-side*3.5,-1.8); ev.rise=1; ev.p=p; ev.dir=new T.Vector3(Math.cos(c.head()),0,-Math.sin(c.head())).multiplyScalar(side*.55); m.rotation.y=Math.atan2(ev.dir.x,ev.dir.z); m.visible=true; ev.stare=0; ev.phase='glide'; ev.wail=sfx('wail',.35); }
     else if(mode==='peek'){ const to=c.state()==='wait'&&c.to?c.to():null; const b=c.base(); let p; if(to){ const dx=to.x-b.x, dz=to.z-b.z, L=Math.hypot(dx,dz)||1; const sd=(Math.random()<.5?-1:1)*1.4; p=new T.Vector3(to.x+dx/L*1.2-dz/L*sd,0,to.z+dz/L*1.2+dx/L*sd); m.position.set(p.x,-1.95,p.z); } else p=placeRel(m,6,(Math.random()<.5?-1:1)*1.8,-1.95); ev.p=p; faceMe(m); m.visible=true; ev.phase='rise'; ev.st0=c.state(); }
     else if(mode==='creep'&&hc){ const side=Math.random()<.5?-1:1; const p=placeRel(m,13,side*4,-.05); ev.p=p; faceMe(m); m.visible=true; ev.phase='creep'; ev.away=0; ev.jumps=0; hc.now('hy',0); hc.now('reach',0); hc.now('hp',.35); hc.now('hr',.4); hc.expr(-1); croak(true); croakVol(.08); }   /* 一二三木頭人：你看她時她不動，轉開視線她就更近一步 */
+    else if(mode==='stalk'&&hc){ const p=placeRel(m,12,(Math.random()-.5)*3,-.05); ev.p=p; faceMe(m); m.visible=true; ev.phase='walk'; ev.burst=0; ev.hold=0; hc.now('hy',0); hc.now('hp',.3); hc.now('hr',.5); hc.now('walk',0); hc.expr(-1); croak(true); croakVol(.05); }   /* 關節錯位地走過來：走一下、停一下，頭歪向一邊亂晃 */
     else if(mode==='bow'&&hc){ const p=placeRel(m,5.5,(Math.random()-.5)*1.5,-.05); ev.p=p; faceMe(m); m.visible=true; ev.phase='bow'; hc.now('hy',0); hc.now('hp',1.25); hc.now('hairFace',1); hc.expr(5); muteAll(true); }   /* 貞子式：低頭、長髮蓋住臉，慢慢飄近 */
     else if(mode==='grab'&&hc){ const camY=(W.camera.getWorldPosition(new T.Vector3()).y), deck=camY-1.62; const p=placeRel(m,-.8,.12,deck); ev.deck=deck;   /* 站在你身後的碼頭上，臉跟你一樣高 */ ev.p=p; faceMe(m); m.rotation.y+=Math.PI; m.visible=true; ev.phase='silence'; hc.now('hy',0); hc.now('reach',0); hc.now('twitch',0); hc.expr(-1); muteAll(true); }   // 《大法師》式：她貼在你背後、身體背對你
     else { const p=placeRel(m,-2.1,0,-.28); ev.p=p; faceMe(m); m.visible=true; ev.phase='wait'; ev.wail=sfx('wail',.22); c.vib&&c.vib([15,60,15]); } });
@@ -5577,6 +5578,15 @@ function update(dt){ { const tt=performance.now()/1000; if(ghostRig&&!hc) ghostR
       if(dist<2.1){ ev.phase='face'; ev.tf=0; placeRel(m,.75,0,-.05); faceMe(m); hc.now('hp',0); hc.now('hr',0); hc.expr(3); hc.set('reach',1); croak(false); sfx('scream_main',1); if(ov) ov.classList.add('on'); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3); }
       if(t>45){ croak(false); endEv(); } }
     else { ev.tf+=dt; if(ev.tf>1.4){ hc.now('reach',0); hc.expr(-1); endEv(); } }
+    return; }
+  if(ev.mode==='stalk'&&hc){ const b=c.base(); tv.set(b.x-m.position.x,0,b.z-m.position.z); const dist=tv.length(); faceMe(m); m.position.y=-.05;
+    if(ev.phase==='walk'){ if(ev.hold>0){ ev.hold-=dt; hc.set('walk',0); }   // 停住：一動也不動
+      else { ev.burst+=dt; hc.set('walk',1); hc.step(dt*7); m.position.addScaledVector(tv.normalize(),dt*.9); m.rotation.z=Math.sin(t*7)*.06;   // 一抽一抽地走
+        if(ev.burst>.35+Math.random()*.4){ ev.burst=0; ev.hold=.25+Math.random()*.7; hc.now('hr',(Math.random()<.5?-1:1)*(.5+Math.random()*.9)); hc.now('hp',Math.random()*.6); hc.now('twitch',1); setTimeout(()=>hc&&hc.set('twitch',0),140); crack(); } }   // 每走幾步頭就突然歪到另一邊、關節喀一聲
+      croakVol(Math.min(.55,.05+(12-dist)*.05));
+      if(dist<2){ ev.phase='tilt'; ev.tt=0; hc.set('walk',0); croak(false); muteAll(true); hc.set('hr',1.55); hc.set('hp',0); } if(t>40){ croak(false); endEv(); } }   // 到你面前：一片死寂，頭慢慢歪成九十度
+    else if(ev.phase==='tilt'){ ev.tt+=dt; if(ev.tt>2.2&&!ev.scr){ ev.scr=1; muteAll(false); hc.expr(3); hc.now('hr',.2); hc.set('reach',1); placeRel(m,.8,0,-.05); faceMe(m); sfx('scream_main',1); if(ov) ov.classList.add('on'); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
+      if(ev.tt>3.6){ hc.now('reach',0); hc.now('hr',0); hc.expr(-1); endEv(); } }
     return; }
   if(ev.mode==='bow'&&hc){ const b=c.base(); tv.set(b.x-m.position.x,0,b.z-m.position.z); const dist=tv.length(); faceMe(m);
     if(ev.phase==='bow'){ m.position.addScaledVector(tv.normalize(),dt*.35); m.position.y=-.05+Math.sin(t*1.3)*.02; hc.set('twitch',Math.random()<dt*1.5?1:0);
@@ -5730,7 +5740,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030072910'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030073422'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';

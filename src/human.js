@@ -48,8 +48,8 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
     const rest={}; list.forEach(b=>rest[b.name]=b.quaternion.clone()); const q=new T.Quaternion(), e=new T.Euler(0,0,0,'YXZ');
     const rot=(b,x,y,z)=>{ e.set(x,y,z,'YXZ'); q.setFromEuler(e); B[b].quaternion.copy(rest[b]).multiply(q); };
     // 狀態：可由劇情設定的姿勢參數（0～1 平滑過渡）
-    const st={t:0,last:performance.now(),blink:0,nb:2,talk:0,hy:0,hp:0,hr:0,reach:0,hairFace:0,twitch:0,crawl:0,expr:-1,exprK:0,lean:0,armUp:0},
-      tg={hy:0,hp:0,hr:0,reach:0,hairFace:0,twitch:0,crawl:0,lean:0,armUp:0};
+    const st={t:0,last:performance.now(),blink:0,nb:2,talk:0,hy:0,hp:0,hr:0,reach:0,hairFace:0,twitch:0,crawl:0,expr:-1,exprK:0,lean:0,armUp:0,walk:0,wph:0},
+      tg={hy:0,hp:0,hr:0,reach:0,hairFace:0,twitch:0,crawl:0,lean:0,armUp:0,walk:0};
     const tick=()=>{ const now=performance.now(), dt=Math.min(.05,(now-st.last)/1000); st.last=now; if(dt<=0) return; st.t+=dt; const t=st.t;
       for(const k in tg){ const sp=k==='hy'?(opt.snap?40:3):k==='twitch'?20:4; st[k]+=(tg[k]-st[k])*Math.min(1,dt*sp); }
       st.nb-=dt; if(st.nb<=0){ st.blink=.15; st.nb=2+Math.random()*4; } st.blink=Math.max(0,st.blink-dt); const bl=st.blink>0?Math.sin((1-st.blink/.15)*Math.PI):0;
@@ -64,11 +64,11 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       for(const [s,k] of [['L',-1],['R',1]]){ const relax=(opt.relax||0)*(1-st.reach)*(1-st.armUp);   /* 寬袖和洋裝是連在一起的：手臂只微微放下（女鬼略張的雙手），避免把布料拉開 */
         rot('up'+s,-st.reach*.25-st.crawl*1.0+jit(),0,k*(relax+st.armUp*.9+.03*Math.sin(t*.8+k))+jit());   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
         rot('fo'+s,-st.reach*1.1,-k*.15,k*st.crawl*.6+jit()); rot('ha'+s,-st.reach*.5,0,k*.1+jit()+k*st.reach*.3*Math.sin(t*14));   /* 手指一抓一抓 */
-        rot('th'+s,-st.crawl*1.4,0,0); rot('kn'+s,st.crawl*2.0,0,0); rot('an'+s,0,0,0); }
+        const wl=st.walk*Math.sin(st.wph+(k>0?Math.PI:0)); rot('th'+s,-st.crawl*1.4-wl*.12,0,0); rot('kn'+s,st.crawl*2.0+Math.max(0,-wl)*.15*st.walk,0,0);   /* 走路：兩腿交替跨步 */ rot('an'+s,0,0,0); }
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.05+Math.sin(t*.9-i*.6)*.04*(i+1)-st.hairFace*(i===0?2.6:.25),Math.sin(t*.5-i*.4)*.05,0));   // 頭髮垂到臉前
     };
     sk.onBeforeRender=tick;
-    return {mesh:sk,bones:B,set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
+    return {mesh:sk,bones:B,step:d=>{ st.wph+=d; },set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
   // 其他角色：小女孩（生前的林秋月）、老漁人
   const PRESET={girl:{faceA:'girl_face.jpg',rect:[.1424,.0638,.1964,.1641],relax:-.55,hairMax:.27},old:{faceA:'old_face.jpg',rect:[.1479,.0451,.1937,.1292],relax:-.12,hairMax:.12}};
   return {rig,preset:(name,root,o)=>rig(root,Object.assign({},PRESET[name]||{},o||{})),PRESET};
