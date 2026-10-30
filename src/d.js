@@ -425,13 +425,12 @@ $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL();
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
 // 釣到美人魚：她從船前方的水裡浮上來（腰以上露出水面），轉向你、眨眼、微笑、說話；送她回家時揮手、慢慢沉回水裡
 function merPresent(dt){ const m=G.merShow; if(!m) return; const g=G.fish.group; if(!g||!m.ctl){ G.merShow=null; return; } m.t+=dt;
-  const cam=W.camera; cam.updateMatrixWorld(true); const hp=cam.getWorldPosition(new THREE.Vector3()), dv=cam.getWorldDirection(new THREE.Vector3()); dv.y=0; dv.normalize(); const yaw=Math.atan2(-dv.x,-dv.z);   /* 用真正的鏡頭方向（不是頭部節點） */
-  const fx=dv.x, fz=dv.z, D=4.6, H=1.75;   // 約 1.75 公尺高，離船 4.6 公尺（太近會被下方的魚卡擋住）
-  if(g.parent!==W.scene) W.scene.attach(g); g.scale.setScalar(H);   /* 模型正規化成長度 1、中心在原點 */
-  const rise=m.leave?Math.max(0,1-m.leave/2.2):Math.min(1,m.t/1.6), sink=(1-rise)*1.1;
-  g.position.set(hp.x+fx*D,-.17*H+.32-sink+Math.sin(m.t*1.3)*.04,hp.z+fz*D);   // 上半身和臀部浮出水面
-  g.rotation.set(0,yaw,0); m.ctl.swim(.25);
-  if(m.leave){ m.leave+=dt; if(m.leave>2.4){ g.visible=false; G.merShow=null; } }
+  const cam=W.camera; if(g.parent!==cam){ cam.add(g); }   // 掛在鏡頭前面：不管鏡頭朝哪裡，她一定在畫面中
+  const H=1.75; g.scale.setScalar(H); g.visible=true;
+  const rise=m.leave?Math.max(0,1-m.leave/2.2):Math.min(1,m.t/1.8), e=1-Math.pow(1-rise,3);
+  g.position.set(.05,-.55-(1-e)*1.6+Math.sin(m.t*1.3)*.03,-4.2); g.rotation.set(.04,Math.sin(m.t*.5)*.08,0);   // 從下方浮上來、輕輕晃
+  m.ctl.swim(.2); if(!m.waved&&m.t>2.6){ m.waved=1; m.ctl.wave(); }
+  if(m.leave){ m.leave+=dt; if(m.leave>2.4){ g.visible=false; cam.remove(g); W.scene.add(g); G.merShow=null; } }
   if(Math.random()<dt*.15&&!m.leave) m.ctl.look(); }
 function finishCatch(sell){
   const keep=sell==='keep'; if(keep) sell=false;   // 帶回家：不賣、也不算放生

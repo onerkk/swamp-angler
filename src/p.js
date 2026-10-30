@@ -59,7 +59,9 @@ let mer3=null;
 if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid_v2.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.42,metalness:.08,emissive:new T.Color(0xe4ecff),emissiveMap:mp||null,emissiveIntensity:.15}); merMats.push(x.material); x.frustumCulled=false; } });
   o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.9/Math.max(sz.y,1e-6); o.scale.setScalar(s);
   o.updateMatrixWorld(true); const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,.15-b2.min.y,-c2.z);
-  mer3=new T.Group(); mer3.add(o); npc.add(mer3); mer.visible=false; mer3.updateMatrixWorld(true); try{ merRig=autoRig(o,'tail'); }catch(e){ console.warn('mer rig',e); } });
+  mer3=new T.Group(); mer3.add(o); npc.add(mer3); mer.visible=false; mer3.updateMatrixWorld(true); try{ if(window.__MER){ const ctl=window.__MER.rig(o); merMats.push(ctl.mesh.material); let wv=0;
+      merRig={pose:p=>{ ctl.swim(Math.min(.6,p.tail*2.2)); if(p.breathe>.015) ctl.talk(.3); if(p.tail>.17&&(wv-=.016)<=0){ wv=9; ctl.wave(); ctl.smile(4); } }}; }   // 霜汐：完整骨架與表情，靠近時微笑揮手、說話時嘴巴會動
+    else merRig=autoRig(o,'tail'); }catch(e){ console.warn('mer rig',e); } });
 let merRig=null;
 const glow=new T.Sprite(new T.SpriteMaterial({map:halo.material.map,color:0x66ccff,blending:T.AdditiveBlending,depthWrite:false,transparent:true})); glow.scale.set(4,4,1); glow.position.y=1.2; npc.add(glow);
 /* 對話介面 */

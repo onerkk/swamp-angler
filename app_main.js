@@ -1,4 +1,4 @@
-/*APPV:20261030011025*/
+/*APPV:20261030020215*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -709,12 +709,13 @@ window.__MER=(()=>{ const T=THREE;
       // 身體：尾巴由上往下的波浪、頭髮慢慢跟著飄、雙手輕輕划水
       const ph=t*(1.6+sw2*2.2), A=.08+sw2*.18;
       ['t1','t2','t3','t4','t5','t6','fin'].forEach((nm,i)=>rot(nm,Math.sin(ph-i*.7)*A*(.35+i*.18),0,0));
-      rot('hips',Math.sin(ph+1.2)*A*.25,0,0); rot('spine',Math.sin(ph+1.6)*A*.15,Math.sin(t*.4)*.05,0); rot('chest',Math.sin(ph+2)*A*.1,0,0);
+      rot('hips',Math.sin(ph+1.2)*A*.25,0,0); rot('spine',Math.sin(ph+1.6)*A*.15,Math.sin(t*.4)*.05,0); rot('chest',Math.sin(ph+2)*A*.1+Math.sin(t*1.7)*.025,0,0);   /* 呼吸 */
       rot('neck',0,Math.sin(t*.37)*.12,0); rot('head',Math.sin(t*.53)*.06,Math.sin(t*.29)*.15,Math.sin(t*.41)*.06);
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.08+Math.sin(ph-1.5-i*.6)*.12*(i+1)*.5,Math.sin(t*.7-i*.5)*.08,0));
       st.wave=Math.max(0,st.wave-dt); const wv=st.wave>0?Math.min(1,Math.min(st.wave,2.4-st.wave)*2.5):0;
       for(const [s,k] of [['L',-1],['R',1]]){ const paddle=Math.sin(ph*.6+(k>0?0:Math.PI))*(.15+sw2*.25), w=k>0?wv:0;
-        rot('up'+s,0,0,k*(paddle*.6-.35*sw2)+k*w*1.05); rot('fo'+s,0,-k*(.2+paddle*.3)*(1-w),k*w*(.6+Math.sin(t*9)*.35)); rot('ha'+s,0,0,k*paddle*.4); }   // 右手揮手時舉起來左右擺
+        const relax=(window.__MERARM??-.62)*(1-w), stream=Math.max(0,sw2-.55)/.45;   // 手臂從 A 字放下到身體兩側；游得快時手往後收貼著身體
+        rot('up'+s,stream*.5,0,k*(relax-stream*.25+paddle*.35+.04*Math.sin(t*.9+k))+k*w*1.6); rot('fo'+s,0,-k*(.25+paddle*.25+.1*Math.sin(t*.7))*(1-w),k*w*(.6+Math.sin(t*9)*.35)+k*.08*Math.sin(t*.6)); rot('ha'+s,0,k*.15*Math.sin(t*1.1+k),k*(paddle*.3+.15)); }   // 右手揮手時舉起來左右擺
     };
     sk.onBeforeRender=tick;
     return {adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } },mesh:sk,bones:B,talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },smile:s=>{ st.smile=Math.max(st.smile,s||3); },wave:()=>{ st.wave=2.4; },look:()=>{ st.look=1.6; },swim:k=>{ st.swim=k; }}; }
@@ -3874,7 +3875,9 @@ let mer3=null;
 if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid_v2.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.42,metalness:.08,emissive:new T.Color(0xe4ecff),emissiveMap:mp||null,emissiveIntensity:.15}); merMats.push(x.material); x.frustumCulled=false; } });
   o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.9/Math.max(sz.y,1e-6); o.scale.setScalar(s);
   o.updateMatrixWorld(true); const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,.15-b2.min.y,-c2.z);
-  mer3=new T.Group(); mer3.add(o); npc.add(mer3); mer.visible=false; mer3.updateMatrixWorld(true); try{ merRig=autoRig(o,'tail'); }catch(e){ console.warn('mer rig',e); } });
+  mer3=new T.Group(); mer3.add(o); npc.add(mer3); mer.visible=false; mer3.updateMatrixWorld(true); try{ if(window.__MER){ const ctl=window.__MER.rig(o); merMats.push(ctl.mesh.material); let wv=0;
+      merRig={pose:p=>{ ctl.swim(Math.min(.6,p.tail*2.2)); if(p.breathe>.015) ctl.talk(.3); if(p.tail>.17&&(wv-=.016)<=0){ wv=9; ctl.wave(); ctl.smile(4); } }}; }   // 霜汐：完整骨架與表情，靠近時微笑揮手、說話時嘴巴會動
+    else merRig=autoRig(o,'tail'); }catch(e){ console.warn('mer rig',e); } });
 let merRig=null;
 const glow=new T.Sprite(new T.SpriteMaterial({map:halo.material.map,color:0x66ccff,blending:T.AdditiveBlending,depthWrite:false,transparent:true})); glow.scale.set(4,4,1); glow.position.y=1.2; npc.add(glow);
 /* 對話介面 */
@@ -5607,7 +5610,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030011025'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030020215'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -7478,13 +7481,12 @@ $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL();
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
 // 釣到美人魚：她從船前方的水裡浮上來（腰以上露出水面），轉向你、眨眼、微笑、說話；送她回家時揮手、慢慢沉回水裡
 function merPresent(dt){ const m=G.merShow; if(!m) return; const g=G.fish.group; if(!g||!m.ctl){ G.merShow=null; return; } m.t+=dt;
-  const cam=W.camera; cam.updateMatrixWorld(true); const hp=cam.getWorldPosition(new THREE.Vector3()), dv=cam.getWorldDirection(new THREE.Vector3()); dv.y=0; dv.normalize(); const yaw=Math.atan2(-dv.x,-dv.z);   /* 用真正的鏡頭方向（不是頭部節點） */
-  const fx=dv.x, fz=dv.z, D=4.6, H=1.75;   // 約 1.75 公尺高，離船 4.6 公尺（太近會被下方的魚卡擋住）
-  if(g.parent!==W.scene) W.scene.attach(g); g.scale.setScalar(H);   /* 模型正規化成長度 1、中心在原點 */
-  const rise=m.leave?Math.max(0,1-m.leave/2.2):Math.min(1,m.t/1.6), sink=(1-rise)*1.1;
-  g.position.set(hp.x+fx*D,-.17*H+.32-sink+Math.sin(m.t*1.3)*.04,hp.z+fz*D);   // 上半身和臀部浮出水面
-  g.rotation.set(0,yaw,0); m.ctl.swim(.25);
-  if(m.leave){ m.leave+=dt; if(m.leave>2.4){ g.visible=false; G.merShow=null; } }
+  const cam=W.camera; if(g.parent!==cam){ cam.add(g); }   // 掛在鏡頭前面：不管鏡頭朝哪裡，她一定在畫面中
+  const H=1.75; g.scale.setScalar(H); g.visible=true;
+  const rise=m.leave?Math.max(0,1-m.leave/2.2):Math.min(1,m.t/1.8), e=1-Math.pow(1-rise,3);
+  g.position.set(.05,-.55-(1-e)*1.6+Math.sin(m.t*1.3)*.03,-4.2); g.rotation.set(.04,Math.sin(m.t*.5)*.08,0);   // 從下方浮上來、輕輕晃
+  m.ctl.swim(.2); if(!m.waved&&m.t>2.6){ m.waved=1; m.ctl.wave(); }
+  if(m.leave){ m.leave+=dt; if(m.leave>2.4){ g.visible=false; cam.remove(g); W.scene.add(g); G.merShow=null; } }
   if(Math.random()<dt*.15&&!m.leave) m.ctl.look(); }
 function finishCatch(sell){
   const keep=sell==='keep'; if(keep) sell=false;   // 帶回家：不賣、也不算放生
