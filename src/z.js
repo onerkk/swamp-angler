@@ -51,7 +51,8 @@ function startShot(i){ si=i; st=0; cur=shots[i]; if(!cur){ finish(false); return
   blk.style.opacity=cur.fadeIn===false?blk.style.opacity:0; }
 function tick(dt){ if(!on) return; st+=dt; const s=cur; if(!s) return; const k=ease(st/s.d);
   // 字幕依鏡頭時間觸發（畫面卡頓時字幕和畫面仍然對得上）
-  const sl=s.subs||[]; while(s.subI<sl.length&&st>=sl[s.subI][0]){ const x=sl[s.subI++]; say(x[1],x[2],x[3]); { const kc=window.__kingCtlE; if(kc&&/^滄淵/.test(x[1])){ kc.talk(Math.min(5,(x[3]||3)*.85)); if(/好|謝|回來|原諒/.test(x[1])) kc.smile((x[3]||3)+1); } }   /* 滄淵說話時鬍子下的嘴巴跟著動 */
+  const sl=s.subs||[]; while(s.subI<sl.length&&st>=sl[s.subI][0]){ const x=sl[s.subI++]; say(x[1],x[2],x[3]); { const lc=window.__linCtlE; if(lc&&/^林秋月|^秋月|^她：/.test(x[1])){ lc.talk(Math.min(4,(x[3]||3)*.8)); } if(lc&&/謝謝|笑|燈火|天亮|放下/.test(x[1])){ lc.ghost(0); lc.expr(4); } }   /* 結局她被放下執念時，臉慢慢變回生前的樣子並微笑 */
+  { const kc=window.__kingCtlE; if(kc&&/^滄淵/.test(x[1])){ kc.talk(Math.min(5,(x[3]||3)*.85)); if(/好|謝|回來|原諒/.test(x[1])) kc.smile((x[3]||3)+1); } }   /* 滄淵說話時鬍子下的嘴巴跟著動 */
   { const mc=window.__merCtlE; if(mc&&/^霜汐/.test(x[1])){ mc.talk(Math.min(4,(x[3]||3)*.8)); if(/謝謝|喜歡|回來|很好|燈/.test(x[1])) mc.smile((x[3]||3)+1); if(/再見|保重|下次|走了/.test(x[1])) mc.wave(); } } }   /* 霜汐說話時嘴巴跟著動，溫暖的話會微笑、道別會揮手 */
   tA.fromArray(s.from[0]).lerp(tB.fromArray(s.to[0]),k); camP.copy(tA); camL.fromArray(s.from[1]).lerp(tB.fromArray(s.to[1]),k);
   if(frameHook) try{ frameHook(st,si); }catch(e){}
@@ -236,8 +237,10 @@ function endingShots(E,c){
   const setOp=(o,a)=>o.traverse(m=>{ if(m.isMesh&&m.material){ m.material.transparent=true; m.material.opacity=a; m.visible=a>.01; } });
   function loadHuman(url,dst,glow,key,hgt){ load(url,g=>{ const o=g.scene.clone(true); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ m.material=mt.clone(); if(mt.map){ m.material.emissive=new T.Color(glow); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.55; } } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar((hgt||1.62)/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
-    const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); dst.add(o); dst.updateMatrixWorld(true); rigs.push({k:key||(dst===hGhost?'ghost':'heng'),rig:autoRig(o,'human')}); }); }
-  loadHuman('models/ghost.glb',hGhost,0xb8c8d8); loadHuman('models/girl.glb',hAlive,0xf0e8dc,'heng',1.35);   // 生前的林秋月：十歲的小女孩
+    const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); dst.add(o); dst.updateMatrixWorld(true);
+    if(url==='models/lin_v1.glb'&&window.__HUMAN){ const hc=window.__HUMAN.rig(o,{ghost:true}); window.__linCtlE=hc; hc.expr(5); rigs.push({k:'ghost',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.4); hc.set('hr',p.headRoll||0); }}}); return; }   /* 結局的她：新模型、哀傷的女鬼臉 */
+    rigs.push({k:key||(dst===hGhost?'ghost':'heng'),rig:autoRig(o,'human')}); }); }
+  loadHuman(window.__HUMAN?'models/lin_v1.glb':'models/ghost.glb',hGhost,0xb8c8d8); loadHuman('models/girl.glb',hAlive,0xf0e8dc,'heng',1.35);   // 生前的林秋月：十歲的小女孩
   // 老漁人（使用者提供設定圖生成）：只在最後的晨光裡出現
   const oldG=new T.Group(); loadHuman('models/oldman.glb',oldG,0xfff0d8,'old');
   // 林秋月的舊髮簪：天亮時留在老漁人的椅子上
