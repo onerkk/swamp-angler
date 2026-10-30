@@ -2,9 +2,9 @@
    骨架：臀→腰→胸→頸→頭；左右肩→上臂→前臂→手；尾巴 6 節＋尾鰭；頭髮 3 節
    表情：臉部那一小塊改用高解析度表情貼圖（平常／閉眼／說話啊／說話喔／微笑／看旁邊）混合，會眨眼、說話嘴巴開合、微笑、偶爾看旁邊
    用法：window.__MER.rig(載入的模型根節點) → 回傳控制器（自己跟著畫面更新；可呼叫 talk(秒)、wave()、smile(秒)、look(秒)、swim(0~1)） */
-window.__MER=(()=>{ const T=THREE;
-  const FACE_RECT=new T.Vector4(.16929,.05296,.20686,.10781);   // 臉在模型貼圖上的位置（u0,v0,u1,v1；v 由上往下）
-  let faceTex=null; const faceT=()=>{ if(!faceTex){ faceTex=new T.TextureLoader().load('mer_face2.jpg'); faceTex.encoding=T.sRGBEncoding; faceTex.anisotropy=8; } return faceTex; };
+window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能比這段程式晚載好：用到時才取用，不能在載入時就碰 THREE */
+  const init=()=>{ if(!T){ T=window.THREE; FACE_RECT=new T.Vector4(.16929,.05296,.20686,.10781); } };   // 臉在模型貼圖上的位置（u0,v0,u1,v1；v 由上往下）
+  let faceTex=null; const faceT=()=>{ init(); if(!faceTex){ faceTex=new T.TextureLoader().load('mer_face2.jpg'); faceTex.encoding=T.sRGBEncoding; faceTex.anisotropy=8; } return faceTex; };
   function faceMat(mat,W){ mat.onBeforeCompile=sh=>{ sh.uniforms.tFace={value:faceT()}; sh.uniforms.uRect={value:FACE_RECT}; sh.uniforms.uFW=W.a; sh.uniforms.uFW2=W.b;
     sh.fragmentShader=sh.fragmentShader.replace('#include <map_pars_fragment>','#include <map_pars_fragment>\nuniform sampler2D tFace; uniform vec4 uRect, uFW, uFW2;\nvec3 cellC(int i, vec2 f){ float cx=float(i-3*(i/3)), cy=float(i/3); return sRGBToLinear(texture2D(tFace,vec2((cx+f.x)/3.,1.-(cy+f.y)/2.))).rgb; }')
       .replace('#include <map_fragment>',`#include <map_fragment>
@@ -12,7 +12,7 @@ window.__MER=(()=>{ const T=THREE;
       float wsum=uFW.x+uFW.y+uFW.z+uFW.w+uFW2.x; vec3 c=cellC(0,f)*max(0.,1.-wsum)+cellC(1,f)*uFW.x+cellC(2,f)*uFW.y+cellC(3,f)*uFW.z+cellC(4,f)*uFW.w+cellC(5,f)*uFW2.x;
       diffuseColor.rgb=mix(diffuseColor.rgb,c,m*.96); } }`); };
     mat.customProgramCacheKey=()=>'merFace'; mat.needsUpdate=true; }
-  function rig(root,opt){ opt=opt||{}; faceT(); root.updateMatrixWorld(true);   /* 表情貼圖一開始就下載（第一次畫到臉之前要載好，否則那塊會是黑的） */ let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
+  function rig(root,opt){ init(); opt=opt||{}; faceT(); root.updateMatrixWorld(true);   /* 表情貼圖一開始就下載（第一次畫到臉之前要載好，否則那塊會是黑的） */ let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
     const geo=src.geometry.clone(); geo.applyMatrix4(new T.Matrix4().copy(root.matrixWorld).invert().multiply(src.matrixWorld)); geo.computeBoundingBox();
     const bb=geo.boundingBox, H=bb.max.y-bb.min.y, top=bb.max.y, Y=f=>top-f*H, Wd=(bb.max.x-bb.min.x)/2, cx=(bb.max.x+bb.min.x)/2, cz=(bb.max.z+bb.min.z)/2;
     // 骨頭（位置用設定圖的身體比例）
