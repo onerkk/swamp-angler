@@ -30,6 +30,14 @@ cls=np.where(side_dom,np.where(fn[:,0]>0,2,3),np.where(fn[:,2]>=0,0,1))
 if os.environ.get('FACEFIX'):   # 臉的前半部有些面法線歪掉被分到側面圖，近看像碎片：臉部範圍內朝前的一律用正面圖
     fc=Vt[Ft].mean(1); fh=(mx[1]-fc[:,1])/r[1]; fx=np.abs(fc[:,0]-(mn[0]+mx[0])/2); fzz=fc[:,2]-(mn[2]+mx[2])/2
     sel=(fh>.03)&(fh<.16)&(fx<.07*r[0])&(fzz>0)&(fn[:,2]>-.2); cls[sel]=0; print('facefix',int(sel.sum()))
+# 選到的圖在那個位置如果是背景（透明，模型和圖片輪廓沒對齊），改用另一張在那裡有東西的圖：避免腿邊、手臂邊出現衣服或背景色的細紋
+if os.environ.get('ALPHAFIX') and hasS:
+    al=[np.asarray(im)[:,:,3] for im in (F_img,B_img,L_img,R_img)]; ws=[wf,wb,wl,wr]
+    fc=Vt[Ft].mean(1); cx_=(fc[:,0]-mn[0])/r[0]; cz_=(fc[:,2]-mn[2])/r[2]; ch_=np.clip((mx[1]-fc[:,1])/r[1],0,.9999)
+    px=[np.clip(((1-cx_)*wf).astype(int),0,wf-1),np.clip((cx_*wb).astype(int),0,wb-1),np.clip(((1-cz_)*wl).astype(int),0,wl-1),np.clip((cz_*wr).astype(int),0,wr-1)]
+    py=(ch_*H).astype(int); A=np.stack([al[i][py,px[i]] for i in range(4)],1)>128
+    pref=np.stack([np.maximum(fn[:,2],0),np.maximum(-fn[:,2],0),np.maximum(fn[:,0],0),np.maximum(-fn[:,0],0)],1)+.05
+    bad=~A[np.arange(len(cls)),cls]; sc=np.where(A,pref,-1.); alt=sc.argmax(1); fix=bad&(sc.max(1)>0); cls=np.where(fix,alt,cls); print('alphafix',int(fix.sum()))
 cls3=np.repeat(cls,3)
 u=np.select([cls3==0,cls3==1,cls3==2,cls3==3],[(1-wx)*wf,wf+wx*wb,wf+wb+(1-wz)*wl,wf+wb+wl+wz*wr])/W; v=np.clip(h,0,1)
 uv=np.stack([u,v],1)
