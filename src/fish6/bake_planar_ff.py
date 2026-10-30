@@ -29,7 +29,7 @@ side_dom=(np.abs(fn[:,0])>np.abs(fn[:,2])) if hasS else np.zeros(len(fn),bool)
 cls=np.where(side_dom,np.where(fn[:,0]>0,2,3),np.where(fn[:,2]>=0,0,1))
 if os.environ.get('FACEFIX'):   # 臉的前半部有些面法線歪掉被分到側面圖，近看像碎片：臉部範圍內朝前的一律用正面圖
     fc=Vt[Ft].mean(1); fh=(mx[1]-fc[:,1])/r[1]; fx=np.abs(fc[:,0]-(mn[0]+mx[0])/2); fzz=fc[:,2]-(mn[2]+mx[2])/2
-    sel=(fh>.03)&(fh<.16)&(fx<.07*r[0])&(fzz>0); cls[sel]=0; print('facefix',int(sel.sum()))
+    sel=(fh>.03)&(fh<.16)&(fx<.07*r[0])&(fzz>0)&(fn[:,2]>-.2); cls[sel]=0; print('facefix',int(sel.sum()))
 cls3=np.repeat(cls,3)
 u=np.select([cls3==0,cls3==1,cls3==2,cls3==3],[(1-wx)*wf,wf+wx*wb,wf+wb+(1-wz)*wl,wf+wb+wl+wz*wr])/W; v=np.clip(h,0,1)
 uv=np.stack([u,v],1)
