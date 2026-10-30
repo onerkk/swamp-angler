@@ -162,7 +162,7 @@ let on=false, fish=null, uni=null, fd=null, prog=0, biteT=-1, camA=0, yaw=0, tt=
 const S=new T.Vector3(), C=new T.Vector3(), dirv=new T.Vector3(), perp=new T.Vector3(), pos=new T.Vector3(), prev=new T.Vector3(), focus=new T.Vector3();
 const cDark=lin('#07110d'), cMid=lin('#2a5240'), cSea=lin('#1d5a7a'), cTint=lin('#3c4a1c'), tmpC=new T.Color();
 function start(fdIn){
-  end(); fd=fdIn; if(fd.sp.special==='mermaid'){ fish=merSprite(); uni=merUni; } else { let src=null; try{ if(window.__MDL&&window.__MDL.fishReady(fd.sp.id)) src=window.__MDL.fish(fd.sp); }catch(e){}   // 用真實的 3D 魚模型（有骨架），不是簡化的魚
+  end(); fd=fdIn; const merReal=fd.sp.special==='mermaid'&&window.__MDL&&window.__MDL.fishReady(fd.sp.id); if(fd.sp.special==='mermaid'&&!merReal){ fish=merSprite(); uni=merUni; } else {   /* 美人魚：有 3D 模型就用有骨架的真模型（水下趴平游泳），沒有才用平面圖 */ let src=null; try{ if(window.__MDL&&window.__MDL.fishReady(fd.sp.id)) src=window.__MDL.fish(fd.sp); }catch(e){}   // 用真實的 3D 魚模型（有骨架），不是簡化的魚
     if(src){ uni=src.uni; fish=src.group; } else { src=P.getFish(fd.sp); uni=src.uni; fish=src.group.clone(); } fish.traverse(o=>{ o.frustumCulled=false; if(o.isMesh&&o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ m.fog=true; }); } }); }
   fish.visible=true; fish.scale.setScalar(fd.L); scene.add(fish);
   const a0=Math.random()*Math.PI*2, R0=3.2+fd.L*2;
