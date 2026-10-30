@@ -1,4 +1,4 @@
-/*APPV:20261030065903*/
+/*APPV:20261030071607*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -4880,7 +4880,7 @@ const sparks=[]; for(let i=0;i<30;i++){ const s=new T.Sprite(new T.SpriteMateria
 const fireL=new T.PointLight(0xff8a40,2.2,9,1.3); fireL.position.set(ROOM.x-1.1,.6,FP.z); scene.add(fireL);
 // 家具：Poly Haven 真實模型（CC0），回家時才載入。位置以房間中央偏後的客廳區為主
 const GL=new T.GLTFLoader(), mcache={}, glowM=[];
-const ART={hanging_picture_frame_01:'mer_a2.jpg',hanging_picture_frame_02:'mer_a2.jpg'};
+const ART={hanging_picture_frame_01:'mer_paint.jpg',hanging_picture_frame_02:'mer_paint.jpg'};   /* 小屋牆上的美人魚畫像：月光下坐在礁石上的全身畫 */
 function put(name,x,y,z,ry,sc,fn){ const place=g=>{ const o=g.scene.clone(true); o.position.set(x,y,z); o.rotation.y=ry||0; o.scale.setScalar(sc||1);
     o.traverse(m=>{ if(!m.isMesh) return; m.frustumCulled=false; const mats=Array.isArray(m.material)?m.material:[m.material];
       mats.forEach((mm,i)=>{ if(!mm) return; if(mm.map) mm.map.anisotropy=4;
@@ -5728,7 +5728,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030065903'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030071607'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
