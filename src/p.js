@@ -51,12 +51,12 @@ else { const r=new T.Mesh(new T.DodecahedronGeometry(.9,1),new T.MeshStandardMat
 const merMats=[], moonL=new T.PointLight(0xc8d8ff,0,10,1.3); moonL.position.set(1.2,2.6,1.6); npc.add(moonL);
 const moonL2=new T.PointLight(0x8fb0ff,0,7,1.5); moonL2.position.set(-1.4,1.4,-1.0); npc.add(moonL2);
 function merNight(){ const lt=W.info?W.info.light:1, k=Math.max(0,.65-lt); merMats.forEach(m=>m.emissiveIntensity=.12+k*1.9); moonL.intensity=k*4.5; moonL2.intensity=k*2.2; }
-const merT=new T.TextureLoader().load('mermaid_front.png',t=>{ const a=t.image.width/t.image.height; mer.scale.set(1.9*a,1.9,1); }); merT.encoding=T.sRGBEncoding;
+const merT=new T.TextureLoader().load('mer_front2.png',t=>{ const a=t.image.width/t.image.height; mer.scale.set(1.9*a,1.9,1); }); merT.encoding=T.sRGBEncoding;
 const mer=new T.Mesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial({map:merT,transparent:true,alphaTest:.05,depthWrite:true,side:T.DoubleSide,fog:false}));
 mer.position.y=1.25; npc.add(mer);
 /* 3D 霜汐：載入後取代平面圖（依玩家設定圖生成的模型） */
 let mer3=null;
-if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid3d.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.42,metalness:.08,emissive:new T.Color(0xe4ecff),emissiveMap:mp||null,emissiveIntensity:.15}); merMats.push(x.material); x.frustumCulled=false; } });
+if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid_v2.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.42,metalness:.08,emissive:new T.Color(0xe4ecff),emissiveMap:mp||null,emissiveIntensity:.15}); merMats.push(x.material); x.frustumCulled=false; } });
   o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.9/Math.max(sz.y,1e-6); o.scale.setScalar(s);
   o.updateMatrixWorld(true); const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,.15-b2.min.y,-c2.z);
   mer3=new T.Group(); mer3.add(o); npc.add(mer3); mer.visible=false; mer3.updateMatrixWorld(true); try{ merRig=autoRig(o,'tail'); }catch(e){ console.warn('mer rig',e); } });

@@ -260,7 +260,7 @@ const sparks=[]; for(let i=0;i<30;i++){ const s=new T.Sprite(new T.SpriteMateria
 const fireL=new T.PointLight(0xff8a40,2.2,9,1.3); fireL.position.set(ROOM.x-1.1,.6,FP.z); scene.add(fireL);
 // 家具：Poly Haven 真實模型（CC0），回家時才載入。位置以房間中央偏後的客廳區為主
 const GL=new T.GLTFLoader(), mcache={}, glowM=[];
-const ART={hanging_picture_frame_01:'mermaid_a.jpg',hanging_picture_frame_02:'mermaid_a.jpg'};
+const ART={hanging_picture_frame_01:'mer_a2.jpg',hanging_picture_frame_02:'mer_a2.jpg'};
 function put(name,x,y,z,ry,sc,fn){ const place=g=>{ const o=g.scene.clone(true); o.position.set(x,y,z); o.rotation.y=ry||0; o.scale.setScalar(sc||1);
     o.traverse(m=>{ if(!m.isMesh) return; m.frustumCulled=false; const mats=Array.isArray(m.material)?m.material:[m.material];
       mats.forEach((mm,i)=>{ if(!mm) return; if(mm.map) mm.map.anisotropy=4;

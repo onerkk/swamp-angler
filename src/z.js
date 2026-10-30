@@ -247,7 +247,7 @@ function endingShots(E,c){
   // 只取石組裡的一顆石頭，半露出水面放在她身後，不要整組散在鏡頭前
   load('rock_moss_set_01.glb',g=>{ const src=g.scene.getObjectByName('rock_moss_set_01_rock02'); if(!src) return; const r=src.clone(true); r.position.set(0,0,0); r.updateMatrixWorld(true);
     const bb=new T.Box3().setFromObject(r), cc=bb.getCenter(new T.Vector3()); const w=new T.Group(); r.position.set(-cc.x,-.75,-cc.z); w.add(r); w.scale.setScalar(.75); w.position.set(-.55,0,-.65); r.traverse(m=>{ m.frustumCulled=false; }); merG.add(w); });
-  load('models/mermaid3d.glb',g=>{ const o=g.scene.clone(true); o.traverse(x=>{ if(x.isMesh){ const mp=x.material&&x.material.map; x.frustumCulled=false;
+  load('models/mermaid_v2.glb',g=>{ const o=g.scene.clone(true); o.traverse(x=>{ if(x.isMesh){ const mp=x.material&&x.material.map; x.frustumCulled=false;
       x.material=new T.MeshStandardMaterial({map:mp||null,roughness:.55,metalness:.05,emissive:new T.Color(0xffffff),emissiveMap:mp||null,emissiveIntensity:.32}); } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(1.9/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-.38-b2.min.y,-c2.z); merW.add(o); merW.updateMatrixWorld(true); rigs.push({k:'mer',rig:autoRig(o,'tail')}); });   // 尾巴沒在淺水裡，像從水裡探出半身

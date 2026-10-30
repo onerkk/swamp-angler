@@ -196,6 +196,8 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #merTx b{display:block;font-size:22px;letter-spacing:.2em;color:#bfe8ff}
 #mer #merX{position:relative;flex:0 0 auto;height:48px;margin-bottom:calc(env(safe-area-inset-bottom,0px) + 22px);width:min(70vw,320px)}
 #mer.vision{pointer-events:none;background:transparent}
+#mer.live{background:linear-gradient(transparent 55%,rgba(0,0,0,.55));pointer-events:none}   /* 釣到美人魚：畫面不再蓋黑，看得到她本人 */
+#mer.live #merX,#mer.live #merTx{pointer-events:auto}
 #mer.vision img{opacity:.55;animation:vis 2.6s ease both}
 #mer.vision #merX{display:none}
 @keyframes kb{from{transform:scale(1.15)}to{transform:scale(1)}}

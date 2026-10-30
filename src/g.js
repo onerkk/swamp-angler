@@ -132,7 +132,7 @@ const fluke=new T.Group(); fluke.visible=false; S.add(fluke);
   const f=new T.Mesh(new T.ShapeGeometry(sh,12),tailM); f.rotation.z=-Math.PI/2; f.position.y=.6; fluke.add(f);
   const shaft=new T.Mesh(new T.CylinderGeometry(.05,.09,.62,14),tailM); shaft.position.y=.3; fluke.add(shaft); fluke.scale.setScalar(1.2); }
 /* 3D 美人魚：上下顛倒，只讓魚尾那一截露出水面（模型依玩家設定圖生成） */
-if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid3d.glb',gl=>{ const o=gl.scene;
+if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid_v2.glb',gl=>{ const o=gl.scene;
   o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.4,metalness:.1,emissive:new T.Color(0x3a6f8a),emissiveIntensity:.25}); x.frustumCulled=false; } });
   const w=new T.Group(); w.add(o); o.updateMatrixWorld(true); let b=new T.Box3().setFromObject(o); o.scale.setScalar(1.6/Math.max(b.getSize(new T.Vector3()).y,1e-6));
   w.rotation.x=Math.PI; w.rotation.z=.18; w.updateMatrixWorld(true); b=new T.Box3().setFromObject(w); const c=b.getCenter(new T.Vector3());

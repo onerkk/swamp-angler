@@ -124,8 +124,8 @@ $('bPhoto').addEventListener('click',()=>{ try{
 
 /* ---------- 美人魚相遇（使用插畫，不再顯示簡陋 3D 模型） ---------- */
 const mer=$('mer'), merImg=$('merImg'), merTx=$('merTx');
-function vision(){ merImg.src='mermaid_b.jpg'; merTx.innerHTML='水面下……有什麼在發光'; mer.className='vision'; setTimeout(()=>{ if(mer.className==='vision') mer.className='hidden'; },2600); }
-function mermaidScene(live){ merImg.src='mermaid_a.jpg'; merImg.style.display=live?'none':''; merTx.innerHTML='<b>美人魚</b>她靜靜看著你，彷彿早就知道你會來。<br><small>送她回家，她會留下一份謝禮。</small>'; mer.className='scene'+(live?' live':''); }   // live：她本人就在船前面，不用再顯示照片
+function vision(){ merImg.src='mer_b2.jpg'; merTx.innerHTML='水面下……有什麼在發光'; mer.className='vision'; setTimeout(()=>{ if(mer.className==='vision') mer.className='hidden'; },2600); }
+function mermaidScene(live){ merImg.src='mer_a2.jpg'; merImg.style.display=live?'none':''; merTx.innerHTML='<b>美人魚</b>她靜靜看著你，彷彿早就知道你會來。<br><small>送她回家，她會留下一份謝禮。</small>'; mer.className='scene'+(live?' live':''); }   // live：她本人就在船前面，不用再顯示照片
 $('merX').addEventListener('click',()=>{ mer.className='hidden'; });
 merImg.addEventListener('error',()=>{ if(mer.className!=='hidden') mer.className='hidden'; });
 

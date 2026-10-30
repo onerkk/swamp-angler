@@ -155,7 +155,7 @@ function merSprite(){ if(merG) return merG; const g=new T.Group();
     const m=new T.MeshStandardMaterial({map:t,alphaTest:.4,roughness:.55,metalness:.1,emissive:new T.Color(0x0a2a3a),emissiveIntensity:.35});
     m.onBeforeCompile=s=>{ s.uniforms.uSwim=merUni.uSwim; s.vertexShader='uniform float uSwim;\n'+s.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nfloat ty_ = clamp(0.48 - uv.y, 0.0, 1.0);\ntransformed.x += sin(uSwim*2.2 - uv.y*7.0)*ty_*ty_*0.16;\nfloat hy_ = smoothstep(0.55, 0.95, uv.y)*abs(position.x)*4.0;\ntransformed.x += sin(uSwim*1.3 + uv.y*5.0)*hy_*0.012;'); };
     const me=new T.Mesh(new T.PlaneGeometry(.497,1,10,48),m);   /* 新設定圖的寬高比（張開雙手） */ me.rotation.y=ry; me.frustumCulled=false; g.add(me); };
-  mk('mermaid_front.png',0); mk('mermaid_back.png',Math.PI); g.userData.mer=true; merG=g; return g; }
+  mk('mer_front2.png',0); mk('mer_back2.png',Math.PI); g.userData.mer=true; merG=g; return g; }
 
 // 魚
 let on=false, fish=null, uni=null, fd=null, prog=0, biteT=-1, camA=0, yaw=0, tt=0;

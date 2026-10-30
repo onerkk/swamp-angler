@@ -196,6 +196,8 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #merTx b{display:block;font-size:22px;letter-spacing:.2em;color:#bfe8ff}
 #mer #merX{position:relative;flex:0 0 auto;height:48px;margin-bottom:calc(env(safe-area-inset-bottom,0px) + 22px);width:min(70vw,320px)}
 #mer.vision{pointer-events:none;background:transparent}
+#mer.live{background:linear-gradient(transparent 55%,rgba(0,0,0,.55));pointer-events:none}   /* 釣到美人魚：畫面不再蓋黑，看得到她本人 */
+#mer.live #merX,#mer.live #merTx{pointer-events:auto}
 #mer.vision img{opacity:.55;animation:vis 2.6s ease both}
 #mer.vision #merX{display:none}
 @keyframes kb{from{transform:scale(1.15)}to{transform:scale(1)}}
@@ -398,7 +400,7 @@ function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classLi
 </script>
 <script>
 /* 主程式載入器：先試 CDN（快），檢查版本號一致才執行；不一致或失敗就改從本站下載。依序執行兩個檔案 */
-(function(){ var V='20261030004207', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@6a41afb29efb90079776ba8e6de54302c34b7a37/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
+(function(){ var V='20261030011025', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
   var note=function(t){ var e=document.getElementById('loadTip'); if(e&&t) e.textContent=t; };
   function run(code){ var b=new Blob([code],{type:'text/javascript'}), s=document.createElement('script'); s.src=URL.createObjectURL(b); return new Promise(function(ok){ s.onload=ok; s.onerror=ok; document.body.appendChild(s); }); }
   function get(u){ return fetch(u,{cache:'no-cache'}).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }); }
