@@ -5,19 +5,25 @@
    用法：window.__HUMAN.rig(模型根節點,{ghost:true}) → 控制器 */
 window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.THREE; RECT=new T.Vector4(.1317,.0442,.1695,.1220); } };   // 臉在模型貼圖上的位置
   const tex={}; const faceT=f=>{ init(); if(!tex[f]){ const t=new T.TextureLoader().load(f); t.encoding=T.sRGBEncoding; t.anisotropy=8; tex[f]=t; } return tex[f]; };
-  function faceMat(mat,U){ mat.onBeforeCompile=sh=>{ sh.uniforms.tA=U.tA; sh.uniforms.tB=U.tB; sh.uniforms.uMix=U.mix; sh.uniforms.uRect={value:U.rect||RECT}; sh.uniforms.uW1=U.w1; sh.uniforms.uW2=U.w2; sh.uniforms.uPale=U.pale;
-    sh.fragmentShader=sh.fragmentShader.replace('#include <map_pars_fragment>','#include <map_pars_fragment>\nuniform sampler2D tA,tB; uniform float uMix,uPale; uniform vec4 uRect,uW1,uW2;\nvec3 cellOf(sampler2D t,int i,vec2 f){ float cx=float(i-3*(i/3)), cy=float(i/3); return sRGBToLinear(texture2D(t,vec2((cx+f.x)/3.,1.-(cy+f.y)/2.))).rgb; }\nvec3 faceOf(sampler2D t,vec2 f){ float s=uW1.x+uW1.y+uW1.z+uW1.w+uW2.x; return cellOf(t,0,f)*max(0.,1.-s)+cellOf(t,1,f)*uW1.x+cellOf(t,2,f)*uW1.y+cellOf(t,3,f)*uW1.z+cellOf(t,4,f)*uW1.w+cellOf(t,5,f)*uW2.x; }')
+  function faceMat(mat,U){ mat.onBeforeCompile=sh=>{ sh.uniforms.tA=U.tA; sh.uniforms.tB=U.tB; sh.uniforms.uMix=U.mix; sh.uniforms.uRect={value:U.rect||RECT}; sh.uniforms.uW1=U.w1; sh.uniforms.uW2=U.w2; sh.uniforms.uPale=U.pale; sh.uniforms.uVeil=U.veil;
+    sh.fragmentShader=sh.fragmentShader.replace('#include <map_pars_fragment>','#include <map_pars_fragment>\nuniform sampler2D tA,tB; uniform float uMix,uPale,uVeil; uniform vec4 uRect,uW1,uW2;\nvec3 cellOf(sampler2D t,int i,vec2 f){ float cx=float(i-3*(i/3)), cy=float(i/3); return sRGBToLinear(texture2D(t,vec2((cx+f.x)/3.,1.-(cy+f.y)/2.))).rgb; }\nvec3 faceOf(sampler2D t,vec2 f){ float s=uW1.x+uW1.y+uW1.z+uW1.w+uW2.x; return cellOf(t,0,f)*max(0.,1.-s)+cellOf(t,1,f)*uW1.x+cellOf(t,2,f)*uW1.y+cellOf(t,3,f)*uW1.z+cellOf(t,4,f)*uW1.w+cellOf(t,5,f)*uW2.x; }')
       .replace('#include <map_fragment>',`#include <map_fragment>
   { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(f.x>0.&&f.x<1.&&f.y>0.&&f.y<1.){ float m=smoothstep(0.,.2,f.x)*smoothstep(1.,.8,f.x)*smoothstep(0.,.14,f.y)*smoothstep(1.,.86,f.y);
       vec3 c=mix(faceOf(tA,f),faceOf(tB,f),uMix); diffuseColor.rgb=mix(diffuseColor.rgb,c,m*.96); } }
+  { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(uVeil>0.&&f.x>-.15&&f.x<1.15&&f.y>-.3&&f.y<1.25){   /* 貞子：濕黑長髮一縷一縷垂在臉前，縫隙間隱約看到眼睛 */
+      float s=fract(f.x*17.+sin(f.y*4.+f.x*9.)*.45+sin(f.x*41.)*.08); float sid=floor(f.x*17.+sin(f.y*4.+f.x*9.)*.45); float pick=step(.62,fract(sin(sid*12.9898)*43758.5)); float gap=pick*smoothstep(.7,.82,s)*smoothstep(.99,.88,s)*smoothstep(.2,.42,f.y)*smoothstep(.75,.55,f.y);   /* 只有少數幾縷之間有縫，剛好露出一點眼睛 */
+      float edge=smoothstep(-.15,.05,f.x)*smoothstep(1.15,.95,f.x)*smoothstep(-.3,-.05,f.y)*smoothstep(1.22,1.05,f.y+.25*fract(sin(sid*3.3)*77.1));   /* 每一縷髮尾長短不一 */
+      vec3 hairC=vec3(.02,.018,.022)*(.8+.4*fract(sin(sid*7.1)*913.7))+vec3(.015)*smoothstep(.4,.5,s)*smoothstep(.6,.5,s);
+      diffuseColor.rgb=mix(diffuseColor.rgb,hairC,uVeil*edge*(1.-gap*.85)); } }
   diffuseColor.rgb=mix(diffuseColor.rgb,vec3(dot(diffuseColor.rgb,vec3(.3,.55,.15)))*vec3(.86,.9,.95),uPale);   /* 變成女鬼：全身失去血色、偏青灰 */`)
       .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
   #ifdef USE_EMISSIVEMAP
   { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(f.x>0.&&f.x<1.&&f.y>0.&&f.y<1.){ float m=smoothstep(0.,.2,f.x)*smoothstep(1.,.8,f.x)*smoothstep(0.,.14,f.y)*smoothstep(1.,.86,f.y);
-      totalEmissiveRadiance=mix(totalEmissiveRadiance,mix(faceOf(tA,f),faceOf(tB,f),uMix)*emissive,m*.96); } }   /* 發光圖也換成表情臉，否則烘焙的臉會從發光層透出來 */
+      totalEmissiveRadiance=mix(totalEmissiveRadiance,mix(faceOf(tA,f),faceOf(tB,f),uMix)*emissive,m*.96); } }
+  { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(uVeil>0.&&f.x>-.15&&f.x<1.15&&f.y>-.3&&f.y<1.25) totalEmissiveRadiance*=1.-uVeil*.85; }   /* 發光圖也換成表情臉，否則烘焙的臉會從發光層透出來 */
   #endif`); };
     mat.customProgramCacheKey=()=>'humanFace'+(U.key||''); mat.needsUpdate=true; }
-  function rig(root,opt){ init(); opt=opt||{}; const U={tA:{value:faceT(opt.faceA||'lin_face_alive.jpg')},tB:{value:faceT(opt.faceB||opt.faceA||'lin_face_ghost.jpg')},rect:opt.rect?new T.Vector4(...opt.rect):null,key:opt.faceA||'',mix:{value:opt.ghost?1:0},w1:{value:new T.Vector4()},w2:{value:new T.Vector4()},pale:{value:opt.ghost?.55:0}};
+  function rig(root,opt){ init(); opt=opt||{}; const U={tA:{value:faceT(opt.faceA||'lin_face_alive.jpg')},tB:{value:faceT(opt.faceB||opt.faceA||'lin_face_ghost.jpg')},rect:opt.rect?new T.Vector4(...opt.rect):null,key:opt.faceA||'',mix:{value:opt.ghost?1:0},w1:{value:new T.Vector4()},w2:{value:new T.Vector4()},pale:{value:opt.ghost?.55:0},veil:{value:0}};
     root.updateMatrixWorld(true); let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
     const geo=src.geometry.clone(); geo.applyMatrix4(new T.Matrix4().copy(root.matrixWorld).invert().multiply(src.matrixWorld)); geo.computeBoundingBox();
     const bb=geo.boundingBox, H=bb.max.y-bb.min.y, top=bb.max.y, Y=f=>top-f*H, Wd=(bb.max.x-bb.min.x)/2, cx=(bb.max.x+bb.min.x)/2, cz=(bb.max.z+bb.min.z)/2;
@@ -79,7 +85,7 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.05+Math.sin(t*.9-i*.6)*.04*(i+1)-st.hairFace*(i===0?2.6:.25),Math.sin(t*.5-i*.4)*.05,0));   /* 頭歪時長髮仍然往下垂，不會跟著頭橫出去 */   // 頭髮垂到臉前
     };
     sk.onBeforeRender=tick;
-    return {mesh:sk,bones:B,step:d=>{ st.wph+=d; },set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
+    return {mesh:sk,bones:B,step:d=>{ st.wph+=d; },set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },veil:k=>{ U.veil.value=k; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
   // 其他角色：小女孩（生前的林秋月）、老漁人
   const PRESET={girl:{faceA:'girl_face.jpg',rect:[.1424,.0638,.1964,.1641],relax:-.55,hairMax:.27,chin:.155},old:{faceA:'old_face.jpg',rect:[.1479,.0451,.1937,.1292],relax:-.12,hairMax:.12,chin:.13}};
   return {rig,preset:(name,root,o)=>rig(root,Object.assign({},PRESET[name]||{},o||{})),PRESET};

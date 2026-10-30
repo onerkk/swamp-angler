@@ -88,7 +88,7 @@ function trigger(force){ if(ev) return false; if(!force&&!eligible()) return fal
     else if(mode==='peek'){ const to=c.state()==='wait'&&c.to?c.to():null; const b=c.base(); let p; if(to){ const dx=to.x-b.x, dz=to.z-b.z, L=Math.hypot(dx,dz)||1; const sd=(Math.random()<.5?-1:1)*1.4; p=new T.Vector3(to.x+dx/L*1.2-dz/L*sd,0,to.z+dz/L*1.2+dx/L*sd); m.position.set(p.x,-1.95,p.z); } else p=placeRel(m,6,(Math.random()<.5?-1:1)*1.8,-1.95); ev.p=p; faceMe(m); m.visible=true; ev.phase='rise'; ev.st0=c.state(); }
     else if(mode==='creep'&&hc){ const side=Math.random()<.5?-1:1; const p=placeRel(m,13,side*4,-.05); ev.p=p; faceMe(m); m.visible=true; ev.phase='creep'; ev.away=0; ev.jumps=0; hc.now('hy',0); hc.now('reach',0); hc.now('hp',.35); hc.now('hr',.4); hc.expr(-1); croak(true); croakVol(.08); }   /* 一二三木頭人：你看她時她不動，轉開視線她就更近一步 */
     else if(mode==='stalk'&&hc){ const p=placeRel(m,12,(Math.random()-.5)*3,-.05); ev.p=p; faceMe(m); m.visible=true; ev.phase='walk'; ev.burst=0; ev.hold=0; hc.now('hy',0); hc.now('hp',.3); hc.now('hr',.5); hc.now('walk',0); hc.expr(-1); croak(true); croakVol(.05); }   /* 關節錯位地走過來：走一下、停一下，頭歪向一邊亂晃 */
-    else if(mode==='bow'&&hc){ const p=placeRel(m,5.5,(Math.random()-.5)*1.5,-.05); ev.p=p; faceMe(m); m.visible=true; ev.phase='bow'; hc.now('hy',0); hc.now('hp',1.25); hc.now('hairFace',1); hc.expr(5); muteAll(true); }   /* 貞子式：低頭、長髮蓋住臉，慢慢飄近 */
+    else if(mode==='bow'&&hc){ const p=placeRel(m,5.5,(Math.random()-.5)*1.5,-.05); ev.p=p; faceMe(m); m.visible=true; ev.phase='bow'; hc.now('hy',0); hc.now('hp',.4); hc.now('hairFace',0); hc.veil(1); hc.expr(5); muteAll(true); }   /* 貞子式：低頭、長髮蓋住臉，慢慢飄近 */
     else if(mode==='grab'&&hc){ const camY=(W.camera.getWorldPosition(new T.Vector3()).y), deck=camY-1.62; const p=placeRel(m,-.8,.12,deck); ev.deck=deck;   /* 站在你身後的碼頭上，臉跟你一樣高 */ ev.p=p; faceMe(m); m.rotation.y+=Math.PI; m.visible=true; ev.phase='silence'; hc.now('hy',0); hc.now('reach',0); hc.now('twitch',0); hc.expr(-1); muteAll(true); }   // 《大法師》式：她貼在你背後、身體背對你
     else { const p=placeRel(m,-2.1,0,-.28); ev.p=p; faceMe(m); m.visible=true; ev.phase='wait'; ev.wail=sfx('wail',.22); c.vib&&c.vib([15,60,15]); } });
   return true; }
@@ -113,7 +113,7 @@ function fxTick(dt){
   const m=model; const inWater=m&&m.visible&&m.position.y<-.05&&m.position.y>-1.75;
   foam.visible=!!inWater; if(inWater){ foam.position.set(m.position.x,.03,m.position.z); const f=.35+.12*Math.sin(performance.now()*.006); foam.material.opacity=f; foam.scale.setScalar(1+.06*Math.sin(performance.now()*.004));
     wakeT-=dt; if(wakeT<=0){ wakeT=.45; ring(m.position,.35,1.8,2.2,.4); } } }
-function endEv(){ if(TEST) testLast=performance.now(); croak(false); muteAll(false); if(model) model.visible=false; if(ov) ov.classList.remove('on'); if(ev&&ev.wail){ try{ ev.wail.pause(); }catch(e){} } ev=null; }
+function endEv(){ if(hc&&hc.veil) hc.veil(0); if(TEST) testLast=performance.now(); croak(false); muteAll(false); if(model) model.visible=false; if(ov) ov.classList.remove('on'); if(ev&&ev.wail){ try{ ev.wail.pause(); }catch(e){} } ev=null; }
 // 跟著環境亮度：越暗越只剩月光般的微光；腳下（水面交界）有一圈水紋
 let ripT=0;
 function blend(dt){ if(!model||!model.visible) return; const lt=W.info?W.info.light:1; mats.forEach(m=>{ if(m.emissiveIntensity!==undefined) m.emissiveIntensity=.1+Math.max(0,.5-lt)*.7; });
@@ -162,7 +162,7 @@ function update(dt){ { const tt=performance.now()/1000; if(ghostRig&&!hc) ghostR
     return; }
   if(ev.mode==='bow'&&hc){ const b=c.base(); tv.set(b.x-m.position.x,0,b.z-m.position.z); const dist=tv.length(); faceMe(m);
     if(ev.phase==='bow'){ m.position.addScaledVector(tv.normalize(),dt*.35); m.position.y=-.05+Math.sin(t*1.3)*.02; hc.set('twitch',Math.random()<dt*1.5?1:0);
-      if(dist<2.2||t>9){ ev.phase='up'; ev.tu=0; hc.now('hairFace',0); hc.now('hp',-.15); hc.expr(3); muteAll(false); sfx('scream_main',1); if(ov) ov.classList.add('on'); c.vib&&c.vib([150,40,200,40,300]); c.shake&&c.shake(3.4); } }   // 走到面前猛然抬頭：女鬼臉、尖叫
+      if(dist<2.2||t>9){ ev.phase='up'; ev.tu=0; hc.veil(0); hc.now('hp',-.15); hc.expr(3); muteAll(false); sfx('scream_main',1); if(ov) ov.classList.add('on'); c.vib&&c.vib([150,40,200,40,300]); c.shake&&c.shake(3.4); } }   // 走到面前猛然抬頭：女鬼臉、尖叫
     else { ev.tu+=dt; hc.set('reach',ev.tu>.3?1:0); if(ev.tu>1.6){ hc.now('reach',0); hc.now('hp',0); hc.expr(-1); endEv(); } }
     return; }
   if(ev.mode==='grab'&&hc){ const st=ev.phase; m.position.y=ev.deck;
