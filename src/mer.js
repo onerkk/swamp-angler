@@ -53,7 +53,7 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
       const ph=t*(1.6+sw2*2.2), A=.08+sw2*.18;
       ['t1','t2','t3','t4','t5','t6','fin'].forEach((nm,i)=>rot(nm,Math.sin(ph-i*.7)*A*(.35+i*.18),0,0));
       rot('hips',Math.sin(ph+1.2)*A*.25,0,0); rot('spine',Math.sin(ph+1.6)*A*.15,Math.sin(t*.4)*.05,0); rot('chest',Math.sin(ph+2)*A*.1+Math.sin(t*1.7)*.025,0,0);   /* 呼吸 */
-      rot('neck',0,Math.sin(t*.37)*.12,0); rot('head',Math.sin(t*.53)*.06,Math.sin(t*.29)*.15,Math.sin(t*.41)*.06);
+      rot('neck',(st.hp||0)*.4,Math.sin(t*.37)*.12*(1-Math.min(1,Math.abs(st.hy||0)))+(st.hy||0)*.45,0); rot('head',Math.sin(t*.53)*.06+(st.hp||0)*.6,Math.sin(t*.29)*.15*(1-Math.min(1,Math.abs(st.hy||0)))+(st.hy||0)*.55,Math.sin(t*.41)*.06);   /* 劇情可指定她轉頭、低頭 */
       ['hr1','hr2','hr3','hr4'].forEach((nm,i)=>rot(nm,.08+Math.sin(ph-1.5-i*.6)*.12*(i+1)*.5,Math.sin(t*.7-i*.5)*.08,0));
       st.wave=Math.max(0,st.wave-dt); const wv=st.wave>0?Math.min(1,Math.min(st.wave,2.4-st.wave)*2.5):0;
       for(const [s,k] of [['L',-1],['R',1]]){ const paddle=Math.sin(ph*.6+(k>0?0:Math.PI))*(.15+sw2*.25), w=k>0?wv:0;
@@ -61,6 +61,6 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
         rot('up'+s,stream*.5,0,k*(relax-stream*.25+paddle*.35+.04*Math.sin(t*.9+k))+k*w*1.6); rot('fo'+s,0,-k*(.25+paddle*.25+.1*Math.sin(t*.7))*(1-w),k*w*(.6+Math.sin(t*9)*.35)+k*.08*Math.sin(t*.6)); rot('ha'+s,0,k*.15*Math.sin(t*1.1+k),k*(paddle*.3+.15)); }   // 右手揮手時舉起來左右擺
     };
     sk.onBeforeRender=tick;
-    return {adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } },mesh:sk,bones:B,talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },smile:s=>{ st.smile=Math.max(st.smile,s||3); },wave:()=>{ st.wave=2.4; },look:()=>{ st.look=1.6; },swim:k=>{ st.swim=k; }}; }
+    return {head:(y,p)=>{ st.hy=y; st.hp=p; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } },mesh:sk,bones:B,talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },smile:s=>{ st.smile=Math.max(st.smile,s||3); },wave:()=>{ st.wave=2.4; },look:()=>{ st.look=1.6; },swim:k=>{ st.swim=k; }}; }
   return {rig};
 })();
