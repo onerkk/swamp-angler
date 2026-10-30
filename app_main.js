@@ -1,4 +1,4 @@
-/*APPV:20261030020804*/
+/*APPV:20261030021525*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -5610,7 +5610,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030020804'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030021525'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -5619,9 +5619,18 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
     try{ const r=await navigator.serviceWorker.getRegistration(); if(r) await r.update(); }catch(e){}
     location.reload(true); }
   upB.addEventListener('click',doUpdate); noB.addEventListener('click',()=>{ bar.style.display='none'; dismissed=bar.dataset.v||''; });
+  /* 自動更新：發現新版，等玩家不在搏魚、挖掘、劇情中（閒置、在小屋、在泥灘走路）時自動存檔並重新載入；
+     網址加上 v=新版本號，瀏覽器一定重新下載網頁本身（不會拿到 GitHub 快取 10 分鐘的舊網頁） */
+  const safe=()=>{ const G=window.__G; if(!G) return true; return (G.state==='idle'||G.state==='home'||G.state==='tide')&&!document.querySelector('#digBox[style*="flex"]'); };
+  let pend='';
+  function autoGo(v){ const u=new URL(location.href); if(u.searchParams.get('v')===v){ bar.dataset.v=v; bar.style.display='flex'; return; }   // 已經用新網址載過還是舊版（極少見）：改顯示按鈕，不無限重整
+    try{ if(window.__saveNow) window.__saveNow(); }catch(e){} try{ localStorage.setItem('swampAngler.updatedTo',v); }catch(e){}
+    u.searchParams.set('v',v); location.replace(u.toString()); }
+  function tryPend(){ if(pend&&safe()) autoGo(pend); }
   async function check(){ try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const j=await r.json();
-      if(j.v&&j.v!==APP_VER&&j.v>APP_VER&&j.v!==dismissed){ bar.dataset.v=j.v; bar.style.display='flex'; } }catch(e){} }
-  setTimeout(check,4000); setInterval(check,10*60*1000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) check(); });
+      if(j.v&&j.v!==APP_VER&&j.v>APP_VER){ pend=j.v; tryPend(); } }catch(e){} }
+  setTimeout(check,1500); setInterval(check,3*60*1000); setInterval(tryPend,4000);
+  try{ const up=localStorage.getItem('swampAngler.updatedTo'); if(up&&up===APP_VER){ localStorage.removeItem('swampAngler.updatedTo'); setTimeout(()=>{ const t=document.createElement('div'); t.textContent='✅ 已自動更新到最新版本'; t.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;padding:8px 14px;border-radius:999px;background:rgba(10,30,20,.85);color:#bff5c8;font-size:14px'; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); },2500); } }catch(e){} document.addEventListener('visibilitychange',()=>{ if(!document.hidden) check(); });
 })();
   if('serviceWorker' in navigator) window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
   async function install(){ if(installed) return 'installed'; if(deferred){ deferred.prompt(); const r=await deferred.userChoice; deferred=null; return r.outcome; }
