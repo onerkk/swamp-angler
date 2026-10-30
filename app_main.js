@@ -1,4 +1,4 @@
-/*APPV:20261030054934*/
+/*APPV:20261030065903*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -732,14 +732,14 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
    用法：window.__HUMAN.rig(模型根節點,{ghost:true}) → 控制器 */
 window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.THREE; RECT=new T.Vector4(.1317,.0442,.1695,.1220); } };   // 臉在模型貼圖上的位置
   const tex={}; const faceT=f=>{ init(); if(!tex[f]){ const t=new T.TextureLoader().load(f); t.encoding=T.sRGBEncoding; t.anisotropy=8; tex[f]=t; } return tex[f]; };
-  function faceMat(mat,U){ mat.onBeforeCompile=sh=>{ sh.uniforms.tA=U.tA; sh.uniforms.tB=U.tB; sh.uniforms.uMix=U.mix; sh.uniforms.uRect={value:RECT}; sh.uniforms.uW1=U.w1; sh.uniforms.uW2=U.w2; sh.uniforms.uPale=U.pale;
+  function faceMat(mat,U){ mat.onBeforeCompile=sh=>{ sh.uniforms.tA=U.tA; sh.uniforms.tB=U.tB; sh.uniforms.uMix=U.mix; sh.uniforms.uRect={value:U.rect||RECT}; sh.uniforms.uW1=U.w1; sh.uniforms.uW2=U.w2; sh.uniforms.uPale=U.pale;
     sh.fragmentShader=sh.fragmentShader.replace('#include <map_pars_fragment>','#include <map_pars_fragment>\nuniform sampler2D tA,tB; uniform float uMix,uPale; uniform vec4 uRect,uW1,uW2;\nvec3 cellOf(sampler2D t,int i,vec2 f){ float cx=float(i-3*(i/3)), cy=float(i/3); return sRGBToLinear(texture2D(t,vec2((cx+f.x)/3.,1.-(cy+f.y)/2.))).rgb; }\nvec3 faceOf(sampler2D t,vec2 f){ float s=uW1.x+uW1.y+uW1.z+uW1.w+uW2.x; return cellOf(t,0,f)*max(0.,1.-s)+cellOf(t,1,f)*uW1.x+cellOf(t,2,f)*uW1.y+cellOf(t,3,f)*uW1.z+cellOf(t,4,f)*uW1.w+cellOf(t,5,f)*uW2.x; }')
       .replace('#include <map_fragment>',`#include <map_fragment>
   { vec2 f=(vUv-uRect.xy)/(uRect.zw-uRect.xy); if(f.x>0.&&f.x<1.&&f.y>0.&&f.y<1.){ float m=smoothstep(0.,.2,f.x)*smoothstep(1.,.8,f.x)*smoothstep(0.,.14,f.y)*smoothstep(1.,.86,f.y);
       vec3 c=mix(faceOf(tA,f),faceOf(tB,f),uMix); diffuseColor.rgb=mix(diffuseColor.rgb,c,m*.96); } }
   diffuseColor.rgb=mix(diffuseColor.rgb,vec3(dot(diffuseColor.rgb,vec3(.3,.55,.15)))*vec3(.86,.9,.95),uPale);   /* 變成女鬼：全身失去血色、偏青灰 */`); };
-    mat.customProgramCacheKey=()=>'humanFace'; mat.needsUpdate=true; }
-  function rig(root,opt){ init(); opt=opt||{}; const U={tA:{value:faceT('lin_face_alive.jpg')},tB:{value:faceT('lin_face_ghost.jpg')},mix:{value:opt.ghost?1:0},w1:{value:new T.Vector4()},w2:{value:new T.Vector4()},pale:{value:opt.ghost?.55:0}};
+    mat.customProgramCacheKey=()=>'humanFace'+(U.key||''); mat.needsUpdate=true; }
+  function rig(root,opt){ init(); opt=opt||{}; const U={tA:{value:faceT(opt.faceA||'lin_face_alive.jpg')},tB:{value:faceT(opt.faceB||opt.faceA||'lin_face_ghost.jpg')},rect:opt.rect?new T.Vector4(...opt.rect):null,key:opt.faceA||'',mix:{value:opt.ghost?1:0},w1:{value:new T.Vector4()},w2:{value:new T.Vector4()},pale:{value:opt.ghost?.55:0}};
     root.updateMatrixWorld(true); let src=null; root.traverse(o=>{ if(o.isMesh&&!src) src=o; }); if(!src) return null;
     const geo=src.geometry.clone(); geo.applyMatrix4(new T.Matrix4().copy(root.matrixWorld).invert().multiply(src.matrixWorld)); geo.computeBoundingBox();
     const bb=geo.boundingBox, H=bb.max.y-bb.min.y, top=bb.max.y, Y=f=>top-f*H, Wd=(bb.max.x-bb.min.x)/2, cx=(bb.max.x+bb.min.x)/2, cz=(bb.max.z+bb.min.z)/2;
@@ -788,7 +788,7 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
       const br=Math.sin(t*1.6)*.02;
       rot('hips',st.crawl*1.35,0,0); rot('spine',(st.lean+st.reach*.6)*.25+br*.5+jit(),jit(),jit()); rot('chest',br+st.crawl*-.2+jit(),0,jit());
       rot('neck',st.hp*.4+jit(),st.hy*.45,st.hr*.5); rot('head',st.hp*.6+Math.sin(t*.5)*.03*(1-tw)+jit(),st.hy*.55+jit(),st.hr*.7+jit());
-      for(const [s,k] of [['L',-1],['R',1]]){ const relax=0;   /* 寬袖和洋裝是連在一起的：手臂只微微放下（女鬼略張的雙手），避免把布料拉開 */
+      for(const [s,k] of [['L',-1],['R',1]]){ const relax=(opt.relax||0)*(1-st.reach)*(1-st.armUp);   /* 寬袖和洋裝是連在一起的：手臂只微微放下（女鬼略張的雙手），避免把布料拉開 */
         rot('up'+s,-st.reach*.25-st.crawl*1.0+jit(),0,k*(relax+st.armUp*.9+.03*Math.sin(t*.8+k))+jit());   /* 這個模型手臂往下的方向和美人魚相反 */   // 伸手往前抓／爬行時手撐地
         rot('fo'+s,-st.reach*1.1,-k*.15,k*st.crawl*.6+jit()); rot('ha'+s,-st.reach*.5,0,k*.1+jit()+k*st.reach*.3*Math.sin(t*14));   /* 手指一抓一抓 */
         rot('th'+s,-st.crawl*1.4,0,0); rot('kn'+s,st.crawl*2.0,0,0); rot('an'+s,0,0,0); }
@@ -796,7 +796,9 @@ window.__HUMAN=(()=>{ let T=null, RECT=null; const init=()=>{ if(!T){ T=window.T
     };
     sk.onBeforeRender=tick;
     return {mesh:sk,bones:B,set:(k,v2)=>{ tg[k]=v2; },now:(k,v2)=>{ tg[k]=v2; st[k]=v2; },talk:s=>{ st.talk=Math.max(st.talk,s||2.5); },expr:i=>{ st.expr=i; },ghost:k=>{ U.mix.value=k; U.pale.value=k*.55; },adv:sec=>{ for(let k=0;k<sec/.05;k++){ st.last-=50; tick(); } }}; }
-  return {rig};
+  // 其他角色：小女孩（生前的林秋月）、老漁人
+  const PRESET={girl:{faceA:'girl_face.jpg',rect:null,relax:-.55},old:{faceA:'old_face.jpg',rect:null,relax:-.55}};
+  return {rig,preset:(name,root,o)=>rig(root,Object.assign({},PRESET[name]||{},o||{})),PRESET};
 })();
 const SCAN_TINT=`#include <map_fragment>
 { vec3 al_ = diffuseColor.rgb; float L_ = dot(al_, vec3(0.3, 0.59, 0.11));
@@ -5726,7 +5728,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030054934'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030065903'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
