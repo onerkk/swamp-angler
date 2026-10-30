@@ -1,4 +1,4 @@
-/*APPV:20261030033044*/
+/*APPV:20261030042029*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -4438,10 +4438,10 @@ if(!S.story){ // 第一次載入：已經打開的地圖維持開放（沿用舊
   S.story={done:[],prog:{},read:[],grand}; }
 const st=S.story; st.prog=st.prog||{}; st.done=st.done||[]; st.read=st.read||[]; st.grand=st.grand||[]; st.seen=st.seen||[];
 const byId=id=>CH.find(x=>x.id===id), isDone=id=>st.done.indexOf(id)>=0;
-function avail(ch){ const o=ch.open; return (!o.after||isDone(o.after))&&(!o.lv||S.lv>=o.lv); }
+function avail(ch){ if(window.__UNLOCK) return true; const o=ch.open; return (!o.after||isDone(o.after))&&(!o.lv||S.lv>=o.lv); }
 function why(ch){ const o=ch.open, r=[]; if(o.after&&!isDone(o.after)) r.push('完成「'+byId(o.after).name.replace(/^.*　/,'')+'」'); if(o.lv&&S.lv<o.lv) r.push('Lv '+o.lv); if(o.kayak&&!S.kayak) r.push('獨木舟'); if(o.yacht&&!S.yacht) r.push('漁船'); return r; }
 /* 地圖開放：以章節為準；舊存檔已開放的維持開放 */
-function lock(i){ const id=SPOT_IDS[i]; if(id==='dock'||st.grand.indexOf(id)>=0) return null; const ch=CH.find(x=>x.spot===id); if(!ch) return null;
+function lock(i){ if(window.__UNLOCK) return null; const id=SPOT_IDS[i]; if(id==='dock'||st.grand.indexOf(id)>=0) return null; const ch=CH.find(x=>x.spot===id); if(!ch) return null;
   const r=why(ch).filter(x=>x!=='獨木舟'&&x!=='漁船'); return r.length?'需要：'+r.join('、'):null; }
 function active(){ return CH.filter(ch=>!isDone(ch.id)&&avail(ch)); }
 function prog(ch){ let p=st.prog[ch.id]; if(!Array.isArray(p)) p=[]; if(p.length!==ch.tasks.length) p=ch.tasks.map((t,i)=>Math.min(t.n,+p[i]||0)); return st.prog[ch.id]=p; }
@@ -5611,7 +5611,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030033044'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030042029'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -7079,11 +7079,14 @@ const maxLine=()=>G.loc==='sea'?250:MAX_LINE;
 /* ---------- 存檔 ---------- */
 // 測試帳號：網址加 test 參數，存檔另開一份（只限擁有者 Google 帳號，驗證在 y.js）
 const TESTACC=/[?&]test=1(&|$)/.test(location.search);
-const SAVE_KEY=TESTACC?'swampAngler.test':'swampAngler.v1';
+/* 全開測試網址 ?unlock=1：獨立的一份存檔（不碰正式存檔、不上傳雲端），等級 60、金幣、獨木舟、遊艇、美人魚認可全部到位，所有釣點與章節都能進去 */
+const UNLOCK=/[?&]unlock=1(&|$)/.test(location.search); window.__UNLOCK=UNLOCK;
+const SAVE_KEY=UNLOCK?'swampAngler.unlockTest':TESTACC?'swampAngler.test':'swampAngler.v1';
 window.__SAVE_KEY=SAVE_KEY;
 let save={coins:0,total:0,sound:true,dex:{}};
 try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); if(s) save=Object.assign(save,s); }catch(e){}
-function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} if(window.__CLOUD) window.__CLOUD.dirty(); }
+if(UNLOCK){ save.lv=Math.max(save.lv||1,60); save.coins=Math.max(save.coins||0,2000000); save.kayak=1; save.yacht=1; save.mer=Object.assign({n:20},save.mer||{}); if((save.mer.n||0)<20) save.mer.n=20; save.total=Math.max(save.total||0,500); save.intro=1; }
+function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} if(window.__CLOUD&&!UNLOCK) window.__CLOUD.dirty(); }   /* 全開測試的存檔絕不上傳雲端 */
 
 /* ---------- 音效（全程序合成） ---------- */
 const Snd=(()=>{

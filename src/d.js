@@ -11,11 +11,14 @@ const maxLine=()=>G.loc==='sea'?250:MAX_LINE;
 /* ---------- 存檔 ---------- */
 // 測試帳號：網址加 test 參數，存檔另開一份（只限擁有者 Google 帳號，驗證在 y.js）
 const TESTACC=/[?&]test=1(&|$)/.test(location.search);
-const SAVE_KEY=TESTACC?'swampAngler.test':'swampAngler.v1';
+/* 全開測試網址 ?unlock=1：獨立的一份存檔（不碰正式存檔、不上傳雲端），等級 60、金幣、獨木舟、遊艇、美人魚認可全部到位，所有釣點與章節都能進去 */
+const UNLOCK=/[?&]unlock=1(&|$)/.test(location.search); window.__UNLOCK=UNLOCK;
+const SAVE_KEY=UNLOCK?'swampAngler.unlockTest':TESTACC?'swampAngler.test':'swampAngler.v1';
 window.__SAVE_KEY=SAVE_KEY;
 let save={coins:0,total:0,sound:true,dex:{}};
 try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); if(s) save=Object.assign(save,s); }catch(e){}
-function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} if(window.__CLOUD) window.__CLOUD.dirty(); }
+if(UNLOCK){ save.lv=Math.max(save.lv||1,60); save.coins=Math.max(save.coins||0,2000000); save.kayak=1; save.yacht=1; save.mer=Object.assign({n:20},save.mer||{}); if((save.mer.n||0)<20) save.mer.n=20; save.total=Math.max(save.total||0,500); save.intro=1; }
+function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} if(window.__CLOUD&&!UNLOCK) window.__CLOUD.dirty(); }   /* 全開測試的存檔絕不上傳雲端 */
 
 /* ---------- 音效（全程序合成） ---------- */
 const Snd=(()=>{
