@@ -116,7 +116,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
       if(opt.ghost){ n.color=new T.Color(0xbfe6ff); n.transparent=true; n.opacity=.38; n.emissive=new T.Color(0x4ab8ff); n.emissiveIntensity=.55; n.depthWrite=false; n.side=T.DoubleSide; }   // 幽靈魚：真的半透明，看得到後面的水草
       bendify(n,uni,opt.king||opt.mer?.15:1); return n; };
     const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
-  try{ if(opt.mer&&window.__MER){ const ctl=window.__MER.rig(grp,{uni}); grp.userData.merCtl=ctl; }   // 美人魚：完整骨架＋表情（眨眼、說話、微笑、揮手、尾巴波浪、頭髮）
+  try{ if(opt.mer&&window.__MER){ const ctl=window.__MER.rig(grp,{uni,horiz:()=>!!window.__UWON&&!(window.__G&&window.__G.merShow)}); grp.userData.merCtl=ctl; }   // 美人魚：完整骨架＋表情（眨眼、說話、微笑、揮手、尾巴波浪、頭髮）
     else if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });
         const rg=autoRig(grp,'tail'); FRIGS.add({grp,uni,up:rg,idle:0}); } }
     else { grp.userData.cutWhite=CUTWHITE.has(sp.id); grp.userData.bigClaw=sp.id==='fiddler'; rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); } cloneSafe(grp); }catch(e){ console.warn('fish rig',sp.id,e); }

@@ -1,4 +1,4 @@
-/*APPV:20261030022943*/
+/*APPV:20261030033044*/
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -698,7 +698,8 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
     // 控制
     const st={t:0,blink:0,nextBlink:2,talk:0,smile:0,look:0,lookT:6,wave:0,swim:.5,last:performance.now()}, rest={}; list.forEach(b=>rest[b.name]=b.quaternion.clone());
     const q=new T.Quaternion(), e=new T.Euler(), rot=(b,x,y,z)=>{ e.set(x,y,z); q.setFromEuler(e); B[b].quaternion.copy(rest[b]).multiply(q); };
-    const tick=()=>{ const now=performance.now(), dt=Math.min(.05,(now-st.last)/1000); st.last=now; if(dt<=0) return; st.t+=dt; if(opt.uni) st.swim=Math.min(1,.25+opt.uni.uAmp.value*3); const t=st.t, sw2=st.swim;   /* 跟著遊戲裡的掙扎／游動強度 */
+    const tick=()=>{ const now=performance.now(), dt=Math.min(.05,(now-st.last)/1000); st.last=now; if(dt<=0) return; st.t+=dt; if(opt.uni) st.swim=Math.min(1,.25+opt.uni.uAmp.value*3);
+      { const hz=opt.horiz&&opt.horiz()?1:0; st.hz=(st.hz||0)+(hz-(st.hz||0))*Math.min(1,dt*3); sk.rotation.order='YXZ'; sk.rotation.set(Math.PI/2*st.hz,Math.PI/2*st.hz,0);   /* 頭朝前（+X）、背朝上、肚子朝下 */ if(hz) st.swim=Math.max(st.swim,.85); }   /* 水下：身體趴平、頭朝前游（海豚式擺尾），雙手往後貼著身體 */ const t=st.t, sw2=st.swim;   /* 跟著遊戲裡的掙扎／游動強度 */
       // 眨眼：每 2～5 秒一次，約 0.15 秒
       st.nextBlink-=dt; if(st.nextBlink<=0){ st.blink=.16; st.nextBlink=2+Math.random()*3; } st.blink=Math.max(0,st.blink-dt); const bl=st.blink>0?Math.sin((1-st.blink/.16)*Math.PI):0;
       // 說話：嘴巴在「啊」「喔」之間開合
@@ -2763,7 +2764,7 @@ $('bPhoto').addEventListener('click',()=>{ try{
 /* ---------- 美人魚相遇（使用插畫，不再顯示簡陋 3D 模型） ---------- */
 const mer=$('mer'), merImg=$('merImg'), merTx=$('merTx');
 function vision(){ merImg.src='mer_b2.jpg'; merTx.innerHTML='水面下……有什麼在發光'; mer.className='vision'; setTimeout(()=>{ if(mer.className==='vision') mer.className='hidden'; },2600); }
-function mermaidScene(live){ merImg.src='mer_a2.jpg'; merImg.style.display=live?'none':''; merTx.innerHTML='<b>美人魚</b>她靜靜看著你，彷彿早就知道你會來。<br><small>送她回家，她會留下一份謝禮。</small>'; mer.className='scene'+(live?' live':''); }   // live：她本人就在船前面，不用再顯示照片
+function mermaidScene(live){ merImg.src='mer_a2.jpg'; merImg.style.display=live?'none':''; merTx.innerHTML=live?'<b>美人魚</b>她靜靜看著你，彷彿早就知道你會來。<br><small>點她和她說說話；送她回家，她會留下一份謝禮。</small>':'<b>美人魚</b>她靜靜看著你，彷彿早就知道你會來。<br><small>送她回家，她會留下一份謝禮。</small>'; mer.className='scene'+(live?' live':''); }   // live：她本人就在船前面，不用再顯示照片
 $('merX').addEventListener('click',()=>{ mer.className='hidden'; });
 merImg.addEventListener('error',()=>{ if(mer.className!=='hidden') mer.className='hidden'; });
 
@@ -3524,7 +3525,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
       if(opt.ghost){ n.color=new T.Color(0xbfe6ff); n.transparent=true; n.opacity=.38; n.emissive=new T.Color(0x4ab8ff); n.emissiveIntensity=.55; n.depthWrite=false; n.side=T.DoubleSide; }   // 幽靈魚：真的半透明，看得到後面的水草
       bendify(n,uni,opt.king||opt.mer?.15:1); return n; };
     const mesh=new T.Mesh(geo,Array.isArray(mat)?mat.map(conv):conv(mat)); mesh.frustumCulled=false; grp.add(mesh); }
-  try{ if(opt.mer&&window.__MER){ const ctl=window.__MER.rig(grp,{uni}); grp.userData.merCtl=ctl; }   // 美人魚：完整骨架＋表情（眨眼、說話、微笑、揮手、尾巴波浪、頭髮）
+  try{ if(opt.mer&&window.__MER){ const ctl=window.__MER.rig(grp,{uni,horiz:()=>!!window.__UWON&&!(window.__G&&window.__G.merShow)}); grp.userData.merCtl=ctl; }   // 美人魚：完整骨架＋表情（眨眼、說話、微笑、揮手、尾巴波浪、頭髮）
     else if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });
         const rg=autoRig(grp,'tail'); FRIGS.add({grp,uni,up:rg,idle:0}); } }
     else { grp.userData.cutWhite=CUTWHITE.has(sp.id); grp.userData.bigClaw=sp.id==='fiddler'; rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); } cloneSafe(grp); }catch(e){ console.warn('fish rig',sp.id,e); }
@@ -5610,7 +5611,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030022943'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030033044'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
@@ -7467,7 +7468,7 @@ function showCard(){
   $('bGrill').classList.toggle('hidden',!canGrill(fd)||!HOME.unlocked()); $('bGrill').textContent='🔥 放進保冷箱，帶回去烤（'+((save.cooler||[]).length)+'/5）';
   { const hr=HOME.check(fd), b=$('bHome'); b.classList.toggle('hidden',!!hr.hide||!HOME.unlocked()); b.textContent=hr.mount?'🖼 '+hr.short+'，做成標本 🪙'+hr.cost.toLocaleString():'🏠 帶回家';
     b.dataset.mode=hr.ok?'keep':hr.mount?'mount':'no'; b.dataset.why=hr.why||''; b.classList.toggle('dim',!hr.ok&&!hr.mount); }
-  FUN.medalBadge(fd); FUN.goalsDot(); if(sp.special==='mermaid'){ const ctl=G.fish.group.userData.merCtl; if(ctl){ G.merShow={t:0,ctl}; G.fish.group.visible=true; FUN.mermaidScene(true); ctl.smile(6); setTimeout(()=>ctl.talk(3.2),900); } else { G.fish.group.visible=false; FUN.mermaidScene(); } }
+  FUN.medalBadge(fd); FUN.goalsDot(); if(sp.special==='mermaid'){ if(!G.fish.group.userData.merCtl&&window.__MER){ try{ G.fish.group.userData.merCtl=window.__MER.rig(G.fish.group,{}); }catch(e){} } const ctl=G.fish.group.userData.merCtl; if(ctl){ G.merShow={t:0,ctl}; G.fish.group.visible=true; FUN.mermaidScene(true); ctl.smile(6); setTimeout(()=>ctl.talk(3.2),900); } else { G.fish.group.visible=false; FUN.mermaidScene(); } }
   const nb=$('cNew'); nb.textContent=isNew?'新魚種':'新紀錄'; nb.classList.toggle('hidden',!(isNew||isRec));
   const tag=$('tag'); tag.style.animation='none'; void tag.offsetWidth; tag.style.animation='';
   ui.catch.classList.remove('hidden'); document.body.classList.add('catching'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden');
@@ -7501,6 +7502,11 @@ function merPresent(dt){ const m=G.merShow; if(!m) return; const g=G.fish.group;
   m.ctl.swim(.2); if(!m.waved&&m.t>2.6){ m.waved=1; m.ctl.wave(); }
   if(m.leave){ m.leave+=dt; if(m.leave>2.4){ g.visible=false; cam.remove(g); W.scene.add(g); G.merShow=null; } }
   if(Math.random()<dt*.15&&!m.leave) m.ctl.look(); }
+// 釣到美人魚時可以和她互動：點畫面上方（她所在的位置），她會有不同的反應和一句話
+const MER_LINES=[['「你的燈……好溫暖。」','smile'],['「我叫霜汐。你呢？」','talk'],['「謝謝你，沒有傷害我。」','smile'],['「月亮圓的時候，我會再來。」','wave'],['「人類的手，原來是暖的。」','smile'],['「別告訴別人你看過我，好嗎？」','look'],['「湖底很安靜……但有點寂寞。」','talk']];
+window.addEventListener('pointerdown',e=>{ const m=G.merShow; if(!m||m.leave||m.t<1.6||e.clientY>innerHeight*.62) return; const L=MER_LINES[(m.li=((m.li||0)+1+Math.floor(Math.random()*2))%MER_LINES.length)];
+  m.ctl.talk(2.6); if(L[1]==='smile') m.ctl.smile(4); if(L[1]==='wave') m.ctl.wave(); if(L[1]==='look') m.ctl.look(); vib(12);
+  const tx=document.getElementById('merTx'); if(tx) tx.innerHTML='<b>霜汐</b>'+L[0]+'<br><small>點她可以再說說話，送她回家，她會留下一份謝禮。</small>'; });
 function finishCatch(sell){
   const keep=sell==='keep'; if(keep) sell=false;   // 帶回家：不賣、也不算放生
   if(sell&&G.fd&&G.fd.sp&&(G.fd.sp.noSell||G.fd.sp.special==='mermaid')) sell=false;   // 保育類、美人魚：任何途徑都不能賣
@@ -8051,7 +8057,7 @@ W.setTime(G.hour,true);
 let last=performance.now(), prAcc=0, prN=0, prChecks=0;
 function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
-  try{ update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ G.mtT=(G.mtT||0)+dt; if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
+  try{ window.__UWON=UW.active(); update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ G.mtT=(G.mtT||0)+dt; if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
   if(prAcc>2){ const fps=prN/prAcc, mode=save.gfx||'auto', ready=window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden;
     if(ready){ G.gfxWarm=(G.gfxWarm||0)+1; }

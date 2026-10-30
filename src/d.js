@@ -400,7 +400,7 @@ function showCard(){
   $('bGrill').classList.toggle('hidden',!canGrill(fd)||!HOME.unlocked()); $('bGrill').textContent='🔥 放進保冷箱，帶回去烤（'+((save.cooler||[]).length)+'/5）';
   { const hr=HOME.check(fd), b=$('bHome'); b.classList.toggle('hidden',!!hr.hide||!HOME.unlocked()); b.textContent=hr.mount?'🖼 '+hr.short+'，做成標本 🪙'+hr.cost.toLocaleString():'🏠 帶回家';
     b.dataset.mode=hr.ok?'keep':hr.mount?'mount':'no'; b.dataset.why=hr.why||''; b.classList.toggle('dim',!hr.ok&&!hr.mount); }
-  FUN.medalBadge(fd); FUN.goalsDot(); if(sp.special==='mermaid'){ const ctl=G.fish.group.userData.merCtl; if(ctl){ G.merShow={t:0,ctl}; G.fish.group.visible=true; FUN.mermaidScene(true); ctl.smile(6); setTimeout(()=>ctl.talk(3.2),900); } else { G.fish.group.visible=false; FUN.mermaidScene(); } }
+  FUN.medalBadge(fd); FUN.goalsDot(); if(sp.special==='mermaid'){ if(!G.fish.group.userData.merCtl&&window.__MER){ try{ G.fish.group.userData.merCtl=window.__MER.rig(G.fish.group,{}); }catch(e){} } const ctl=G.fish.group.userData.merCtl; if(ctl){ G.merShow={t:0,ctl}; G.fish.group.visible=true; FUN.mermaidScene(true); ctl.smile(6); setTimeout(()=>ctl.talk(3.2),900); } else { G.fish.group.visible=false; FUN.mermaidScene(); } }
   const nb=$('cNew'); nb.textContent=isNew?'新魚種':'新紀錄'; nb.classList.toggle('hidden',!(isNew||isRec));
   const tag=$('tag'); tag.style.animation='none'; void tag.offsetWidth; tag.style.animation='';
   ui.catch.classList.remove('hidden'); document.body.classList.add('catching'); ui.actWrap.classList.add('hidden'); ui.sub.classList.add('hidden');
@@ -434,6 +434,11 @@ function merPresent(dt){ const m=G.merShow; if(!m) return; const g=G.fish.group;
   m.ctl.swim(.2); if(!m.waved&&m.t>2.6){ m.waved=1; m.ctl.wave(); }
   if(m.leave){ m.leave+=dt; if(m.leave>2.4){ g.visible=false; cam.remove(g); W.scene.add(g); G.merShow=null; } }
   if(Math.random()<dt*.15&&!m.leave) m.ctl.look(); }
+// 釣到美人魚時可以和她互動：點畫面上方（她所在的位置），她會有不同的反應和一句話
+const MER_LINES=[['「你的燈……好溫暖。」','smile'],['「我叫霜汐。你呢？」','talk'],['「謝謝你，沒有傷害我。」','smile'],['「月亮圓的時候，我會再來。」','wave'],['「人類的手，原來是暖的。」','smile'],['「別告訴別人你看過我，好嗎？」','look'],['「湖底很安靜……但有點寂寞。」','talk']];
+window.addEventListener('pointerdown',e=>{ const m=G.merShow; if(!m||m.leave||m.t<1.6||e.clientY>innerHeight*.62) return; const L=MER_LINES[(m.li=((m.li||0)+1+Math.floor(Math.random()*2))%MER_LINES.length)];
+  m.ctl.talk(2.6); if(L[1]==='smile') m.ctl.smile(4); if(L[1]==='wave') m.ctl.wave(); if(L[1]==='look') m.ctl.look(); vib(12);
+  const tx=document.getElementById('merTx'); if(tx) tx.innerHTML='<b>霜汐</b>'+L[0]+'<br><small>點她可以再說說話，送她回家，她會留下一份謝禮。</small>'; });
 function finishCatch(sell){
   const keep=sell==='keep'; if(keep) sell=false;   // 帶回家：不賣、也不算放生
   if(sell&&G.fd&&G.fd.sp&&(G.fd.sp.noSell||G.fd.sp.special==='mermaid')) sell=false;   // 保育類、美人魚：任何途徑都不能賣
@@ -984,7 +989,7 @@ W.setTime(G.hour,true);
 let last=performance.now(), prAcc=0, prN=0, prChecks=0;
 function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
-  try{ update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ G.mtT=(G.mtT||0)+dt; if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
+  try{ window.__UWON=UW.active(); update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ G.mtT=(G.mtT||0)+dt; if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
   if(prAcc>2){ const fps=prN/prAcc, mode=save.gfx||'auto', ready=window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden;
     if(ready){ G.gfxWarm=(G.gfxWarm||0)+1; }

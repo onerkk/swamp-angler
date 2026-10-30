@@ -41,7 +41,8 @@ window.__MER=(()=>{ let T=null, FACE_RECT=null;   /* 3D 引擎（THREE）可能�
     // 控制
     const st={t:0,blink:0,nextBlink:2,talk:0,smile:0,look:0,lookT:6,wave:0,swim:.5,last:performance.now()}, rest={}; list.forEach(b=>rest[b.name]=b.quaternion.clone());
     const q=new T.Quaternion(), e=new T.Euler(), rot=(b,x,y,z)=>{ e.set(x,y,z); q.setFromEuler(e); B[b].quaternion.copy(rest[b]).multiply(q); };
-    const tick=()=>{ const now=performance.now(), dt=Math.min(.05,(now-st.last)/1000); st.last=now; if(dt<=0) return; st.t+=dt; if(opt.uni) st.swim=Math.min(1,.25+opt.uni.uAmp.value*3); const t=st.t, sw2=st.swim;   /* 跟著遊戲裡的掙扎／游動強度 */
+    const tick=()=>{ const now=performance.now(), dt=Math.min(.05,(now-st.last)/1000); st.last=now; if(dt<=0) return; st.t+=dt; if(opt.uni) st.swim=Math.min(1,.25+opt.uni.uAmp.value*3);
+      { const hz=opt.horiz&&opt.horiz()?1:0; st.hz=(st.hz||0)+(hz-(st.hz||0))*Math.min(1,dt*3); sk.rotation.order='YXZ'; sk.rotation.set(Math.PI/2*st.hz,Math.PI/2*st.hz,0);   /* 頭朝前（+X）、背朝上、肚子朝下 */ if(hz) st.swim=Math.max(st.swim,.85); }   /* 水下：身體趴平、頭朝前游（海豚式擺尾），雙手往後貼著身體 */ const t=st.t, sw2=st.swim;   /* 跟著遊戲裡的掙扎／游動強度 */
       // 眨眼：每 2～5 秒一次，約 0.15 秒
       st.nextBlink-=dt; if(st.nextBlink<=0){ st.blink=.16; st.nextBlink=2+Math.random()*3; } st.blink=Math.max(0,st.blink-dt); const bl=st.blink>0?Math.sin((1-st.blink/.16)*Math.PI):0;
       // 說話：嘴巴在「啊」「喔」之間開合
