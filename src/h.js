@@ -83,7 +83,7 @@ bank(-10.5,-7,11,13,1); bank(12.5,-9,10,12,-1);
 if(T.GLTFLoader){
   const gl=new T.GLTFLoader(mgr);
   const place=(file,list)=>gl.load(file,g=>{ g.scene.traverse(o=>{ if(o.isMesh&&o.material){ o.material.envMapIntensity=1; } });
-    for(const it of list){ const c=g.scene.clone(true); c.position.set(it[0],it[1],it[2]); c.rotation.set(it[4]||0,it[3]||0,it[5]||0); c.scale.setScalar(it[6]||1); c.userData.lake=true; c.visible=!(W.isSea&&W.isSea()); W.scene.add(c); } });
+    for(const it of list){ const c=g.scene.clone(true); c.position.set(it[0],it[1],it[2]); c.rotation.set(it[4]||0,it[3]||0,it[5]||0); c.scale.setScalar(it[6]||1); c.userData.lake=true; c.visible=!(W.isSea&&W.isSea()); W.scene.add(c); if(/trunk|stump|branches|rock/.test(file)) W.fishingPhysics.addObject(c,()=>c.visible,file.includes("rock")?"岸邊岩石":"倒木樹枝"); } });
   place('dead_tree_trunk_02.glb',[[-5.8,-.2,-9.5,.6,0,.05,1.1],[7.5,-.25,-16,-1.1,0,0,1.0],[-13,-.15,-22,2.2,0,0,1.2],[2,-.3,-26,.2,0,0,1.3]]);
   place('tree_stump_01.glb',[[3.9,-.14,-7.6,1,0,0,1.0],[-8.2,-.12,-14,2,0,0,1.3],[10,-.18,-24,0,0,0,1.4],[-3,-.2,-30,1.2,0,0,1.5]]);
   place('tree_stump_02.glb',[[-3.4,-.12,-5.2,.4,0,0,.8],[12.5,-.12,-11,1.7,0,0,1.1],[5.5,-.15,-34,2.5,0,0,1.6]]);

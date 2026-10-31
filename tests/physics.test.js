@@ -1,0 +1,17 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const Physics=require('../src/physics.js');
+const p=(x,y=0,z=0)=>({x,y,z});
+const wall=(w,min=p(-.1,-2,-2),max=p(.1,3,2),enabled=()=>true)=>{w.addBox(min,max,enabled,'wood');w.refresh();};
+test('fast casts cannot tunnel through a thin post',()=>{const w=new Physics();wall(w);const q=w.move(p(-30),p(30),.06,false);assert(q.contact);assert(q.pos.x<-.15);assert(w.clear(q.pos,.06));});
+test('diagonal movement slides along a face',()=>{const w=new Physics();wall(w);const q=w.move(p(-2,0,-1),p(2,0,1),.1);assert(q.contact);assert(q.pos.x<-.19);assert(q.pos.z>.9);});
+test('fish below a leaf or above a submerged rock can pass',()=>{const w=new Physics();wall(w,p(-1,-.03,-1),p(1,.03,1));assert(!w.move(p(-3,-.4),p(3,-.4),.1).contact);assert(w.move(p(-3),p(3),.06).contact);});
+test('airborne cast passes over low structure',()=>{const w=new Physics();wall(w);assert(!w.move(p(-3,5),p(3,5),.06,false).contact);});
+test('line routes around obstruction and every segment is clear',()=>{const w=new Physics();wall(w);const a=p(-3,1),b=p(3,0);const path=w.route(a,b);assert(path.length>2);assert.deepEqual(path[0],a);assert.deepEqual(path.at(-1),b);for(let i=1;i<path.length;i++)assert(!w.hit(path[i-1],path[i],.025));});
+test('multiple adjacent structures still produce a clear route',()=>{const w=new Physics();wall(w);wall(w,p(.5,-2,-.5),p(1.5,3,3));const path=w.route(p(-4,1),p(4));assert.deepEqual(path.at(-1),p(4));for(let i=1;i<path.length;i++)assert(!w.hit(path[i-1],path[i],.025));});
+test('tackle retrieval route has body clearance',()=>{const w=new Physics();wall(w);const path=w.route(p(-3,1),p(3),.085);assert(path.length>2);for(let i=1;i<path.length;i++)assert(!w.move(path[i-1],path[i],.065).contact);});
+test('line contact disappears only when its geometry clears the obstacle',()=>{const w=new Physics();wall(w);assert(w.hit(p(-3),p(3),.025));assert(!w.hit(p(-3,0,3),p(3,0,3),.025));});
+test('inactive lake obstacles cannot collide in the sea',()=>{let lake=true;const w=new Physics();wall(w,undefined,undefined,()=>lake);assert(w.hit(p(-3),p(3)));lake=false;w.refresh();assert.equal(w.hit(p(-3),p(3)),null);});
+test('embedded spawn resolves to safe water without jumping to top',()=>{const w=new Physics();wall(w);const q=w.resolve(p(0),.1);assert(w.clear(q,.1));assert.equal(q.y,0);});
+test('moving away from a touching surface is not another collision',()=>{const w=new Physics();wall(w);assert(!w.move(p(-.2),p(-2),.1).contact);});
+test('random swept movements always stop outside geometry',()=>{const w=new Physics();wall(w);for(let i=0;i<2000;i++){const a=p(-2,0,Math.sin(i)*4),b=p(2,0,Math.cos(i*3)*4),q=w.move(a,b,.1);assert(w.clear(q.pos,.099));}});

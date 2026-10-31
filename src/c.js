@@ -8,6 +8,7 @@ const SCAN_TINT=`#include <map_fragment>
 function createProps(W){
 'use strict';
 const T = THREE, {scene, player, head, camera, U} = W;
+const PH=W.fishingPhysics=new FishingPhysics();
 const clamp=(x,a,b)=>x<a?a:x>b?b:x, lerp=(a,b,t)=>a+(b-a)*t;
 const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 function hashI(x,y){ let h=(Math.imul(x|0,374761393)+Math.imul(y|0,668265263))|0; h=Math.imul(h^(h>>>13),1274126177); h^=h>>>16; return (h>>>0)/4294967296; }
@@ -40,6 +41,7 @@ const NPL=46, planks=new T.InstancedMesh(new T.BoxGeometry(2.5,.055,.19), plankM
   plankMat.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute vec2 iOff;').replace('#include <uv_vertex>','#include <uv_vertex>\n#ifdef USE_UV\nvUv += iOff;\n#endif'); };
   plankMat.customProgramCacheKey=()=>'plankOff'; }
 planks.userData.lake=true; scene.add(planks);
+PH.addBox({x:-1.3,y:.77,z:-3.31},{x:1.3,y:.88,z:6.2},()=>planks.visible,"碼頭木板");
 const postTex=dataTex(64,128,(u,v,o)=>{ const n=fbm(u*8,v*30,3), g=sstep(.58,.66,v), w=[34,38,24], dr=[96,80,62];
   for(let k=0;k<3;k++) o[k]=(w[k]+(dr[k]-w[k])*g)*(.7+.6*n); });
 const postMat=new T.MeshStandardMaterial({map:postTex, roughness:.85});
@@ -47,9 +49,9 @@ const postMat=new T.MeshStandardMaterial({map:postTex, roughness:.85});
 const endTex=dataTex(64,64,(u,v,o)=>{ const x=u*2-1, y=v*2-1, r=Math.hypot(x,y), ring=.5+.5*Math.sin(r*38+fbm(u*6,v*6,2)*6), crack=Math.pow(Math.abs(Math.sin(Math.atan2(y,x)*3+fbm(u*3,v*3,2)*4)),40)*.6;
   const k=(.55+.25*ring)*(1-crack)*(1-.35*sstep(.8,1,r)); o[0]=78*k; o[1]=62*k; o[2]=46*k; });
 const endMat=new T.MeshStandardMaterial({map:endTex, roughness:.97, metalness:0});
-for(const x of [-1.18,1.18]) for(const z of [-3.1,-.4,2.3,5.0]){ const m=new T.Mesh(new T.CylinderGeometry(.11,.12,2.6,10),[postMat,endMat,endMat]); m.position.set(x,-.3,z); m.rotation.y=Math.random()*6.28; m.userData.lake=true; scene.add(m); }
+for(const x of [-1.18,1.18]) for(const z of [-3.1,-.4,2.3,5.0]){ const m=new T.Mesh(new T.CylinderGeometry(.11,.12,2.6,10),[postMat,endMat,endMat]); m.position.set(x,-.3,z); m.rotation.y=Math.random()*6.28; m.userData.lake=true; scene.add(m); PH.addObject(m,()=>m.visible,"碼頭木樁"); }
 const beamMat=new T.MeshStandardMaterial({map:woodTex, color:0x8a7a68, roughness:.9});
-for(const x of [-1.0,1.0]){ const m=new T.Mesh(new T.BoxGeometry(.12,.16,9.5),beamMat); m.position.set(x,.7,1.4); m.userData.lake=true; scene.add(m); }
+for(const x of [-1.0,1.0]){ const m=new T.Mesh(new T.BoxGeometry(.12,.16,9.5),beamMat); m.position.set(x,.7,1.4); m.userData.lake=true; scene.add(m); PH.addObject(m,()=>m.visible,"碼頭橫梁"); }
 
 /* ---------- 睡蓮葉、花、蘆葦 ---------- */
 const padTex=dataTex(128,128,(u,v,o)=>{ const x=u*2-1, y=v*2-1, r=Math.hypot(x,y), a=Math.atan2(y,x);
@@ -62,6 +64,7 @@ const padPos=[];
   for(const c of cl) for(let i=0;i<c[2];i++){ const a=R()*6.283, r=Math.sqrt(R())*1.6; padPos.push([c[0]+Math.cos(a)*r, c[1]+Math.sin(a)*r, .13+R()*.22, R()*6.283]); } }
 const pads=new T.InstancedMesh(padGeo,padMat,padPos.length);
 padPos.forEach((p,i)=>{ q4.setFromEuler(eu.set(0,p[3],0)); pv.set(p[0],.006+i*.00003,p[1]); sv.set(p[2],1,p[2]); m4.compose(pv,q4,sv); pads.setMatrixAt(i,m4);
+  PH.addBox({x:p[0]-p[2],y:-.03,z:p[1]-p[2]},{x:p[0]+p[2],y:.025,z:p[1]+p[2]},()=>pads.visible,"睡蓮葉");
   const c=.85+((i*7919)%100)/100*.3; pads.setColorAt(i,new T.Color(c,c,c*.9)); });
 pads.userData.lake=true; scene.add(pads);
 const petalMat=new T.MeshStandardMaterial({color:0xf3dfe4, roughness:.5, emissive:0x1a0a0c});
@@ -167,10 +170,16 @@ function setLine(end, slack, visible, light, trem){
   lineMesh.visible=!!visible; if(!visible) return;
   let n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(rod.tipW);
   const tip=rod.tipW, dist=tip.distanceTo(end), sag=slack*Math.min(dist,40)*0.12, NC=LN-n;
+  const path=PH.route(tip,end);
   const ctrl=tmp2.copy(tip).add(end).multiplyScalar(.5); ctrl.y-=sag*2;
   if(trem){ const tq=performance.now()*.001; ctrl.x+=Math.sin(tq*61)*trem; ctrl.y+=Math.sin(tq*47+1.3)*trem*.7; ctrl.z+=Math.cos(tq*53)*trem; }   // 繃緊的釣線細微顫動
   for(let i=1;i<=NC;i++){ const t=i/NC, a=(1-t)*(1-t), b=2*(1-t)*t, c=t*t;
-    LP[n++].set(a*tip.x+b*ctrl.x+c*end.x, a*tip.y+b*ctrl.y+c*end.y, a*tip.z+b*ctrl.z+c*end.z); }
+    if(path.length>2||PH.hit(tip,end,.025)){ const u=t*(path.length-1), j=Math.min(path.length-2,Math.floor(u)), k=u-j; LP[n++].set(lerp(path[j].x,path[j+1].x,k),lerp(path[j].y,path[j+1].y,k),lerp(path[j].z,path[j+1].z,k)); }
+    else LP[n++].set(a*tip.x+b*ctrl.x+c*end.x, a*tip.y+b*ctrl.y+c*end.y, a*tip.z+b*ctrl.z+c*end.z); }
+  if(path.length>2){ n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(tip); for(let i=1;i<path.length&&n<LN;i++) LP[n++].copy(path[i]); }
+  // A slack curve can touch a low branch even when its straight chord is clear.
+  let curveBlocked=false; for(let i=rod.guidesW.length+2;i<n;i++) if(PH.hit(LP[i-1],LP[i],.025)){curveBlocked=true;break;}
+  if(curveBlocked&&path.length===2&&!PH.hit(tip,end,.025)){const first=rod.guidesW.length+2, count=n-first;for(let i=0;i<count;i++)LP[first+i].copy(tip).lerp(end,(i+1)/count);}
   camera.getWorldPosition(camW);
   const pix=2*Math.tan(camera.fov*Math.PI/360)/Math.max(300,window.innerHeight);
   for(let i=0;i<n;i++){ const p=LP[i]; const pa=LP[Math.max(0,i-1)], pb=LP[Math.min(n-1,i+1)];

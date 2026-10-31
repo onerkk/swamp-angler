@@ -45,7 +45,7 @@ function placeSnag(x,z,h){ const o=snagSrc.clone(true), g=new T.Group(); g.add(o
       k.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying float vWY;').replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWY=(modelMatrix*vec4(transformed,1.0)).y;');
         sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vWY;').replace('#include <dithering_fragment>','#include <dithering_fragment>\ngl_FragColor.rgb*=mix(0.45,1.0,smoothstep(0.0,0.55,vWY));'); };
       return k; }; m.material=Array.isArray(m.material)?m.material.map(conv):conv(m.material); } });
-  g.userData.lake=true; g.visible=!(W.isSea&&W.isSea()); S.add(g); SNAG_RIP.push([x,z]); }
+  g.userData.lake=true; g.visible=!(W.isSea&&W.isSea()); S.add(g); W.fishingPhysics.addObject(g,()=>g.visible,"倒木"); SNAG_RIP.push([x,z]); }
 const SNAG_CLIP=new T.Plane(new T.Vector3(0,1,0),.01), SNAG_RIP=[];
 if(T.GLTFLoader) new T.GLTFLoader().load('dead_tree_trunk_02.glb',gl=>{ snagSrc=gl.scene; SNAGQ.forEach(a=>placeSnag(...a)); });
 snag(-33,-30,5); snag(-22,-35,3.6); snag(-36,-17,6.5); snag(-18,-29,2.4); snag(-29,-39,4.2); snag(-40,-26,3.2);
@@ -56,6 +56,13 @@ let padG=null; const paddleTilt={x:0,z:0};
 /* 槳掛在鏡頭上（永遠在胸前、轉頭也跟著）：鏡頭座標下方 .27、前方 .82；padOn＝握槳程度（0 握竿、1 握槳），划船時升起、停下後收回畫面下方 */
 const PAD_Y=-.27, PAD_Z=-.82; let padOn=0;
 const boat=new T.Group(); boat.visible=false; S.add(boat);
+const canoeCollider=W.fishingPhysics.addBox({x:-.4,y:-.3,z:-2.45},{x:.4,y:.3,z:1.75},()=>boat.visible,'船體');
+canoeCollider.update=()=>{
+  const b=ctx.base(),h=ctx.head(),cs=Math.cos(h),sn=Math.sin(h),xs=[],zs=[];
+  for(const x of [-.4,.4])for(const z of [-2.45,1.75]){xs.push(b.x+x*cs+z*sn);zs.push(b.z-x*sn+z*cs);}
+  Object.assign(canoeCollider.boxes[0].min,{x:Math.min(...xs),y:-.3,z:Math.min(...zs)});
+  Object.assign(canoeCollider.boxes[0].max,{x:Math.max(...xs),y:.3,z:Math.max(...zs)});
+};
 /* 原木獨木舟（依玩家設定圖生成）：載入後取代程式做的塑膠艇；船頭朝 −Z，長 4.2 米 */
 if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.85,metalness:0}); x.castShadow=false; } });
   const w=new T.Group(); w.add(o); w.rotation.y=Math.PI; w.updateMatrixWorld(true); let b=new T.Box3().setFromObject(w); const sz=b.getSize(new T.Vector3()); w.scale.set(.78/Math.max(sz.x,1e-6),.42/Math.max(sz.y,1e-6),4.2/Math.max(sz.z,1e-6));   // 長寬高分開縮放成真實獨木舟比例

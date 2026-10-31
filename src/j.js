@@ -41,6 +41,23 @@ function hullOut(p,o){ const b=base(); if(!yacht.visible){ o.set(p.x-b.x,0,p.z-b
   if(vx*vx+vz*vz<1e-6){ vx=lx<0?-1:1; vz=0; } const l=Math.hypot(vx,vz); vx/=l; vz/=l; return o.set(vx*cs+vz*sn,0,-vx*sn+vz*cs); }
 
 if(window.__MDL){ window.__MDL.attachYacht(yacht,setHull,SPOTS); }
+/* Persistent visible reefs and hull collision; open ocean has no phantom reef. */
+const reefRoot=new T.Group(); reefRoot.visible=false; S.add(reefRoot);
+if(T.GLTFLoader) new T.GLTFLoader().load('rock_moss_set_01.glb',gl=>{
+  const rock=gl.scene.getObjectByName('rock_moss_set_01_rock04')||gl.scene;
+  for(const [x,z,h] of [[-7,-14,2.6],[5,-21,3.3],[-11,-29,2.2],[11,-36,3.8]]){
+    const g=new T.Group(),o=rock.clone(true); o.position.set(0,0,0); g.add(o); g.updateMatrixWorld(true);
+    let b=new T.Box3().setFromObject(g),sz=b.getSize(new T.Vector3()),ct=b.getCenter(new T.Vector3());
+    o.position.sub(ct); g.scale.setScalar(h/Math.max(.01,sz.y)); g.position.set(x,-h*.28,z); reefRoot.add(g);
+    W.fishingPhysics.addObject(g,()=>reefRoot.visible,'礁岩');
+  }
+});
+const hullCollider=W.fishingPhysics.addBox({x:-HX,y:-.8,z:HZ0},{x:HX,y:1.7,z:HZ1},()=>yacht.visible,'船體');
+hullCollider.update=()=>{
+  const cs=Math.cos(G.head),sn=Math.sin(G.head),xs=[],zs=[];
+  for(const x of [-HX,HX])for(const z of [HZ0,HZ1]){xs.push(G.base.x+x*cs+z*sn);zs.push(G.base.z-x*sn+z*cs);}
+  const b=hullCollider.boxes[0]; Object.assign(b.min,{x:Math.min(...xs),y:-.8,z:Math.min(...zs)});Object.assign(b.max,{x:Math.max(...xs),y:1.7,z:Math.max(...zs)});
+};
 /* ---------- 海豚 ---------- */
 const dTex=gradTex([62,74,90],[214,220,226],.42);
 const dMat=new T.MeshPhysicalMaterial({map:dTex,roughness:.35,clearcoat:.8,clearcoatRoughness:.2});
@@ -242,6 +259,7 @@ $('bCam').addEventListener('click',()=>{ if(window.__GHOST&&window.__GHOST.onPho
 }catch(e){ c.toast('這個瀏覽器不支援拍照存檔','bad'); } });
 
 function update(dt,t){
+  reefRoot.visible=loc==='sea'&&SPOTS[G.spot].id==='reef';
   const wx=c.wx(), day=W.info.day;
   if(wx.r>.4) lastRain=60; else lastRain=Math.max(0,lastRain-dt);
   updEv(dt,t,wx,day); updChase(dt);

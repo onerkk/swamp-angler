@@ -20,7 +20,7 @@ for(let s=0;s<3;s++){ const im=new T.InstancedMesh(GEO,MATS.lake,N); im.frustumC
   const off=[]; for(let i=0;i<N;i++) off.push({x:rand(-1.6,1.6),z:rand(-.9,.9),d:rand(0,.12),ph:rand(0,6.28),sz:rand(.75,1.25)});
   schools.push({im,gl,off,on:false,t:0,life:0,x:0,z:0,h:0,sp:0,turn:0,fear:0,depth:0,next:rand(4,14)+s*6,jump:null,gt:0}); }
 function waterY(x,z,t){ return (c.loc()==='sea'&&W.swell)?W.swell(x,z,t):0; }
-function spawn(s){ W.camera.getWorldPosition(cam); const a=rand(0,6.28), d=rand(16,42), x=cam.x+Math.sin(a)*d, z=cam.z+Math.cos(a)*d;
+function spawn(s){ s.off.forEach(o=>{o.prev=null;}); W.camera.getWorldPosition(cam); const a=rand(0,6.28), d=rand(16,42), x=cam.x+Math.sin(a)*d, z=cam.z+Math.cos(a)*d;
   if(c.loc()!=='sea'&&W.shoreR&&Math.hypot(x,z)>W.shoreR(Math.atan2(x,-z))-6) return false;
   const sea=c.loc()==='sea'; s.im.material=sea?MATS.sea:MATS.lake; s.scale=sea?rand(.28,.42):rand(.16,.26);
   Object.assign(s,{on:true,t:0,life:rand(35,70),x,z,h:rand(0,6.28),sp:rand(.6,1.2),turn:0,fear:0,depth:0,jump:null,gt:rand(.5,2)}); s.im.visible=true; s.gl.visible=true; return true; }
@@ -33,20 +33,22 @@ function update(dt,t){ const ok=c.ok(); W.camera.getWorldPosition(cam);
     if(dCam<7&&s.fear<=0){ s.fear=4; s.h=Math.atan2(s.x-cam.x,s.z-cam.z); s.sp=3.2; if(P&&P.splash) P.splash(s.x,0,s.z,14,.6); }   // 船靠太近：受驚散開
     if(s.fear>0){ s.fear-=dt; s.depth=Math.min(1,s.depth+dt*.6); } else { s.sp+=(1-s.sp)*dt*.5; s.depth=Math.max(0,s.depth-dt*.2); }
     s.turn-=dt; if(s.turn<=0){ s.turn=rand(3,7); s.ht=s.h+rand(-1.2,1.2); } if(s.ht!==undefined) s.h+=(s.ht-s.h)*Math.min(1,dt*.6);
-    s.x+=Math.sin(s.h)*s.sp*dt; s.z+=Math.cos(s.h)*s.sp*dt;
+    const old={x:s.x,y:-.3-s.depth*.9,z:s.z}, next={x:s.x+Math.sin(s.h)*s.sp*dt,y:old.y,z:s.z+Math.cos(s.h)*s.sp*dt};
+    const q=W.fishingPhysics.move(old,next,.4); s.x=q.pos.x; s.z=q.pos.z; if(q.contact){s.h+=Math.PI*.5;s.ht=s.h;}
     const fade=Math.min(1,s.t/2)*Math.min(1,(s.life-s.t)/3)*(1-s.depth*.9);
     if(s.t>s.life||dCam>70||!ok){ s.on=false; s.im.visible=false; s.gl.visible=false; return; }
     const sc=s.scale, wy=waterY(s.x,s.z,t);
     for(let i=0;i<N;i++){ const o=s.off[i], wob=Math.sin(t*3.1+o.ph)*.22, lx=o.x+Math.sin(t*.7+o.ph)*.25, lz=o.z+Math.cos(t*.9+o.ph)*.2;
       const ch=Math.cos(s.h), sh=Math.sin(s.h), px=s.x+sh*lx+ch*lz, pz=s.z+ch*lx-sh*lz;
-      V.set(px,wy-.04-o.d-s.depth*.9-(1-fade)*.4,pz); E.set(0,s.h-Math.PI/2+wob*.35,Math.sin(t*9+o.ph)*.12); Q.setFromEuler(E); SC.setScalar(sc*o.sz);
+      V.set(px,wy-.04-o.d-s.depth*.9-(1-fade)*.4,pz);
+      { const q=W.fishingPhysics.move(o.prev||V,V,.12); V.set(q.pos.x,q.pos.y,q.pos.z); o.prev={x:V.x,y:V.y,z:V.z}; } E.set(0,s.h-Math.PI/2+wob*.35,Math.sin(t*9+o.ph)*.12); Q.setFromEuler(E); SC.setScalar(sc*o.sz);
       M.compose(V,Q,SC); s.im.setMatrixAt(i,M); }
     s.im.instanceMatrix.needsUpdate=true;
     // 水面騷動：魚群上方不時冒出小水紋，偶爾一尾跳出水面
     if(Math.random()<dt*1.4*fade&&W.addRipple) W.addRipple(s.x+rand(-1.2,1.2),s.z+rand(-1.2,1.2),.25);
     if(!s.jump&&s.fear<=0&&Math.random()<dt*.18*fade) s.jump={t:0,i:Math.floor(rand(0,N))};
     if(s.jump){ const j=s.jump; j.t+=dt; const u=j.t/.55, o=s.off[j.i], px=s.x+Math.sin(s.h)*o.x, pz=s.z+Math.cos(s.h)*o.x;
-      V.set(px,wy+Math.sin(Math.min(1,u)*Math.PI)*.45,pz); E.set(-.9+1.8*Math.min(1,u),s.h-Math.PI/2,0); Q.setFromEuler(E); SC.setScalar(sc*1.1); M.compose(V,Q,SC); s.im.setMatrixAt(j.i,M);
+      V.set(px,wy+Math.sin(Math.min(1,u)*Math.PI)*.45,pz); {const q=W.fishingPhysics.move(o.prev||V,V,.12);V.set(q.pos.x,q.pos.y,q.pos.z);o.prev={x:V.x,y:V.y,z:V.z};} E.set(-.9+1.8*Math.min(1,u),s.h-Math.PI/2,0); Q.setFromEuler(E); SC.setScalar(sc*1.1); M.compose(V,Q,SC); s.im.setMatrixAt(j.i,M);
       if(u>=1){ if(P&&P.splash) P.splash(px,0,pz,6,.25); if(W.addRipple) W.addRipple(px,pz,.3); s.jump=null; } }
     // 鱗片反光
     s.gt-=dt; const ga=s.gl.geometry.attributes.position; if(s.gt<=0){ s.gt=rand(.3,1.2); for(let k=0;k<6;k++){ const o=s.off[Math.floor(rand(0,N))]; ga.setXYZ(k,s.x+Math.sin(s.h)*o.x+rand(-.3,.3),wy+.02,s.z+Math.cos(s.h)*o.x+rand(-.3,.3)); } ga.needsUpdate=true; }

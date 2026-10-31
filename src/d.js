@@ -164,9 +164,35 @@ function pickSpecies(){
 }
 
 /* ---------- 動作 ---------- */
+const PH=W.fishingPhysics;
+function setPoint(v,p){ v.set(p.x,p.y,p.z); return v; }
+function tackleSnag(hit,from){
+  if(G.snag) return;
+  G.snag=true; G.snagOnce=true; G.snagHit=hit; G.snagFrom=from.clone();
+  G.snagYaw=G.yawT; G.snagStress=0; G.snagEase=0; G.timer=99;
+  G.fd=null; G.sp=null; ambClear(); exitUW();
+  toast('卡到'+hit.box.label+'！先放手卸力，再向側邊拖曳改變拉線角度；持續硬收會斷線','warn',3600); vib([40,40]);
+}
+function snagTick(dt){
+  if(!G.snag) return;
+  G.timer=99;
+  const turn=Math.abs(G.yawT-G.snagYaw);
+  G.snagStress=Math.max(0,(G.snagStress||0)+(G.held?dt*.65:-dt*.4));
+  G.snagEase=!G.held&&turn>.22?(G.snagEase||0)+dt:0;
+  rod.bendT=.18+G.snagStress*.6;
+  if(G.snagStress>=1){ G.snag=false; G.snapped=true; G.state='lost'; G.stT=0; LURE.end(); Snd.snap(); toast('持續硬拉，釣組斷在障礙物上了','bad',2600); return; }
+  if(G.snagEase>.8){
+    // Back the hook out along its actual incoming path with a changed pull angle is required.
+    const at=bob.position.clone(), back=G.snagFrom.clone().sub(at); back.y=0;
+    if(back.lengthSq()<.01) back.set(Math.sin(G.head+G.yawT),0,Math.cos(G.head+G.yawT));
+    back.normalize().multiplyScalar(.5); const q=PH.move(at,at.clone().add(back),.06);
+    if(!q.contact){ setPoint(bob.position,q.pos); G.to.set(q.pos.x,0,q.pos.z); G.snag=false; G.snagHit=null; toast('釣組退出卡點了，換個角度收回再拋','good',2200); startRetrieve(); }
+    else G.snagEase=0;
+  }
+}
 function startCharge(){ if(G.scareT>0){ toast('驚魂未定，等一下再拋竿…','warn',1400); return; } G.state='charge'; G.chargeT=0; G.aimYawCast=G.yawT; }
 function cast(){
-  G.baitUsed=META.useBait(); G.noBait=false; LURE.bobberVis(!(G.baitUsed&&G.baitUsed.lure));
+  G.snag=false; G.snagHit=null; G.snagOnce=false; G.bottom=false; G.baitUsed=META.useBait(); G.noBait=false; LURE.bobberVis(!(G.baitUsed&&G.baitUsed.lure));
   const p=G.power, dist=6+p*META.gear().rod.cast, A=G.head+G.yaw, fw=tv.set(-Math.sin(A),0,-Math.cos(A)), bx=G.base.x, bz=G.base.z;
   let x=bx+fw.x*dist+rand(-.6,.6), z=bz+fw.z*dist+rand(-.6,.6);
   for(let k=0;k<14;k++){ const r=Math.hypot(x,z), maxR=W.shoreR(Math.atan2(x,-z))-6; if(r<=maxR) break; x=bx+(x-bx)*.9; z=bz+(z-bz)*.9; }
@@ -175,10 +201,12 @@ function cast(){
   G.castT=0; G.delay=.12; G.state='cast'; rod.pitchT=-.32; Snd.whoosh(); setPower(0);
 }
 function landBobber(){
+  const landingHit=G.castHit; G.castHit=null;
+  if(landingHit){ G.state='wait'; G.to.set(bob.position.x,0,bob.position.z); G.bottom=false; tackleSnag(landingHit,G.from); return; }
   if(G.baitUsed&&G.baitUsed.lure){ G.state='lure'; P.splash(G.to.x,0,G.to.z,10,.4); W.addRipple(G.to.x,G.to.z,.4); Snd.plop(); G.sp=null; G.fd=null; FUN.castTag(G.castDist); LURE.start(G.to,G.baitUsed,G.base); return; }
   G.state='wait'; P.splash(G.to.x,0,G.to.z,16,.7); W.addRipple(G.to.x,G.to.z,.55); Snd.plop();
   // 沉底釣：釣棚調到「深棚」又不是路亞時，鉛墜帶著餌沉到底，不看浮標、改看竿尖；結構區會有掛底風險
-  G.bottom=save.depth===2&&!(G.baitUsed&&G.baitUsed.lure)&&G.loc!=='ice'; setTimeout(()=>{ if(G.state==='wait') ambStart(); },400); G.snag=false; G.snagMv=0; G.snagFlip=0; G.snagOnce=false;
+  G.bottom=save.depth===2&&!(G.baitUsed&&G.baitUsed.lure)&&G.loc!=='ice'; setTimeout(()=>{ if(G.state==='wait'&&!G.snag) ambStart(); },400); G.snag=false; G.snagMv=0; G.snagFlip=0; G.snagOnce=false;
   if(G.bottom&&!save.bottomTip){ save.bottomTip=1; persist(); setTimeout(()=>toast('🎣 沉底釣：沒有浮標，看竿尖——輕抖是試咬，竿尖被拉彎才揚竿','',3600),600); }
   G.timer=rand(6,15)*PER_WAIT[period(G.hour)]*(1-G.luck*.6)*(G.baitUsed?G.baitUsed.wait:1)*WL.waitK()*(window.__ECO&&window.__ECO.fxOn('glow')?.6:1)*(1+.2*depNow(depKey())); G.nib=Math.floor(rand(0,3.99)); G.approach=0; G.sp=null; G.fd=null;
   FUN.castTag(G.castDist);
@@ -204,7 +232,7 @@ function ambMake(sp,L){ let f=null; try{ if(window.__MDL&&window.__MDL.fishReady
   return {f,sp,L,pos:new THREE.Vector3(),h:Math.random()*6.28,sp0:rand(.25,.55),dep:rand(.45,1.1),wt:0,flee:0,want,aff,lay,insp:0}; }
 function ambStart(){ ambClear(); if(G.loc==='ice'||(G.baitUsed&&G.baitUsed.lure)) return; const n=Math.floor(rand(2,4.99)), seen={};
   for(let i=0;i<n;i++){ const sp=pickSpecies(); if(!sp||sp.special||seen[sp.id]) continue; seen[sp.id]=1; const L=lerp(sp.len[0],sp.len[1],Math.random()*.7)/100, a=ambMake(sp,L); if(!a) continue;
-    const ang=rand(0,6.28), r=rand(2.2,6); a.pos.set(G.to.x+Math.cos(ang)*r,-a.dep,G.to.z+Math.sin(ang)*r); AMB.list.push(a); } }
+    const ang=rand(0,6.28), r=rand(2.2,6); a.pos.set(G.to.x+Math.cos(ang)*r,-a.dep,G.to.z+Math.sin(ang)*r); setPoint(a.pos,PH.resolve(a.pos,Math.max(.1,L*.22))); AMB.list.push(a); } }
 function ambClear(){ AMB.told=false; AMB.inspT=null; AMB.list.forEach(a=>{ a.f.group.visible=false; if(a.f.group.parent) a.f.group.parent.remove(a.f.group); }); AMB.list=[]; AMB.app=null; }
 function ambScare(x,z){ AMB.list.forEach(a=>{ a.flee=3; a.h=Math.atan2(a.pos.z-z,a.pos.x-x); }); }
 function ambUpdate(dt){ if(!AMB.list.length) return; if(G.state!=='wait'&&G.state!=='bite'){ ambClear(); return; }
@@ -224,7 +252,7 @@ function ambUpdate(dt){ if(!AMB.list.length) return; if(G.state!=='wait'&&G.stat
     if(!a){ a=ambMake(G.fd.sp,G.fd.L); if(a){ const ang=rand(0,6.28); a.pos.set(G.to.x+Math.cos(ang)*7,-.9,G.to.z+Math.sin(ang)*7); AMB.list.push(a); } }
     else { a.L=G.fd.L; a.f.group.scale.setScalar(G.fd.L); } AMB.app=a; }
   const bait=tv2.set(G.to.x,G.bottom?-1.1:-.35,G.to.z);
-  AMB.list.forEach(a=>{ let sp=a.sp0, ty=-a.dep;
+  AMB.list.forEach(a=>{ const old=a.pos.clone(); let sp=a.sp0, ty=-a.dep;
     if(a.flee>0){ a.flee-=dt; sp=2.6; ty=-1.6; a.f.group.visible=a.flee>.4; }
     else if(a===AMB.app){ const dx=bait.x-a.pos.x, dz=bait.z-a.pos.z, d=Math.hypot(dx,dz);
       const want=G.state==='bite'?0:G.dip>0?.05:(G.timer<1.2?.35:.9);   // 試咬時衝到嘴邊，平常在餌旁邊繞
@@ -232,6 +260,7 @@ function ambUpdate(dt){ if(!AMB.list.length) return; if(G.state!=='wait'&&G.stat
       sp=d>want?Math.min(1.6,.4+d*.5):.15; ty=bait.y; if(G.state==='bite'){ a.pos.lerp(bait,Math.min(1,dt*6)); sp=0; } }
     else { a.wt-=dt; if(a.wt<=0){ a.wt=rand(1.5,4); a.ht=a.h+rand(-1.2,1.2); const dx=G.to.x-a.pos.x, dz=G.to.z-a.pos.z; if(Math.hypot(dx,dz)>7) a.ht=Math.atan2(dz,dx); } if(a.ht!==undefined) a.h+=(a.ht-a.h)*Math.min(1,dt*.8); }
     a.pos.x+=Math.cos(a.h)*sp*dt; a.pos.z+=Math.sin(a.h)*sp*dt; a.pos.y+=(ty-a.pos.y)*Math.min(1,dt*1.5);
+    const q=PH.move(old,a.pos,Math.max(.1,a.L*.22)); setPoint(a.pos,q.pos); if(q.contact){ a.h+=Math.PI*.5; a.ht=a.h; }
     const g=a.f.group; g.position.copy(a.pos); g.rotation.set(0,-a.h,0); a.f.uni.uSwim.value+=dt*(4+sp*7); a.f.uni.uAmp.value=.04+.05*Math.min(1,sp); });
   if(G.state==='bite'&&AMB.app){ /* 咬住：那條魚就在餌上 */ } }
 // 水面距離標記：在浮標／入水點／路亞／搏魚中的魚的位置標一個小點和距離（像真實釣魚時估落點），手機上一眼知道線在多遠
@@ -242,7 +271,7 @@ function updDistMark(){ const st=G.state; let p=null;
   if(!p||document.body.classList.contains('sheetOn')||UW.active()){ DMK.style.display='none'; return; }   // 水下鏡頭時不顯示水面距離
   const d=Math.hypot(p.x-G.base.x,p.z-G.base.z); DMV.set(p.x,(p.y||0)+.05,p.z).project(W.camera); if(DMV.z>1){ DMK.style.display='none'; return; }
   DMK.style.display='block'; DMK.style.left=((DMV.x+1)/2*innerWidth)+'px'; DMK.style.top=((1-DMV.y)/2*innerHeight)+'px'; DMKt.textContent=d.toFixed(d<10?1:0)+' 米'; }
-function startRetrieve(msg,cls){ exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
+function startRetrieve(msg,cls){ G.retrievePath=PH.route(rod.tipW,bob.position,.085).slice().reverse().map(p=>new T.Vector3(p.x,p.y,p.z)); G.retrieveNode=1; exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
 function nibble(){ const big=Math.random()<.25; G.dip=big?.75:.28; G.dipMax=G.dip; G.dipAmp=big?.14:.035; W.addRipple(G.to.x,G.to.z,big?.5:.18); if(big){ P.splash(G.to.x,0,G.to.z,5,.35); Snd.bite(); vib([40,30,60]); } else { Snd.nibble(); vib(12); } G.approach=Math.max(G.approach,.01); }
 // 體型等級：u 是這條魚在該魚種體型範圍內的位置（0 最小、1 最大，巨物可再超出）
 const GRADES=[[.2,'幼魚'],[.7,'成魚'],[.93,'大物'],[9,'巨物']];
@@ -265,24 +294,18 @@ function hook(q){
   const sp=G.sp, L=G.fd.L; exitUW(); ambClear();
   const perfect=!!q; if(perfect){ save.perf=(save.perf||0)+1; if(window.__STORY) window.__STORY.onPerfect(); }
   G.f={perfect,hq:perfect?1:.7,drag:save.drag==null?1:save.drag,cover:0,abr:0,coverSide:Math.random()<.5?-1:1,d:G.loc==='ice'?rand(10,18):G.castDist,az0:Math.atan2(-(G.to.x-G.base.x),-(G.to.z-G.base.z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
+  G.f.pos=G.to.clone(); G.f.pos.y=-.35; setPoint(G.f.pos,PH.resolve(G.f.pos,Math.max(.12,L*.22)));
   G.state='fight'; P.splash(G.to.x,0,G.to.z,22,1); W.addRipple(G.to.x,G.to.z,.7); Snd.splash(.7); vib(40);
   toast(perfect?'完美揚竿！':'上鉤了！',perfect?'good':'',1200);
   ui.fight.classList.remove('hidden'); WL.onHook(G.fd,()=>fishPos(G.chaseV,0));
-  // 結構物：在倒木區、礁岩中到愛躲的魚，就在牠要鑽的那一側放上看得到的倒木或礁石，讓玩家知道往哪邊拉
-  { const zid=WL.zoneId?WL.zoneId():''; const stru=zid==='wood'||zid==='reef'||(zid==='lily'&&G.loc!=='sea'); const hider=!G.fd.item&&(LAYER_B.has(G.fd.sp.id)||(G.fd.sp.spots&&G.fd.sp.spots.includes('reef')));
-    if(stru&&hider&&G.loc!=='ice') showSnag(zid==='reef'); } SEA.onHook(G.fd,()=>fishPos(G.chaseV,0));
+  SEA.onHook(G.fd,()=>fishPos(G.chaseV,0));
   const fish=G.fd.item?FUN.itemFish(G.fd.item):P.getFish(sp); G.fish=fish; fish.group.scale.setScalar(L); fish.group.visible=false; if(!fish.group.parent) W.scene.add(fish.group); seeThrough(fish.group);
   if(G.fd.boss&&window.__TAL) window.__TAL.bossIntro(G,b=>{ P.splash(G.to.x,0,G.to.z,70,2.4); W.addRipple(G.to.x,G.to.z,1.6); Snd.splash(2.2); if(G.loc!=='ice') setTimeout(()=>{ if(G.state==='fight'&&G.f) startJump(); },500); });
 }
-function fishPos(out,y){ const az=G.f.az0+G.f.theta; out.set(G.base.x-Math.sin(az)*G.f.d,y,G.base.z-Math.cos(az)*G.f.d); if(G.loc==='sea') SEA.hullClear(out,.35); else if(G.loc==='ice'&&window.__ICE){ const hp=window.__ICE.holePos(); out.x=hp.x; out.z=hp.z; } return out; }
+function fishPos(out,y){ const f=G.f; if(f.pos) out.copy(f.pos); else { const az=f.az0+f.theta; out.set(G.base.x-Math.sin(az)*f.d,0,G.base.z-Math.cos(az)*f.d); } out.y=y; if(G.loc==='ice'&&window.__ICE){ const hp=window.__ICE.holePos(); out.x=hp.x; out.z=hp.z; } return out; }
+function surgeFish(){ const f=G.f; if(!f.pos) return; const az=f.az0+f.theta, want=new T.Vector3(G.base.x-Math.sin(az)*f.d,f.pos.y,G.base.z-Math.cos(az)*f.d); setPoint(f.pos,PH.move(f.pos,want,Math.max(.12,G.fd.L*.22)).pos); }
 function sizeWord(w){ return w<.6?'小傢伙':w<2.5?'中型魚':w<8?'大魚！':'巨物！！'; }
-// 搏魚用的結構物模型（真實倒木與礁石），中魚時放在魚要鑽的那一側，搏魚結束收起
-const SNAG={g:new THREE.Group(),wood:null,rock:null}; W.scene.add(SNAG.g); SNAG.g.visible=false;
-{ const L=new THREE.GLTFLoader(); L.load('dry_branches_medium_01.glb',g=>{ SNAG.wood=g.scene; SNAG.wood.traverse(m=>{ m.frustumCulled=false; }); });
-  L.load('rock_moss_set_01.glb',g=>{ const r=g.scene.getObjectByName('rock_moss_set_01_rock04')||g.scene; SNAG.rock=r.clone(true); SNAG.rock.position.set(0,0,0); SNAG.rock.traverse(m=>{ m.frustumCulled=false; }); }); }
-function showSnag(reef){ const f=G.f; SNAG.g.clear(); const src=reef?SNAG.rock:SNAG.wood; if(!src) return; const o=src.clone(true); SNAG.g.add(o);
-  const az=f.az0+f.coverSide*.62, d=Math.max(6,f.d*.9); SNAG.g.position.set(G.base.x-Math.sin(az)*d,reef?-.7:-.15,G.base.z-Math.cos(az)*d);
-  SNAG.g.rotation.y=Math.random()*6.28; SNAG.g.scale.setScalar(reef?1.1:3.2); SNAG.g.visible=true; }
+const SNAG={g:new THREE.Group()}; // Kept for existing UI cleanup.
 // 魚訊放大視窗：等魚時在右上角放大顯示浮標（浮標釣）或竿尖（沉底釣），小螢幕也看得清楚試咬與咬口
 const MAG=document.createElement('div'); MAG.id='magWin'; MAG.style.cssText='position:fixed;right:10px;top:calc(var(--hudY,150px) + 54px);z-index:6;width:74px;height:96px;border-radius:12px;background:rgba(10,30,40,.62);border:1px solid rgba(255,255,255,.22);display:none;pointer-events:none;overflow:hidden';
 // 放大視窗裡的浮標：用和 3D 浮標同一份外形與配色畫出立體感（左右明暗、清漆高光），不再是平面圖示
@@ -466,7 +489,7 @@ function actDown(){
   switch(G.state){
     case 'idle': if(G.loc==='ice'){ if(ICE.drilled()) iceDrop(); } else startCharge(); break;
     case 'lure': LURE.press(); break;
-    case 'wait': if(G.snag){ G.snag=false; Snd.snap&&Snd.snap(); vib([60,30,80]); G.noBait=false; startRetrieve('掛底時硬收，線斷了，損失一組釣組','bad'); setTimeout(()=>toast('💡 原因：卡在障礙物上硬拉。改善：左右來回拖曳畫面解掛，或改在開闊水域用沉底釣。','',4000),1900); break; }
+    case 'wait': if(G.snag){ break; }
       startRetrieve(G.dip>0?'太早了：剛剛只是魚在試咬，要等浮標整個沉下去再揚竿':'收線','warn'); break;
     case 'bite': { const r=FUN.hookPress(); if(r==='miss') missBite(); else hook(r==='perfect'); } break;
   }
@@ -681,7 +704,10 @@ function updateKayak(dt){
   let nx=G.base.x+fx*KY.v*dt, nz=G.base.z+fz*KY.v*dt;
   const r=Math.hypot(nx,nz), Rm=W.shoreR(Math.atan2(nx,-nz))-5; if(r>Rm){ nx*=Rm/r; nz*=Rm/r; KY.v*=-.2; }
   if(G.loc!=='sea'&&Math.abs(nx)<2.2&&nz>-4.6&&nz<7){ if(2.2-Math.abs(nx)<nz+4.6){ nx=nx<0?-2.2:2.2; } else nz=-4.6; KY.v*=.3; }
-  if(G.loc!=='sea') for(const o of WL.obstacles){ const dx=nx-o[0], dz=nz-o[1], dd=Math.hypot(dx,dz)||.01, m=o[2]+1; if(dd<m){ nx=o[0]+dx/dd*m; nz=o[1]+dz/dd*m; KY.v*=.5; } }
+  // Sweep the boat through the same visible structures, excluding its own hull.
+  const boxes=PH.boxes; PH.boxes=boxes.filter(b=>b.label!=='船體'&&b.label!=='睡蓮葉');
+  const boatHit=PH.move({x:G.base.x,y:0,z:G.base.z},{x:nx,y:0,z:nz},s.yacht?1.8:.55);
+  PH.boxes=boxes; nx=boatHit.pos.x; nz=boatHit.pos.z; if(boatHit.contact) KY.v*=.4;
   G.base.x=nx; G.base.z=nz;
   if(Math.abs(thr)>.1) G.yawT+=(0-G.yawT)*Math.min(1,dt*1.5);
   KY.wake-=dt; const spd=Math.abs(KY.v);
@@ -707,6 +733,7 @@ function guardUW(){ if(UW.active()&&!uwExiting&&G.state!=='wait'&&G.state!=='bit
 /* ---------- 每幀更新 ---------- */
 function updateFight(dt){
   const f=G.f, sp=G.fd.sp, fs=sp.f, fd=G.fd;
+  if(f.pos&&G.loc!=='ice'){ f.d=Math.hypot(f.pos.x-G.base.x,f.pos.z-G.base.z); }
   f.ft=(f.ft||0)+dt; f.maxT=Math.max(f.maxT||0,f.T); if(f.run&&!f.wasRun) f.runs=(f.runs||0)+1; f.wasRun=f.run;   // 搏魚統計：時間、最高張力、衝刺次數
   const ST=styOf(fd.sp.id), DF=D();
   f.phaseT-=dt;
@@ -728,16 +755,7 @@ function updateFight(dt){
   const stamF=.4+.6*f.stam/100;
   const F=fs.pow*(.8+.25*Math.pow(fd.w,.45))*(1+.22*sp.rar)*(fd.boss?fd.boss.pow:1)*stamF*(f.run?ST.mul:1)*(dive?1.35:1);
   const good=-f.latDir*G.rodSide, steerMul=1-.28*clamp(good,0,1)+.15*clamp(-good,0,1);
-  // 障礙物磨線：在倒木區、礁岩中魚時，愛躲的魚（底棲魚、礁岩魚）衝刺時會往結構物鑽；線一碰到就開始磨損。
-  // 往牠鑽的反方向控竿就能把牠帶離；線越粗、鋼絲前導線越耐磨
-  { const zid=WL.zoneId?WL.zoneId():'', stru=zid==='wood'||zid==='reef'||(zid==='lily'&&G.loc!=='sea'), hider=!fd.item&&(LAYER_B.has(fd.sp.id)||(fd.sp.spots&&fd.sp.spots.includes('reef')));
-    if(stru&&hider&&G.loc!=='ice'){
-      if(f.run){ if(f.latDir!==f.coverSide&&Math.random()<dt*.8) f.latDir=f.coverSide;   // 衝刺時偏向結構物那一側
-        const toward=f.latDir===f.coverSide; f.cover=clamp(f.cover+(toward?(good>.4?-.35:.45):-.2)*dt,0,1); }
-      else f.cover=clamp(f.cover-(good>.4?.5:.15)*dt,0,1);
-      if(f.cover>.55&&f.T>.25){ f.abr+=dt*(.18+.5*f.T)*(f.cover-.4)/((.7+.3*META.gear().line.s)*DF.line); if(!f.rubW){ f.rubW=1; toast(zid==='reef'?'🪨 魚往礁石鑽！往反方向控竿把牠帶出來':'🪵 魚往倒木裡鑽！往反方向控竿把牠帶出來','warn',2000); vib([30,30,30]); } }
-      else if(f.cover<.3) f.rubW=0;
-      ui.tBar.classList.toggle('rub',f.cover>.55); } }
+  // Contact and line wear are evaluated after the swept fish motion below.
   let Tt=(F*(G.held?1:.35)+(G.held?.5:0))/(META.gear().line.s*DF.line)*steerMul*META.gear().rod.tens;
   if(f.jumpT>0&&G.held) Tt+=.45;
   if(shake) Tt+=G.held?.38:.12;
@@ -756,7 +774,26 @@ function updateFight(dt){
   const run=f.run?fs.spd*ST.spd*stamF*1.5*(G.held?.35:1)*(dive?.4:1):(G.held?0:.05);
   f.d=Math.max(0,f.d+(run-reel)*dt);
   f.theta=clamp(f.theta+f.latDir*fs.agi*ST.lat*.16*stamF*dt*(G.held?.7:1),-.85,.85);
-  const az=f.az0+f.theta; { fishPos(tv,0); const r=Math.hypot(tv.x,tv.z), Rm=W.shoreR(Math.atan2(tv.x,-tv.z))-3; if(r>Rm) f.d=Math.max(2,f.d-(r-Rm)); }
+  let az=f.az0+f.theta; { fishPos(tv,0); const r=Math.hypot(tv.x,tv.z), Rm=W.shoreR(Math.atan2(tv.x,-tv.z))-3; if(r>Rm) f.d=Math.max(2,f.d-(r-Rm)); }
+  if(G.loc!=='ice'){
+    const old=f.pos.clone(), want=new T.Vector3(G.base.x-Math.sin(az)*f.d,f.pos.y,G.base.z-Math.cos(az)*f.d);
+    // Lateral rod pressure changes the fish's path, not merely the tension number.
+    want.x+=Math.cos(az)*G.rodSide*dt*1.6; want.z-=Math.sin(az)*G.rodSide*dt*1.6;
+    if(G.loc!=='sea'){ const Rm=W.shoreR(Math.atan2(want.x,-want.z))-3,r=Math.hypot(want.x,want.z); if(r>Rm){want.x*=Rm/r;want.z*=Rm/r;} }
+    const moved=PH.move(old,want,Math.max(.12,fd.L*.22)); setPoint(f.pos,moved.pos);
+    const lineHit=PH.hit(rod.tipW,f.pos,.025); f.cover=lineHit?1:0;
+    if(moved.contact){ f.latDir=G.rodSide>.05?-1:G.rodSide<-.05?1:-f.latDir||1; f.theta+=f.latDir*dt*.3; }
+    if(lineHit){
+      f.abr+=dt*(.025+.22*f.T)*(G.held?1.7:.35)/((.7+.3*META.gear().line.s)*DF.line);
+      if(!f.rubW){f.rubW=1;toast('魚線碰到'+lineHit.box.label+'！放手降低張力，左右控竿尋找能把魚帶出的角度','warn',2800);}
+      // Reeling against a bend cannot pull the fish through the object.
+      if(G.held){ f.T=Math.min(1.2,f.T+dt*.3); f.brk+=dt*.14*f.T; }
+    }else f.rubW=0;
+    ui.tBar.classList.toggle('rub',!!lineHit);
+    f.d=Math.hypot(f.pos.x-G.base.x,f.pos.z-G.base.z);
+    const actual=Math.atan2(-(f.pos.x-G.base.x),-(f.pos.z-G.base.z));
+    f.theta=Math.atan2(Math.sin(actual-f.az0),Math.cos(actual-f.az0)); az=f.az0+f.theta;
+  }
   if(G.held){ f.clickA+=reel*dt*9; while(f.clickA>=1){ Snd.click(); f.clickA-=1; } rod.spin-=reel*dt*14; }
   else if(f.run&&f.T>.3){ f.clickA+=dt*28; while(f.clickA>=1){ Snd.click(4500); f.clickA-=1; } }
   f.vibT-=dt; if(f.vibT<=0){ if(f.T>.85){ vib(14); f.vibT=.22; } else if(f.run){ vib(Math.round(5+8*f.T)); f.vibT=.32; } else f.vibT=.2; }
@@ -766,7 +803,7 @@ function updateFight(dt){
   const g=G.fish.group;
   if(f.jumpT>0){
     f.jumpT-=dt; const s=1-f.jumpT/f.jumpDur, h=.5+.45*Math.sqrt(fd.L), y=4*h*s*(1-s)-.15*fd.L;
-    g.position.set(tv.x,y,tv.z); te.set(0,az+(f.latDir<0?Math.PI:0)+Math.PI/2,clamp(4*h*(1-2*s)/(1.2*fd.L+.5),-1.2,1.2)); g.quaternion.setFromEuler(te);
+    { const q=PH.move(f.pos,{x:tv.x,y,z:tv.z},Math.max(.12,fd.L*.22)); g.position.set(q.pos.x,q.pos.y,q.pos.z); } te.set(0,az+(f.latDir<0?Math.PI:0)+Math.PI/2,clamp(4*h*(1-2*s)/(1.2*fd.L+.5),-1.2,1.2)); g.quaternion.setFromEuler(te);
     G.fish.uni.uAmp.value=.14; G.fish.uni.uSwim.value+=dt*18;
     if(f.jumpT<=0){ g.visible=false; P.splash(tv.x,0,tv.z,30,1.1); W.addRipple(tv.x,tv.z,.9); Snd.splash(1); }
   } else if(f.run&&fs.jump>0&&fd.sp.special!=='mermaid'&&f.stam>20&&f.d>4&&G.loc!=='ice'&&Math.random()<fs.jump*.3*dt) startJump();
@@ -775,10 +812,10 @@ function updateFight(dt){
   sh.material.opacity=f.jumpT>0?0:.4*(1-sstep(3,10,f.d));
   // 浮標與釣竿
   { const pull=clamp(f.T*1.1+(f.run?.15:0),0,1);   // 浮標被拖進水裡、朝釣竿方向傾斜
-    { const rt=rod.tipW, k=Math.min(.35,1.2/Math.max(2,f.d)); bob.position.set(tv.x+(rt.x-tv.x)*k,-.03-.28*pull+Math.sin(G.t*9)*.012*(f.run?1:.4),tv.z+(rt.z-tv.z)*k); }   // 浮標滑在線上、在魚前方靠釣竿這側
+    { const rt=rod.tipW, k=Math.min(.35,1.2/Math.max(2,f.d)); bob.position.set(tv.x+(rt.x-tv.x)*k,-.03-.28*pull+Math.sin(G.t*9)*.012*(f.run?1:.4),tv.z+(rt.z-tv.z)*k); const q=PH.move(tv,bob.position,.065); setPoint(bob.position,q.pos); }   // 浮標沿魚線移動並避開實體
     bob.rotation.set(-.6*pull,0,Math.sin(G.t*7)*.25*(1-pull*.6)); bob.visible=!(f.jumpT>0)&&!G.bottom; }
   { const load=clamp(.25+.35*Math.min(1,fd.w/3),.25,.6), jit=(f.run||shake)?Math.sin(G.t*38)*.05*(.5+f.T):0;   // 掛上魚就有弧度，張力再加深，衝刺甩頭時竿尖抖動
-    rod.end=G.endV.copy(tv); rod.pitchT=.18+.08*f.T; rod.bendT=clamp(load+.85*f.T+(f.run?.12:0)+jit,0,1.25);
+    rod.end=G.endV.copy(f.pos||tv); rod.pitchT=.18+.08*f.T; rod.bendT=clamp(load+.85*f.T+(f.run?.12:0)+jit,0,1.25);
     // 竿子跟著魚：魚往哪邊衝，竿身就被往那邊拖過去；衝刺時再往下壓
     rod.side=clamp((rod.side||0)+((G.rodSide||0)*.5+clamp(f.theta*.7,-.4,.4)-(rod.side||0))*Math.min(1,dt*3),-.6,.6); /* 竿子跟著魚擺，但不會甩出畫面 */ rod.pitchT-=(f.run?.06:0)+.05*f.T; }
   G.yawT=clamp(az-G.head,-.95,.95);
@@ -799,7 +836,7 @@ function updateFight(dt){
   if(f.lostWhy) return lose(f.lostWhy);
   if(f.d>maxLine()*.7) f.stam=Math.max(0,f.stam-dt*(f.d/maxLine())*8);   /* 線快放光時捲線器剩下的線越少、阻力越大，魚衝不動、體力掉得快 */
   if(f.d>maxLine()) return lose('spool');
-  if(f.d<(G.spot===0?4.0:2.6)){
+  if(f.cover<.5&&f.d<(G.spot===0?4.0:2.6)){
     // 魚還有力氣就拉不上來：靠近時再衝出去，要遛到沒力才能收進來
     // 衝出去會消耗魚的體力，最多衝兩次；體力低於 45% 或衝過兩次就拉得上來
     f.surges=f.surges||0; if(f.stam<=45||f.surges>=2){
@@ -809,13 +846,14 @@ function updateFight(dt){
       // 按鈕即時顯示能不能抄：魚在衝＝灰色等待；魚停下＝亮起並震一下。魚剛開始衝的 0.4 秒內按下仍算成功
       if(f.run){ f.calmT=0; f.runT=(f.runT||0)+dt; ui.netBtn.textContent='⏳ 魚在衝，等一下'; ui.netBtn.style.background='rgba(255,255,255,.22)'; ui.netBtn.style.color='#fff'; }
       else { if(!(f.calmT>0)) vib(25); f.calmT=(f.calmT||0)+dt; f.runT=0; ui.netBtn.textContent='🥅 現在抄網！'; ui.netBtn.style.background='#7dff9a'; ui.netBtn.style.color='#0b3a14'; }
-      if(f.netGo){ f.netGo=false; if(!f.run||f.runT<.4){ ui.netBtn.classList.add('hidden'); f.netted=true; return land(); } f.netOn=false; ui.netBtn.classList.add('hidden'); f.d+=3+Math.random()*2; f.stam=Math.max(0,f.stam-10); toast('魚還在衝，被網子嚇到又衝出去了！','warn',1600); vib([30,30,60]); }
+      if(f.netGo){ f.netGo=false; if(!f.run||f.runT<.4){ ui.netBtn.classList.add('hidden'); f.netted=true; return land(); } f.netOn=false; ui.netBtn.classList.add('hidden'); f.d+=3+Math.random()*2; surgeFish(); f.stam=Math.max(0,f.stam-10); toast('魚還在衝，被網子嚇到又衝出去了！','warn',1600); vib([30,30,60]); }
       return; }
-    f.surges++; f.stam=Math.max(0,f.stam-25); f.d+=2+Math.random()*2; f.run=true; f.phaseT=rand(1,1.8); P.splash(G.to.x,0,G.to.z,14,.8); vib([30,20,40]);
+    f.surges++; f.stam=Math.max(0,f.stam-25); f.d+=2+Math.random()*2; surgeFish(); f.run=true; f.phaseT=rand(1,1.8); P.splash(G.to.x,0,G.to.z,14,.8); vib([30,20,40]);
     if(!f.surgeTip){ f.surgeTip=1; toast('魚還有力氣，又衝出去了','warn',1500); } }
 }
 
 function update(dt){
+  PH.refresh();
   // 拉魚開始時記住拋竿瞄準的方向；離開拉魚（釣到、跑掉、斷線）就轉回去。放在最前面，不受後面任何錯誤影響
   // 離開拉魚：釣竿傾斜一律歸零，不受手指狀態影響
   if(G.prevSt==='fight'&&G.state!=='fight'){ G.yawT=G.aimYaw||0; G.rodSideT=0; }
@@ -841,17 +879,25 @@ function update(dt){
   else if(st==='cast'){
     if(G.delay>0){ G.delay-=dt; hangPos(bob.position); if(G.delay<=0) G.from.copy(bob.position); }
     else { G.castT+=dt; const s=Math.min(1,G.castT/G.castDur);
-      bob.position.set(lerp(G.from.x,G.to.x,s),lerp(G.from.y,0,s)+4*G.apex*s*(1-s),lerp(G.from.z,G.to.z,s));
-      if(G.castT>.25) rod.pitchT=.05; if(s>=1) landBobber(); }
+      const old=bob.position.clone(), want=new T.Vector3(lerp(G.from.x,G.to.x,s),lerp(G.from.y,0,s)+4*G.apex*s*(1-s),lerp(G.from.z,G.to.z,s));
+      const q=PH.move(old,want,.06,false); setPoint(bob.position,q.pos);
+      if(q.contact){ G.castHit=q.contact; G.to.set(q.pos.x,0,q.pos.z); landBobber(); }
+
+      if(G.castT>.25) rod.pitchT=.05; if(s>=1&&G.state==='cast') landBobber(); }
     lineEnd=bob.position; slack=.1; setAct('・・・','',false);
   }
   else if(st==='lure'){
       const ev=LURE.update(dt,G.held); bob.position.copy(LURE.pos()); lineEnd=bob.position; slack=.08; if(G.held){ rod.spin-=dt*14; if(Math.random()<dt*10) Snd.click(); }
       setAct(G.held?'收線中':'按住收線<br>點擊抽竿',LURE.interest()>.25?'魚在追！照這個節奏繼續':'按住收線、短按抽竿，找出魚喜歡的節奏',false);
-      if(ev==='strike'){ G.to.set(bob.position.x,0,bob.position.z); G.castDist=Math.hypot(G.to.x-G.base.x,G.to.z-G.base.z); { const ch=LURE.chaser(); if(ch){ ch.group.position.set(G.to.x,-.05,G.to.z); } } LURE.end(); if(!G.fd) prepFish(); P.splash(G.to.x,0,G.to.z,40,1.3); W.addRipple(G.to.x,G.to.z,.9); Snd.splash&&Snd.splash(1.2); vib([40,30,80]); bite(); toast('咬了！','good',900); }
+      if(ev==='snag'){ const old=bob.position.clone(); G.to.set(old.x,0,old.z); G.state='wait'; G.bottom=false; const hit=LURE.contact(); const from=LURE.incoming(); LURE.end(); if(hit) tackleSnag(hit,from); }
+      else if(ev==='strike'){ G.to.set(bob.position.x,0,bob.position.z); G.castDist=Math.hypot(G.to.x-G.base.x,G.to.z-G.base.z); { const ch=LURE.chaser(); if(ch){ ch.group.position.set(G.to.x,-.05,G.to.z); } } LURE.end(); if(!G.fd) prepFish(); P.splash(G.to.x,0,G.to.z,40,1.3); W.addRipple(G.to.x,G.to.z,.9); Snd.splash&&Snd.splash(1.2); vib([40,30,80]); bite(); toast('咬了！','good',900); }
       else if(ev==='lost'){ G.fd=null; toast('魚失去興趣游走了','warn',1400); }
       else if(ev==='done'){ LURE.end(); startRetrieve('路亞收回來了，這次沒有魚咬','warn'); LURE.bobberVis(true); }
     }
+  else if((st==='wait'||st==='bite')&&G.snag){
+    snagTick(dt); lineEnd=bob.position; slack=G.held?0:.14;
+    setAct(G.held?'硬拉中':'放手解掛','先放手，再向側邊拖曳改變角度；持續硬拉會斷線',false);
+  }
   else if(st==='wait'||st==='bite'){
     rod.pitchT=.05;
     const y=W.swell(G.to.x,G.to.z,G.t)-.005;
@@ -862,7 +908,11 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       if(G.state==='wait'&&G.nib===0&&G.timer<3&&!G.fd){ prepFish(); if(!G.fd.item&&(save.uw!==false||G.fd.sp.special==='mermaid')) enterUW(); }
       if(UW.active()&&G.state==='wait') UW.setProgress(1-G.timer/3);
       if(G.fd&&G.state==='wait'){ G.bubT=(G.bubT||0)-dt; if(G.bubT<=0){ G.bubT=rand(.25,.7); W.addRipple(G.to.x+rand(-.3,.3),G.to.z+rand(-.3,.3),.05); P.splash(G.to.x+rand(-.25,.25),0,G.to.z+rand(-.25,.25),1,.15); } }
-      { const wv=WL.wind(); G.to.x+=wv.x*wv.s*.05*dt; G.to.z+=wv.z*wv.s*.05*dt; }
+      { const wv=WL.wind(), old=new T.Vector3(G.to.x,y,G.to.z), want=old.clone();
+        if(!G.bottom){ want.x+=wv.x*wv.s*.05*dt; want.z+=wv.z*wv.s*.05*dt; }
+        const q=PH.move(old,want,.065); G.to.x=q.pos.x; G.to.z=q.pos.z;
+        if(q.contact) tackleSnag(q.contact,old);
+      }
       const dip=G.dip>0?Math.sin((G.dip/(G.dipMax||.28))*Math.PI)*(G.dipAmp||.035):0;
       bob.position.set(G.to.x,y-dip,G.to.z);
       if(G.nib===0&&G.timer<3) G.approach=Math.min(1,G.approach+dt*.5);
@@ -871,15 +921,14 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       if(G.noBait&&!(G.stealT>0)&&!G.bottom) bob.position.y+=.025*bob.scale.x;   // 餌沒了：浮標少了重量，浮得比較高
       if(G.inspDip>0){ G.inspDip-=dt; bob.position.y-=Math.sin(G.inspDip*18)*.02; bob.rotation.z=Math.sin(G.inspDip*14)*.25; }
       setAct('收線',G.snag?'掛底了！左右來回拖曳畫面試著解開（硬收會斷線）':UW.active()?'魚正在靠近餌……':G.bottom?'看竿尖：被拉彎時立刻點擊！':'浮標被拉進水裡時，立刻點擊！',false);
-      if(G.bottom){ bob.position.y=-1.2; rod.bendT=.1+(G.dip>0?.22*Math.sin((G.dip/(G.dipMax||.28))*Math.PI):0)+Math.sin(G.t*1.3)*.012;   // 竿尖：試咬時輕抖、平常隨水流微微晃
-        const zid=WL.zoneId?WL.zoneId():''; const snagK=(zid==='reef'?1:.8)*({休閒:.4,標準:1,硬派:1.3,專家:1.6}[D().n]||1); if(!G.snag&&!G.fd&&!G.snagOnce&&(zid==='wood'||zid==='reef')&&Math.random()<dt*.012*snagK){ G.snagOnce=true; G.snag=true; G.timer=99; G.snagYaw=G.yawT; vib([40,40]); toast('🪨 掛底了！左右來回拖曳畫面試著解開','warn',2400); }
-        if(G.snag){ const dy=G.yawT-G.snagYaw; if(Math.abs(dy)>.12){ const sg=Math.sign(dy); if(sg!==G.snagLast){ G.snagFlip++; G.snagLast=sg; } G.snagYaw=G.yawT; }
-          rod.bendT=.42+Math.sin(G.t*20)*.03+(Math.random()<dt*2?.12:0);
-          G.snRip=(G.snRip||0)-dt; if(G.snRip<=0&&G.entry){ G.snRip=rand(.35,.8); W.addRipple(G.entry.x,G.entry.z,.12); P.splash(G.entry.x,0,G.entry.z,2,.08); }   // 卡住的線在入水點不斷冒小泡、小漣漪
-          if(G.snagFlip>=3&&G.entry){ P.splash(G.entry.x,0,G.entry.z,14,.45); W.addRipple(G.entry.x,G.entry.z,.6); rod.bendT=0; }   // 解開：線一鬆、竿子彈回、入水點噴出一團水花
-          if(G.snagFlip>=3){ G.snag=false; G.snagFlip=0; G.timer=rand(3,8); toast('解開了！','good',1200); vib(20); } } }
+      if(G.bottom){ const dropFrom=bob.position.clone(); bob.position.y=-1.2; rod.bendT=.1+(G.dip>0?.22*Math.sin((G.dip/(G.dipMax||.28))*Math.PI):0)+Math.sin(G.t*1.3)*.012;   // 竿尖：試咬時輕抖、平常隨水流微微晃
+        const hookAt=new T.Vector3(G.to.x,-1.2,G.to.z), q=PH.move(dropFrom,hookAt,.065,false);
+        setPoint(bob.position,q.pos); if(q.contact) tackleSnag(q.contact,dropFrom);
+      }
+
     } else {
       G.biteT+=dt; bob.position.set(G.to.x+Math.sin(G.biteT*3)*.15,G.bottom?-1.2:y-.13-.04*Math.sin(G.biteT*12),G.to.z+G.biteT*.2); if(G.bottom){ rod.bendT=.55+.08*Math.sin(G.biteT*14); rod.pitchT=-.02; }
+      { const q=PH.move(new T.Vector3(G.to.x,y,G.to.z),bob.position,.065); setPoint(bob.position,q.pos); }
       P.shadow.material.opacity=0;
       setAct('起鉤','藍色區按下＝完美，黃色區＝上鉤',true);
       if(FUN.hookExpired()){ FUN.pop('錯過','miss'); missBite(); }
@@ -893,11 +942,19 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
   else if(st==='fight'){ updateFight(dt); if(G.state==='fight'){ const f=G.f; lineEnd=rod.end; slack=clamp(.1*(1-f.T*1.4),0,.1);   // 魚掛在線上：線幾乎繃直
       trem=(.012+.05*f.T)*(f.run?1.6:1); } }
   else if(st==='retrieve'){
-    G.stT+=dt; const s=Math.min(1,G.stT/.9), e=sstep(0,1,s); hangPos(tv);
-    bob.position.set(lerp(G.from.x,tv.x,e),s<.7?W.swell(bob.position.x,bob.position.z,G.t):lerp(0,tv.y,(s-.7)/.3),lerp(G.from.z,tv.z,e));
-    rod.spin-=dt*20; if(Math.random()<dt*14) Snd.click(); lineEnd=bob.position; slack=.15; setAct('收線中','',false);
-    if(s>=1) G.state='idle';
+    const path=G.retrievePath||[bob.position.clone(),rod.tipW.clone()];
+    let budget=dt*1.5*META.gear().reel.spd;
+    while(budget>0&&G.retrieveNode<path.length){
+      const target=path[G.retrieveNode], old=bob.position.clone(), distance=old.distanceTo(target), step=Math.min(distance,budget);
+      const want=old.clone().lerp(target,distance>.0001?step/distance:1), q=PH.move(old,want,.065);
+      setPoint(bob.position,q.pos); budget-=step;
+      if(q.contact){ G.state='wait'; G.bottom=false; G.to.set(q.pos.x,0,q.pos.z); tackleSnag(q.contact,old); break; }
+      if(distance<=step+.001) G.retrieveNode++; else break;
+    }
+    rod.spin-=dt*20; if(Math.random()<dt*14) Snd.click(); lineEnd=bob.position; slack=.06; setAct('收線中','拖曳改變竿角可避開前方障礙物',false);
+    if(G.state==='retrieve'&&G.retrieveNode>=path.length) G.state='idle';
   }
+
   else if(st==='lost'){ G.stT+=dt; lineOn=false; setAct('・・・','',false); if(G.stT>1.3){ G.snapped=false; G.state='idle'; } }
   else if(st==='land'||st==='catch'||st==='post'){
     const g=G.fish.group, D=dispDist(); rod.pitchT=.45; bob.visible=false; lineOn=st!=='post';

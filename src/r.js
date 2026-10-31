@@ -47,7 +47,7 @@ const hT=hud.querySelector('.t'), hC=hud.querySelector('.chase'), hBand=hud.quer
 function bobberVis(v){ P.bobber.children.forEach(o=>{ o.visible=v; }); }
 function start(at,bait,base){ const k=bait.lure, cf=LURE_CFG[k]; getModel(k); show(k);
   cur={k,cf,base:base.clone(),depth:0,heldT:0,pause:0,speed:0,twitchV:0,chase:null,delay:2+Math.random()*3,interest:0,maxSp:c.reelSpd()*.55,pressT:0};
-  pos.copy(at); pos.y=0; holder.visible=true; bobberVis(false); hud.classList.remove('hidden');
+  pos.copy(at); pos.y=0; holder.position.copy(at); holder.position.y=-.05; holder.visible=true; bobberVis(false); hud.classList.remove('hidden');
   hT.textContent=bait.icon+' '+bait.name; hC.textContent='';
   const mx=2.4; hBand.style.left=(cf.band[0]/mx*100)+'%'; hBand.style.width=((cf.band[1]-cf.band[0])/mx*100)+'%';
   c.toast(cf.tip,'',2600); }
@@ -59,10 +59,15 @@ function update(dt,held){ if(!cur) return null; const cf=cur.cf;
   const target=held?cur.maxSp*Math.min(1,.4+.6*cur.heldT/1.5):0;
   cur.speed+=(target-cur.speed)*Math.min(1,dt*5); cur.twitchV=Math.max(0,cur.twitchV-dt*4);
   dir.set(cur.base.x-pos.x,0,cur.base.z-pos.z); const dist=dir.length(); dir.normalize();
-  const v=cur.speed+cur.twitchV; pos.addScaledVector(dir,v*dt);
+  const v=cur.speed+cur.twitchV, old=holder.position.clone(), next=old.clone().addScaledVector(dir,v*dt);
+  // Pull toward the rod's lateral angle, so the player can steer around structure.
+  next.x+=Math.cos(G.head+G.yawT)*Math.sin(G.yawT-(G.aimYawCast||0))*v*dt*.5;
+  next.z-=Math.sin(G.head+G.yawT)*Math.sin(G.yawT-(G.aimYawCast||0))*v*dt*.5;
+  const q=W.fishingPhysics.move(old,next,.06); pos.set(q.pos.x,0,q.pos.z);
+  if(q.contact){ cur.hit=q.contact; cur.incoming=old; holder.position.set(q.pos.x,q.pos.y,q.pos.z); return 'snag'; }
   const want=cur.speed>.2?cf.dive*Math.min(1,cur.speed/cf.band[1]):(cf.sink?Math.min(2.5,cur.depth+dt*.4):(cf.float?0:cur.depth));
   cur.depth+=(want-cur.depth)*Math.min(1,dt*1.5);
-  holder.position.set(pos.x,-cur.depth-.05,pos.z); holder.lookAt(tmp.set(cur.base.x,holder.position.y,cur.base.z));
+  { const q=W.fishingPhysics.move(holder.position,{x:pos.x,y:-cur.depth-.05,z:pos.z},.06); holder.position.set(q.pos.x,q.pos.y,q.pos.z); if(q.contact){cur.hit=q.contact;cur.incoming=old;return 'snag';} } holder.lookAt(tmp.set(cur.base.x,holder.position.y,cur.base.z));
   holder.rotateZ(Math.sin(performance.now()*.02)*(.15+.6*cur.twitchV)); holder.rotateY(Math.sin(performance.now()*.013)*.25*Math.min(1,v));
   hDot.style.left=Math.min(98,v/2.4*100)+'%';
   /* 魚：先等一段時間才有魚注意到；之後依收線方式調整興趣 */
@@ -81,7 +86,7 @@ function update(dt,held){ if(!cur) return null; const cf=cur.cf;
     P.shadow.rotation&&(P.shadow.rotation.y=Math.atan2(dir.x,dir.z));
     if(chaser){ /* 真實魚模型跟在假餌後面：越有興趣越靠近水面、跟得越緊、尾巴擺得越快 */
       const g=chaser.group, I=cur.interest, wob=Math.sin(performance.now()*.004)*.35*(1-I);
-      g.position.set(tmp.x+dir.z*wob,-(.25-.3*I)+Math.sin(performance.now()*.006)*.01,tmp.z-dir.x*wob); g.rotation.set(0,Math.atan2(-dir.z,dir.x),0);
+      const oldFish=g.position.clone(); g.position.set(tmp.x+dir.z*wob,-(.25-.3*I)+Math.sin(performance.now()*.006)*.01,tmp.z-dir.x*wob); const q=W.fishingPhysics.move(oldFish,g.position,Math.max(.1,chaser.L*.22)); g.position.set(q.pos.x,q.pos.y,q.pos.z); if(q.contact) cur.interest=Math.min(.7,cur.interest); g.rotation.set(0,Math.atan2(-dir.z,dir.x),0);
       chaser.uni.uSwim.value+=dt*(5+9*(cur.speed+I)); chaser.uni.uAmp.value=.05+.04*I;
       { const far=Math.min(1,Math.max(0,(dist-6)/14)); P.shadow.scale.setScalar(1+1.6*far); P.shadow.material.opacity=Math.min(.75,(.15+.35*I)*(.5+.9*far)); }   // 遠處時加強魚下方的暗影，讓人看得出有魚在跟
       if(I>.75&&Math.random()<dt*6) P.splash(g.position.x-dir.x*chaser.L*.3,0,g.position.z-dir.z*chaser.L*.3,2,.18); }   // 背鰭劃開水面
@@ -155,5 +160,5 @@ function renderPiP(renderer,dt){ const on=(cur||pip.strikeT>0)&&(!c.uwOn||c.uwOn
   const ac=renderer.autoClear; renderer.setScissorTest(true); renderer.setScissor(x,yb,w,h); renderer.setViewport(x,yb,w,h); renderer.autoClear=true;
   renderer.render(pip.scene,pip.cam); renderer.setScissorTest(false); renderer.setViewport(0,0,vs.x,vs.y); renderer.autoClear=ac;
   Object.assign(frame.style,{display:'block',left:x+'px',top:top+'px',width:w+'px',height:h+'px'}); }
-return {renderPiP,start,update,press,release,end,chaser:()=>chaser,bobberVis,pos:()=>pos,interest:()=>cur?cur.interest:0,active:()=>!!cur};
+return {contact:()=>cur&&cur.hit,incoming:()=>cur&&cur.incoming?cur.incoming.clone():holder.position.clone(),renderPiP,start,update,press,release,end,chaser:()=>chaser,bobberVis,pos:()=>holder.position,interest:()=>cur?cur.interest:0,active:()=>!!cur};
 }
