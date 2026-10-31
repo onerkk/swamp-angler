@@ -498,7 +498,7 @@ const cv=W.renderer.domElement;
 cv.addEventListener('pointerdown',e=>{ if(dragPtr!==null) return; dragPtr=e.pointerId; dragX0=e.clientX; yaw0=G.yawT; dragY0=e.clientY; pitch0=G.pitchT||0; try{ cv.setPointerCapture(e.pointerId); }catch(_){} });
 cv.addEventListener('pointermove',e=>{ if(e.pointerId!==dragPtr) return; const dx=e.clientX-dragX0;
   if(G.state==='fight') G.rodSideT=clamp(dx/70,-1,1); else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(yaw0-dx*.005,-.95,.95);   // 拋竿後（等魚、咬餌、路亞）也能自由轉視角
-  if(G.state==='idle'||G.state==='wait') G.pitchT=clamp(pitch0+(e.clientY-dragY0)*.004,-.4,.72); });   // 上下拖曳：抬頭看天空
+  if(G.state==='idle'||G.state==='wait') G.pitchT=clamp(pitch0-(e.clientY-dragY0)*.004,-.4,.72); });   // 向上滑抬頭、向下滑低頭，與小屋鏡頭方向一致
 const dragRel=e=>{ if(e.pointerId!==dragPtr) return; dragPtr=null; if(actPtr===null) G.rodSideT=0; };
 cv.addEventListener('pointerup',dragRel); cv.addEventListener('pointercancel',dragRel); cv.addEventListener('lostpointercapture',dragRel);
 ui.act.addEventListener('lostpointercapture',actRel);

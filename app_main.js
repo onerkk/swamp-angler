@@ -1,4 +1,4 @@
-/*APPV:20261031202716*/
+/*APPV:20261031203535*/
 /* Account assistance follows the authenticated Google identity, never a saved flag. */
 function createAccountAssist(){
   let enabled=false;
@@ -6328,7 +6328,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261031202716'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261031203535'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8304,7 +8304,7 @@ const cv=W.renderer.domElement;
 cv.addEventListener('pointerdown',e=>{ if(dragPtr!==null) return; dragPtr=e.pointerId; dragX0=e.clientX; yaw0=G.yawT; dragY0=e.clientY; pitch0=G.pitchT||0; try{ cv.setPointerCapture(e.pointerId); }catch(_){} });
 cv.addEventListener('pointermove',e=>{ if(e.pointerId!==dragPtr) return; const dx=e.clientX-dragX0;
   if(G.state==='fight') G.rodSideT=clamp(dx/70,-1,1); else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(yaw0-dx*.005,-.95,.95);   // 拋竿後（等魚、咬餌、路亞）也能自由轉視角
-  if(G.state==='idle'||G.state==='wait') G.pitchT=clamp(pitch0+(e.clientY-dragY0)*.004,-.4,.72); });   // 上下拖曳：抬頭看天空
+  if(G.state==='idle'||G.state==='wait') G.pitchT=clamp(pitch0-(e.clientY-dragY0)*.004,-.4,.72); });   // 向上滑抬頭、向下滑低頭，與小屋鏡頭方向一致
 const dragRel=e=>{ if(e.pointerId!==dragPtr) return; dragPtr=null; if(actPtr===null) G.rodSideT=0; };
 cv.addEventListener('pointerup',dragRel); cv.addEventListener('pointercancel',dragRel); cv.addEventListener('lostpointercapture',dragRel);
 ui.act.addEventListener('lostpointercapture',actRel);
