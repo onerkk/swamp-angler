@@ -1,4 +1,4 @@
-/*APPV:20261031193139*/
+/*APPV:20261031200632*/
 /* Account assistance follows the authenticated Google identity, never a saved flag. */
 function createAccountAssist(){
   let enabled=false;
@@ -125,7 +125,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={SHOP_BRAND,drawSh
 /* One animated surface model for mesh displacement, normals, bobbers and boat motion. */
 const WATER_WAVES={
  lake:[[4.8,.028,0,.3],[2.7,.016,.72,2.1],[1.45,.009,-.85,4.7],[.8,.004,1.4,1.4],[3.67,.011,-.39,3.6],[1.93,.006,.28,5.9],[.56,.002,-1.9,.9],[.35,.001,2.4,4.1]],
- sea:[[38,.26,0,1.7],[23,.17,.69,4.1],[15,.11,-.69,.6],[9,.065,1.22,2.8],[5.5,.036,.35,5.3],[3.2,.018,-1.05,3.7],[11.7,.038,-.23,4.6],[7.6,.024,.92,.2],[2.3,.009,-.35,2.3],[1.2,.004,.47,5.7],[.7,.0014,-1.8,1.1]]
+ sea:[[38,.26,0,1.7],[23,.17,.69,4.1],[15,.11,-.69,.6],[9,.065,1.22,2.8],[5.5,.036,.35,5.3],[3.2,.018,-1.05,3.7],[11.7,.038,-.23,4.6],[7.6,.024,.92,.2],[2.3,.009,-.35,2.3],[1.2,.004,.47,5.7],[.7,.0014,-1.8,1.1],[4.2,.028,1.9,2.4],[1.7,.010,-.65,3.2],[.9,.004,2.3,5.6]]
 };
 function sampleWater(x,z,t,wind,sea){
   const len=Math.hypot(wind.x,wind.y),wx=len>.001?wind.x/len:1,wz=len>.001?wind.y/len:0;
@@ -240,6 +240,111 @@ function createSurfaceResidents(W,P,MDL){
 }
 
 if(typeof module!=='undefined'&&module.exports)module.exports={createSurfaceResidents};
+/* Finish identity is shared by equipped tackle and the shop's 3D preview. */
+const TACKLE_FINISHES={
+ factory:{name:'原廠配色',color:'#245bb4',metalness:.08,roughness:.28,clearcoat:1,coatRoughness:.1,carbon:true,desc:'碳纖編織・透明保護漆'},
+ black:{name:'霧黑',color:'#24282d',metalness:.06,roughness:.62,clearcoat:.18,coatRoughness:.45,carbon:true,desc:'霧面碳纖・黑色陽極五金'},
+ coral:{name:'珊瑚紅',color:'#c84435',metalness:.12,roughness:.27,clearcoat:1,coatRoughness:.1,carbon:true,desc:'紅色烤漆・透明亮光層'},
+ mint:{name:'薄荷綠',color:'#2f9e88',metalness:.12,roughness:.3,clearcoat:1,coatRoughness:.12,carbon:true,desc:'薄荷綠烤漆・透明亮光層'},
+ galaxy:{name:'星空紫',color:'#4c267c',metalness:.38,roughness:.25,clearcoat:1,coatRoughness:.08,carbon:false,gold:true,desc:'紫色金屬漆・金色五金'},
+ gold:{name:'鍍金',color:'#ddb35c',metalness:1,roughness:.23,clearcoat:.24,coatRoughness:.16,carbon:false,gold:true,desc:'金屬鍍金反射・細緻拉絲'}
+};
+function tackleFinish(id,color,gold){
+ const base=TACKLE_FINISHES[id==='def'?'factory':id]||TACKLE_FINISHES.factory;
+ return {...base,color:id==='factory'&&color?color:base.color,gold:base.gold||!!gold};
+}
+function applyTackleFinish(T,materials,id,color,gold,assets){
+ const f=tackleFinish(id,color,gold);
+ for(const m of materials){
+  const role=m.userData.tackleRole;
+  if(role==='blank'){
+   m.color.set(f.color).convertSRGBToLinear();m.map=f.carbon?assets.carbon:null;
+   m.bumpMap=f.carbon?assets.weave:assets.brushed;m.bumpScale=f.carbon?.000035:.000018;
+   m.roughnessMap=null;m.metalness=f.metalness;m.roughness=f.roughness;m.clearcoat=f.clearcoat;m.clearcoatRoughness=f.coatRoughness;m.envMapIntensity=1;
+   m.userData.finish=id;
+  }else if(role==='trim'){
+   m.color.set(f.gold?'#dfb85f':'#c6cdd2').convertSRGBToLinear();m.metalness=1;m.roughness=f.gold?.22:.19;m.envMapIntensity=1;
+  }else if(role==='frame'){
+   m.color.set(id==='black'?'#25282b':'#30363c').convertSRGBToLinear();m.metalness=.8;m.roughness=.3;
+  }
+  m.needsUpdate=true;
+ }
+ return f;
+}
+function createTacklePreview(W,build){
+ const T=THREE;let rt=null;const scene=new T.Scene(),cam=new T.PerspectiveCamera(30,1,.01,10);
+ scene.add(new T.HemisphereLight(0xe9eff4,0x34312d,1.1));const key=new T.DirectionalLight(0xfff4df,2);key.position.set(1.5,2,2);scene.add(key);const rim=new T.DirectionalLight(0xc0ddff,1);rim.position.set(-2,1,-1);scene.add(rim);
+ return function(canvas,kind,id){
+  if(!canvas||!canvas.isConnected)return;const model=build(kind,id);if(!model)return;scene.add(model.root);scene.environment=W.scene.environment;
+  const width=Math.max(2,Math.round(canvas.clientWidth*Math.min(2,window.devicePixelRatio||1))),height=Math.max(2,Math.round(canvas.clientHeight*Math.min(2,window.devicePixelRatio||1)));canvas.width=width;canvas.height=height;
+  if(!rt||rt.width!==width||rt.height!==height){if(rt)rt.dispose();rt=new T.WebGLRenderTarget(width,height,{depthBuffer:true});rt.texture.encoding=T.sRGBEncoding;}
+  cam.aspect=width/height;cam.updateProjectionMatrix();cam.position.copy(model.focus).add(kind==='rod'?new T.Vector3(.28,.2,.52):new T.Vector3(.18,.1,.52));cam.lookAt(model.focus);
+  const R=W.renderer,target=R.getRenderTarget(),scissor=R.getScissorTest(),color=R.getClearColor(new T.Color()),alpha=R.getClearAlpha(),exposure=R.toneMappingExposure;
+  try{
+   R.setScissorTest(false);R.toneMappingExposure=.95;R.setRenderTarget(rt);R.setClearColor(0x111b1c,1);R.clear();R.render(scene,cam);
+   const bytes=new Uint8Array(width*height*4);R.readRenderTargetPixels(rt,0,0,width,height,bytes);const ctx=canvas.getContext('2d'),img=ctx.createImageData(width,height),row=width*4;
+   for(let y=0;y<height;y++)img.data.set(bytes.subarray((height-1-y)*row,(height-y)*row),y*row);ctx.putImageData(img,0,0);
+  }finally{R.setRenderTarget(target);R.setScissorTest(scissor);R.setClearColor(color,alpha);R.toneMappingExposure=exposure;scene.remove(model.root);if(model.dispose)model.dispose();model.root.traverse(m=>{if(m.isMesh)for(const mat of(Array.isArray(m.material)?m.material:[m.material]))mat.dispose();});}
+ };
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={TACKLE_FINISHES,tackleFinish,applyTackleFinish};
+/* Material assignments follow the yacht asset's named parts, not average pixel color. */
+const MARINE_PARTS={
+ material_3:'teak',material_5:'navy',material_40:'navy',material_1:'gelcoat',material_33:'gelcoat',material_42:'steel',material_7:'steel',material_2:'steel',material_4:'steel',material_35:'steel',material_17:'fabric',material_8:'leather'
+};
+function marinePart(name){return MARINE_PARTS[name]||'original';}
+function createMarineMaterials(T){
+ const tl=new T.TextureLoader(),texture=(f,color)=>{const t=tl.load(f);t.wrapS=t.wrapT=T.RepeatWrapping;t.anisotropy=8;if(color)t.encoding=T.sRGBEncoding;return t;};
+ const microCanvas=document.createElement('canvas');microCanvas.width=microCanvas.height=128;const g=microCanvas.getContext('2d');
+ for(let y=0;y<128;y++)for(let x=0;x<128;x++){const v=128+9*Math.sin(x*1.71+y*2.13)+5*Math.cos(x*4.13-y*3.79);g.fillStyle=`rgb(${v},${v},${v})`;g.fillRect(x,y,1,1);}
+ const micro=new T.CanvasTexture(microCanvas);micro.wrapS=micro.wrapT=T.RepeatWrapping;micro.repeat.set(9,9);
+ const teak=new T.MeshStandardMaterial({color:new T.Color('#bda47d').convertSRGBToLinear(),map:texture('dock_diff.jpg',true),normalMap:texture('dock_nor.jpg'),roughnessMap:texture('dock_rough.jpg'),normalScale:new T.Vector2(.55,.55),roughness:.87,envMapIntensity:.5});teak.name='Marine teak with caulk';
+ teak.onBeforeCompile=s=>{s.fragmentShader=s.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
+   float boardU=fract(vUv.x/.13);
+   float caulk=1.0-smoothstep(.0012,.0038,min(boardU,1.0-boardU)*.13);
+   float endJoint=1.0-smoothstep(.001,.003,min(fract((vUv.y+floor(vUv.x/.13)*.47)/2.1),1.0-fract((vUv.y+floor(vUv.x/.13)*.47)/2.1))*2.1);
+   diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.012,.015,.014),max(caulk,endJoint)*.86);`);};teak.customProgramCacheKey=()=> 'marine-teak-caulk-v1';
+ const color=h=>new T.Color(h).convertSRGBToLinear();
+ const gelcoat=new T.MeshPhysicalMaterial({color:color('#e7e6df'),roughness:.28,metalness:0,clearcoat:1,clearcoatRoughness:.15,bumpMap:micro,bumpScale:.0004});gelcoat.name='Marine fiberglass gelcoat';
+ const navy=new T.MeshPhysicalMaterial({color:color('#203d50'),roughness:.25,metalness:0,clearcoat:1,clearcoatRoughness:.12,bumpMap:micro,bumpScale:.00035});navy.name='Marine navy enamel';
+ const steel=new T.MeshStandardMaterial({color:color('#bfc7ca'),metalness:1,roughness:.23,bumpMap:micro,bumpScale:.00006});steel.name='Marine brushed stainless steel';
+ const fabric=new T.MeshStandardMaterial({color:color('#bdb9ae'),roughness:.92,bumpMap:micro,bumpScale:.0012});
+ const leather=new T.MeshStandardMaterial({color:color('#4e3224'),roughness:.64,bumpMap:micro,bumpScale:.0006});
+ return{teak,gelcoat,navy,steel,fabric,leather};
+}
+function dressYacht(T,object,materials){
+ object.updateWorldMatrix(true,true);const inverse=new T.Matrix4().copy(object.parent.matrixWorld).invert(),v=new T.Vector3();
+ object.traverse(m=>{if(!m.isMesh)return;
+  const source=Array.isArray(m.material)?m.material:[m.material],parts=source.map(mt=>marinePart(mt.name));
+  if(parts.every(p=>p==='teak')){
+   m.geometry=m.geometry.clone();const positions=m.geometry.attributes.position,uv=new Float32Array(positions.count*2),transform=new T.Matrix4().multiplyMatrices(inverse,m.matrixWorld);
+   for(let i=0;i<positions.count;i++){v.fromBufferAttribute(positions,i).applyMatrix4(transform);uv[i*2]=v.x;uv[i*2+1]=v.z;}m.geometry.setAttribute('uv',new T.BufferAttribute(uv,2));
+  }
+  const selected=source.map((mt,i)=>{const out=materials[parts[i]]||mt;return out;});m.material=Array.isArray(m.material)?selected:selected[0];m.castShadow=true;m.receiveShadow=true;
+ });
+}
+function addMarineHardware(T,wrap,deck,materials){
+ // Dimensions and fittings are in metres, measured after the hull is normalized.
+ const fittings=new T.Group();fittings.name='Marine deck fittings';wrap.add(fittings);
+ function screw(x,y,z){const head=new T.Mesh(new T.CylinderGeometry(.009,.009,.003,12),materials.steel);head.position.set(x,y,z);fittings.add(head);const slot=new T.Mesh(new T.BoxGeometry(.011,.0015,.002),new T.MeshStandardMaterial({color:0x262b2e,roughness:.6}));slot.position.set(x,y+.002,z);fittings.add(slot);}
+ const rc=new T.Raycaster(),down=new T.Vector3(0,-1,0);
+ for(const [x,z]of[[-.7,-3.0],[.7,-3.0]]){
+  wrap.updateMatrixWorld(true);rc.set(new T.Vector3(x,deck+3,z),down);const hit=rc.intersectObject(wrap,true)[0],y=hit?hit.point.y:deck;
+  const frame=new T.Mesh(new T.BoxGeometry(.24,.007,.19),materials.steel);frame.position.set(x,y+.006,z);fittings.add(frame);
+  const grill=new T.Mesh(new T.BoxGeometry(.20,.007,.15),new T.MeshStandardMaterial({color:0x20272a,roughness:.8}));grill.position.set(x,y+.01,z);fittings.add(grill);
+  for(let n=0;n<7;n++){const rib=new T.Mesh(new T.BoxGeometry(.18,.004,.007),materials.steel);rib.position.set(x,y+.016,z-.065+n*.0215);fittings.add(rib);}
+  for(const sx of[-1,1])for(const sz of[-1,1])screw(x+sx*.106,y+.013,z+sz*.08);
+ }
+ // Add flush latch and hinges only when the source hatch is actually under this point.
+ wrap.updateMatrixWorld(true);rc.set(new T.Vector3(0,deck+3,-1.6),down);const hatch=rc.intersectObject(wrap,true).find(h=>h.object.material===materials.gelcoat);
+ if(hatch){const y=hatch.point.y,z=hatch.point.z,base=new T.Mesh(new T.BoxGeometry(.15,.004,.095),materials.steel);base.position.set(0,y+.003,z);fittings.add(base);
+  const recess=new T.Mesh(new T.BoxGeometry(.116,.005,.065),new T.MeshStandardMaterial({color:0x172226,roughness:.8}));recess.position.set(0,y+.006,z);fittings.add(recess);
+  const pull=new T.Mesh(new T.TorusGeometry(.025,.003,8,32),materials.steel);pull.rotation.x=-Math.PI/2;pull.position.set(0,y+.01,z);fittings.add(pull);
+  for(const x of[-.36,.36]){rc.set(new T.Vector3(x,deck+3,z-.29),down);const h=rc.intersectObject(wrap,true).find(h=>h.object.material===materials.gelcoat);if(!h)continue;const hinge=new T.Mesh(new T.BoxGeometry(.1,.013,.055),materials.steel);hinge.position.set(x,h.point.y+.008,z-.29);fittings.add(hinge);screw(x-.033,h.point.y+.018,z-.29);screw(x+.033,h.point.y+.018,z-.29);}
+ }
+ fittings.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return fittings;
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={MARINE_PARTS,marinePart,dressYacht};
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -678,8 +783,8 @@ void main(){
     bodyD += vec3(0.04, 0.24, 0.26)*smoothstep(-0.1, 0.9, vH)*uLightK*(0.4 + 0.6*clamp(dot(N, normalize(vec3(uSunDir.x, 0.25, uSunDir.z))), 0.0, 1.0));
     // 浪頭白沫：風越大、浪越高越多；碎成一塊一塊、隨時間消散
     { float wcN = noise2(vW.xz*0.35 + vec2(uTime*0.05, uTime*0.03))*0.6 + noise2(vW.xz*1.3 - uTime*0.08)*0.4;
-      float wc = smoothstep(0.62, 0.9, vH*0.75 + wcN*0.55)*clamp(uWind.z*1.4 - 0.25, 0.0, 1.0)*(1.0 - smoothstep(60.0, 260.0, dist));
-      wc *= smoothstep(0.45, 0.8, noise2(vW.xz*0.06 + vec2(uTime*0.02, 0.0)))*smoothstep(0.3, 0.7, noise2(vW.xz*0.9 + uTime*0.1));   // 白沫零星成塊，不會沿著浪的等高線連成一條條白線
+      float wc = smoothstep(.26,.64,vH+wcN*.12)*clamp((uWind.z-.28)*1.35,0.0,1.0)*(1.0 - smoothstep(60.0, 260.0, dist));
+      wc *= smoothstep(0.45, 0.8, noise2(vW.xz*0.06 + vec2(uTime*0.02, 0.0)))*smoothstep(0.3, 0.7, noise2(vW.xz*1.7 + vec2(uTime*.15,-uTime*.11)));   // 白沫零星成塊，不會沿著浪的等高線連成一條條白線
       bodyD = mix(bodyD, vec3(0.82, 0.86, 0.88)*(0.35 + 0.65*uLightK), wc*0.6); }
     #endif
     refl *= vec3(0.74, 0.88, 1.0); F *= 0.82;
@@ -758,7 +863,7 @@ const head = new T.Group(); head.rotation.x = -0.16; player.add(head); head.add(
 const V = () => new T.Vector3();
 const U = { uTime:{value:0}, uSunDir:{value:new T.Vector3(0,1,0)}, uLightCol:{value:V()}, uSunDisk:{value:new T.Vector3(0,1,0)},
   uSunCol:{value:V()}, uMoonDir:{value:new T.Vector3(0,1,0)}, uMoonCol:{value:V()}, uZenith:{value:V()}, uHorizon:{value:V()},
-  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.035,.25,.40)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
+  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.012,.075,.13)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
 
 // 天空球（含樹林遠景）
 const skyMat = new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:SH.common+SH.skyFS, side:T.BackSide, depthWrite:false, depthTest:false});
@@ -781,6 +886,9 @@ const seaGrid = new T.Mesh(makeWaterGrid(T), seaMat); seaGrid.visible=true; seaG
 
 // 光源
 const sunLight = new T.DirectionalLight(0xffffff, 0.9); scene.add(sunLight); scene.add(sunLight.target);
+renderer.shadowMap.type=T.PCFSoftShadowMap;sunLight.castShadow=true;sunLight.shadow.bias=-.00018;sunLight.shadow.normalBias=.012;sunLight.shadow.radius=2;
+Object.assign(sunLight.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.2,far:130});sunLight.shadow.camera.updateProjectionMatrix();
+function setShadows(q){renderer.shadowMap.enabled=q!=='low';const n=q==='high'?2048:q==='mid'?512:1024;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
 const hemi = new T.HemisphereLight(0xffffff, 0x223322, 0.55); scene.add(hemi);
 
 // 環境光照貼圖（由同一套天空/樹林產生）
@@ -870,6 +978,7 @@ function seaH(x,z,t){ return sampleWater(x,z,t,U.uWind.value,true).height; }
 function swell(x,z,t){return sampleWater(x,z,t,U.uWind.value,seaMode).height;}
 
 function update(dt, t){
+  if(renderer.shadowMap.enabled){const target=new T.Vector3();camera.getWorldPosition(target);target.y=0;sunLight.target.position.copy(target);sunLight.position.copy(target).addScaledVector(U.uSunDir.value,60);sunLight.target.updateMatrixWorld();}
   U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
   if(seaGrid.visible) seaGrid.position.set(U.uEye.value.x,0,U.uEye.value.z);
   { const w=U.uWind.value, k=(.002+.01*w.z)*dt; U.uCloudOff.value.x+=w.x*k; U.uCloudOff.value.y+=w.y*k; }
@@ -929,7 +1038,7 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
 /* ===== 美人魚的骨架與表情（依新設定圖生成的模型，載入後在執行時自動加骨架）=====
    骨架：臀→腰→胸→頸→頭；左右肩→上臂→前臂→手；尾巴 6 節＋尾鰭；頭髮 3 節
@@ -1200,11 +1309,16 @@ reeds.userData.lake=true; scene.add(reeds);
 
 /* ---------- 釣竿（藍色碳纖竿、導環、紡車捲線器） ---------- */
 const rod={pitch:0, pitchT:0, side:0, bend:0, bendT:0, spin:0, end:null, tipW:new T.Vector3(), spoolW:new T.Vector3(), guidesW:[]};
-const R_BASE=new T.Vector3(...FISHING_VIEW.rodBase), R_DIR=new T.Vector3(...FISHING_VIEW.rodDirection).normalize(), R_LEN=2.65, NS=20;
+const R_BASE=new T.Vector3(...FISHING_VIEW.rodBase), R_DIR=new T.Vector3(...FISHING_VIEW.rodDirection).normalize(), R_LEN=2.65, NS=36;
 // 真實釣竿材質：碳纖編織紋竿身＋透明亮光漆、EVA 發泡握把（細小氣孔）、捲線器線杯纏著一圈圈釣線
 const texC=(w,h,draw,rx,ry)=>{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; draw(cv.getContext('2d'),w,h); const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx||1,ry||1); return t; };
-const carbonTex=texC(64,64,(g,w,h)=>{ g.fillStyle='#16181c'; g.fillRect(0,0,w,h); for(let y=0;y<h;y+=8) for(let x=0;x<w;x+=8){ const on=((x+y)/8)%2===0, gr=g.createLinearGradient(x,y,on?x+8:x,on?y:y+8); gr.addColorStop(0,'#1c1f24'); gr.addColorStop(.5,on?'#3a414b':'#2c323a'); gr.addColorStop(1,'#1c1f24'); g.fillStyle=gr; g.fillRect(x+.5,y+.5,7,7); } },3,4);
+const carbonTex=texC(256,256,(g,w,h)=>{ g.fillStyle='#d0d1d3'; g.fillRect(0,0,w,h); for(let y=0;y<h;y+=8) for(let x=0;x<w;x+=8){ const on=((x+y)/8)%2===0, gr=g.createLinearGradient(x,y,on?x+8:x,on?y:y+8); gr.addColorStop(0,'#7c8087'); gr.addColorStop(.5,on?'#c5c8cc':'#a1a7ae'); gr.addColorStop(1,'#868b91'); g.fillStyle=gr; g.fillRect(x+.5,y+.5,7,7); } },3,4);
+carbonTex.encoding=T.sRGBEncoding;carbonTex.anisotropy=8;
+const weaveTex=texC(128,128,(g,w,h)=>{for(let y=0;y<h;y++)for(let x=0;x<w;x++){const n=128+26*Math.sin((x+y)*Math.PI/4)*Math.sin((x-y)*Math.PI/4);g.fillStyle=`rgb(${n},${n},${n})`;g.fillRect(x,y,1,1);}},3,4);
+const brushedTex=texC(128,128,(g,w,h)=>{for(let y=0;y<h;y++){const n=128+12*Math.sin(y*2.91)+5*Math.sin(y*9.3);g.fillStyle=`rgb(${n},${n},${n})`;g.fillRect(0,y,w,1);}},1,3);
+const finishAssets={carbon:carbonTex,weave:weaveTex,brushed:brushedTex};
 const evaTex=texC(64,64,(g,w,h)=>{ g.fillStyle='#202124'; g.fillRect(0,0,w,h); for(let i=0;i<500;i++){ g.fillStyle=Math.random()<.5?'rgba(0,0,0,.55)':'rgba(70,72,78,.35)'; g.beginPath(); g.arc(Math.random()*w,Math.random()*h,Math.random()*1.3+.3,0,7); g.fill(); } },2,6);
+evaTex.encoding=T.sRGBEncoding;
 const blankMat=new T.MeshPhysicalMaterial({color:0xffffff,map:carbonTex,metalness:.25,roughness:.38,clearcoat:1,clearcoatRoughness:.05});
 const gripMat=new T.MeshStandardMaterial({color:0xffffff,map:evaTex,bumpMap:evaTex,bumpScale:.002,roughness:.92});
 const chromeMat=new T.MeshStandardMaterial({color:0xdde2e6, metalness:1, roughness:.16});
@@ -1227,12 +1341,19 @@ const reel=new T.Group(); rodGroup.add(reel);
 { const foot=new T.Mesh(new T.BoxGeometry(.05,.008,.012),darkMetal); foot.position.y=-.016; reel.add(foot);
   const stem=new T.Mesh(new T.BoxGeometry(.012,.05,.01),darkMetal); stem.position.y=-.045; reel.add(stem);
   const body=new T.Mesh(new T.CylinderGeometry(.027,.031,.055,18),darkMetal); body.rotation.z=Math.PI/2; body.position.set(-.006,-.085,0); reel.add(body);
-  const spool=new T.Mesh(new T.CylinderGeometry(.028,.028,.03,22),blueAno); spool.rotation.z=Math.PI/2; spool.position.set(.04,-.085,0); reel.add(spool);
+  const spool=new T.Mesh(new T.CylinderGeometry(.028,.028,.03,22),blueAno); spool.name='tackleSpool';spool.rotation.z=Math.PI/2; spool.position.set(.04,-.085,0); reel.add(spool);
   const lip=new T.Mesh(new T.CylinderGeometry(.031,.031,.004,22),chromeMat); lip.rotation.z=Math.PI/2; lip.position.set(.056,-.085,0); reel.add(lip);
   const bail=new T.Mesh(new T.TorusGeometry(.034,.0016,6,20,Math.PI),chromeMat); bail.rotation.y=Math.PI/2; bail.position.set(.044,-.085,0); reel.add(bail); }
+reel.name='tackleReel';
 const crank=new T.Group(); crank.position.set(-.008,-.085,.034); reel.add(crank);
 { const arm=new T.Mesh(new T.BoxGeometry(.006,.055,.005),darkMetal); arm.position.y=-.024; crank.add(arm);
   const knob=new T.Mesh(new T.CylinderGeometry(.008,.008,.022,12),gripMat); knob.rotation.x=Math.PI/2; knob.position.set(0,-.05,.014); crank.add(knob); }
+// Machined reel details: rotor, line-roller, drag dial and fastener heads.
+for(const x of [.025,.058]){const ring=new T.Mesh(new T.TorusGeometry(.029,.0012,8,40),chromeMat);ring.rotation.y=Math.PI/2;ring.position.set(x,-.085,0);reel.add(ring);}
+const dragDial=new T.Mesh(new T.CylinderGeometry(.014,.018,.009,32),darkMetal);dragDial.rotation.z=Math.PI/2;dragDial.position.set(.064,-.085,0);reel.add(dragDial);
+for(let k=0;k<12;k++){const a=k*Math.PI/6,m=new T.Mesh(new T.SphereGeometry(.0015,6,4),chromeMat);m.position.set(.07,-.085+Math.cos(a)*.013,Math.sin(a)*.013);reel.add(m);}
+for(const [mat,role]of[[blankMat,'blank'],[chromeMat,'trim'],[goldMat,'trim'],[darkMetal,'frame'],[gripMat,'grip'],[blueAno,'line']])mat.userData.tackleRole=role;
+blueAno.roughness=.57;blueAno.metalness=0;blueAno.clearcoat=.15;
 const pts=[]; for(let i=0;i<=NS;i++) pts.push(new T.Vector3());
 const AX=new T.Vector3(1,0,0), AY=new T.Vector3(0,1,0), AZ=new T.Vector3(0,0,1);
 const dir=new T.Vector3(), bdir=new T.Vector3(), tmp=new T.Vector3(), tmp2=new T.Vector3(), tan=new T.Vector3(), dn=new T.Vector3(), sd=new T.Vector3();
@@ -1307,7 +1428,7 @@ const tipMat=new T.MeshStandardMaterial({color:0xfff080, emissive:0xffb020, emis
 { const body=new T.Mesh(new T.LatheGeometry(FLOAT_PROFILE.map(([r,y])=>new T.Vector2(r,y)),28),bTopMat); bobber.add(body);
   // 天線：一節一節的彩色刻度（橘、黃綠、橘、白），浮標在水面上下時看得出吃水
   const segs=[['#ff3b10',.03],['#d8ff2a',.025],['#ff3b10',.025],['#f4f4f0',.02],['#ff3b10',.025]]; let y=.06;
-  segs.forEach(([c,h])=>{ const m=new T.Mesh(new T.CylinderGeometry(.0034,.0036,h,12),new T.MeshPhysicalMaterial({color:new T.Color(c),roughness:.3,clearcoat:1,clearcoatRoughness:.1})); m.position.y=y+h/2; bobber.add(m); y+=h; });
+  segs.forEach(([c,h])=>{ const m=new T.Mesh(new T.CylinderGeometry(.0034,.0036,h,12),new T.MeshPhysicalMaterial({color:new T.Color(c),roughness:.3,clearcoat:1,clearcoatRoughness:.1})); m.userData.floatAntenna=true;m.position.y=y+h/2; bobber.add(m); y+=h; });
   const tp=new T.Mesh(new T.SphereGeometry(.0055,14,10),tipMat); tp.position.y=y+.003; bobber.add(tp);
   const ring=new T.Mesh(new T.TorusGeometry(.0045,.0012,8,16),new T.MeshStandardMaterial({color:0xb8b8b8,metalness:.9,roughness:.25})); ring.position.y=-.1; ring.rotation.y=Math.PI/2; bobber.add(ring); }
 window.__FLOAT_PROFILE=FLOAT_PROFILE;
@@ -1844,9 +1965,34 @@ function getFish(sp){
 
 const showLight=new T.PointLight(0xfff4e8,0,6,1.2); showLight.position.set(.5,.6,.3); head.add(showLight);
 
-function setRodLook(col,gold){ blankMat.color.set(col).lerp(new T.Color(1,1,1),.5);   // 不同竿子在碳纖紋上帶一點顏色（像真的有色碳纖竿），不是整根塗成純色
-  const gm=gold?goldMat:chromeMat; guides.forEach(g=>{ g.material=gm; }); tipTop.material=gm; }
-return { dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook, rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
+let factoryRodColor='#245bb4',factoryRodGold=false,activeFloatTexture=null;
+function setRodLook(col,gold,finish='factory'){
+  if(finish==='factory'){factoryRodColor=col;factoryRodGold=gold;}
+  applyTackleFinish(T,[blankMat,chromeMat,goldMat,darkMetal],finish,col,gold,finishAssets);
+  const gm=gold?goldMat:chromeMat;guides.forEach(g=>g.material=gm);tipTop.material=gm;
+}
+function paintFloat(mat,top,bottom,id){
+ const cv=document.createElement('canvas');cv.width=32;cv.height=256;const g=cv.getContext('2d'),hex=n=>'#'+n.toString(16).padStart(6,'0');
+ g.fillStyle=hex(bottom);g.fillRect(0,0,32,256);g.fillStyle=hex(top);g.fillRect(0,0,32,104);g.fillStyle=id==='gold'?'#805815':'#292c2c';g.fillRect(0,101,32,3);
+ const t=new T.CanvasTexture(cv);t.encoding=T.sRGBEncoding;
+ mat.color.setHex(0xffffff);mat.map=t;mat.metalness=id==='gold'?.92:0;mat.roughness=id==='gold'?.24:.28;mat.clearcoat=id==='gold'?.3:1;mat.clearcoatRoughness=.1;mat.needsUpdate=true;return t;
+}
+function setFloatLook(top,bottom,id='classic'){
+ if(activeFloatTexture)activeFloatTexture.dispose();activeFloatTexture=paintFloat(bTopMat,top,bottom,id);
+ let i=0;bobber.traverse(o=>{if(o.userData.floatAntenna){o.material.color.setHex(i++%2?bottom:top).convertSRGBToLinear();o.material.metalness=id==='gold'?.8:0;o.material.roughness=.28;o.material.needsUpdate=true;}});
+}
+const previewFinish=createTacklePreview(W,(kind,id)=>{
+ const root=(kind==='rod'?rodGroup:bobber).clone(true);root.position.set(0,0,0);root.rotation.set(0,0,0);root.scale.setScalar(1);root.visible=true;
+ root.traverse(o=>{if(o.isMesh){o.material=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone();o.frustumCulled=false;}});
+ if(kind==='rod'){
+  const mats=[];root.traverse(o=>{if(o.isMesh)mats.push(...(Array.isArray(o.material)?o.material:[o.material]));});applyTackleFinish(T,mats,id==='def'?'factory':id,factoryRodColor,id==='def'?factoryRodGold:false,finishAssets);
+  root.updateMatrixWorld(true);const reel=root.getObjectByName('tackleReel');return{root,focus:reel?reel.getWorldPosition(new T.Vector3()):new T.Vector3(-.2,-.65,-1)};
+ }
+ const palette={classic:[0xd8301a,0xf2efe8],lime:[0x7cff3a,0x1a1a1a],panda:[0x111111,0xffffff],sakura:[0xff8fb8,0xfff0f5],gold:[0xd9b25a,0xf6e6b0]},colors=palette[id]||palette.classic;
+ const body=root.children[0],texture=paintFloat(body.material,colors[0],colors[1],id);let i=0;root.traverse(o=>{if(o.userData.floatAntenna){o.material.color.setHex(i++%2?colors[1]:colors[0]).convertSRGBToLinear();o.material.metalness=id==='gold'?.8:0;}});root.rotation.z=-.2;return{root,focus:new T.Vector3(0,.035,0),dispose:()=>texture.dispose()};
+});
+
+return { dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook,setFloatLook,previewFinish,rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
 }
 /* ===== 第 2 段 · 水下鏡頭、釣具店、等級與任務 ===== */
 const SH2 = {};
@@ -2289,6 +2435,7 @@ function render(){
       return row(lock?'🔒 '+(s.req?'？？？':s.name):(s.yacht?'🛥️ ':s.kayak?'🛶 ':s.loc==='ice'?'❄️ ':'🪵 ')+s.name,lock?(s.req?'只在月光下才看得見的地方':'跟著老漁人的手記前進，就會找到這裡'):s.sub,btn); }).join('');
   }
   shB.innerHTML=h;
+  if(cur==='shop'&&shopTab==='skin')requestAnimationFrame(()=>ECO.preview());
   { const dsp=cur==='log'&&dexSel&&SPECIES.find(s=>s.id===dexSel); if(dsp) DEXV.show(dsp,$('dexCv'),!!save.dex[dsp.id]); else { DEXV.stop(); if(cur==='log') DEXV.thumbs(SPECIES.map(s=>[s,!!save.dex[s.id]])); } }
 }
 // 圖鑑詳細頁：未釣獲只給出沒線索，釣獲後顯示完整資料
@@ -3747,6 +3894,7 @@ const capOf=()=>Math.min(10,Math.floor((c.save.lv||1)/3));   // 強化上限：�
 const S=c.save, now=()=>Date.now();
 S.mat=S.mat||{scale:0,bone:0,pearl:0,crystal:0}; S.enh=S.enh||{rod:{},line:{},reel:{}}; S.inv=S.inv||{}; S.fx=S.fx||{};
 S.skin=S.skin||{rod:'def',bob:'classic'}; S.skinOwn=S.skinOwn||{rod:['def'],bob:['classic']}; S.merch=S.merch||{};
+const previewSkin={rod:null,bob:null};
 const fxOn=id=>(S.fx[id]||0)>now();
 /* 強化 */
 const lvOf=(k,i)=>(S.enh[k]&&S.enh[k][i])||0;
@@ -3798,8 +3946,8 @@ function useCon(id){ const it=CONS.find(x=>x.id===id); if(!it||(S.inv[id]||0)<=0
   S.inv[id]--; c.persist(); c.Snd.coin(); if(id!=='lure') c.toast(it.i+' '+it.n+' 生效 '+it.min+' 分鐘','good'); }
 function useLeader(){ if((S.inv.leader||0)>0){ S.inv.leader--; c.persist(); return true; } return false; }
 /* 外觀 */
-function applySkins(){ const rs=SKINS.rod.find(s=>s.id===S.skin.rod); if(rs&&rs.c) c.P.setRodLook(rs.c,!!rs.gold);
-  const bs=SKINS.bob.find(s=>s.id===S.skin.bob)||SKINS.bob[0], ch=c.P.bobber.children; ch[0].material.color.setHex(bs.t); ch[1].material.color.setHex(bs.b); }
+function applySkins(){ const rs=SKINS.rod.find(s=>s.id===S.skin.rod); if(rs&&rs.c) c.P.setRodLook(rs.c,!!rs.gold,rs.id);
+  const bs=SKINS.bob.find(s=>s.id===S.skin.bob)||SKINS.bob[0]; c.P.setFloatLook(bs.t,bs.b,bs.id); }
 /* 介面 */
 const row=(name,sub,right)=>`<div class="row"><div class="nm"><b>${name}</b><small>${sub}</small></div><div class="rt">${right}</div></div>`;
 const matLine=()=>`<div class="note">${Object.keys(MATS).map(k=>MATS[k].i+' '+MATS[k].n+' '+(S.mat[k]||0)).join('　')}</div>`;
@@ -3827,12 +3975,13 @@ function render(tab,GEAR){
     h+=CONS.map(it=>{ const n=S.inv[it.id]||0, act=fxOn(it.id)?`（剩 ${Math.ceil((S.fx[it.id]-now())/60000)} 分）`:'';
       return row(`${it.i} ${it.n} <small class="cnt">×${n}</small>`,it.d+act,`<div class="bb"><button class="sbtn" data-a="buyc" data-v="${it.id}">+1 🪙${it.p}</button>${n>0&&it.id!=='leader'?`<button class="sbtn pri" data-a="usec" data-v="${it.id}">使用</button>`:''}</div>`); }).join('');
   } else if(tab==='skin'){
-    h+='<div class="note">釣竿配色（不影響數值）</div>';
+    const pr=previewSkin.rod||S.skin.rod,pb=previewSkin.bob||S.skin.bob,rodStyle=SKINS.rod.find(x=>x.id===pr)||SKINS.rod[0],bobStyle=SKINS.bob.find(x=>x.id===pb)||SKINS.bob[0];
+    h+=`<div class="finish-preview"><div><canvas id="rodFinishPreview" role="img" aria-label="${rodStyle.n}釣竿與捲線器細節"></canvas><b>${rodStyle.n}</b><small>握把與捲線器細節</small></div><div><canvas id="bobFinishPreview" role="img" aria-label="${bobStyle.n}浮標細節"></canvas><b>${bobStyle.n}</b><small>浮身與天線</small></div></div><div class="note">先按「預覽」看細節；預覽不會購買或換裝。</div><div class="note">釣竿材質與配色（不影響數值）</div>`;
     h+=SKINS.rod.map(s=>{ const own=S.skinOwn.rod.includes(s.id), on=S.skin.rod===s.id;
-      return row(`<span class="sw" style="background:${s.c||'#1d4fb8'}"></span>${s.n}`,s.gold?'附金色導環':'',on?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="skine" data-v="rod:${s.id}">換上</button>`:`<button class="sbtn pri" data-a="skinb" data-v="rod:${s.id}">🪙 ${s.p.toLocaleString()}</button>`); }).join('');
+      return row(`<span class="sw" style="background:${s.c||'#1d4fb8'}"></span>${s.n}`,(TACKLE_FINISHES[s.id==='def'?'factory':s.id]||TACKLE_FINISHES.factory).desc,`<div class="bb"><button class="sbtn" data-a="skinp" data-v="rod:${s.id}">預覽</button>`+(on?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="skine" data-v="rod:${s.id}">換上</button>`:`<button class="sbtn pri" data-a="skinb" data-v="rod:${s.id}">🪙 ${s.p.toLocaleString()}</button>`)+`</div>`); }).join('');
     h+='<div class="note" style="margin-top:12px">浮標造型</div>';
     h+=SKINS.bob.map(s=>{ const own=S.skinOwn.bob.includes(s.id), on=S.skin.bob===s.id, hx=n=>'#'+n.toString(16).padStart(6,'0');
-      return row(`<span class="sw" style="background:linear-gradient(${hx(s.t)} 50%,${hx(s.b)} 50%)"></span>${s.n}`,'',on?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="skine" data-v="bob:${s.id}">換上</button>`:`<button class="sbtn pri" data-a="skinb" data-v="bob:${s.id}">🪙 ${s.p.toLocaleString()}</button>`); }).join('');
+      return row(`<span class="sw" style="background:linear-gradient(${hx(s.t)} 50%,${hx(s.b)} 50%)"></span>${s.n}`,s.id==='gold'?'金色金屬漆・清漆表面':'雙色塗裝・亮光保護漆',`<div class="bb"><button class="sbtn" data-a="skinp" data-v="bob:${s.id}">預覽</button>`+(on?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="skine" data-v="bob:${s.id}">換上</button>`:`<button class="sbtn pri" data-a="skinb" data-v="bob:${s.id}">🪙 ${s.p.toLocaleString()}</button>`)+`</div>`); }).join('');
   } else if(tab==='market'){
     const left=86400000-(now()%86400000);
     h+=`<div class="note">今日魚市行情（${fmtT(left)} 後更新）。賣出時自動套用。</div>`;
@@ -3849,9 +3998,10 @@ function click(a,v,GEAR){
   if(a==='merch'){ const o=offers().find(x=>x.id===v); if(!o||bought().includes(v)) return true; if(S.coins<o.p){ c.toast('金幣不夠','bad'); return true; }
     S.coins-=o.p; const g=o.give; for(const k in g.inv||{}) S.inv[k]=(S.inv[k]||0)+g.inv[k]; for(const k in g.bait||{}) S.baits[k]=(S.baits[k]||0)+g.bait[k]; for(const k in g.mat||{}) S.mat[k]=(S.mat[k]||0)+g.mat[k];
     S.merch={[rot()]:[...bought(),v]}; c.persist(); c.setCoins(); c.Snd.coin(); c.toast('買到了：'+o.n,'good'); return true; }
+  if(a==='skinp'){const [k,id]=v.split(':');if(SKINS[k]&&SKINS[k].some(x=>x.id===id))previewSkin[k]=id;return true;}
   if(a==='skinb'||a==='skine'){ const [k,id]=v.split(':'), s=SKINS[k].find(x=>x.id===id);
     if(a==='skinb'){ if(S.coins<s.p){ c.toast('金幣不夠','bad'); return true; } S.coins-=s.p; S.skinOwn[k].push(id); c.Snd.coin(); }
-    S.skin[k]=id; c.persist(); c.setCoins(); c.applyRod(); return true; }
+    previewSkin[k]=id;S.skin[k]=id; c.persist(); c.setCoins(); c.applyRod(); return true; }
   return false;
 }
 /* 生效中的道具、自動調整提示位置 */
@@ -3861,7 +4011,7 @@ function tick(){ const t1=document.getElementById('top'), t2=document.getElement
   document.documentElement.style.setProperty('--hudY',Math.round(y)+'px');
   if(fxBar) fxBar.innerHTML=CONS.filter(it=>it.min&&fxOn(it.id)).map(it=>`<span>${it.i} ${Math.ceil((S.fx[it.id]-now())/60000)}分</span>`).join('')+(fxOn('meal_str')?`<span>💪 ${Math.ceil((S.fx.meal_str-now())/60000)}分</span>`:''); }
 setInterval(tick,1000); window.addEventListener('resize',tick); setTimeout(tick,300);
-return {fxOn,enhance,drop,dropItem,lastDrop:()=>lastD,priceMul,useLeader,applySkins,render,click,matLine};
+return {preview:()=>{c.P.previewFinish(document.getElementById('rodFinishPreview'),'rod',previewSkin.rod||S.skin.rod);c.P.previewFinish(document.getElementById('bobFinishPreview'),'bob',previewSkin.bob||S.skin.bob);},fxOn,enhance,drop,dropItem,lastDrop:()=>lastD,priceMul,useLeader,applySkins,render,click,matLine};
 }
 /* ===== 真實 3D 模型（Sketchfab CC-BY，作者見設定頁） ===== */
 const REAL_DIR='models/';
@@ -4023,24 +4173,8 @@ function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene
   const rc=new T.Raycaster(new T.Vector3(0,100,0),new T.Vector3(0,-1,0)); const hit=rc.intersectObject(wrap,true)[0];
   const deck=hit?hit.point.y:1.6;
   obj.traverse(m=>{ m.frustumCulled=false; if(m.isMesh) m.castShadow=false; });
-  // 船的材質升級：原模型貼圖只有 128～256 像素。依材質實際顏色分類：木甲板換成實拍柚木板（含法線、粗糙度）、白色船身換成亮面玻璃纖維漆（清漆反光）、金屬換成拋光不鏽鋼
-  try{ const TL=new T.TextureLoader(), tx=(f,r,srgb)=>{ const t=TL.load(f); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(r,r); if(srgb) t.encoding=T.sRGBEncoding; t.anisotropy=8; return t; };
-    const teak=new T.MeshStandardMaterial({map:tx('dock_diff.jpg',3,true),normalMap:tx('dock_nor.jpg',3),roughnessMap:tx('dock_rough.jpg',3),color:0xc9a27a,roughness:.85});
-    const gel=new T.MeshPhysicalMaterial({color:0xf2f4f5,roughness:.22,metalness:0,clearcoat:1,clearcoatRoughness:.06});
-    const steel=new T.MeshStandardMaterial({color:0xd9dde1,metalness:1,roughness:.18});
-    const navy=new T.MeshPhysicalMaterial({color:0x1b2a44,roughness:.25,metalness:0,clearcoat:1,clearcoatRoughness:.08});
-    const vinylTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d'); x.fillStyle='#e9e6df'; x.fillRect(0,0,64,64); for(let i=0;i<900;i++){ x.fillStyle=Math.random()<.5?'rgba(0,0,0,.05)':'rgba(255,255,255,.07)'; x.fillRect(Math.random()*64,Math.random()*64,1,1); } const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(6,6); return t; })();
-    const vinyl=new T.MeshStandardMaterial({color:0xffffff,map:vinylTex,bumpMap:vinylTex,bumpScale:.003,roughness:.62});
-    const cvs=document.createElement('canvas'); cvs.width=cvs.height=8; const g2=cvs.getContext('2d');
-    const avg=t=>{ try{ g2.clearRect(0,0,8,8); g2.drawImage(t.image,0,0,8,8); const d=g2.getImageData(0,0,8,8).data; let r=0,g=0,b=0; for(let i=0;i<d.length;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; } const n=d.length/4; return [r/n,g/n,b/n]; }catch(e){ return null; } };
-    const memo=new Map();
-    obj.traverse(m=>{ if(!m.isMesh||!m.material) return; const mm=m.material; if(memo.has(mm)){ m.material=memo.get(mm); return; } let out=mm;
-      if(mm.metalness>.6&&!mm.map) out=(mm.color&&(mm.color.r+mm.color.g+mm.color.b)<.5)?navy:steel;   // 很暗的金屬色其實是深藍船身漆，不是不鏽鋼
-      else if(mm.map&&mm.map.image){ const c=avg(mm.map); if(c){ const [r,g,b]=c, mx=Math.max(r,g,b), mn=Math.min(r,g,b);
-          if(r>g&&g>b&&r-b>30&&mx<210) out=teak; else if(mn>175&&mx-mn<30) out=gel;
-          else if(b>r+15&&mx<140) out=navy;   // 深藍船身：換成深藍亮面漆（清漆反光）
-          else if(mx-mn<22&&mx>95&&mx<=175) out=vinyl; } }   // 灰白座墊、帆布：換成船用防水皮革（細紋、半霧面）
-      memo.set(mm,out); m.material=out; if(window.__YDBG) console.log('YM',mm.name,out===teak?'teak':out===gel?'gel':out===navy?'navy':out===vinyl?'vinyl':out===steel?'steel':'keep',mm.map&&mm.map.image?avg(mm.map).map(v=>v|0).join(','):'-',(mm.color&&mm.color.getHexString())); }); }catch(e){ console.warn('yacht mats',e); }
+  const marine=createMarineMaterials(T);dressYacht(T,obj,marine);addMarineHardware(T,wrap,deck,marine);
+
   host.children.slice().forEach(ch=>{ ch.visible=false; }); host.add(wrap);
   const b3=new T.Box3().setFromObject(wrap); setHull(Math.max(Math.abs(b3.min.x),b3.max.x),b3.min.z,b3.max.z);
   spots.forEach(s=>{ if(s.yacht) s.eye=deck+1.62; }); }); }
@@ -6177,7 +6311,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261031193139'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261031200632'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8316,7 +8450,7 @@ window.__gfxCap=()=>Math.min(window.devicePixelRatio||1,2.5);
 window.__applyGfx=q=>{ window.__GFX=q; const dpr=window.devicePixelRatio||1;
   // 高：手機原生解析度＋完整倒影；中：約 6 成解析度＋簡化倒影；低：約 4 成解析度、沒有倒影（最省電，畫面會明顯變糊）
   const pr={high:Math.min(dpr,2.5),mid:Math.min(dpr,2.5)*.62,low:Math.min(dpr,2.5)*.42,auto:Math.min(dpr,2.5)}[q]||dpr;
-  if(W.setRefl) W.setRefl(q!=='low',q==='mid'?.32:q==='high'?.65:.5); W.setPR(Math.max(.6,pr));
+  if(W.setShadows) W.setShadows(q); if(W.setRefl) W.setRefl(q!=='low',q==='mid'?.32:q==='high'?.65:.5); W.setPR(Math.max(.6,pr));
   document.body.dataset.gfx=q; if(window.__toastGfx) window.__toastGfx(q); };
 window.__applyGfx(save.gfx||'auto');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,held:()=>G.held,grind:()=>Snd.grind&&Snd.grind(),splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
@@ -8692,7 +8826,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
   { const z=WL.zoneId?WL.zoneId():'', tgt=G.loc==='ice'?[.03,.08,.12]:G.loc==='sea'?(z==='reef'?[.02,.2,.25]:[.01,.08,.2]):[.04,.13,.15], v=SEE_U.value, k=Math.min(1,dt*1.5);   // 水下物體混入的水色依地點
     v.set(v.x+(tgt[0]-v.x)*k,v.y+(tgt[1]-v.y)*k,v.z+(tgt[2]-v.z)*k); }
   { const zr=WL.zoneId&&WL.zoneId()==='reef'?1:0, k=Math.min(1,dt*.8); W.U.uReef.value+=(zr-W.U.uReef.value)*k;
-    const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.012,.12,.30),k); }
+    const sc=W.U.uSeaCol.value; if(zr) sc.lerp(tvSea.set(.02,.30,.40),k); else sc.lerp(tvSea.set(.008,.065,.115),k); }
   if(G.look){ if(G.t>G.look.until){ G.yawT=clamp(G.look.prev,-.95,.95); G.look=null; }
     else { let a=Math.atan2(-(G.look.x-G.base.x),-(G.look.z-G.base.z))-G.head; while(a-G.yaw>Math.PI) a-=Math.PI*2; while(a-G.yaw<-Math.PI) a+=Math.PI*2; G.yawT=a; if(G.look.snap){ G.yaw=a; G.look.snap=false; } } }
   G.yaw+=(G.yawT-G.yaw)*Math.min(1,dt*(G.look?9:st==='fight'?2.5:6)); W.player.rotation.y=G.head+G.yaw;

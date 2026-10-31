@@ -439,6 +439,7 @@ function render(){
       return row(lock?'🔒 '+(s.req?'？？？':s.name):(s.yacht?'🛥️ ':s.kayak?'🛶 ':s.loc==='ice'?'❄️ ':'🪵 ')+s.name,lock?(s.req?'只在月光下才看得見的地方':'跟著老漁人的手記前進，就會找到這裡'):s.sub,btn); }).join('');
   }
   shB.innerHTML=h;
+  if(cur==='shop'&&shopTab==='skin')requestAnimationFrame(()=>ECO.preview());
   { const dsp=cur==='log'&&dexSel&&SPECIES.find(s=>s.id===dexSel); if(dsp) DEXV.show(dsp,$('dexCv'),!!save.dex[dsp.id]); else { DEXV.stop(); if(cur==='log') DEXV.thumbs(SPECIES.map(s=>[s,!!save.dex[s.id]])); } }
 }
 // 圖鑑詳細頁：未釣獲只給出沒線索，釣獲後顯示完整資料

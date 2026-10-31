@@ -97,11 +97,16 @@ reeds.userData.lake=true; scene.add(reeds);
 
 /* ---------- 釣竿（藍色碳纖竿、導環、紡車捲線器） ---------- */
 const rod={pitch:0, pitchT:0, side:0, bend:0, bendT:0, spin:0, end:null, tipW:new T.Vector3(), spoolW:new T.Vector3(), guidesW:[]};
-const R_BASE=new T.Vector3(...FISHING_VIEW.rodBase), R_DIR=new T.Vector3(...FISHING_VIEW.rodDirection).normalize(), R_LEN=2.65, NS=20;
+const R_BASE=new T.Vector3(...FISHING_VIEW.rodBase), R_DIR=new T.Vector3(...FISHING_VIEW.rodDirection).normalize(), R_LEN=2.65, NS=36;
 // 真實釣竿材質：碳纖編織紋竿身＋透明亮光漆、EVA 發泡握把（細小氣孔）、捲線器線杯纏著一圈圈釣線
 const texC=(w,h,draw,rx,ry)=>{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; draw(cv.getContext('2d'),w,h); const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx||1,ry||1); return t; };
-const carbonTex=texC(64,64,(g,w,h)=>{ g.fillStyle='#16181c'; g.fillRect(0,0,w,h); for(let y=0;y<h;y+=8) for(let x=0;x<w;x+=8){ const on=((x+y)/8)%2===0, gr=g.createLinearGradient(x,y,on?x+8:x,on?y:y+8); gr.addColorStop(0,'#1c1f24'); gr.addColorStop(.5,on?'#3a414b':'#2c323a'); gr.addColorStop(1,'#1c1f24'); g.fillStyle=gr; g.fillRect(x+.5,y+.5,7,7); } },3,4);
+const carbonTex=texC(256,256,(g,w,h)=>{ g.fillStyle='#d0d1d3'; g.fillRect(0,0,w,h); for(let y=0;y<h;y+=8) for(let x=0;x<w;x+=8){ const on=((x+y)/8)%2===0, gr=g.createLinearGradient(x,y,on?x+8:x,on?y:y+8); gr.addColorStop(0,'#7c8087'); gr.addColorStop(.5,on?'#c5c8cc':'#a1a7ae'); gr.addColorStop(1,'#868b91'); g.fillStyle=gr; g.fillRect(x+.5,y+.5,7,7); } },3,4);
+carbonTex.encoding=T.sRGBEncoding;carbonTex.anisotropy=8;
+const weaveTex=texC(128,128,(g,w,h)=>{for(let y=0;y<h;y++)for(let x=0;x<w;x++){const n=128+26*Math.sin((x+y)*Math.PI/4)*Math.sin((x-y)*Math.PI/4);g.fillStyle=`rgb(${n},${n},${n})`;g.fillRect(x,y,1,1);}},3,4);
+const brushedTex=texC(128,128,(g,w,h)=>{for(let y=0;y<h;y++){const n=128+12*Math.sin(y*2.91)+5*Math.sin(y*9.3);g.fillStyle=`rgb(${n},${n},${n})`;g.fillRect(0,y,w,1);}},1,3);
+const finishAssets={carbon:carbonTex,weave:weaveTex,brushed:brushedTex};
 const evaTex=texC(64,64,(g,w,h)=>{ g.fillStyle='#202124'; g.fillRect(0,0,w,h); for(let i=0;i<500;i++){ g.fillStyle=Math.random()<.5?'rgba(0,0,0,.55)':'rgba(70,72,78,.35)'; g.beginPath(); g.arc(Math.random()*w,Math.random()*h,Math.random()*1.3+.3,0,7); g.fill(); } },2,6);
+evaTex.encoding=T.sRGBEncoding;
 const blankMat=new T.MeshPhysicalMaterial({color:0xffffff,map:carbonTex,metalness:.25,roughness:.38,clearcoat:1,clearcoatRoughness:.05});
 const gripMat=new T.MeshStandardMaterial({color:0xffffff,map:evaTex,bumpMap:evaTex,bumpScale:.002,roughness:.92});
 const chromeMat=new T.MeshStandardMaterial({color:0xdde2e6, metalness:1, roughness:.16});
@@ -124,12 +129,19 @@ const reel=new T.Group(); rodGroup.add(reel);
 { const foot=new T.Mesh(new T.BoxGeometry(.05,.008,.012),darkMetal); foot.position.y=-.016; reel.add(foot);
   const stem=new T.Mesh(new T.BoxGeometry(.012,.05,.01),darkMetal); stem.position.y=-.045; reel.add(stem);
   const body=new T.Mesh(new T.CylinderGeometry(.027,.031,.055,18),darkMetal); body.rotation.z=Math.PI/2; body.position.set(-.006,-.085,0); reel.add(body);
-  const spool=new T.Mesh(new T.CylinderGeometry(.028,.028,.03,22),blueAno); spool.rotation.z=Math.PI/2; spool.position.set(.04,-.085,0); reel.add(spool);
+  const spool=new T.Mesh(new T.CylinderGeometry(.028,.028,.03,22),blueAno); spool.name='tackleSpool';spool.rotation.z=Math.PI/2; spool.position.set(.04,-.085,0); reel.add(spool);
   const lip=new T.Mesh(new T.CylinderGeometry(.031,.031,.004,22),chromeMat); lip.rotation.z=Math.PI/2; lip.position.set(.056,-.085,0); reel.add(lip);
   const bail=new T.Mesh(new T.TorusGeometry(.034,.0016,6,20,Math.PI),chromeMat); bail.rotation.y=Math.PI/2; bail.position.set(.044,-.085,0); reel.add(bail); }
+reel.name='tackleReel';
 const crank=new T.Group(); crank.position.set(-.008,-.085,.034); reel.add(crank);
 { const arm=new T.Mesh(new T.BoxGeometry(.006,.055,.005),darkMetal); arm.position.y=-.024; crank.add(arm);
   const knob=new T.Mesh(new T.CylinderGeometry(.008,.008,.022,12),gripMat); knob.rotation.x=Math.PI/2; knob.position.set(0,-.05,.014); crank.add(knob); }
+// Machined reel details: rotor, line-roller, drag dial and fastener heads.
+for(const x of [.025,.058]){const ring=new T.Mesh(new T.TorusGeometry(.029,.0012,8,40),chromeMat);ring.rotation.y=Math.PI/2;ring.position.set(x,-.085,0);reel.add(ring);}
+const dragDial=new T.Mesh(new T.CylinderGeometry(.014,.018,.009,32),darkMetal);dragDial.rotation.z=Math.PI/2;dragDial.position.set(.064,-.085,0);reel.add(dragDial);
+for(let k=0;k<12;k++){const a=k*Math.PI/6,m=new T.Mesh(new T.SphereGeometry(.0015,6,4),chromeMat);m.position.set(.07,-.085+Math.cos(a)*.013,Math.sin(a)*.013);reel.add(m);}
+for(const [mat,role]of[[blankMat,'blank'],[chromeMat,'trim'],[goldMat,'trim'],[darkMetal,'frame'],[gripMat,'grip'],[blueAno,'line']])mat.userData.tackleRole=role;
+blueAno.roughness=.57;blueAno.metalness=0;blueAno.clearcoat=.15;
 const pts=[]; for(let i=0;i<=NS;i++) pts.push(new T.Vector3());
 const AX=new T.Vector3(1,0,0), AY=new T.Vector3(0,1,0), AZ=new T.Vector3(0,0,1);
 const dir=new T.Vector3(), bdir=new T.Vector3(), tmp=new T.Vector3(), tmp2=new T.Vector3(), tan=new T.Vector3(), dn=new T.Vector3(), sd=new T.Vector3();
@@ -204,7 +216,7 @@ const tipMat=new T.MeshStandardMaterial({color:0xfff080, emissive:0xffb020, emis
 { const body=new T.Mesh(new T.LatheGeometry(FLOAT_PROFILE.map(([r,y])=>new T.Vector2(r,y)),28),bTopMat); bobber.add(body);
   // 天線：一節一節的彩色刻度（橘、黃綠、橘、白），浮標在水面上下時看得出吃水
   const segs=[['#ff3b10',.03],['#d8ff2a',.025],['#ff3b10',.025],['#f4f4f0',.02],['#ff3b10',.025]]; let y=.06;
-  segs.forEach(([c,h])=>{ const m=new T.Mesh(new T.CylinderGeometry(.0034,.0036,h,12),new T.MeshPhysicalMaterial({color:new T.Color(c),roughness:.3,clearcoat:1,clearcoatRoughness:.1})); m.position.y=y+h/2; bobber.add(m); y+=h; });
+  segs.forEach(([c,h])=>{ const m=new T.Mesh(new T.CylinderGeometry(.0034,.0036,h,12),new T.MeshPhysicalMaterial({color:new T.Color(c),roughness:.3,clearcoat:1,clearcoatRoughness:.1})); m.userData.floatAntenna=true;m.position.y=y+h/2; bobber.add(m); y+=h; });
   const tp=new T.Mesh(new T.SphereGeometry(.0055,14,10),tipMat); tp.position.y=y+.003; bobber.add(tp);
   const ring=new T.Mesh(new T.TorusGeometry(.0045,.0012,8,16),new T.MeshStandardMaterial({color:0xb8b8b8,metalness:.9,roughness:.25})); ring.position.y=-.1; ring.rotation.y=Math.PI/2; bobber.add(ring); }
 window.__FLOAT_PROFILE=FLOAT_PROFILE;
@@ -741,7 +753,32 @@ function getFish(sp){
 
 const showLight=new T.PointLight(0xfff4e8,0,6,1.2); showLight.position.set(.5,.6,.3); head.add(showLight);
 
-function setRodLook(col,gold){ blankMat.color.set(col).lerp(new T.Color(1,1,1),.5);   // 不同竿子在碳纖紋上帶一點顏色（像真的有色碳纖竿），不是整根塗成純色
-  const gm=gold?goldMat:chromeMat; guides.forEach(g=>{ g.material=gm; }); tipTop.material=gm; }
-return { dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook, rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
+let factoryRodColor='#245bb4',factoryRodGold=false,activeFloatTexture=null;
+function setRodLook(col,gold,finish='factory'){
+  if(finish==='factory'){factoryRodColor=col;factoryRodGold=gold;}
+  applyTackleFinish(T,[blankMat,chromeMat,goldMat,darkMetal],finish,col,gold,finishAssets);
+  const gm=gold?goldMat:chromeMat;guides.forEach(g=>g.material=gm);tipTop.material=gm;
+}
+function paintFloat(mat,top,bottom,id){
+ const cv=document.createElement('canvas');cv.width=32;cv.height=256;const g=cv.getContext('2d'),hex=n=>'#'+n.toString(16).padStart(6,'0');
+ g.fillStyle=hex(bottom);g.fillRect(0,0,32,256);g.fillStyle=hex(top);g.fillRect(0,0,32,104);g.fillStyle=id==='gold'?'#805815':'#292c2c';g.fillRect(0,101,32,3);
+ const t=new T.CanvasTexture(cv);t.encoding=T.sRGBEncoding;
+ mat.color.setHex(0xffffff);mat.map=t;mat.metalness=id==='gold'?.92:0;mat.roughness=id==='gold'?.24:.28;mat.clearcoat=id==='gold'?.3:1;mat.clearcoatRoughness=.1;mat.needsUpdate=true;return t;
+}
+function setFloatLook(top,bottom,id='classic'){
+ if(activeFloatTexture)activeFloatTexture.dispose();activeFloatTexture=paintFloat(bTopMat,top,bottom,id);
+ let i=0;bobber.traverse(o=>{if(o.userData.floatAntenna){o.material.color.setHex(i++%2?bottom:top).convertSRGBToLinear();o.material.metalness=id==='gold'?.8:0;o.material.roughness=.28;o.material.needsUpdate=true;}});
+}
+const previewFinish=createTacklePreview(W,(kind,id)=>{
+ const root=(kind==='rod'?rodGroup:bobber).clone(true);root.position.set(0,0,0);root.rotation.set(0,0,0);root.scale.setScalar(1);root.visible=true;
+ root.traverse(o=>{if(o.isMesh){o.material=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone();o.frustumCulled=false;}});
+ if(kind==='rod'){
+  const mats=[];root.traverse(o=>{if(o.isMesh)mats.push(...(Array.isArray(o.material)?o.material:[o.material]));});applyTackleFinish(T,mats,id==='def'?'factory':id,factoryRodColor,id==='def'?factoryRodGold:false,finishAssets);
+  root.updateMatrixWorld(true);const reel=root.getObjectByName('tackleReel');return{root,focus:reel?reel.getWorldPosition(new T.Vector3()):new T.Vector3(-.2,-.65,-1)};
+ }
+ const palette={classic:[0xd8301a,0xf2efe8],lime:[0x7cff3a,0x1a1a1a],panda:[0x111111,0xffffff],sakura:[0xff8fb8,0xfff0f5],gold:[0xd9b25a,0xf6e6b0]},colors=palette[id]||palette.classic;
+ const body=root.children[0],texture=paintFloat(body.material,colors[0],colors[1],id);let i=0;root.traverse(o=>{if(o.userData.floatAntenna){o.material.color.setHex(i++%2?colors[1]:colors[0]).convertSRGBToLinear();o.material.metalness=id==='gold'?.8:0;}});root.rotation.z=-.2;return{root,focus:new T.Vector3(0,.035,0),dispose:()=>texture.dispose()};
+});
+
+return { dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook,setFloatLook,previewFinish,rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
 }

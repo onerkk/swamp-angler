@@ -158,24 +158,8 @@ function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene
   const rc=new T.Raycaster(new T.Vector3(0,100,0),new T.Vector3(0,-1,0)); const hit=rc.intersectObject(wrap,true)[0];
   const deck=hit?hit.point.y:1.6;
   obj.traverse(m=>{ m.frustumCulled=false; if(m.isMesh) m.castShadow=false; });
-  // 船的材質升級：原模型貼圖只有 128～256 像素。依材質實際顏色分類：木甲板換成實拍柚木板（含法線、粗糙度）、白色船身換成亮面玻璃纖維漆（清漆反光）、金屬換成拋光不鏽鋼
-  try{ const TL=new T.TextureLoader(), tx=(f,r,srgb)=>{ const t=TL.load(f); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(r,r); if(srgb) t.encoding=T.sRGBEncoding; t.anisotropy=8; return t; };
-    const teak=new T.MeshStandardMaterial({map:tx('dock_diff.jpg',3,true),normalMap:tx('dock_nor.jpg',3),roughnessMap:tx('dock_rough.jpg',3),color:0xc9a27a,roughness:.85});
-    const gel=new T.MeshPhysicalMaterial({color:0xf2f4f5,roughness:.22,metalness:0,clearcoat:1,clearcoatRoughness:.06});
-    const steel=new T.MeshStandardMaterial({color:0xd9dde1,metalness:1,roughness:.18});
-    const navy=new T.MeshPhysicalMaterial({color:0x1b2a44,roughness:.25,metalness:0,clearcoat:1,clearcoatRoughness:.08});
-    const vinylTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d'); x.fillStyle='#e9e6df'; x.fillRect(0,0,64,64); for(let i=0;i<900;i++){ x.fillStyle=Math.random()<.5?'rgba(0,0,0,.05)':'rgba(255,255,255,.07)'; x.fillRect(Math.random()*64,Math.random()*64,1,1); } const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(6,6); return t; })();
-    const vinyl=new T.MeshStandardMaterial({color:0xffffff,map:vinylTex,bumpMap:vinylTex,bumpScale:.003,roughness:.62});
-    const cvs=document.createElement('canvas'); cvs.width=cvs.height=8; const g2=cvs.getContext('2d');
-    const avg=t=>{ try{ g2.clearRect(0,0,8,8); g2.drawImage(t.image,0,0,8,8); const d=g2.getImageData(0,0,8,8).data; let r=0,g=0,b=0; for(let i=0;i<d.length;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; } const n=d.length/4; return [r/n,g/n,b/n]; }catch(e){ return null; } };
-    const memo=new Map();
-    obj.traverse(m=>{ if(!m.isMesh||!m.material) return; const mm=m.material; if(memo.has(mm)){ m.material=memo.get(mm); return; } let out=mm;
-      if(mm.metalness>.6&&!mm.map) out=(mm.color&&(mm.color.r+mm.color.g+mm.color.b)<.5)?navy:steel;   // 很暗的金屬色其實是深藍船身漆，不是不鏽鋼
-      else if(mm.map&&mm.map.image){ const c=avg(mm.map); if(c){ const [r,g,b]=c, mx=Math.max(r,g,b), mn=Math.min(r,g,b);
-          if(r>g&&g>b&&r-b>30&&mx<210) out=teak; else if(mn>175&&mx-mn<30) out=gel;
-          else if(b>r+15&&mx<140) out=navy;   // 深藍船身：換成深藍亮面漆（清漆反光）
-          else if(mx-mn<22&&mx>95&&mx<=175) out=vinyl; } }   // 灰白座墊、帆布：換成船用防水皮革（細紋、半霧面）
-      memo.set(mm,out); m.material=out; if(window.__YDBG) console.log('YM',mm.name,out===teak?'teak':out===gel?'gel':out===navy?'navy':out===vinyl?'vinyl':out===steel?'steel':'keep',mm.map&&mm.map.image?avg(mm.map).map(v=>v|0).join(','):'-',(mm.color&&mm.color.getHexString())); }); }catch(e){ console.warn('yacht mats',e); }
+  const marine=createMarineMaterials(T);dressYacht(T,obj,marine);addMarineHardware(T,wrap,deck,marine);
+
   host.children.slice().forEach(ch=>{ ch.visible=false; }); host.add(wrap);
   const b3=new T.Box3().setFromObject(wrap); setHull(Math.max(Math.abs(b3.min.x),b3.max.x),b3.min.z,b3.max.z);
   spots.forEach(s=>{ if(s.yacht) s.eye=deck+1.62; }); }); }

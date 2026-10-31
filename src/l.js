@@ -17,6 +17,7 @@ const capOf=()=>Math.min(10,Math.floor((c.save.lv||1)/3));   // 強化上限：�
 const S=c.save, now=()=>Date.now();
 S.mat=S.mat||{scale:0,bone:0,pearl:0,crystal:0}; S.enh=S.enh||{rod:{},line:{},reel:{}}; S.inv=S.inv||{}; S.fx=S.fx||{};
 S.skin=S.skin||{rod:'def',bob:'classic'}; S.skinOwn=S.skinOwn||{rod:['def'],bob:['classic']}; S.merch=S.merch||{};
+const previewSkin={rod:null,bob:null};
 const fxOn=id=>(S.fx[id]||0)>now();
 /* 強化 */
 const lvOf=(k,i)=>(S.enh[k]&&S.enh[k][i])||0;
@@ -68,8 +69,8 @@ function useCon(id){ const it=CONS.find(x=>x.id===id); if(!it||(S.inv[id]||0)<=0
   S.inv[id]--; c.persist(); c.Snd.coin(); if(id!=='lure') c.toast(it.i+' '+it.n+' 生效 '+it.min+' 分鐘','good'); }
 function useLeader(){ if((S.inv.leader||0)>0){ S.inv.leader--; c.persist(); return true; } return false; }
 /* 外觀 */
-function applySkins(){ const rs=SKINS.rod.find(s=>s.id===S.skin.rod); if(rs&&rs.c) c.P.setRodLook(rs.c,!!rs.gold);
-  const bs=SKINS.bob.find(s=>s.id===S.skin.bob)||SKINS.bob[0], ch=c.P.bobber.children; ch[0].material.color.setHex(bs.t); ch[1].material.color.setHex(bs.b); }
+function applySkins(){ const rs=SKINS.rod.find(s=>s.id===S.skin.rod); if(rs&&rs.c) c.P.setRodLook(rs.c,!!rs.gold,rs.id);
+  const bs=SKINS.bob.find(s=>s.id===S.skin.bob)||SKINS.bob[0]; c.P.setFloatLook(bs.t,bs.b,bs.id); }
 /* 介面 */
 const row=(name,sub,right)=>`<div class="row"><div class="nm"><b>${name}</b><small>${sub}</small></div><div class="rt">${right}</div></div>`;
 const matLine=()=>`<div class="note">${Object.keys(MATS).map(k=>MATS[k].i+' '+MATS[k].n+' '+(S.mat[k]||0)).join('　')}</div>`;
@@ -97,12 +98,13 @@ function render(tab,GEAR){
     h+=CONS.map(it=>{ const n=S.inv[it.id]||0, act=fxOn(it.id)?`（剩 ${Math.ceil((S.fx[it.id]-now())/60000)} 分）`:'';
       return row(`${it.i} ${it.n} <small class="cnt">×${n}</small>`,it.d+act,`<div class="bb"><button class="sbtn" data-a="buyc" data-v="${it.id}">+1 🪙${it.p}</button>${n>0&&it.id!=='leader'?`<button class="sbtn pri" data-a="usec" data-v="${it.id}">使用</button>`:''}</div>`); }).join('');
   } else if(tab==='skin'){
-    h+='<div class="note">釣竿配色（不影響數值）</div>';
+    const pr=previewSkin.rod||S.skin.rod,pb=previewSkin.bob||S.skin.bob,rodStyle=SKINS.rod.find(x=>x.id===pr)||SKINS.rod[0],bobStyle=SKINS.bob.find(x=>x.id===pb)||SKINS.bob[0];
+    h+=`<div class="finish-preview"><div><canvas id="rodFinishPreview" role="img" aria-label="${rodStyle.n}釣竿與捲線器細節"></canvas><b>${rodStyle.n}</b><small>握把與捲線器細節</small></div><div><canvas id="bobFinishPreview" role="img" aria-label="${bobStyle.n}浮標細節"></canvas><b>${bobStyle.n}</b><small>浮身與天線</small></div></div><div class="note">先按「預覽」看細節；預覽不會購買或換裝。</div><div class="note">釣竿材質與配色（不影響數值）</div>`;
     h+=SKINS.rod.map(s=>{ const own=S.skinOwn.rod.includes(s.id), on=S.skin.rod===s.id;
-      return row(`<span class="sw" style="background:${s.c||'#1d4fb8'}"></span>${s.n}`,s.gold?'附金色導環':'',on?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="skine" data-v="rod:${s.id}">換上</button>`:`<button class="sbtn pri" data-a="skinb" data-v="rod:${s.id}">🪙 ${s.p.toLocaleString()}</button>`); }).join('');
+      return row(`<span class="sw" style="background:${s.c||'#1d4fb8'}"></span>${s.n}`,(TACKLE_FINISHES[s.id==='def'?'factory':s.id]||TACKLE_FINISHES.factory).desc,`<div class="bb"><button class="sbtn" data-a="skinp" data-v="rod:${s.id}">預覽</button>`+(on?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="skine" data-v="rod:${s.id}">換上</button>`:`<button class="sbtn pri" data-a="skinb" data-v="rod:${s.id}">🪙 ${s.p.toLocaleString()}</button>`)+`</div>`); }).join('');
     h+='<div class="note" style="margin-top:12px">浮標造型</div>';
     h+=SKINS.bob.map(s=>{ const own=S.skinOwn.bob.includes(s.id), on=S.skin.bob===s.id, hx=n=>'#'+n.toString(16).padStart(6,'0');
-      return row(`<span class="sw" style="background:linear-gradient(${hx(s.t)} 50%,${hx(s.b)} 50%)"></span>${s.n}`,'',on?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="skine" data-v="bob:${s.id}">換上</button>`:`<button class="sbtn pri" data-a="skinb" data-v="bob:${s.id}">🪙 ${s.p.toLocaleString()}</button>`); }).join('');
+      return row(`<span class="sw" style="background:linear-gradient(${hx(s.t)} 50%,${hx(s.b)} 50%)"></span>${s.n}`,s.id==='gold'?'金色金屬漆・清漆表面':'雙色塗裝・亮光保護漆',`<div class="bb"><button class="sbtn" data-a="skinp" data-v="bob:${s.id}">預覽</button>`+(on?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="skine" data-v="bob:${s.id}">換上</button>`:`<button class="sbtn pri" data-a="skinb" data-v="bob:${s.id}">🪙 ${s.p.toLocaleString()}</button>`)+`</div>`); }).join('');
   } else if(tab==='market'){
     const left=86400000-(now()%86400000);
     h+=`<div class="note">今日魚市行情（${fmtT(left)} 後更新）。賣出時自動套用。</div>`;
@@ -119,9 +121,10 @@ function click(a,v,GEAR){
   if(a==='merch'){ const o=offers().find(x=>x.id===v); if(!o||bought().includes(v)) return true; if(S.coins<o.p){ c.toast('金幣不夠','bad'); return true; }
     S.coins-=o.p; const g=o.give; for(const k in g.inv||{}) S.inv[k]=(S.inv[k]||0)+g.inv[k]; for(const k in g.bait||{}) S.baits[k]=(S.baits[k]||0)+g.bait[k]; for(const k in g.mat||{}) S.mat[k]=(S.mat[k]||0)+g.mat[k];
     S.merch={[rot()]:[...bought(),v]}; c.persist(); c.setCoins(); c.Snd.coin(); c.toast('買到了：'+o.n,'good'); return true; }
+  if(a==='skinp'){const [k,id]=v.split(':');if(SKINS[k]&&SKINS[k].some(x=>x.id===id))previewSkin[k]=id;return true;}
   if(a==='skinb'||a==='skine'){ const [k,id]=v.split(':'), s=SKINS[k].find(x=>x.id===id);
     if(a==='skinb'){ if(S.coins<s.p){ c.toast('金幣不夠','bad'); return true; } S.coins-=s.p; S.skinOwn[k].push(id); c.Snd.coin(); }
-    S.skin[k]=id; c.persist(); c.setCoins(); c.applyRod(); return true; }
+    previewSkin[k]=id;S.skin[k]=id; c.persist(); c.setCoins(); c.applyRod(); return true; }
   return false;
 }
 /* 生效中的道具、自動調整提示位置 */
@@ -131,5 +134,5 @@ function tick(){ const t1=document.getElementById('top'), t2=document.getElement
   document.documentElement.style.setProperty('--hudY',Math.round(y)+'px');
   if(fxBar) fxBar.innerHTML=CONS.filter(it=>it.min&&fxOn(it.id)).map(it=>`<span>${it.i} ${Math.ceil((S.fx[it.id]-now())/60000)}分</span>`).join('')+(fxOn('meal_str')?`<span>💪 ${Math.ceil((S.fx.meal_str-now())/60000)}分</span>`:''); }
 setInterval(tick,1000); window.addEventListener('resize',tick); setTimeout(tick,300);
-return {fxOn,enhance,drop,dropItem,lastDrop:()=>lastD,priceMul,useLeader,applySkins,render,click,matLine};
+return {preview:()=>{c.P.previewFinish(document.getElementById('rodFinishPreview'),'rod',previewSkin.rod||S.skin.rod);c.P.previewFinish(document.getElementById('bobFinishPreview'),'bob',previewSkin.bob||S.skin.bob);},fxOn,enhance,drop,dropItem,lastDrop:()=>lastD,priceMul,useLeader,applySkins,render,click,matLine};
 }

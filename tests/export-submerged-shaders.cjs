@@ -16,4 +16,12 @@ const fp='uniform mat4 viewMatrix;uniform vec3 cameraPosition;uniform bool isOrt
 out.standardVS=defs+vp+expand(ps.vertexShader);out.standardFS=defs+fp+expand(ps.fragmentShader);
 out.skinnedVS=defs+'#define USE_SKINNING\n#define MAX_BONES 16\nattribute vec4 skinIndex,skinWeight;\n'+vp+expand(ps.vertexShader);
 out.standardInstVS=defs+'#define USE_INSTANCING\nattribute mat4 instanceMatrix;\n'+vp+expand(ps.vertexShader);
+// Compile the actual caulked deck shader as well as the physical tackle shader.
+const vm=require('vm'),textureLoad=T.TextureLoader.prototype.load;
+global.document={createElement:()=>({width:128,height:128,getContext:()=>({fillRect:()=>{}})})};
+T.TextureLoader.prototype.load=()=>new T.Texture();vm.runInThisContext(fs.readFileSync(require.resolve('../src/marine.js'),'utf8'));
+const marine=createMarineMaterials(T),deck={uniforms:{},vertexShader:T.ShaderLib.standard.vertexShader,fragmentShader:T.ShaderLib.standard.fragmentShader};marine.teak.onBeforeCompile(deck,{});
+out.marineVS=defs+vp+expand(deck.vertexShader);out.marineFS=defs+fp+expand(deck.fragmentShader);
+out.physicalFS=defs+'#define PHYSICAL\n'+fp+expand(T.ShaderLib.physical.fragmentShader);
+T.TextureLoader.prototype.load=textureLoad;
 process.stdout.write(JSON.stringify(out));
