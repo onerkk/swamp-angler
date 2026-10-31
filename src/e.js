@@ -400,8 +400,6 @@ function render(){
     if(!save.yacht){ const ok=window.__STORY&&window.__STORY.done('c5'), m=save.mat||{}, need=BOAT_COST, have=k=>(m[k]||0)>=need[k];
       h+=ok?row('🛥️ 修復老漁人的漁船',`停在河口船塢的舊漁船，修好就能出海。需要 🪙 ${need.coins.toLocaleString()}、魚鱗 ${need.scale}（有 ${m.scale||0}）、魚骨 ${need.bone}（有 ${m.bone||0}）、珍珠 ${need.pearl}（有 ${m.pearl||0}）`,`<button class="sbtn pri" data-a="yacht"${save.coins>=need.coins&&have('scale')&&have('bone')&&have('pearl')?'':' disabled'}>修復</button>`)
           :row('🔒 ？？？的漁船','完成主線第六章「月潮」後，霜汐會告訴你它在哪裡','<span class="lk">第六章後</span>'); }
-    { const G2=window.__G, atHome=G2&&G2.state==='home', ok=!window.__HOMEOK||window.__HOMEOK();   /* 地圖第一列：回老漁人的小屋（任何釣點都能直接回去） */
-      h+=row('🏠 老漁人的小屋',ok?'魚缸、標本牆、壁爐、烤魚，還有老漁人留下的東西':'完成主線第一章後就能回來整理',atHome?'<span class="eqd">目前位置</span>':ok?'<button class="sbtn pri" data-a="home">回家</button>':'<span class="lk">第一章後</span>'); }
     { const tl=window.__TIDE, hh=(window.__G&&window.__G.hour)||0, low=tl&&tl.low(hh), nx=tl?tl.nextLow(hh):0;   // 潮間帶：退潮時才能去
       h+=row('🦀 蚵仔寮潮間帶',low?'退潮中！看泥面痕跡，挖文蛤、赤嘴蛤、竹蟶、海瓜子、沙蟹':'滿潮中，下次退潮 '+String(Math.floor(nx%24)).padStart(2,'0')+':'+(nx%1?'30':'00'),low?'<button class="sbtn pri" data-a="tide">下灘</button>':'<span class="lk">等退潮</span>'); }
     h+=SPOTS.map((s,i)=>{ const why=window.__STORY?window.__STORY.lock(i):null, lock=window.__STORY?!!why:(save.lv<s.lv||(s.req==='mer1'&&!(save.mer&&save.mer.n>=1))), need=(s.kayak&&!save.kayak)||(s.yacht&&!save.yacht), here=c.curSpot()===i;
