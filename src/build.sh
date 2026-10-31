@@ -2,10 +2,23 @@
 # 組裝 index.html，並替這次部署蓋上同一個版本號：網頁內 APP_VER、version.json、sw.js 的快取版本
 set -e
 cd "$(dirname "$0")"
-JS="assist.js graphics.js presentation.js physics.js landing.js shop.js water.js submerged.js surface-life.js finishes.js marine.js b.js mer.js human.js c.js e.js f.js g.js h.js i.js j.js k.js l.js m.js stars.js n.js o.js p.js q.js r.js s.js t.js u.js v.js w.js x.js y.js z.js tut.js sch.js tide.js d.js"
+JS="assist.js graphics.js presentation.js physics.js landing.js shop.js water.js optics.js submerged.js surface-life.js finishes.js marine.js b.js mer.js human.js c.js e.js f.js g.js h.js i.js j.js k.js l.js m.js stars.js n.js o.js p.js q.js r.js s.js t.js u.js v.js w.js x.js y.js z.js tut.js sch.js tide.js d.js"
 cat scan.js $JS > /tmp/all.js && node --check /tmp/all.js
 python3 tools/lintc.py >/dev/null
-STAMP=$(date +%Y%m%d%H%M%S)
+STAMP=$(python3 - <<'BUILDSTAMP'
+from datetime import datetime,timedelta,timezone
+import json,subprocess
+now=datetime.now(timezone.utc).replace(tzinfo=None)
+try:
+    versions=[json.load(open('../version.json'))['v']]
+    try:versions.append(json.loads(subprocess.check_output(['git','show','HEAD:version.json'],cwd='..'))['v'])
+    except subprocess.CalledProcessError:pass
+    previous=max(datetime.strptime(v,'%Y%m%d%H%M%S')for v in versions)
+    now=max(now,previous+timedelta(seconds=1))
+except (OSError,ValueError,KeyError):pass
+print(now.strftime('%Y%m%d%H%M%S'))
+BUILDSTAMP
+)
 # 主程式拆成兩個檔案，從 jsDelivr CDN 下載（比 GitHub 快約 8 倍）；index.html 只剩畫面與一小段載入器
 # 每個檔案第一行標上這次的版本號：CDN 還沒更新（舊版）時自動改從本站下載，絕不執行到舊程式
 { echo "/*APPV:$STAMP*/"; cat scan.js; } > ../app_scan.js

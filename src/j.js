@@ -49,7 +49,7 @@ if(T.GLTFLoader) new T.GLTFLoader().load('rock_moss_set_01.glb',gl=>{
     const g=new T.Group(),o=rock.clone(true); o.position.set(0,0,0); g.add(o); g.updateMatrixWorld(true);
     let b=new T.Box3().setFromObject(g),sz=b.getSize(new T.Vector3()),ct=b.getCenter(new T.Vector3());
     o.position.sub(ct); g.scale.setScalar(h/Math.max(.01,sz.y)); g.position.set(x,-h*.28,z); reefRoot.add(g);
-    W.fishingPhysics.addObject(g,()=>reefRoot.visible,'礁岩');
+    W.fishingPhysics.addObject(g,()=>reefRoot.visible,'礁岩');W.optics.add(g);W.submerged.add(g);
   }
 });
 const hullCollider=W.fishingPhysics.addBox({x:-HX,y:-.8,z:HZ0},{x:HX,y:1.7,z:HZ1},()=>yacht.visible,'船體');
@@ -66,9 +66,9 @@ function makeDolphin(){ const g=new T.Group();
   const fl=new T.Shape(); fl.moveTo(0,0); fl.quadraticCurveTo(.2,-.1,.38,-.22); fl.quadraticCurveTo(.15,-.18,0,-.08); fl.quadraticCurveTo(-.15,-.18,-.38,-.22); fl.quadraticCurveTo(-.2,-.1,0,0);
   const tail=new T.Mesh(new T.ShapeGeometry(fl),dMat); tail.rotation.x=-Math.PI/2; tail.position.set(0,0,-.92); g.add(tail);
   for(const s of [1,-1]){ const p=new T.Mesh(new T.SphereGeometry(1,10,6),dMat); p.scale.set(.16,.02,.07); p.position.set(s*.2,-.1,.35); p.rotation.y=s*.6; g.add(p); }
-  g.scale.setScalar(2.2); g.visible=false; g.traverse(o=>{ o.frustumCulled=false; }); S.add(g); return g; }
+  g.scale.setScalar(1); g.visible=false; g.traverse(o=>{ o.frustumCulled=false; }); S.add(g); return g; }
 const dolphins=[]; for(let i=0;i<6;i++) dolphins.push({g:makeDolphin(),ph:0,t:0,on:false});
-if(window.__MDL) dolphins.forEach(o=>window.__MDL.attach(o.g,'dolphin',{len:2.4,target:'+z',clip:'Swim'}));
+if(window.__MDL) dolphins.forEach(o=>window.__MDL.attach(o.g,'dolphin',{len:2.4,target:'+z',clip:'Swim',onLoad:()=>{W.optics.add(o.g);W.submerged.add(o.g);o.bounds=marineBodyBounds(T,o.g);}}));
 
 /* ---------- 鯨魚（座頭鯨） ---------- */
 const wTex=gradTex([34,40,48],[180,186,190],.35);
@@ -77,14 +77,14 @@ const whale=new T.Group(); whale.visible=false; whale.rotation.order='YXZ'; S.ad
 { const b=new T.Mesh(new T.SphereGeometry(1,32,20),wMat); b.scale.set(1.6,1.5,7); whale.add(b);
   for(const s of [1,-1]){ const f=new T.Mesh(new T.SphereGeometry(1,12,8),wMat); f.scale.set(2.6,.12,.5); f.position.set(s*2.4,-.6,2.5); f.rotation.set(0,s*.5,s*-.3); whale.add(f); } }
 // 座頭鯨（使用者提供側面、俯視設定圖生成）：模型原本頭朝上，載入後自動綁骨，再轉成水平、頭朝 +z
-let whaleRig=null; const WP={tail:.18,tailF:1.2,bend:0,arch:0};
+let whaleBounds=null;let whaleRig=null; const WP={tail:.18,tailF:1.2,bend:0,arch:0};
 let whaleLoaded=false; function loadWhale(){ if(whaleLoaded||!T.GLTFLoader) return; whaleLoaded=true;   // 鯨魚模型 8.6MB：第一次出海才下載
  new T.GLTFLoader().load('models/whale2.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material.roughness=.42; m.material.metalness=.05; } } });
   o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(13/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
   const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-c2.y,-c2.z);
   const holder=new T.Group(); holder.add(o); holder.updateMatrixWorld(true); try{ whaleRig=autoRig(o,'tail'); }catch(e){ console.warn('whale rig',e); }
   const turn=new T.Group(); turn.rotation.set(-Math.PI/2,Math.PI,0,'YXZ'); turn.add(holder);
-  whale.children.forEach(ch=>{ ch.visible=false; }); whale.add(turn); whale.userData.real=true; },undefined,()=>{ if(window.__MDL) window.__MDL.attach(whale,'whale',{len:13,target:'+z'}); }); }
+  whale.children.forEach(ch=>{ ch.visible=false; }); whale.add(turn); whale.userData.real=true;W.optics.add(whale);W.submerged.add(whale);whaleBounds=marineBodyBounds(T,whale); },undefined,()=>{ if(window.__MDL) window.__MDL.attach(whale,'whale',{len:13,target:'+z',onLoad:()=>{W.optics.add(whale);W.submerged.add(whale);whaleBounds=marineBodyBounds(T,whale);}}); }); }
 const fluke=new T.Group(); fluke.visible=false; S.add(fluke);
 { const sh=new T.Shape(); sh.moveTo(0,.25); sh.quadraticCurveTo(-1.2,.5,-2.6,1.6); sh.quadraticCurveTo(-1.7,.6,-1.5,0); sh.quadraticCurveTo(-1.7,-.6,-2.6,-1.6); sh.quadraticCurveTo(-1.2,-.5,0,-.25); sh.lineTo(0,.25);
   const f=new T.Mesh(new T.ShapeGeometry(sh,14),wMat); f.rotation.z=-Math.PI/2; f.position.y=2.6; fluke.add(f);
@@ -110,10 +110,10 @@ const foamTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.heig
   for(let i=0;i<900;i++){ const a=Math.random()*6.283, r=70+Math.random()*55*Math.random()+Math.random()*40, x=128+Math.cos(a)*r*.95, y=128+Math.sin(a)*r*.95, s2=1+Math.random()*4; g.fillStyle=`rgba(255,255,255,${.15+Math.random()*.5})`; g.beginPath(); g.arc(x,y,s2,0,7); g.fill(); }
   const rg=g.createRadialGradient(128,128,10,128,128,128); rg.addColorStop(0,'rgba(255,255,255,.35)'); rg.addColorStop(.6,'rgba(255,255,255,.12)'); rg.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=rg; g.fillRect(0,0,256,256); return new T.CanvasTexture(cv); })();
 const foams=[]; for(let i=0;i<4;i++){ const m=new T.Mesh(new T.PlaneGeometry(1,1).rotateX(-Math.PI/2),new T.MeshBasicMaterial({map:foamTex,transparent:true,opacity:0,depthWrite:false,color:0xf4fbff})); m.visible=false; m.renderOrder=2; S.add(m); foams.push({m,t:9,dur:1,r0:1,r1:1}); }
-function foam(x,z,r0,r1,dur){ const f=foams.find(q=>q.t>=q.dur)||foams[0]; Object.assign(f,{t:0,dur,r0,r1}); f.m.position.set(x,.06,z); f.m.rotation.y=Math.random()*6.28; f.m.visible=true; }
-function updFoam(dt){ for(const f of foams){ if(f.t>=f.dur){ f.m.visible=false; continue; } f.t+=dt; const k=f.t/f.dur, r=f.r0+(f.r1-f.r0)*(1-Math.pow(1-k,2)); f.m.scale.set(r*2,1,r*2); f.m.material.opacity=.9*(1-k); } }
+function foam(x,z,r0,r1,dur){ const f=foams.find(q=>q.t>=q.dur)||foams[0]; Object.assign(f,{t:0,dur,r0,r1}); f.m.position.set(x,W.swell(x,z,G.t)+.02,z); f.m.rotation.y=Math.random()*6.28; f.m.visible=true; }
+function updFoam(dt){ for(const f of foams){ if(f.t>=f.dur){ f.m.visible=false; continue; } f.t+=dt;f.m.position.y=W.swell(f.m.position.x,f.m.position.z,G.t)+.02; const k=f.t/f.dur, r=f.r0+(f.r1-f.r0)*(1-Math.pow(1-k,2)); f.m.scale.set(r*2,1,r*2); f.m.material.opacity=.9*(1-k); } }
 // 噴氣：一道往上衝、被風吹斜、慢慢散開的白霧柱
-function blow(x,z){ for(let k=0;k<6;k++) setTimeout(()=>{ SPRAY.emit(x,.8,z,110,.55,13,.25,1.9); MIST.emit(x,1.5+k*.6,z,26,.6,6.5,.35,3.6); },k*70); c.Snd.splash&&c.Snd.splash(.5); }
+function blow(x,z){const water=W.swell(x,z,G.t); for(let k=0;k<6;k++) setTimeout(()=>{ SPRAY.emit(x,water+.35,z,110,.55,13,.25,1.9); MIST.emit(x,water+.6+k*.6,z,26,.6,6.5,.35,3.6); },k*70); c.Snd.splash&&c.Snd.splash(.5); }
 // 巨大落水：放射狀水牆、四散水滴、白霧、泡沫圈、海面漣漪、船身震動
 function crash(x,z,big){ SPRAY.emit(x,.5,z,big?520:260,big?9:6,big?13:9,big?4:2.5,2.4); SPRAY.emit(x,.5,z,big?200:90,3,big?20:13,1.5,2.8);
   MIST.emit(x,.8,z,big?160:80,3.2,big?3.2:2,big?4:2.5,3.6); foam(x,z,big?3:2,big?22:12,big?9:6); foam(x,z,1,big?12:7,big?6:4);
@@ -125,9 +125,11 @@ function crash(x,z,big){ SPRAY.emit(x,.5,z,big?520:260,big?9:6,big?13:9,big?4:2.
 const sfMat=new T.MeshStandardMaterial({color:0x40464e,roughness:.45,side:T.DoubleSide});
 const sfin=new T.Group(); sfin.visible=false; S.add(sfin);
 { const s=new T.Shape(); s.moveTo(.35,0); s.quadraticCurveTo(.2,.45,-.15,.75); s.quadraticCurveTo(-.12,.35,-.4,0); s.lineTo(.35,0);
-if(window.__MDL){  window.__MDL.attach(fluke,'whale',{len:13,target:'+z',pitch:1.25,off:[0,-3.4,2.05]}); window.__MDL.attach(sfin,'gwhite',{len:4.2,target:'+x',top:.34,clip:'Swim'}); }
-  const m=new T.Mesh(new T.ExtrudeGeometry(s,{depth:.04,bevelEnabled:true,bevelThickness:.02,bevelSize:.02,bevelSegments:2}),sfMat); m.rotation.y=Math.PI/2; m.position.y=-.1; sfin.add(m); sfin.scale.setScalar(1.3); }
 
+  const m=new T.Mesh(new T.ExtrudeGeometry(s,{depth:.04,bevelEnabled:true,bevelThickness:.02,bevelSize:.02,bevelSegments:2}),sfMat); m.rotation.y=Math.PI/2; m.position.y=-.1; sfin.add(m); m.scale.setScalar(1.3); }
+if(window.__MDL){  window.__MDL.attach(sfin,'gwhite',{len:4.2,target:'+x',top:.34,clip:'Swim',onLoad:()=>{W.optics.add(sfin);W.submerged.add(sfin);}}); }
+
+for(const root of [whale,fluke,sfin,...dolphins.map(o=>o.g)]){W.optics.add(root);W.submerged.add(root);}
 /* ---------- 飛魚 ---------- */
 const ffMat=new T.MeshPhysicalMaterial({map:gradTex([40,70,120],[230,236,240],.5),metalness:.6,roughness:.25,clearcoat:.6,side:T.DoubleSide});
 const flyers=[]; for(let i=0;i<7;i++){ const g=new T.Group(); const b=new T.Mesh(new T.SphereGeometry(1,12,8),ffMat); b.scale.set(.05,.05,.2); g.add(b);
@@ -185,7 +187,7 @@ function endAll(){ ev.id=null; banner.classList.add('hidden'); $('bCam').classLi
   whale.visible=false; fluke.visible=false; if(!chase) sfin.visible=false; flyers.forEach(f=>{ f.on=false; f.g.visible=false; }); mets.forEach(m=>m.m.visible=false); }
 function updEv(dt,t,wx,day){
   if(c.G&&c.G.state==='home'){ if(ev.id) endAll(); return; }   // 在小屋裡不會發生、也不會提示外面的事件
-  W.camera.getWorldPosition(cw); SPRAY.tick(dt,0); MIST.tick(dt,1.2); updFoam(dt);
+  W.camera.getWorldPosition(cw);const sprayLight=Math.max(.08,Math.min(1,W.info.light));SPRAY.mat.color.setRGB(.75*sprayLight,.86*sprayLight,sprayLight);MIST.mat.color.copy(SPRAY.mat.color);for(const f of foams)f.m.material.color.copy(SPRAY.mat.color); SPRAY.tick(dt,0); MIST.tick(dt,1.2); updFoam(dt);
   if(!ev.id){ evT-=dt; if(evT<=0){ evT=loc==='sea'?rand(30,60):rand(45,90); if(c.underwater()) return;
       if(forced&&canEv(forced,day,wx)){ startEv(forced); forced=null; return; } forced=null;
       const ids=Object.keys(SCENES).filter(id=>canEv(id,day,wx)); if(ids.length) startEv(ids[Math.floor(Math.random()*ids.length)]); } return; }
@@ -196,37 +198,37 @@ function updEv(dt,t,wx,day){
   else if(ev.id==='dolphin'){ d.p.addScaledVector(d.v,dt);
     for(const o of dolphins){ if(!o.on) continue; o.t+=dt; const cy=o.cyc, ph=(o.t%cy)/cy, jump=ph>.55; const g=o.g;
       tv.copy(d.p).add(o.off); const s=(ph-.55)/.45;
-      if(jump){ g.visible=true; const h=1.6; g.position.set(tv.x+d.v.x*.1*s,4*h*s*(1-s)-.3,tv.z+d.v.z*.1*s); hullClear(g.position,1.4); g.lookAt(tv2.copy(g.position).add(d.v)); g.rotateX(-(1-2*s)*.9);
+      if(jump){ g.visible=true; const h=1.6; g.position.set(tv.x+d.v.x*.1*s,W.swell(tv.x,tv.z,t)+4*h*s*(1-s)-.6,tv.z+d.v.z*.1*s); hullClear(g.position,1.4); g.lookAt(tv2.copy(g.position).add(d.v)); g.rotateX(-(1-2*s)*.9);
         if(!o.inA&&s>.02){ o.inA=true; P.splash(g.position.x,0,g.position.z,14,.8); AT.ring(g.position.x,g.position.z,.8); }
         if(s>.96&&o.inA){ o.inA=false; P.splash(g.position.x,0,g.position.z,22,1); W.addRipple(g.position.x,g.position.z,.5); } }
-      else g.visible=false; } }
+      else {g.visible=true;const bounds=o.bounds||(o.bounds=marineBodyBounds(T,g));g.position.set(tv.x,marineSurfaceY(bounds,W.swell(tv.x,tv.z,t),.12),tv.z);g.lookAt(tv2.copy(g.position).add(d.v));} } }
   else if(ev.id==='whale'){ const p=d.p, tt=ev.t, dx=Math.sin(d.dir), dz=Math.cos(d.dir), at=(k)=>tv2.set(p.x+dx*k,0,p.z+dz*k);
     // 骨架動作：平常緩緩擺尾；躍出時尾巴猛力上下拍、身體弓起；空中扭身；落水前身體反弓
     if(whaleRig){ const br=tt>16&&tt<20.2, q=(tt-16)/3.6;
       const tail=br?(q<.45?.55:.28):.16, tf=br?(q<.45?3.4:1.6):1.1, arch=br?(q<.45?-.18:q<.75?.12:.3):0, bend=br?(q<.45?0:.18*Math.sin(q*8)):0;
       whaleRig.pose({t:tt,tail,tailF:tf,tailX:true,tailBend:bend,arch,breathe:0}); }
     // 1. 兩次換氣：背脊浮出水面、噴起高高的白霧柱
-    if(tt>1.2&&d.stage===0){ d.stage=1; const q=at(-8); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
-    if(tt>7.5&&d.stage===1){ d.stage=2; const q=at(-2); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
+    if(tt>3&&d.stage===0){ d.stage=1; const q=whale.localToWorld(new T.Vector3(0,0,4)); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
+    if(tt>9.3&&d.stage===1){ d.stage=2; const q=whale.localToWorld(new T.Vector3(0,0,4)); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
     if(tt<13){ const seg=tt<6.5?(tt-.8)/5.7:(tt-6.8)/5.7, q=at(tt<6.5?-10+tt*1.1:-4+(tt-6.8)*1.1), up=Math.sin(Math.max(0,Math.min(1,seg))*Math.PI);
-      whale.visible=seg>0&&seg<1; whale.position.set(q.x,-2.6+2.1*up,q.z); whale.rotation.set(.08-.16*seg,d.dir,0); if(whale.visible&&Math.random()<.2) SPRAY.emit(q.x,.2,q.z,6,1.5,1.2,3,1); }
+      whale.visible=seg>0&&seg<1; const bounds=whaleBounds||(whaleBounds=marineBodyBounds(T,whale)),water=W.swell(q.x,q.z,t);whale.position.set(q.x,water-bounds.max.y-.4+((bounds.max.y-bounds.min.y)*.22+.4)*up,q.z); whale.rotation.set(.08-.16*seg,d.dir,0); if(whale.visible&&Math.random()<.2) SPRAY.emit(q.x,.2,q.z,6,1.5,1.2,3,1); }
     // 2. 海面下翻起白浪：要躍出水面了（鏡頭自動轉過去）
     const bp=at(8);
     if(tt>13.5&&d.stage===2){ d.stage=3; whale.visible=false; if(window.__FACE) window.__FACE(new T.Vector3(bp.x,3,bp.z),{dur:6,pitch:.12}); foam(bp.x,bp.z,1,7,5); if(c.toast) c.toast('🐋 鯨魚要躍出水面了！','good',2200); }
     if(tt>13.5&&tt<16) { if(Math.random()<.5) SPRAY.emit(bp.x,.2,bp.z,8,2,2.5,3,1); }
     // 3. 躍身擊浪：幾乎整隻衝出海面、在空中翻身、側身重重砸回海裡
     if(tt>16&&tt<20.2){ const q=(tt-16)/3.6, qq=Math.min(1,q), y=-9+4*12*qq*(1-qq)+ (q>1?-(q-1)*20:0), fw=6*qq;
-      whale.visible=true; whale.position.set(bp.x+dx*fw,y,bp.z+dz*fw); whale.rotation.order='YXZ'; whale.rotation.set(-1.45+1.9*qq,d.dir,1.5*sstep(.2,1,qq));
+      whale.visible=true; whale.position.set(bp.x+dx*fw,W.swell(bp.x+dx*fw,bp.z+dz*fw,t)+y,bp.z+dz*fw); whale.rotation.order='YXZ'; whale.rotation.set(-1.45+1.9*qq,d.dir,1.5*sstep(.2,1,qq));
       if(d.stage===3){ d.stage=4; crash(bp.x,bp.z,false); }
       if(qq<.6&&Math.random()<.9) SPRAY.emit(whale.position.x+(Math.random()-.5)*2,Math.max(.5,whale.position.y+(Math.random()-.5)*8),whale.position.z+(Math.random()-.5)*2,10,1.6,1,1.6,1.6);
       if(q>.93&&d.stage===4){ d.stage=5; const cp=tv3.set(bp.x+dx*6.5,0,bp.z+dz*6.5); crash(cp.x,cp.z,true); } }
     else if(tt>=20.2&&tt<23) whale.visible=false;
     // 4. 最後一次換氣，舉起尾鰭慢慢潛下去
-    if(tt>23&&d.stage===5){ d.stage=6; const q=at(16); blow(q.x,q.z); }
-    if(tt>25&&tt<31){ fluke.visible=true; const q=(tt-25)/6, fp=at(18); fluke.position.set(fp.x,(q<.45?-3+6.5*sstep(0,.45,q):3.5-7*sstep(.45,1,q)),fp.z); hullClear(fluke.position,3); fluke.rotation.set(.25*(1-q),d.dir,0); fluke.scale.setScalar(1.4);
+    if(tt>23&&tt<25){const q=at(16),bounds=whaleBounds||(whaleBounds=marineBodyBounds(T,whale));whale.visible=true;whale.rotation.set(0,d.dir,0);whale.position.set(q.x,marineSurfaceY(bounds,W.swell(q.x,q.z,t),.18),q.z);if(d.stage===5){d.stage=6;whale.updateWorldMatrix(true,true);const head=whale.localToWorld(new T.Vector3(0,0,4));blow(head.x,head.z);}}else if(tt>=25)whale.visible=false;
+    if(tt>25&&tt<31){ fluke.visible=true; const q=(tt-25)/6, fp=at(9.5); fluke.position.set(fp.x,W.swell(fp.x,fp.z,t)+(q<.45?-3+6.5*sstep(0,.45,q):3.5-7*sstep(.45,1,q)),fp.z); hullClear(fluke.position,3); fluke.rotation.set(.25*(1-q),d.dir,0); fluke.scale.setScalar(1.4);
       if(q<.5&&Math.random()<.6) SPRAY.emit(fp.x,fluke.position.y+1.5,fp.z,6,.6,.5,1.6,1.4);
       if(q>.8&&d.stage===6){ d.stage=7; crash(fp.x,fp.z,false); } } else fluke.visible=false; }
-  else if(ev.id==='shark'&&!chase){ d.a+=dt*.22; const b=base(); sfin.position.set(b.x+Math.cos(d.a)*d.r,0,b.z+Math.sin(d.a)*d.r); hullClear(sfin.position,.6); sfin.rotation.y=-d.a; sfin.visible=true;
+  else if(ev.id==='shark'&&!chase){ d.a+=dt*.22; const b=base(); sfin.position.set(b.x+Math.cos(d.a)*d.r,0,b.z+Math.sin(d.a)*d.r);sfin.position.y=W.swell(sfin.position.x,sfin.position.z,t); hullClear(sfin.position,.6); sfin.rotation.y=-d.a; sfin.visible=true;
     if(Math.random()<dt*3) AT.ring(sfin.position.x,sfin.position.z,.35); }
   else if(ev.id==='flyfish'){ for(const f of flyers){ if(!f.on) continue; f.t+=dt; if(f.t<0){ f.g.visible=false; continue; } const q=f.t/1.4;
       if(q>1){ f.t=-rand(.5,2.5); P.splash(f.g.position.x,0,f.g.position.z,6,.4); f.p.add(tv.set(-Math.sin(f.a)*9,0,-Math.cos(f.a)*9)); continue; }
@@ -239,7 +241,7 @@ let chase=null, stolenF=false;
 function onHook(fd,get){ chase=null; stolenF=false; if(loc==='sea'&&fd.sp.rar>=2&&Math.random()<.2*(1-.12*(window.__TAL?window.__TAL.rank('sea'):0))&&!(window.__ECO&&window.__ECO.fxOn('repel'))) chase={delay:rand(3,7),get,p:null}; }
 function updChase(dt){ if(!chase) return; if(chase.delay>0){ chase.delay-=dt; if(chase.delay<=0){ const f=chase.get(); chase.p=new T.Vector3(f.x+rand(-14,14),0,f.z+rand(-14,14)); sfin.visible=true; c.toast('⚠️ 鯊魚衝過來了！快收線！','bad',2400); c.vib([60,60,60]); } return; }
   const f=chase.get(); tv.subVectors(f,chase.p); tv.y=0; const d=tv.length(); tv.normalize(); chase.p.addScaledVector(tv,Math.min(d,1.6*dt)); hullClear(chase.p,.6);
-  sfin.position.copy(chase.p); sfin.rotation.y=Math.atan2(tv.x,tv.z)-Math.PI/2; if(Math.random()<dt*4) AT.ring(chase.p.x,chase.p.z,.4);
+  sfin.position.copy(chase.p);sfin.position.y=W.swell(sfin.position.x,sfin.position.z,G.t); sfin.rotation.y=Math.atan2(tv.x,tv.z)-Math.PI/2; if(Math.random()<dt*4) AT.ring(chase.p.x,chase.p.z,.4);
   if(!chase.q&&d<9){ chase.q=true; const back=tv.clone(); if(window.__KK) window.__KK.offerDodge(()=>{ if(chase) chase.p.addScaledVector(back,-12); if(G.f) G.f.d=Math.max(2.8,G.f.d-3); }); }
   if(d<1.2){ chase=null; sfin.visible=false; if(window.__KK) window.__KK.snatch(f.clone(),()=>{ stolenF=true; }); else stolenF=true; } }
 function endChase(){ chase=null; if(ev.id!=='shark') sfin.visible=false; }
@@ -255,11 +257,13 @@ $('bCam').addEventListener('click',()=>{ if(window.__GHOST&&window.__GHOST.onPho
   else c.toast('照片已存到下載資料夾','good');
 }catch(e){ c.toast('這個瀏覽器不支援拍照存檔','bad'); } });
 
+let marineWakeT=0;
 function update(dt,t){
   reefRoot.visible=loc==='sea'&&SPOTS[G.spot].id==='reef';
   const wx=c.wx(), day=W.info.day;
   if(wx.r>.4) lastRain=60; else lastRain=Math.max(0,lastRain-dt);
   updEv(dt,t,wx,day); updChase(dt);
+  if((marineWakeT-=dt)<=0){marineWakeT=.45;for(const root of [whale,sfin,...dolphins.map(o=>o.g)]){if(!root.visible)continue;const water=W.swell(root.position.x,root.position.z,t),b=marineBodyBounds(T,root).applyMatrix4(root.matrixWorld);if(b.min.y<water&&b.max.y>water){W.addRipple(root.position.x,root.position.z,root===whale?1.2:.35);foam(root.position.x,root.position.z,root===whale?1.8:.3,root===whale?3.5:.9,1.5);}}}
   lakeT-=dt; if(lakeT<=0){ lakeT=.25; const sea=(G.loc||loc)!=='lake'; S.children.forEach(o=>{ if(o.userData&&o.userData.lake){ const want=!sea&&!(o.userData.veg&&window.__GFX==='low'); if(o.visible!==want) o.visible=want; } }); }
   if(yacht.visible){ const b=base(); const h0=W.swell(b.x,b.z,t), fx=-Math.sin(G.head), fz=-Math.cos(G.head);
     const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);

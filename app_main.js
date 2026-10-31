@@ -1,4 +1,4 @@
-/*APPV:20261031221050*/
+/*APPV:20261031221054*/
 /* Account assistance follows the authenticated Google identity, never a saved flag. */
 function createAccountAssist(){
   let enabled=false;
@@ -198,9 +198,14 @@ function sampleWater(x,z,t,wind,sea){
 function waterWaveGLSL(){
   const n=v=>Number(v).toFixed(9);
   const lines=sea=>WATER_WAVES[sea?'sea':'lake'].map(([L,A,angle,offset])=>`waterTerm(p,clock,vec2(wd.x*${n(Math.cos(angle))}-wd.y*${n(Math.sin(angle))},wd.x*${n(Math.sin(angle))}+wd.y*${n(Math.cos(angle))}),${n(L)},${n(A)}*strength,${n(offset)},s);`).join('\n');
-  return `void waterTerm(vec2 p,float clock,vec2 d,float L,float A,float offset,inout vec3 s){float k=6.283185307/L;float phase=k*dot(d,p)-sqrt(9.81*k)*clock+offset;float slope=k*A*cos(phase);s+=vec3(d.x*slope,A*sin(phase),d.y*slope);}
+  return `
+#ifndef SWAMP_WATER_WAVES
+#define SWAMP_WATER_WAVES
+void waterTerm(vec2 p,float clock,vec2 d,float L,float A,float offset,inout vec3 s){float k=6.283185307/L;float phase=k*dot(d,p)-sqrt(9.81*k)*clock+offset;float slope=k*A*cos(phase);s+=vec3(d.x*slope,A*sin(phase),d.y*slope);}
 vec3 waterSample(vec2 p,float clock,vec3 wind,float sea){vec2 wd=length(wind.xy)>.001?normalize(wind.xy):vec2(1.0,0.0);vec3 s=vec3(0.0);float strength;
-if(sea>.5){strength=.55+1.3*wind.z+1.5*max(0.0,wind.z-.6);${lines(true)}}else{strength=.45+1.8*wind.z;${lines(false)}}return s;}`;
+if(sea>.5){strength=.55+1.3*wind.z+1.5*max(0.0,wind.z-.6);${lines(true)}}else{strength=.45+1.8*wind.z;${lines(false)}}return s;}
+#endif
+`;
 }
 function makeWaterGrid(T,radius=150,rings=112,segments=192){
   const points=[0,0,0],indices=[];
@@ -210,6 +215,50 @@ function makeWaterGrid(T,radius=150,rings=112,segments=192){
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(points,3));g.setIndex(indices);return g;
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={WATER_WAVES,sampleWater,waterWaveGLSL,makeWaterGrid};
+/* Shared water lighting: wet surfaces, Snell-projected moving caustics and depth loss. */
+function createWaterOptics(U,{surface=0,bounds=null,flat=false,strength=1}={}){
+ const T=THREE,patched=new WeakSet(),materials=new Set(),detail={value:1};
+ const uniforms={uOptTime:U.uTime,uOptWind:U.uWind,uOptSea:U.uSea,uOptLight:U.uLightCol,uOptDir:U.uSunDir,uOptSurface:{value:surface},uOptFlat:{value:flat?1:0},uOptStrength:{value:strength},uOptDetail:detail,uOptMin:{value:bounds?bounds.min:new T.Vector3(-1e6,-1e6,-1e6)},uOptMax:{value:bounds?bounds.max:new T.Vector3(1e6,1e6,1e6)}};
+ function patch(mat){
+  if(!mat||patched.has(mat)||!(mat.isMeshStandardMaterial||mat.isMeshPhysicalMaterial))return;patched.add(mat);materials.add(mat);
+  const previous=mat.onBeforeCompile,key=mat.customProgramCacheKey.bind(mat),baseEnv=mat.envMapIntensity??1;
+  mat.userData.opticsEnv=baseEnv;
+  mat.onBeforeCompile=(s,r)=>{
+   if(previous)previous(s,r);Object.assign(s.uniforms,uniforms);
+   s.vertexShader='varying vec3 vOptWorld,vOptNormal;\n'+s.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
+     vec4 optP=vec4(transformed,1.0);vec3 optN=objectNormal;
+     #ifdef USE_INSTANCING
+     optP=instanceMatrix*optP;optN=mat3(instanceMatrix)*optN;
+     #endif
+     vOptWorld=(modelMatrix*optP).xyz;vOptNormal=normalize(mat3(modelMatrix)*optN);`);
+   s.fragmentShader='varying vec3 vOptWorld,vOptNormal;\nuniform float uOptTime,uOptSea,uOptSurface,uOptFlat,uOptStrength,uOptDetail;uniform vec3 uOptWind,uOptLight,uOptDir,uOptMin,uOptMax;\n'+waterWaveGLSL()+'\n'+s.fragmentShader;
+   s.fragmentShader=s.fragmentShader.replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
+     float optInside=step(uOptMin.y,vOptWorld.y)*step(vOptWorld.y,uOptMax.y)*step(uOptMin.x,vOptWorld.x)*step(vOptWorld.x,uOptMax.x)*step(uOptMin.z,vOptWorld.z)*step(vOptWorld.z,uOptMax.z);
+     float optWave=0.0;if(uOptFlat<.5&&uOptDetail>.5)optWave=waterSample(vOptWorld.xz,uOptTime,uOptWind,uOptSea).y;
+     float optDepth=uOptSurface+optWave-vOptWorld.y;
+     float optWet=(1.0-smoothstep(-.03,.15,-optDepth))*optInside;
+     roughnessFactor=mix(roughnessFactor,max(.16,roughnessFactor*.55),optWet);
+     diffuseColor.rgb*=mix(1.0,.82,optWet);`);
+   s.fragmentShader=s.fragmentShader.replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
+     vec3 optRay=refract(-normalize(uOptDir),vec3(0.0,1.0,0.0),1.0/1.333);
+     vec2 optQ=vOptWorld.xz-optRay.xz*max(0.0,optDepth)/max(.2,-optRay.y);
+     float optC=sin(optQ.x*3.7+sin(optQ.y*2.3)+uOptTime*.8)+sin(optQ.y*4.1-uOptTime*.65);
+     float optCaustic=pow(max(0.0,1.0-abs(optC)*.65),14.0);
+     float optWater=step(0.0,optDepth)*optInside*exp(-max(0.0,optDepth)*.35);
+     reflectedLight.indirectDiffuse+=uOptLight*optCaustic*optWater*.24*max(.12,vOptNormal.y)*uOptStrength*uOptDetail;`);
+  };mat.customProgramCacheKey=()=>key()+'|water-optics-v1';mat.needsUpdate=true;
+ }
+ function add(root){root.traverse(m=>{if(!m.isMesh)return;m.castShadow=m.receiveShadow=true;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))patch(mat);});}
+ function update(){detail.value=typeof window!=='undefined'&&window.__GFX==='low'?.45:1;const day=U.uDay?U.uDay.value:1;for(const m of materials)m.envMapIntensity=m.userData.opticsEnv*(.22+.78*day);}
+ return{add,patch,update,uniforms};
+}
+function marineBodyBounds(T,root){
+ root.updateWorldMatrix(true,true);const inverse=new T.Matrix4().copy(root.matrixWorld).invert(),box=new T.Box3();
+ function visit(o,visible){visible=visible&&o.visible;if(!visible)return;if(o.isMesh&&o.geometry){if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inverse,o.matrixWorld)));}for(const c of o.children)visit(c,visible);}
+ for(const c of root.children)visit(c,true);return box;
+}
+function marineSurfaceY(bounds,water,exposure=.22){return water-bounds.max.y+(bounds.max.y-bounds.min.y)*exposure;}
+if(typeof module!=='undefined'&&module.exports)module.exports={createWaterOptics,marineBodyBounds,marineSurfaceY};
 /* Above-water fragments and underwater radiance are rendered separately. The water
    shader transmits the underwater target, then applies its reflection on top. */
 function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
@@ -276,7 +325,7 @@ function createSurfaceResidents(W,P,MDL){
     for(let i=fish.length;i<count;i++){
       const id=ids[i%ids.length],sp=P.SPECIES.find(s=>s.id===id);if(!sp||!MDL.fishReady(id))continue;
       const f=MDL.fish(sp);if(!f)continue;const L=sea?.65+(i%3)*.15:.32+(i%3)*.09;
-      f.group.scale.setScalar(L);group.add(f.group);W.submerged.add(f.group);fish.push({...f,L,phase:i*2.399,depth:.3+(i%3)*.16,last:null});
+      f.group.scale.setScalar(L);group.add(f.group);if(W.optics)W.optics.add(f.group);W.submerged.add(f.group);fish.push({...f,L,phase:i*2.399,depth:.3+(i%3)*.16,last:null});
     }
   }
   function update(dt,G){
@@ -1014,7 +1063,7 @@ function setTime(hour, force){
   U.uSunVis.value = (direct*vis + wM)/(direct + wM + 1e-4);
   renderer.toneMappingExposure = lerp(a.exp, b.exp, f)*(1+.1*wx.cloud);
   const lc = U.uLightCol.value;
-  sunLight.color.setRGB(lc.x, lc.y, lc.z); sunLight.intensity = 0.85;
+  sunLight.color.setRGB(lc.x, lc.y, lc.z); sunLight.intensity = 0.85;hemi.intensity=.55;
   sunLight.position.copy(ld).multiplyScalar(60);
   const z = U.uZenith.value, hz = U.uHorizon.value;
   hemi.color.setRGB((z.x+hz.x)*0.6, (z.y+hz.y)*0.6, (z.z+hz.z)*0.6);
@@ -1022,8 +1071,8 @@ function setTime(hour, force){
   info.day = U.uDay.value; info.light = Math.min(1.2, 0.08 + (lc.x+lc.y+lc.z)/3*0.35 + (hz.x+hz.y+hz.z)/3*0.5);
   if(photoHook){ const o=photoHook(h,wx); if(o){
     U.uSunDir.value.copy(o.dir); U.uSunDisk.value.copy(o.dir); U.uLightCol.value.set(o.lc[0],o.lc[1],o.lc[2]); U.uSunVis.value=1-wx.cloud*.85;
-    renderer.toneMappingExposure=o.exp; U.uExpo.value=o.exp; sunLight.color.setRGB(o.lc[0],o.lc[1],o.lc[2]); sunLight.intensity=.35*(1-wx.cloud*.8);
-    sunLight.position.copy(o.dir).multiplyScalar(60); hemi.intensity=0; info.light=o.light; return info; } }
+    renderer.toneMappingExposure=o.exp; U.uExpo.value=o.exp; sunLight.color.setRGB(o.lc[0],o.lc[1],o.lc[2]); sunLight.intensity=.7*(1-wx.cloud*.5);
+    sunLight.position.copy(o.dir).multiplyScalar(60);hemi.color.setRGB(.18+.35*U.uDay.value,.23+.35*U.uDay.value,.32+.35*U.uDay.value);hemi.groundColor.setRGB(.035,.045,.055);hemi.intensity=.45*(1-wx.cloud*.3);info.light=o.light;return info; } }
   let dh = Math.abs(h - envHour); if(dh > 12) dh = 24 - dh;
   if(force || dh > 0.35 || wxDirty){ wxDirty = false; envHour = h; regenEnv(); }
   return info;
@@ -1035,8 +1084,8 @@ function seaH(x,z,t){ return sampleWater(x,z,t,U.uWind.value,true).height; }
 function swell(x,z,t){return sampleWater(x,z,t,U.uWind.value,seaMode).height;}
 
 function update(dt, t){
-  if(renderer.shadowMap.enabled){const target=new T.Vector3();camera.getWorldPosition(target);target.y=0;sunLight.target.position.copy(target);sunLight.position.copy(target).addScaledVector(U.uSunDir.value,60);sunLight.target.updateMatrixWorld();}
-  U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
+  {const target=new T.Vector3();camera.getWorldPosition(target);target.y=0;sunLight.target.position.copy(target);sunLight.position.copy(target).addScaledVector(U.uSunDir.value,60);sunLight.target.updateMatrixWorld();}
+  optics.update();U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
   if(seaGrid.visible) seaGrid.position.set(U.uEye.value.x,0,U.uEye.value.z);
   { const w=U.uWind.value, k=(.002+.01*w.z)*dt; U.uCloudOff.value.x+=w.x*k; U.uCloudOff.value.y+=w.y*k; }
   for(let i=0;i<12;i++){ const r = ripS[i]; r.age += dt; rip[i].set(r.x, r.z, r.age, r.age < 5 ? r.amp : 0); }
@@ -1082,6 +1131,7 @@ function renderRefl(){
   }
 }
 
+const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
 function render(){ submerged.render(); if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } renderer.render(scene, camera); }
 
@@ -1095,7 +1145,7 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
 /* ===== 美人魚的骨架與表情（依新設定圖生成的模型，載入後在執行時自動加骨架）=====
    骨架：臀→腰→胸→頸→頭；左右肩→上臂→前臂→手；尾巴 6 節＋尾鰭；頭髮 3 節
@@ -2697,7 +2747,7 @@ function placeSnag(x,z,h){ const o=snagSrc.clone(true), g=new T.Group(); g.add(o
       k.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying float vWY;').replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWY=(modelMatrix*vec4(transformed,1.0)).y;');
         sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vWY;').replace('#include <dithering_fragment>','#include <dithering_fragment>\ngl_FragColor.rgb*=mix(0.45,1.0,smoothstep(0.0,0.55,vWY));'); };
       return k; }; m.material=Array.isArray(m.material)?m.material.map(conv):conv(m.material); } });
-  g.userData.lake=true; g.visible=!(W.isSea&&W.isSea()); S.add(g); W.fishingPhysics.addObject(g,()=>g.visible,"倒木"); SNAG_RIP.push([x,z]); }
+  g.userData.lake=true; g.visible=!(W.isSea&&W.isSea()); S.add(g);W.optics.add(g);W.submerged.add(g); W.fishingPhysics.addObject(g,()=>g.visible,"倒木"); SNAG_RIP.push([x,z]); }
 const SNAG_CLIP=new T.Plane(new T.Vector3(0,1,0),.01), SNAG_RIP=[];
 if(T.GLTFLoader) new T.GLTFLoader().load('dead_tree_trunk_02.glb',gl=>{ snagSrc=gl.scene; SNAGQ.forEach(a=>placeSnag(...a)); });
 snag(-33,-30,5); snag(-22,-35,3.6); snag(-36,-17,6.5); snag(-18,-29,2.4); snag(-29,-39,4.2); snag(-40,-26,3.2);
@@ -2760,7 +2810,7 @@ function patchGator(){ if(gPatched||(gH&&!gH.loaded)) return; let hit=false;
         transformed.z+=uGA*w_*${(len*0.11).toFixed(3)}*sin(uGT-tl_*6.2);
         transformed.y+=uGA*${(len*0.006).toFixed(3)}*sin(uGT*0.5+tl_*2.0);`); };
     m.customProgramCacheKey=()=>'gatorswim'; m.needsUpdate=true; });
-  if(hit){gPatched=true;W.submerged.add(gator);} }
+  if(hit){gPatched=true;W.optics.add(gator);W.submerged.add(gator);} }
 let gs={mode:'off'}, gTimer=rand(40,90), gRip=0, chaseDelay=-1, chaseGet=null, stolenF=false;
 const gS=new T.Vector3(), gE=new T.Vector3(), gP=new T.Vector3();
 function placeGator(p,yaw){ patchGator(); gator.position.set(p.x,W.swell(p.x,p.z,W.U.uTime.value)-.025,p.z);
@@ -3205,7 +3255,7 @@ W.setPhotoHook((h,wx)=>{
   /* 深夜係數：19:20 起天色轉暗，21:00～04:00 為深夜，05:00 前天亮。照片曝光、光照一起壓暗，天空與水面反射一致 */
   const H=((h%24)+24)%24, ss=(a0,a1,x)=>{ const t=Math.min(1,Math.max(0,(x-a0)/(a1-a0))); return t*t*(3-2*t); };
   const nk=H>=12?ss(19.3,21,H):1-ss(4,5,H), deep=SET==='sea'?.018:.05; U.uNight.value=nk; U.uNightDeep.value=deep;
-  { const want=nk>.6?null:(env[ek]||null); if(W.scene.environment!==want){ W.scene.environment=want; envKey=ek; } }
+  { const want=env[ek]||null; if(W.scene.environment!==want){ W.scene.environment=want; envKey=ek; } }
   const li=L(MA.li,MB.li)*(1-wx.cloud*.75-wx.rain*.15)*(1-.6*nk);
   return {dir, lc:[L(MA.lc[0],MB.lc[0])*li,L(MA.lc[1],MB.lc[1])*li,L(MA.lc[2],MB.lc[2])*li],
     exp:Math.exp(L(Math.log(MA.exp),Math.log(MB.exp)))*(1-wx.cloud*.15), light:L(MA.light,MB.light)*(1-wx.cloud*.3)*(1-.55*nk)};
@@ -3246,7 +3296,7 @@ if(T.GLTFLoader){
             sh.fragmentShader='varying float vWetY;\n'+sh.fragmentShader.replace('#include <dithering_fragment>','gl_FragColor.rgb*=mix(.58,1.0,smoothstep(-.08,.24,vWetY));\n#include <dithering_fragment>');};k.customProgramCacheKey=()=> 'shore-wet';return k;};
           m.material=Array.isArray(m.material)?m.material.map(wet):wet(m.material);});
       }
-      W.scene.add(c); if(/trunk|stump|branches|rock/.test(file)) W.fishingPhysics.addObject(c,()=>c.visible,file.includes("rock")?"岸邊岩石":"倒木樹枝"); } });
+      W.scene.add(c);if(/trunk|stump|branches|rock/.test(file)){W.optics.add(c);W.submerged.add(c);} if(/trunk|stump|branches|rock/.test(file)) W.fishingPhysics.addObject(c,()=>c.visible,file.includes("rock")?"岸邊岩石":"倒木樹枝"); } });
   place('dead_tree_trunk_02.glb',[[-5.8,-.2,-9.5,.6,0,.05,1.1],[7.5,-.25,-16,-1.1,0,0,1.0],[-13,-.15,-22,2.2,0,0,1.2],[2,-.3,-26,.2,0,0,1.3]]);
   place('tree_stump_01.glb',[[3.9,-.14,-7.6,1,0,0,1.0],[-8.2,-.12,-14,2,0,0,1.3],[10,-.18,-24,0,0,0,1.4],[-3,-.2,-30,1.2,0,0,1.5]]);
   place('tree_stump_02.glb',[[-3.4,-.12,-5.2,.4,0,0,.8],[12.5,-.12,-11,1.7,0,0,1.1],[5.5,-.15,-34,2.5,0,0,1.6]]);
@@ -3551,7 +3601,7 @@ if(T.GLTFLoader) new T.GLTFLoader().load('rock_moss_set_01.glb',gl=>{
     const g=new T.Group(),o=rock.clone(true); o.position.set(0,0,0); g.add(o); g.updateMatrixWorld(true);
     let b=new T.Box3().setFromObject(g),sz=b.getSize(new T.Vector3()),ct=b.getCenter(new T.Vector3());
     o.position.sub(ct); g.scale.setScalar(h/Math.max(.01,sz.y)); g.position.set(x,-h*.28,z); reefRoot.add(g);
-    W.fishingPhysics.addObject(g,()=>reefRoot.visible,'礁岩');
+    W.fishingPhysics.addObject(g,()=>reefRoot.visible,'礁岩');W.optics.add(g);W.submerged.add(g);
   }
 });
 const hullCollider=W.fishingPhysics.addBox({x:-HX,y:-.8,z:HZ0},{x:HX,y:1.7,z:HZ1},()=>yacht.visible,'船體');
@@ -3568,9 +3618,9 @@ function makeDolphin(){ const g=new T.Group();
   const fl=new T.Shape(); fl.moveTo(0,0); fl.quadraticCurveTo(.2,-.1,.38,-.22); fl.quadraticCurveTo(.15,-.18,0,-.08); fl.quadraticCurveTo(-.15,-.18,-.38,-.22); fl.quadraticCurveTo(-.2,-.1,0,0);
   const tail=new T.Mesh(new T.ShapeGeometry(fl),dMat); tail.rotation.x=-Math.PI/2; tail.position.set(0,0,-.92); g.add(tail);
   for(const s of [1,-1]){ const p=new T.Mesh(new T.SphereGeometry(1,10,6),dMat); p.scale.set(.16,.02,.07); p.position.set(s*.2,-.1,.35); p.rotation.y=s*.6; g.add(p); }
-  g.scale.setScalar(2.2); g.visible=false; g.traverse(o=>{ o.frustumCulled=false; }); S.add(g); return g; }
+  g.scale.setScalar(1); g.visible=false; g.traverse(o=>{ o.frustumCulled=false; }); S.add(g); return g; }
 const dolphins=[]; for(let i=0;i<6;i++) dolphins.push({g:makeDolphin(),ph:0,t:0,on:false});
-if(window.__MDL) dolphins.forEach(o=>window.__MDL.attach(o.g,'dolphin',{len:2.4,target:'+z',clip:'Swim'}));
+if(window.__MDL) dolphins.forEach(o=>window.__MDL.attach(o.g,'dolphin',{len:2.4,target:'+z',clip:'Swim',onLoad:()=>{W.optics.add(o.g);W.submerged.add(o.g);o.bounds=marineBodyBounds(T,o.g);}}));
 
 /* ---------- 鯨魚（座頭鯨） ---------- */
 const wTex=gradTex([34,40,48],[180,186,190],.35);
@@ -3579,14 +3629,14 @@ const whale=new T.Group(); whale.visible=false; whale.rotation.order='YXZ'; S.ad
 { const b=new T.Mesh(new T.SphereGeometry(1,32,20),wMat); b.scale.set(1.6,1.5,7); whale.add(b);
   for(const s of [1,-1]){ const f=new T.Mesh(new T.SphereGeometry(1,12,8),wMat); f.scale.set(2.6,.12,.5); f.position.set(s*2.4,-.6,2.5); f.rotation.set(0,s*.5,s*-.3); whale.add(f); } }
 // 座頭鯨（使用者提供側面、俯視設定圖生成）：模型原本頭朝上，載入後自動綁骨，再轉成水平、頭朝 +z
-let whaleRig=null; const WP={tail:.18,tailF:1.2,bend:0,arch:0};
+let whaleBounds=null;let whaleRig=null; const WP={tail:.18,tailF:1.2,bend:0,arch:0};
 let whaleLoaded=false; function loadWhale(){ if(whaleLoaded||!T.GLTFLoader) return; whaleLoaded=true;   // 鯨魚模型 8.6MB：第一次出海才下載
  new T.GLTFLoader().load('models/whale2.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material.roughness=.42; m.material.metalness=.05; } } });
   o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(13/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
   const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-c2.y,-c2.z);
   const holder=new T.Group(); holder.add(o); holder.updateMatrixWorld(true); try{ whaleRig=autoRig(o,'tail'); }catch(e){ console.warn('whale rig',e); }
   const turn=new T.Group(); turn.rotation.set(-Math.PI/2,Math.PI,0,'YXZ'); turn.add(holder);
-  whale.children.forEach(ch=>{ ch.visible=false; }); whale.add(turn); whale.userData.real=true; },undefined,()=>{ if(window.__MDL) window.__MDL.attach(whale,'whale',{len:13,target:'+z'}); }); }
+  whale.children.forEach(ch=>{ ch.visible=false; }); whale.add(turn); whale.userData.real=true;W.optics.add(whale);W.submerged.add(whale);whaleBounds=marineBodyBounds(T,whale); },undefined,()=>{ if(window.__MDL) window.__MDL.attach(whale,'whale',{len:13,target:'+z',onLoad:()=>{W.optics.add(whale);W.submerged.add(whale);whaleBounds=marineBodyBounds(T,whale);}}); }); }
 const fluke=new T.Group(); fluke.visible=false; S.add(fluke);
 { const sh=new T.Shape(); sh.moveTo(0,.25); sh.quadraticCurveTo(-1.2,.5,-2.6,1.6); sh.quadraticCurveTo(-1.7,.6,-1.5,0); sh.quadraticCurveTo(-1.7,-.6,-2.6,-1.6); sh.quadraticCurveTo(-1.2,-.5,0,-.25); sh.lineTo(0,.25);
   const f=new T.Mesh(new T.ShapeGeometry(sh,14),wMat); f.rotation.z=-Math.PI/2; f.position.y=2.6; fluke.add(f);
@@ -3612,10 +3662,10 @@ const foamTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.heig
   for(let i=0;i<900;i++){ const a=Math.random()*6.283, r=70+Math.random()*55*Math.random()+Math.random()*40, x=128+Math.cos(a)*r*.95, y=128+Math.sin(a)*r*.95, s2=1+Math.random()*4; g.fillStyle=`rgba(255,255,255,${.15+Math.random()*.5})`; g.beginPath(); g.arc(x,y,s2,0,7); g.fill(); }
   const rg=g.createRadialGradient(128,128,10,128,128,128); rg.addColorStop(0,'rgba(255,255,255,.35)'); rg.addColorStop(.6,'rgba(255,255,255,.12)'); rg.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=rg; g.fillRect(0,0,256,256); return new T.CanvasTexture(cv); })();
 const foams=[]; for(let i=0;i<4;i++){ const m=new T.Mesh(new T.PlaneGeometry(1,1).rotateX(-Math.PI/2),new T.MeshBasicMaterial({map:foamTex,transparent:true,opacity:0,depthWrite:false,color:0xf4fbff})); m.visible=false; m.renderOrder=2; S.add(m); foams.push({m,t:9,dur:1,r0:1,r1:1}); }
-function foam(x,z,r0,r1,dur){ const f=foams.find(q=>q.t>=q.dur)||foams[0]; Object.assign(f,{t:0,dur,r0,r1}); f.m.position.set(x,.06,z); f.m.rotation.y=Math.random()*6.28; f.m.visible=true; }
-function updFoam(dt){ for(const f of foams){ if(f.t>=f.dur){ f.m.visible=false; continue; } f.t+=dt; const k=f.t/f.dur, r=f.r0+(f.r1-f.r0)*(1-Math.pow(1-k,2)); f.m.scale.set(r*2,1,r*2); f.m.material.opacity=.9*(1-k); } }
+function foam(x,z,r0,r1,dur){ const f=foams.find(q=>q.t>=q.dur)||foams[0]; Object.assign(f,{t:0,dur,r0,r1}); f.m.position.set(x,W.swell(x,z,G.t)+.02,z); f.m.rotation.y=Math.random()*6.28; f.m.visible=true; }
+function updFoam(dt){ for(const f of foams){ if(f.t>=f.dur){ f.m.visible=false; continue; } f.t+=dt;f.m.position.y=W.swell(f.m.position.x,f.m.position.z,G.t)+.02; const k=f.t/f.dur, r=f.r0+(f.r1-f.r0)*(1-Math.pow(1-k,2)); f.m.scale.set(r*2,1,r*2); f.m.material.opacity=.9*(1-k); } }
 // 噴氣：一道往上衝、被風吹斜、慢慢散開的白霧柱
-function blow(x,z){ for(let k=0;k<6;k++) setTimeout(()=>{ SPRAY.emit(x,.8,z,110,.55,13,.25,1.9); MIST.emit(x,1.5+k*.6,z,26,.6,6.5,.35,3.6); },k*70); c.Snd.splash&&c.Snd.splash(.5); }
+function blow(x,z){const water=W.swell(x,z,G.t); for(let k=0;k<6;k++) setTimeout(()=>{ SPRAY.emit(x,water+.35,z,110,.55,13,.25,1.9); MIST.emit(x,water+.6+k*.6,z,26,.6,6.5,.35,3.6); },k*70); c.Snd.splash&&c.Snd.splash(.5); }
 // 巨大落水：放射狀水牆、四散水滴、白霧、泡沫圈、海面漣漪、船身震動
 function crash(x,z,big){ SPRAY.emit(x,.5,z,big?520:260,big?9:6,big?13:9,big?4:2.5,2.4); SPRAY.emit(x,.5,z,big?200:90,3,big?20:13,1.5,2.8);
   MIST.emit(x,.8,z,big?160:80,3.2,big?3.2:2,big?4:2.5,3.6); foam(x,z,big?3:2,big?22:12,big?9:6); foam(x,z,1,big?12:7,big?6:4);
@@ -3627,9 +3677,11 @@ function crash(x,z,big){ SPRAY.emit(x,.5,z,big?520:260,big?9:6,big?13:9,big?4:2.
 const sfMat=new T.MeshStandardMaterial({color:0x40464e,roughness:.45,side:T.DoubleSide});
 const sfin=new T.Group(); sfin.visible=false; S.add(sfin);
 { const s=new T.Shape(); s.moveTo(.35,0); s.quadraticCurveTo(.2,.45,-.15,.75); s.quadraticCurveTo(-.12,.35,-.4,0); s.lineTo(.35,0);
-if(window.__MDL){  window.__MDL.attach(fluke,'whale',{len:13,target:'+z',pitch:1.25,off:[0,-3.4,2.05]}); window.__MDL.attach(sfin,'gwhite',{len:4.2,target:'+x',top:.34,clip:'Swim'}); }
-  const m=new T.Mesh(new T.ExtrudeGeometry(s,{depth:.04,bevelEnabled:true,bevelThickness:.02,bevelSize:.02,bevelSegments:2}),sfMat); m.rotation.y=Math.PI/2; m.position.y=-.1; sfin.add(m); sfin.scale.setScalar(1.3); }
 
+  const m=new T.Mesh(new T.ExtrudeGeometry(s,{depth:.04,bevelEnabled:true,bevelThickness:.02,bevelSize:.02,bevelSegments:2}),sfMat); m.rotation.y=Math.PI/2; m.position.y=-.1; sfin.add(m); m.scale.setScalar(1.3); }
+if(window.__MDL){  window.__MDL.attach(sfin,'gwhite',{len:4.2,target:'+x',top:.34,clip:'Swim',onLoad:()=>{W.optics.add(sfin);W.submerged.add(sfin);}}); }
+
+for(const root of [whale,fluke,sfin,...dolphins.map(o=>o.g)]){W.optics.add(root);W.submerged.add(root);}
 /* ---------- 飛魚 ---------- */
 const ffMat=new T.MeshPhysicalMaterial({map:gradTex([40,70,120],[230,236,240],.5),metalness:.6,roughness:.25,clearcoat:.6,side:T.DoubleSide});
 const flyers=[]; for(let i=0;i<7;i++){ const g=new T.Group(); const b=new T.Mesh(new T.SphereGeometry(1,12,8),ffMat); b.scale.set(.05,.05,.2); g.add(b);
@@ -3687,7 +3739,7 @@ function endAll(){ ev.id=null; banner.classList.add('hidden'); $('bCam').classLi
   whale.visible=false; fluke.visible=false; if(!chase) sfin.visible=false; flyers.forEach(f=>{ f.on=false; f.g.visible=false; }); mets.forEach(m=>m.m.visible=false); }
 function updEv(dt,t,wx,day){
   if(c.G&&c.G.state==='home'){ if(ev.id) endAll(); return; }   // 在小屋裡不會發生、也不會提示外面的事件
-  W.camera.getWorldPosition(cw); SPRAY.tick(dt,0); MIST.tick(dt,1.2); updFoam(dt);
+  W.camera.getWorldPosition(cw);const sprayLight=Math.max(.08,Math.min(1,W.info.light));SPRAY.mat.color.setRGB(.75*sprayLight,.86*sprayLight,sprayLight);MIST.mat.color.copy(SPRAY.mat.color);for(const f of foams)f.m.material.color.copy(SPRAY.mat.color); SPRAY.tick(dt,0); MIST.tick(dt,1.2); updFoam(dt);
   if(!ev.id){ evT-=dt; if(evT<=0){ evT=loc==='sea'?rand(30,60):rand(45,90); if(c.underwater()) return;
       if(forced&&canEv(forced,day,wx)){ startEv(forced); forced=null; return; } forced=null;
       const ids=Object.keys(SCENES).filter(id=>canEv(id,day,wx)); if(ids.length) startEv(ids[Math.floor(Math.random()*ids.length)]); } return; }
@@ -3698,37 +3750,37 @@ function updEv(dt,t,wx,day){
   else if(ev.id==='dolphin'){ d.p.addScaledVector(d.v,dt);
     for(const o of dolphins){ if(!o.on) continue; o.t+=dt; const cy=o.cyc, ph=(o.t%cy)/cy, jump=ph>.55; const g=o.g;
       tv.copy(d.p).add(o.off); const s=(ph-.55)/.45;
-      if(jump){ g.visible=true; const h=1.6; g.position.set(tv.x+d.v.x*.1*s,4*h*s*(1-s)-.3,tv.z+d.v.z*.1*s); hullClear(g.position,1.4); g.lookAt(tv2.copy(g.position).add(d.v)); g.rotateX(-(1-2*s)*.9);
+      if(jump){ g.visible=true; const h=1.6; g.position.set(tv.x+d.v.x*.1*s,W.swell(tv.x,tv.z,t)+4*h*s*(1-s)-.6,tv.z+d.v.z*.1*s); hullClear(g.position,1.4); g.lookAt(tv2.copy(g.position).add(d.v)); g.rotateX(-(1-2*s)*.9);
         if(!o.inA&&s>.02){ o.inA=true; P.splash(g.position.x,0,g.position.z,14,.8); AT.ring(g.position.x,g.position.z,.8); }
         if(s>.96&&o.inA){ o.inA=false; P.splash(g.position.x,0,g.position.z,22,1); W.addRipple(g.position.x,g.position.z,.5); } }
-      else g.visible=false; } }
+      else {g.visible=true;const bounds=o.bounds||(o.bounds=marineBodyBounds(T,g));g.position.set(tv.x,marineSurfaceY(bounds,W.swell(tv.x,tv.z,t),.12),tv.z);g.lookAt(tv2.copy(g.position).add(d.v));} } }
   else if(ev.id==='whale'){ const p=d.p, tt=ev.t, dx=Math.sin(d.dir), dz=Math.cos(d.dir), at=(k)=>tv2.set(p.x+dx*k,0,p.z+dz*k);
     // 骨架動作：平常緩緩擺尾；躍出時尾巴猛力上下拍、身體弓起；空中扭身；落水前身體反弓
     if(whaleRig){ const br=tt>16&&tt<20.2, q=(tt-16)/3.6;
       const tail=br?(q<.45?.55:.28):.16, tf=br?(q<.45?3.4:1.6):1.1, arch=br?(q<.45?-.18:q<.75?.12:.3):0, bend=br?(q<.45?0:.18*Math.sin(q*8)):0;
       whaleRig.pose({t:tt,tail,tailF:tf,tailX:true,tailBend:bend,arch,breathe:0}); }
     // 1. 兩次換氣：背脊浮出水面、噴起高高的白霧柱
-    if(tt>1.2&&d.stage===0){ d.stage=1; const q=at(-8); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
-    if(tt>7.5&&d.stage===1){ d.stage=2; const q=at(-2); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
+    if(tt>3&&d.stage===0){ d.stage=1; const q=whale.localToWorld(new T.Vector3(0,0,4)); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
+    if(tt>9.3&&d.stage===1){ d.stage=2; const q=whale.localToWorld(new T.Vector3(0,0,4)); blow(q.x,q.z); foam(q.x,q.z,1,5,4); }
     if(tt<13){ const seg=tt<6.5?(tt-.8)/5.7:(tt-6.8)/5.7, q=at(tt<6.5?-10+tt*1.1:-4+(tt-6.8)*1.1), up=Math.sin(Math.max(0,Math.min(1,seg))*Math.PI);
-      whale.visible=seg>0&&seg<1; whale.position.set(q.x,-2.6+2.1*up,q.z); whale.rotation.set(.08-.16*seg,d.dir,0); if(whale.visible&&Math.random()<.2) SPRAY.emit(q.x,.2,q.z,6,1.5,1.2,3,1); }
+      whale.visible=seg>0&&seg<1; const bounds=whaleBounds||(whaleBounds=marineBodyBounds(T,whale)),water=W.swell(q.x,q.z,t);whale.position.set(q.x,water-bounds.max.y-.4+((bounds.max.y-bounds.min.y)*.22+.4)*up,q.z); whale.rotation.set(.08-.16*seg,d.dir,0); if(whale.visible&&Math.random()<.2) SPRAY.emit(q.x,.2,q.z,6,1.5,1.2,3,1); }
     // 2. 海面下翻起白浪：要躍出水面了（鏡頭自動轉過去）
     const bp=at(8);
     if(tt>13.5&&d.stage===2){ d.stage=3; whale.visible=false; if(window.__FACE) window.__FACE(new T.Vector3(bp.x,3,bp.z),{dur:6,pitch:.12}); foam(bp.x,bp.z,1,7,5); if(c.toast) c.toast('🐋 鯨魚要躍出水面了！','good',2200); }
     if(tt>13.5&&tt<16) { if(Math.random()<.5) SPRAY.emit(bp.x,.2,bp.z,8,2,2.5,3,1); }
     // 3. 躍身擊浪：幾乎整隻衝出海面、在空中翻身、側身重重砸回海裡
     if(tt>16&&tt<20.2){ const q=(tt-16)/3.6, qq=Math.min(1,q), y=-9+4*12*qq*(1-qq)+ (q>1?-(q-1)*20:0), fw=6*qq;
-      whale.visible=true; whale.position.set(bp.x+dx*fw,y,bp.z+dz*fw); whale.rotation.order='YXZ'; whale.rotation.set(-1.45+1.9*qq,d.dir,1.5*sstep(.2,1,qq));
+      whale.visible=true; whale.position.set(bp.x+dx*fw,W.swell(bp.x+dx*fw,bp.z+dz*fw,t)+y,bp.z+dz*fw); whale.rotation.order='YXZ'; whale.rotation.set(-1.45+1.9*qq,d.dir,1.5*sstep(.2,1,qq));
       if(d.stage===3){ d.stage=4; crash(bp.x,bp.z,false); }
       if(qq<.6&&Math.random()<.9) SPRAY.emit(whale.position.x+(Math.random()-.5)*2,Math.max(.5,whale.position.y+(Math.random()-.5)*8),whale.position.z+(Math.random()-.5)*2,10,1.6,1,1.6,1.6);
       if(q>.93&&d.stage===4){ d.stage=5; const cp=tv3.set(bp.x+dx*6.5,0,bp.z+dz*6.5); crash(cp.x,cp.z,true); } }
     else if(tt>=20.2&&tt<23) whale.visible=false;
     // 4. 最後一次換氣，舉起尾鰭慢慢潛下去
-    if(tt>23&&d.stage===5){ d.stage=6; const q=at(16); blow(q.x,q.z); }
-    if(tt>25&&tt<31){ fluke.visible=true; const q=(tt-25)/6, fp=at(18); fluke.position.set(fp.x,(q<.45?-3+6.5*sstep(0,.45,q):3.5-7*sstep(.45,1,q)),fp.z); hullClear(fluke.position,3); fluke.rotation.set(.25*(1-q),d.dir,0); fluke.scale.setScalar(1.4);
+    if(tt>23&&tt<25){const q=at(16),bounds=whaleBounds||(whaleBounds=marineBodyBounds(T,whale));whale.visible=true;whale.rotation.set(0,d.dir,0);whale.position.set(q.x,marineSurfaceY(bounds,W.swell(q.x,q.z,t),.18),q.z);if(d.stage===5){d.stage=6;whale.updateWorldMatrix(true,true);const head=whale.localToWorld(new T.Vector3(0,0,4));blow(head.x,head.z);}}else if(tt>=25)whale.visible=false;
+    if(tt>25&&tt<31){ fluke.visible=true; const q=(tt-25)/6, fp=at(9.5); fluke.position.set(fp.x,W.swell(fp.x,fp.z,t)+(q<.45?-3+6.5*sstep(0,.45,q):3.5-7*sstep(.45,1,q)),fp.z); hullClear(fluke.position,3); fluke.rotation.set(.25*(1-q),d.dir,0); fluke.scale.setScalar(1.4);
       if(q<.5&&Math.random()<.6) SPRAY.emit(fp.x,fluke.position.y+1.5,fp.z,6,.6,.5,1.6,1.4);
       if(q>.8&&d.stage===6){ d.stage=7; crash(fp.x,fp.z,false); } } else fluke.visible=false; }
-  else if(ev.id==='shark'&&!chase){ d.a+=dt*.22; const b=base(); sfin.position.set(b.x+Math.cos(d.a)*d.r,0,b.z+Math.sin(d.a)*d.r); hullClear(sfin.position,.6); sfin.rotation.y=-d.a; sfin.visible=true;
+  else if(ev.id==='shark'&&!chase){ d.a+=dt*.22; const b=base(); sfin.position.set(b.x+Math.cos(d.a)*d.r,0,b.z+Math.sin(d.a)*d.r);sfin.position.y=W.swell(sfin.position.x,sfin.position.z,t); hullClear(sfin.position,.6); sfin.rotation.y=-d.a; sfin.visible=true;
     if(Math.random()<dt*3) AT.ring(sfin.position.x,sfin.position.z,.35); }
   else if(ev.id==='flyfish'){ for(const f of flyers){ if(!f.on) continue; f.t+=dt; if(f.t<0){ f.g.visible=false; continue; } const q=f.t/1.4;
       if(q>1){ f.t=-rand(.5,2.5); P.splash(f.g.position.x,0,f.g.position.z,6,.4); f.p.add(tv.set(-Math.sin(f.a)*9,0,-Math.cos(f.a)*9)); continue; }
@@ -3741,7 +3793,7 @@ let chase=null, stolenF=false;
 function onHook(fd,get){ chase=null; stolenF=false; if(loc==='sea'&&fd.sp.rar>=2&&Math.random()<.2*(1-.12*(window.__TAL?window.__TAL.rank('sea'):0))&&!(window.__ECO&&window.__ECO.fxOn('repel'))) chase={delay:rand(3,7),get,p:null}; }
 function updChase(dt){ if(!chase) return; if(chase.delay>0){ chase.delay-=dt; if(chase.delay<=0){ const f=chase.get(); chase.p=new T.Vector3(f.x+rand(-14,14),0,f.z+rand(-14,14)); sfin.visible=true; c.toast('⚠️ 鯊魚衝過來了！快收線！','bad',2400); c.vib([60,60,60]); } return; }
   const f=chase.get(); tv.subVectors(f,chase.p); tv.y=0; const d=tv.length(); tv.normalize(); chase.p.addScaledVector(tv,Math.min(d,1.6*dt)); hullClear(chase.p,.6);
-  sfin.position.copy(chase.p); sfin.rotation.y=Math.atan2(tv.x,tv.z)-Math.PI/2; if(Math.random()<dt*4) AT.ring(chase.p.x,chase.p.z,.4);
+  sfin.position.copy(chase.p);sfin.position.y=W.swell(sfin.position.x,sfin.position.z,G.t); sfin.rotation.y=Math.atan2(tv.x,tv.z)-Math.PI/2; if(Math.random()<dt*4) AT.ring(chase.p.x,chase.p.z,.4);
   if(!chase.q&&d<9){ chase.q=true; const back=tv.clone(); if(window.__KK) window.__KK.offerDodge(()=>{ if(chase) chase.p.addScaledVector(back,-12); if(G.f) G.f.d=Math.max(2.8,G.f.d-3); }); }
   if(d<1.2){ chase=null; sfin.visible=false; if(window.__KK) window.__KK.snatch(f.clone(),()=>{ stolenF=true; }); else stolenF=true; } }
 function endChase(){ chase=null; if(ev.id!=='shark') sfin.visible=false; }
@@ -3757,11 +3809,13 @@ $('bCam').addEventListener('click',()=>{ if(window.__GHOST&&window.__GHOST.onPho
   else c.toast('照片已存到下載資料夾','good');
 }catch(e){ c.toast('這個瀏覽器不支援拍照存檔','bad'); } });
 
+let marineWakeT=0;
 function update(dt,t){
   reefRoot.visible=loc==='sea'&&SPOTS[G.spot].id==='reef';
   const wx=c.wx(), day=W.info.day;
   if(wx.r>.4) lastRain=60; else lastRain=Math.max(0,lastRain-dt);
   updEv(dt,t,wx,day); updChase(dt);
+  if((marineWakeT-=dt)<=0){marineWakeT=.45;for(const root of [whale,sfin,...dolphins.map(o=>o.g)]){if(!root.visible)continue;const water=W.swell(root.position.x,root.position.z,t),b=marineBodyBounds(T,root).applyMatrix4(root.matrixWorld);if(b.min.y<water&&b.max.y>water){W.addRipple(root.position.x,root.position.z,root===whale?1.2:.35);foam(root.position.x,root.position.z,root===whale?1.8:.3,root===whale?3.5:.9,1.5);}}}
   lakeT-=dt; if(lakeT<=0){ lakeT=.25; const sea=(G.loc||loc)!=='lake'; S.children.forEach(o=>{ if(o.userData&&o.userData.lake){ const want=!sea&&!(o.userData.veg&&window.__GFX==='low'); if(o.visible!==want) o.visible=want; } }); }
   if(yacht.visible){ const b=base(); const h0=W.swell(b.x,b.z,t), fx=-Math.sin(G.head), fz=-Math.cos(G.head);
     const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);
@@ -5570,6 +5624,7 @@ const glassEdgeM=new T.MeshStandardMaterial({color:0x7fd0b8,transparent:true,opa
 const siliconeM=new T.MeshStandardMaterial({color:0x0c0d0e,roughness:.8,transparent:true,opacity:.85});
 const brassM=new T.MeshStandardMaterial({color:0xb08a4a,roughness:.3,metalness:.85});
 // tanks 依水質存放每個缸：群組、尺寸、位置、魚、水草、氣泡
+const tankLightTime=W.U.uTime;
 const tanks={}, causList=[], shaftList=[], tv2=new T.Vector3(), tv3=new T.Vector3();
 // 造景缸的木製底櫃：檯面板、門框、內嵌門片、黃銅把手、踢腳
 function standCabinet(g,W,Hs,D){ const add=(geo,m,px,py,pz)=>{ const o=new T.Mesh(geo,m); o.position.set(px,py,pz); g.add(o); return o; };
@@ -5645,7 +5700,8 @@ function buildTank(water,spec,x){
   if(!tags.some(q=>q.k==='tank_'+water)){ const tg=makeTag(water==='sea'?'👆 點海水缸觀賞':'👆 點水族箱觀賞'); tg.position.set(x,ly+.2,z); scene.add(tg); tags.push({s:tg,y:ly+.2,k:'tank_'+water}); } else { const tg=tags.find(q=>q.k==='tank_'+water); tg.s.position.set(x,ly+.2,z); tg.y=ly+.2; }
   if(false&&W>2.5){ const L2=new T.PointLight(0x9ad8ff,.6,3,1.4); L2.position.set(-W*.3,y+Hh-.05,0); g.add(L2); const L3=L2.clone(); L3.position.x=W*.3; g.add(L3); }
   const L=new T.PointLight(water==='sea'?0x8ad0ff:0x9ad8ff,.75,3,1.4); L.position.set(0,y+Hh-.05,0); g.add(L);
-  tanks[water]={g,spec,x,y,z,fish:[],plants,bub,glass:gl,sig:'',hAt};
+  const tankOptics=createWaterOptics({uTime:tankLightTime,uWind:{value:new T.Vector3(1,0,0)},uSea:{value:0},uLightCol:{value:new T.Vector3(.5,.72,.85)},uSunDir:{value:new T.Vector3(.1,1,.1)},uDay:{value:1}},{surface:y+Hh-.07,flat:true,bounds:{min:new T.Vector3(x-W/2,y,z-D/2),max:new T.Vector3(x+W/2,y+Hh,z+D/2)}});tankOptics.add(g);
+  tanks[water]={g,spec,x,y,z,fish:[],plants,bub,glass:gl,sig:'',hAt,optics:tankOptics};
 }
 
 // 把水族箱裡記錄的魚做成會游的模型（用遊戲同一個魚模型，按實際體長縮放）
@@ -5686,7 +5742,7 @@ function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.s
   for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=want[w]||[], sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|');
     if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[];
     list.forEach(rec=>{ try{ c.want(rec.id); const o=fishObj(rec); if(!o) return; o.scale.setScalar(BENTHIC[rec.id]?Math.max(.1,dispL(tk,rec.L)*1.6):dispL(tk,rec.L));   /* 小小的螃蟹、貝類在缸裡放大一點才看得到 */ const f={o,rec,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni}; const b=bounds(tk,rec.L);
-      o.position.set(b.x0+Math.random()*(b.x1-b.x0),b.y0+Math.random()*(b.y1-b.y0),(Math.random()-.5)*.1); o.rotation.y=Math.random()<.5?0:Math.PI; f.yaw=o.rotation.y; f.o=o; pickTarget(f,tk); tk.g.add(o); tk.fish.push(f);
+      o.position.set(b.x0+Math.random()*(b.x1-b.x0),b.y0+Math.random()*(b.y1-b.y0),(Math.random()-.5)*.1); o.rotation.y=Math.random()<.5?0:Math.PI; f.yaw=o.rotation.y; f.o=o; pickTarget(f,tk); tk.g.add(o);if(tk.optics)tk.optics.add(o); tk.fish.push(f);
       }catch(err){ console.error('tank fish',rec&&rec.id,err); } }); } }
 // 標本牆：右牆、壁爐後方，兩排各四個；大魚統一縮到木板放得下的長度
 const MSLOT=[]; for(const y of [1.5,2.15]) for(const z of [-3.65,-2.85,-2.05,-1.25]) MSLOT.push({y,z});   // 先掛視線高度那一排
@@ -6036,7 +6092,7 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
   updGrill(dt);   // 爐火劈啪聲，隨機間隔
   { const rk=c.rain?Math.min(1,c.rain()*1.6):0; rainGlass.tick(dt,rk); viewM.color.setScalar((.35+.65*daylight())*(1-.35*rk)); }   // 下雨：窗上有水珠、水痕往下滑，外面變暗變霧
   sparkles.forEach(q=>{ const k=Math.max(0,Math.sin(t*1.7+q.ph)); q.sp.material.opacity=Math.pow(k,8); q.sp.scale.setScalar(.03+.05*Math.pow(k,4)); if(k<.02&&Math.random()<.02) q.sp.position.set((Math.random()-.5)*1.5,(Math.random()-.5)*1.2,.0); });   // 水晶閃光
-  updTanks(dt);
+  updTanks(dt);for(const k of ['fresh','sea'])if(tanks[k]&&tanks[k].optics)tanks[k].optics.update();
   const shadowSize=window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
   const exposure=R.toneMappingExposure,shadows=R.shadowMap.enabled,shadowType=R.shadowMap.type;
   try{
@@ -6362,7 +6418,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261031221050'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261031221054'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -7034,8 +7090,8 @@ function createTide(W,c){
 'use strict';
 const T=THREE, rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const S=new T.Scene(), cam=new T.PerspectiveCamera(58,1,.05,400);
-const sky=new T.Color(0xb9c4c8); S.background=sky; new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.encoding=T.sRGBEncoding; const dome=new T.Mesh(new T.SphereGeometry(300,48,24),new T.MeshBasicMaterial({map:t,side:T.BackSide,fog:false,depthWrite:false})); dome.renderOrder=-10; dome.onBeforeRender=()=>dome.position.copy(cam.position); S.add(dome); });   /* 實拍海邊陰天天空（360 度全景貼在大球內側） */ S.fog=new T.Fog(sky,40,260);
-S.add(new T.HemisphereLight(0xeef4f8,0x6a6050,1.7)); const sun=new T.DirectionalLight(0xfff2dc,1.6); sun.position.set(30,60,-20); S.add(sun);
+let tideDome=null;const sky=new T.Color(0xb9c4c8); S.background=sky; new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.encoding=T.sRGBEncoding; const dome=new T.Mesh(new T.SphereGeometry(300,48,24),new T.MeshBasicMaterial({map:t,side:T.BackSide,fog:false,depthWrite:false})); tideDome=dome;dome.renderOrder=-10; dome.onBeforeRender=()=>dome.position.copy(cam.position); S.add(dome); });   /* 實拍海邊陰天天空（360 度全景貼在大球內側） */ S.fog=new T.Fog(sky,40,260);
+const tideHemi=new T.HemisphereLight(0xeef4f8,0x6a6050,.7);S.add(tideHemi); const sun=new T.DirectionalLight(0xfff2dc,1.6); sun.position.set(30,60,-20);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-12,right:12,top:12,bottom:-12,near:.2,far:120});sun.shadow.bias=-.0003;sun.shadow.normalBias=.006;S.add(sun,sun.target);let tideLightTick=0;
 // 泥灘地面（3D 地形）：沙紋起伏、潮溝、低窪積水都是真的高低差，不是平面貼圖
 //   ・岸邊是沙、往海那邊是泥，兩種用噪聲邊界自然融合（不是一條直線交接）
 //   ・低於積水面的地方有真正會反射天空的水窪
@@ -7822,7 +7878,10 @@ window.addEventListener('pointerdown',e=>{ if(!on||dig) return; const t=e.target
 /* ---------- 每一格 ---------- */
 let t=0;
 let rspawn=0;
-function render(dt){ if(!on) return; if(!dig) dropTick(dt); jetTick(dt); t+=dt; if(!roamers.length&&(rspawn-=dt)<=0){ rspawn=2; spawnRoamers(); } /* 模型下載好就放出泥面上的生物 */ const h=c.hour(), left=(endH-h)*60;   // 剩下幾分鐘（遊戲時間）
+function render(dt){ if(!on) return;
+  const daylight=Math.max(0,Math.min(1,W.U.uDay.value));sun.color.setRGB(W.U.uLightCol.value.x,W.U.uLightCol.value.y,W.U.uLightCol.value.z);sun.intensity=.7;sun.target.position.set(pos.x,0,pos.z);sun.position.copy(sun.target.position).addScaledVector(W.U.uSunDir.value,60);sun.target.updateMatrixWorld();tideHemi.intensity=.2+.7*daylight;tideHemi.color.setRGB(.25+.5*daylight,.32+.5*daylight,.45+.45*daylight);S.environment=W.scene.environment;if(tideDome)tideDome.material.color.setScalar(.06+.94*daylight);S.fog.color.copy(sky).multiplyScalar(.08+.92*daylight);
+  if((tideLightTick-=dt)<=0){tideLightTick=1;const shadowSize=window.__GFX==='high'?2048:512;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}S.traverse(o=>{if(o.isMesh){o.receiveShadow=true;if(o.geometry.type!=='PlaneGeometry'&&o.material&&o.material.isMeshStandardMaterial)o.castShadow=true;}});}
+ if(!dig) dropTick(dt); jetTick(dt); t+=dt; if(!roamers.length&&(rspawn-=dt)<=0){ rspawn=2; spawnRoamers(); } /* 模型下載好就放出泥面上的生物 */ const h=c.hour(), left=(endH-h)*60;   // 剩下幾分鐘（遊戲時間）
   $('tdClock').innerHTML=left>40?`🌊 退潮中・離漲潮還有 ${Math.floor(left)} 分`:`<span style="color:#ffb39a">⚠️ 漲潮倒數 ${Math.max(0,Math.floor(left))} 分</span>`;
   if(left<=40&&warned<1){ warned=1; warnEl.innerHTML='🌊 潮水開始回漲了！<br><small>跟著地上發亮的箭頭往岸邊走</small>'; warnEl.style.display='block'; setTimeout(()=>warnEl.style.display='none',3800); vib([80,60,80]); /* 不再插旗子 */ }
   if(left<=20&&warned<2){ warned=2; warnEl.innerHTML='⚠️ 二十分鐘後滿潮！立刻撤離<br><small>真實的泥灘：漲潮速度常比走路快，泥灘也會陷住腳。一定要先查潮汐表、結伴、提早離開</small>'; warnEl.style.display='block'; setTimeout(()=>warnEl.style.display='none',5200); vib([120,80,120,80,120]); }
@@ -7990,7 +8049,7 @@ function specialK(sp){ if(!sp.special) return 1;
 /* 魚群警覺：同一個方向一直釣，魚會變少、變小、變慢咬；換方向或換釣點就恢復（每分鐘消退 1） */
 /* 透水：水下物體在水面之後繪製，越深越透明、越帶水色（湖底沒有地形，所以讓物體透出來，而不是讓水變透明） */
 const SEE_U={value:new THREE.Vector3(.04,.13,.15)}, SEE_K={value:1}; window.__SEE_K=SEE_K;
-function seeThrough(obj){ if(obj&&W.submerged)W.submerged.add(obj); }
+function seeThrough(obj){if(obj&&W.optics)W.optics.add(obj);if(obj&&W.submerged)W.submerged.add(obj); }
 window.__seeThrough=seeThrough;
 const DEPL={}; const TR=b=>window.__TAL?window.__TAL.rank(b):0;
 function depKey(){ const A=((G.head+G.yaw)%(2*Math.PI)+2*Math.PI)%(2*Math.PI); return (WL.zoneId?WL.zoneId():'')+':'+Math.floor(A/(Math.PI/3)); }

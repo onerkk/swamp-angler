@@ -52,7 +52,7 @@ W.setPhotoHook((h,wx)=>{
   /* 深夜係數：19:20 起天色轉暗，21:00～04:00 為深夜，05:00 前天亮。照片曝光、光照一起壓暗，天空與水面反射一致 */
   const H=((h%24)+24)%24, ss=(a0,a1,x)=>{ const t=Math.min(1,Math.max(0,(x-a0)/(a1-a0))); return t*t*(3-2*t); };
   const nk=H>=12?ss(19.3,21,H):1-ss(4,5,H), deep=SET==='sea'?.018:.05; U.uNight.value=nk; U.uNightDeep.value=deep;
-  { const want=nk>.6?null:(env[ek]||null); if(W.scene.environment!==want){ W.scene.environment=want; envKey=ek; } }
+  { const want=env[ek]||null; if(W.scene.environment!==want){ W.scene.environment=want; envKey=ek; } }
   const li=L(MA.li,MB.li)*(1-wx.cloud*.75-wx.rain*.15)*(1-.6*nk);
   return {dir, lc:[L(MA.lc[0],MB.lc[0])*li,L(MA.lc[1],MB.lc[1])*li,L(MA.lc[2],MB.lc[2])*li],
     exp:Math.exp(L(Math.log(MA.exp),Math.log(MB.exp)))*(1-wx.cloud*.15), light:L(MA.light,MB.light)*(1-wx.cloud*.3)*(1-.55*nk)};
@@ -93,7 +93,7 @@ if(T.GLTFLoader){
             sh.fragmentShader='varying float vWetY;\n'+sh.fragmentShader.replace('#include <dithering_fragment>','gl_FragColor.rgb*=mix(.58,1.0,smoothstep(-.08,.24,vWetY));\n#include <dithering_fragment>');};k.customProgramCacheKey=()=> 'shore-wet';return k;};
           m.material=Array.isArray(m.material)?m.material.map(wet):wet(m.material);});
       }
-      W.scene.add(c); if(/trunk|stump|branches|rock/.test(file)) W.fishingPhysics.addObject(c,()=>c.visible,file.includes("rock")?"岸邊岩石":"倒木樹枝"); } });
+      W.scene.add(c);if(/trunk|stump|branches|rock/.test(file)){W.optics.add(c);W.submerged.add(c);} if(/trunk|stump|branches|rock/.test(file)) W.fishingPhysics.addObject(c,()=>c.visible,file.includes("rock")?"岸邊岩石":"倒木樹枝"); } });
   place('dead_tree_trunk_02.glb',[[-5.8,-.2,-9.5,.6,0,.05,1.1],[7.5,-.25,-16,-1.1,0,0,1.0],[-13,-.15,-22,2.2,0,0,1.2],[2,-.3,-26,.2,0,0,1.3]]);
   place('tree_stump_01.glb',[[3.9,-.14,-7.6,1,0,0,1.0],[-8.2,-.12,-14,2,0,0,1.3],[10,-.18,-24,0,0,0,1.4],[-3,-.2,-30,1.2,0,0,1.5]]);
   place('tree_stump_02.glb',[[-3.4,-.12,-5.2,.4,0,0,.8],[12.5,-.12,-11,1.7,0,0,1.1],[5.5,-.15,-34,2.5,0,0,1.6]]);

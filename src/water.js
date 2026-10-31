@@ -17,9 +17,14 @@ function sampleWater(x,z,t,wind,sea){
 function waterWaveGLSL(){
   const n=v=>Number(v).toFixed(9);
   const lines=sea=>WATER_WAVES[sea?'sea':'lake'].map(([L,A,angle,offset])=>`waterTerm(p,clock,vec2(wd.x*${n(Math.cos(angle))}-wd.y*${n(Math.sin(angle))},wd.x*${n(Math.sin(angle))}+wd.y*${n(Math.cos(angle))}),${n(L)},${n(A)}*strength,${n(offset)},s);`).join('\n');
-  return `void waterTerm(vec2 p,float clock,vec2 d,float L,float A,float offset,inout vec3 s){float k=6.283185307/L;float phase=k*dot(d,p)-sqrt(9.81*k)*clock+offset;float slope=k*A*cos(phase);s+=vec3(d.x*slope,A*sin(phase),d.y*slope);}
+  return `
+#ifndef SWAMP_WATER_WAVES
+#define SWAMP_WATER_WAVES
+void waterTerm(vec2 p,float clock,vec2 d,float L,float A,float offset,inout vec3 s){float k=6.283185307/L;float phase=k*dot(d,p)-sqrt(9.81*k)*clock+offset;float slope=k*A*cos(phase);s+=vec3(d.x*slope,A*sin(phase),d.y*slope);}
 vec3 waterSample(vec2 p,float clock,vec3 wind,float sea){vec2 wd=length(wind.xy)>.001?normalize(wind.xy):vec2(1.0,0.0);vec3 s=vec3(0.0);float strength;
-if(sea>.5){strength=.55+1.3*wind.z+1.5*max(0.0,wind.z-.6);${lines(true)}}else{strength=.45+1.8*wind.z;${lines(false)}}return s;}`;
+if(sea>.5){strength=.55+1.3*wind.z+1.5*max(0.0,wind.z-.6);${lines(true)}}else{strength=.45+1.8*wind.z;${lines(false)}}return s;}
+#endif
+`;
 }
 function makeWaterGrid(T,radius=150,rings=112,segments=192){
   const points=[0,0,0],indices=[];

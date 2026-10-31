@@ -45,7 +45,7 @@ function placeSnag(x,z,h){ const o=snagSrc.clone(true), g=new T.Group(); g.add(o
       k.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying float vWY;').replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWY=(modelMatrix*vec4(transformed,1.0)).y;');
         sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vWY;').replace('#include <dithering_fragment>','#include <dithering_fragment>\ngl_FragColor.rgb*=mix(0.45,1.0,smoothstep(0.0,0.55,vWY));'); };
       return k; }; m.material=Array.isArray(m.material)?m.material.map(conv):conv(m.material); } });
-  g.userData.lake=true; g.visible=!(W.isSea&&W.isSea()); S.add(g); W.fishingPhysics.addObject(g,()=>g.visible,"倒木"); SNAG_RIP.push([x,z]); }
+  g.userData.lake=true; g.visible=!(W.isSea&&W.isSea()); S.add(g);W.optics.add(g);W.submerged.add(g); W.fishingPhysics.addObject(g,()=>g.visible,"倒木"); SNAG_RIP.push([x,z]); }
 const SNAG_CLIP=new T.Plane(new T.Vector3(0,1,0),.01), SNAG_RIP=[];
 if(T.GLTFLoader) new T.GLTFLoader().load('dead_tree_trunk_02.glb',gl=>{ snagSrc=gl.scene; SNAGQ.forEach(a=>placeSnag(...a)); });
 snag(-33,-30,5); snag(-22,-35,3.6); snag(-36,-17,6.5); snag(-18,-29,2.4); snag(-29,-39,4.2); snag(-40,-26,3.2);
@@ -108,7 +108,7 @@ function patchGator(){ if(gPatched||(gH&&!gH.loaded)) return; let hit=false;
         transformed.z+=uGA*w_*${(len*0.11).toFixed(3)}*sin(uGT-tl_*6.2);
         transformed.y+=uGA*${(len*0.006).toFixed(3)}*sin(uGT*0.5+tl_*2.0);`); };
     m.customProgramCacheKey=()=>'gatorswim'; m.needsUpdate=true; });
-  if(hit){gPatched=true;W.submerged.add(gator);} }
+  if(hit){gPatched=true;W.optics.add(gator);W.submerged.add(gator);} }
 let gs={mode:'off'}, gTimer=rand(40,90), gRip=0, chaseDelay=-1, chaseGet=null, stolenF=false;
 const gS=new T.Vector3(), gE=new T.Vector3(), gP=new T.Vector3();
 function placeGator(p,yaw){ patchGator(); gator.position.set(p.x,W.swell(p.x,p.z,W.U.uTime.value)-.025,p.z);

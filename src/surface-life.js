@@ -7,7 +7,7 @@ function createSurfaceResidents(W,P,MDL){
     for(let i=fish.length;i<count;i++){
       const id=ids[i%ids.length],sp=P.SPECIES.find(s=>s.id===id);if(!sp||!MDL.fishReady(id))continue;
       const f=MDL.fish(sp);if(!f)continue;const L=sea?.65+(i%3)*.15:.32+(i%3)*.09;
-      f.group.scale.setScalar(L);group.add(f.group);W.submerged.add(f.group);fish.push({...f,L,phase:i*2.399,depth:.3+(i%3)*.16,last:null});
+      f.group.scale.setScalar(L);group.add(f.group);if(W.optics)W.optics.add(f.group);W.submerged.add(f.group);fish.push({...f,L,phase:i*2.399,depth:.3+(i%3)*.16,last:null});
     }
   }
   function update(dt,G){

@@ -8,7 +8,7 @@ root=Path(__file__).resolve().parents[1]
 s=json.loads(subprocess.check_output(['node','tests/export-submerged-shaders.cjs'],cwd=root))
 def es3(code,vert):
  return '#version 300 es\n#define texture2D texture\n'+('#define attribute in\n#define varying out\n' if vert else '#define varying in\nout highp vec4 outColor;\n#define gl_FragColor outColor\n')+code.replace('#extension GL_OES_standard_derivatives : enable\n','')
-for key in ['vs','fs','instVS','standardVS','standardFS','skinnedVS','standardInstVS','marineVS','marineFS','physicalFS']:
+for key in ['vs','fs','instVS','standardVS','standardFS','skinnedVS','standardInstVS','marineVS','marineFS','physicalFS','opticsVS','opticsFS','opticsSkinVS','opticsPhysicalFS']:
  typ=0x8B30 if key.lower().endswith('fs') else 0x8B31
  assert gl.check(key,typ,s[key]);assert gl.check('WebGL2 '+key,typ,es3(s[key],typ!=0x8B30))
 f=gl.fn

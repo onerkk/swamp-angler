@@ -8,8 +8,8 @@ function createTide(W,c){
 'use strict';
 const T=THREE, rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const S=new T.Scene(), cam=new T.PerspectiveCamera(58,1,.05,400);
-const sky=new T.Color(0xb9c4c8); S.background=sky; new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.encoding=T.sRGBEncoding; const dome=new T.Mesh(new T.SphereGeometry(300,48,24),new T.MeshBasicMaterial({map:t,side:T.BackSide,fog:false,depthWrite:false})); dome.renderOrder=-10; dome.onBeforeRender=()=>dome.position.copy(cam.position); S.add(dome); });   /* 實拍海邊陰天天空（360 度全景貼在大球內側） */ S.fog=new T.Fog(sky,40,260);
-S.add(new T.HemisphereLight(0xeef4f8,0x6a6050,1.7)); const sun=new T.DirectionalLight(0xfff2dc,1.6); sun.position.set(30,60,-20); S.add(sun);
+let tideDome=null;const sky=new T.Color(0xb9c4c8); S.background=sky; new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.encoding=T.sRGBEncoding; const dome=new T.Mesh(new T.SphereGeometry(300,48,24),new T.MeshBasicMaterial({map:t,side:T.BackSide,fog:false,depthWrite:false})); tideDome=dome;dome.renderOrder=-10; dome.onBeforeRender=()=>dome.position.copy(cam.position); S.add(dome); });   /* 實拍海邊陰天天空（360 度全景貼在大球內側） */ S.fog=new T.Fog(sky,40,260);
+const tideHemi=new T.HemisphereLight(0xeef4f8,0x6a6050,.7);S.add(tideHemi); const sun=new T.DirectionalLight(0xfff2dc,1.6); sun.position.set(30,60,-20);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-12,right:12,top:12,bottom:-12,near:.2,far:120});sun.shadow.bias=-.0003;sun.shadow.normalBias=.006;S.add(sun,sun.target);let tideLightTick=0;
 // 泥灘地面（3D 地形）：沙紋起伏、潮溝、低窪積水都是真的高低差，不是平面貼圖
 //   ・岸邊是沙、往海那邊是泥，兩種用噪聲邊界自然融合（不是一條直線交接）
 //   ・低於積水面的地方有真正會反射天空的水窪
@@ -796,7 +796,10 @@ window.addEventListener('pointerdown',e=>{ if(!on||dig) return; const t=e.target
 /* ---------- 每一格 ---------- */
 let t=0;
 let rspawn=0;
-function render(dt){ if(!on) return; if(!dig) dropTick(dt); jetTick(dt); t+=dt; if(!roamers.length&&(rspawn-=dt)<=0){ rspawn=2; spawnRoamers(); } /* 模型下載好就放出泥面上的生物 */ const h=c.hour(), left=(endH-h)*60;   // 剩下幾分鐘（遊戲時間）
+function render(dt){ if(!on) return;
+  const daylight=Math.max(0,Math.min(1,W.U.uDay.value));sun.color.setRGB(W.U.uLightCol.value.x,W.U.uLightCol.value.y,W.U.uLightCol.value.z);sun.intensity=.7;sun.target.position.set(pos.x,0,pos.z);sun.position.copy(sun.target.position).addScaledVector(W.U.uSunDir.value,60);sun.target.updateMatrixWorld();tideHemi.intensity=.2+.7*daylight;tideHemi.color.setRGB(.25+.5*daylight,.32+.5*daylight,.45+.45*daylight);S.environment=W.scene.environment;if(tideDome)tideDome.material.color.setScalar(.06+.94*daylight);S.fog.color.copy(sky).multiplyScalar(.08+.92*daylight);
+  if((tideLightTick-=dt)<=0){tideLightTick=1;const shadowSize=window.__GFX==='high'?2048:512;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}S.traverse(o=>{if(o.isMesh){o.receiveShadow=true;if(o.geometry.type!=='PlaneGeometry'&&o.material&&o.material.isMeshStandardMaterial)o.castShadow=true;}});}
+ if(!dig) dropTick(dt); jetTick(dt); t+=dt; if(!roamers.length&&(rspawn-=dt)<=0){ rspawn=2; spawnRoamers(); } /* 模型下載好就放出泥面上的生物 */ const h=c.hour(), left=(endH-h)*60;   // 剩下幾分鐘（遊戲時間）
   $('tdClock').innerHTML=left>40?`🌊 退潮中・離漲潮還有 ${Math.floor(left)} 分`:`<span style="color:#ffb39a">⚠️ 漲潮倒數 ${Math.max(0,Math.floor(left))} 分</span>`;
   if(left<=40&&warned<1){ warned=1; warnEl.innerHTML='🌊 潮水開始回漲了！<br><small>跟著地上發亮的箭頭往岸邊走</small>'; warnEl.style.display='block'; setTimeout(()=>warnEl.style.display='none',3800); vib([80,60,80]); /* 不再插旗子 */ }
   if(left<=20&&warned<2){ warned=2; warnEl.innerHTML='⚠️ 二十分鐘後滿潮！立刻撤離<br><small>真實的泥灘：漲潮速度常比走路快，泥灘也會陷住腳。一定要先查潮汐表、結伴、提早離開</small>'; warnEl.style.display='block'; setTimeout(()=>warnEl.style.display='none',5200); vib([120,80,120,80,120]); }

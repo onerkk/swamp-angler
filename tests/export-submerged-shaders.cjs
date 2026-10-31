@@ -24,4 +24,12 @@ const marine=createMarineMaterials(T),deck={uniforms:{},vertexShader:T.ShaderLib
 out.marineVS=defs+vp+expand(deck.vertexShader);out.marineFS=defs+fp+expand(deck.fragmentShader);
 out.physicalFS=defs+'#define PHYSICAL\n'+fp+expand(T.ShaderLib.physical.fragmentShader);
 T.TextureLoader.prototype.load=textureLoad;
+// The combined standard/physical optics and immersion shaders must share wave definitions.
+const {createWaterOptics}=require('../src/optics.js');Object.assign(W.U,{uSunDir:{value:new T.Vector3(.3,.8,.2)},uLightCol:{value:new T.Vector3(1,.9,.7)},uDay:{value:1}});
+const optics=createWaterOptics(W.U),wet=new T.MeshStandardMaterial(),wetMesh=new T.Mesh(new T.BoxGeometry(),wet);optics.add(wetMesh);layer.add(wetMesh);
+const wetShader={uniforms:{},vertexShader:T.ShaderLib.standard.vertexShader,fragmentShader:T.ShaderLib.standard.fragmentShader};wet.onBeforeCompile(wetShader,{});
+out.opticsVS=defs+vp+expand(wetShader.vertexShader);out.opticsFS=defs+fp+expand(wetShader.fragmentShader);
+out.opticsSkinVS=defs+'#define USE_SKINNING\n#define MAX_BONES 16\nattribute vec4 skinIndex,skinWeight;\n'+vp+expand(wetShader.vertexShader);
+const wetPhysical=new T.MeshPhysicalMaterial();optics.patch(wetPhysical);const physicalShader={uniforms:{},vertexShader:T.ShaderLib.physical.vertexShader,fragmentShader:T.ShaderLib.physical.fragmentShader};wetPhysical.onBeforeCompile(physicalShader,{});
+out.opticsPhysicalFS=defs+'#define PHYSICAL\n'+fp+expand(physicalShader.fragmentShader);
 process.stdout.write(JSON.stringify(out));

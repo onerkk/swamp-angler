@@ -610,7 +610,7 @@ function setTime(hour, force){
   U.uSunVis.value = (direct*vis + wM)/(direct + wM + 1e-4);
   renderer.toneMappingExposure = lerp(a.exp, b.exp, f)*(1+.1*wx.cloud);
   const lc = U.uLightCol.value;
-  sunLight.color.setRGB(lc.x, lc.y, lc.z); sunLight.intensity = 0.85;
+  sunLight.color.setRGB(lc.x, lc.y, lc.z); sunLight.intensity = 0.85;hemi.intensity=.55;
   sunLight.position.copy(ld).multiplyScalar(60);
   const z = U.uZenith.value, hz = U.uHorizon.value;
   hemi.color.setRGB((z.x+hz.x)*0.6, (z.y+hz.y)*0.6, (z.z+hz.z)*0.6);
@@ -618,8 +618,8 @@ function setTime(hour, force){
   info.day = U.uDay.value; info.light = Math.min(1.2, 0.08 + (lc.x+lc.y+lc.z)/3*0.35 + (hz.x+hz.y+hz.z)/3*0.5);
   if(photoHook){ const o=photoHook(h,wx); if(o){
     U.uSunDir.value.copy(o.dir); U.uSunDisk.value.copy(o.dir); U.uLightCol.value.set(o.lc[0],o.lc[1],o.lc[2]); U.uSunVis.value=1-wx.cloud*.85;
-    renderer.toneMappingExposure=o.exp; U.uExpo.value=o.exp; sunLight.color.setRGB(o.lc[0],o.lc[1],o.lc[2]); sunLight.intensity=.35*(1-wx.cloud*.8);
-    sunLight.position.copy(o.dir).multiplyScalar(60); hemi.intensity=0; info.light=o.light; return info; } }
+    renderer.toneMappingExposure=o.exp; U.uExpo.value=o.exp; sunLight.color.setRGB(o.lc[0],o.lc[1],o.lc[2]); sunLight.intensity=.7*(1-wx.cloud*.5);
+    sunLight.position.copy(o.dir).multiplyScalar(60);hemi.color.setRGB(.18+.35*U.uDay.value,.23+.35*U.uDay.value,.32+.35*U.uDay.value);hemi.groundColor.setRGB(.035,.045,.055);hemi.intensity=.45*(1-wx.cloud*.3);info.light=o.light;return info; } }
   let dh = Math.abs(h - envHour); if(dh > 12) dh = 24 - dh;
   if(force || dh > 0.35 || wxDirty){ wxDirty = false; envHour = h; regenEnv(); }
   return info;
@@ -631,8 +631,8 @@ function seaH(x,z,t){ return sampleWater(x,z,t,U.uWind.value,true).height; }
 function swell(x,z,t){return sampleWater(x,z,t,U.uWind.value,seaMode).height;}
 
 function update(dt, t){
-  if(renderer.shadowMap.enabled){const target=new T.Vector3();camera.getWorldPosition(target);target.y=0;sunLight.target.position.copy(target);sunLight.position.copy(target).addScaledVector(U.uSunDir.value,60);sunLight.target.updateMatrixWorld();}
-  U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
+  {const target=new T.Vector3();camera.getWorldPosition(target);target.y=0;sunLight.target.position.copy(target);sunLight.position.copy(target).addScaledVector(U.uSunDir.value,60);sunLight.target.updateMatrixWorld();}
+  optics.update();U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
   if(seaGrid.visible) seaGrid.position.set(U.uEye.value.x,0,U.uEye.value.z);
   { const w=U.uWind.value, k=(.002+.01*w.z)*dt; U.uCloudOff.value.x+=w.x*k; U.uCloudOff.value.y+=w.y*k; }
   for(let i=0;i<12;i++){ const r = ripS[i]; r.age += dt; rip[i].set(r.x, r.z, r.age, r.age < 5 ? r.amp : 0); }
@@ -678,6 +678,7 @@ function renderRefl(){
   }
 }
 
+const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
 function render(){ submerged.render(); if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } renderer.render(scene, camera); }
 
@@ -691,5 +692,5 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
