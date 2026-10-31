@@ -56,9 +56,9 @@ for(const x of [-1.0,1.0]){ const m=new T.Mesh(new T.BoxGeometry(.12,.16,9.5),be
 /* ---------- 睡蓮葉、花、蘆葦 ---------- */
 const padTex=dataTex(128,128,(u,v,o)=>{ const x=u*2-1, y=v*2-1, r=Math.hypot(x,y), a=Math.atan2(y,x);
   const vein=Math.pow(Math.abs(Math.cos(a*7)),60)*sstep(.1,.3,r)*.5, n=fbm(u*9,v*9,3);
-  const k=.78+.35*n-vein*.6+.12*sstep(.85,1,r); o[0]=58*k; o[1]=92*k; o[2]=34*k; });
+  const k=.78+.35*n-vein*.6+.12*sstep(.85,1,r); o[0]=49*k; o[1]=68*k; o[2]=29*k; });
 const padGeo=new T.CircleGeometry(1,24,.16,Math.PI*2-.32); padGeo.rotateX(-Math.PI/2);
-const padMat=new T.MeshStandardMaterial({map:padTex, roughness:.68, metalness:0, side:T.DoubleSide, envMapIntensity:.35});   // 葉面蠟質只有淡淡光澤，陰天不會反射成一片白
+const padMat=new T.MeshStandardMaterial({map:padTex, roughness:.86, metalness:0, side:T.DoubleSide, envMapIntensity:.18});   // 葉面蠟質只有淡淡光澤，陰天不會反射成一片白
 const padPos=[];
 { const R=rng(11); const cl=[[-3.0,-5.5,9],[-2.4,-9.5,8],[3.4,-7.2,10],[2.9,-13,7],[-5.5,-15,10],[6,-18,9],[-3.8,-24,8],[5,-28,7],[-7,-30,9],[3.4,-4.6,6],[-3.3,-3.6,5]];
   for(const c of cl) for(let i=0;i<c[2];i++){ const a=R()*6.283, r=Math.sqrt(R())*1.6; padPos.push([c[0]+Math.cos(a)*r, c[1]+Math.sin(a)*r, .13+R()*.22, R()*6.283]); } }

@@ -561,13 +561,22 @@ const SCH=createSchools(W,P,{loc:()=>G.loc||'lake',period:()=>period(G.hour),ok:
 const AFTER=createEndingWorld(W,{done:()=>!!(save.story&&save.story.ending),lake:()=>(G.loc||'lake')==='lake'&&G.state!=='home',ending:()=>END.on(),hour:()=>G.hour});
 window.__playEnding=done=>{ if(G.state==='home'){ leaveHome(()=>window.__playEnding(done)); return; } END.play(endingShots(END,{save,W,P,G}),done); };
 // 靜月之光：作者的水晶小店（遊戲免費，喜歡的話可以支持作者）
-const SHOP_URL='https://tw.shp.ee/BcamsN2F';
-function openShop(){ const ui=$('shopUI'); ui.innerHTML=`<div class="box"><h3>💎 靜月之光・水晶手作</h3>
-  <div class="sub">《濕地垂釣》完全免費。做這個遊戲的人，平常也親手挑選、串製天然水晶。<br>老漁人說：「月光灣的石頭會發光，這些也是。」喜歡的話，歡迎逛逛。</div>
-  <div class="grid">${[1,2,3,4,5,6,7,8,9].map(i=>`<img src="shop${i}.jpg" alt="水晶作品" loading="lazy">`).join('')}</div>
-  <a class="go" href="${SHOP_URL}" target="_blank" rel="noopener">🛍 前往蝦皮賣場「靜月之光」</a><button class="x" data-x="1">關閉</button></div>`;
-  ui.classList.remove('hidden'); ui.onclick=e=>{ if(e.target===ui||e.target.dataset.x) ui.classList.add('hidden'); }; }
+const SHOP_URL=SHOP_BRAND.url;
+let shopReturnFocus=null;
+function closeShop(){ $('shopUI').classList.add('hidden');if(shopReturnFocus&&shopReturnFocus.focus)shopReturnFocus.focus(); }
+function openShop(){ const ui=$('shopUI');shopReturnFocus=document.activeElement;
+  ui.innerHTML=`<div class="box" role="dialog" aria-modal="true" aria-labelledby="shopTitle">
+    <div class="shop-head"><span>JING YUE · NATURAL STONES</span><button class="shop-close" type="button" data-x="1" aria-label="關閉商品展示">×</button></div>
+    <div class="shop-scroll"><div class="shop-intro"><p class="shop-kicker">漁人小屋裡的一間水晶小店</p><h3 id="shopTitle">靜月之光</h3><p class="shop-line">把喜歡的光，戴進日常。</p><p class="sub">從晶透光澤到個性礦石，看看哪一款適合今天的你。<br>以下皆為商品實拍，喜歡就到蝦皮看更多細節。</p></div>
+    <div class="shop-featured">${SHOP_BRAND.features.map(f=>`<a class="shop-card" href="${SHOP_URL}" target="_blank" rel="noopener noreferrer" aria-label="到蝦皮挑選${f.label}款式"><img src="${f.image}" alt="${f.label}飾品實拍"><span>${f.label}<b>到賣場挑選 ↗</b></span></a>`).join('')}</div>
+    <div class="shop-details"><span>商品實拍</span><span>款式自由挑選</span><span>蝦皮下單</span></div>
+    <div class="shop-more"><h4>再看看其他搭配</h4><div class="grid">${[2,3,5,6,7,8].map(i=>`<a href="${SHOP_URL}" target="_blank" rel="noopener noreferrer" aria-label="前往靜月之光蝦皮賣場"><img src="shop${i}.jpg" alt="靜月之光飾品實拍 ${i}" loading="lazy"></a>`).join('')}</div><p class="shop-small">款式、價格與庫存，以蝦皮賣場資訊為準。逛逛小店，也是在支持《濕地垂釣》的製作。</p></div></div>
+    <div class="shop-footer"><a class="go" href="${SHOP_URL}" target="_blank" rel="noopener noreferrer">開啟蝦皮・看價格與現貨 <span>↗</span></a><button class="x" type="button" data-x="1">繼續遊戲</button></div></div>`;
+  ui.classList.remove('hidden');ui.onclick=e=>{if(e.target===ui||e.target.closest('[data-x]'))closeShop();};ui.querySelector('.shop-close').focus();
+}
+document.addEventListener('keydown',e=>{const ui=$('shopUI');if(ui.classList.contains('hidden'))return;if(e.key==='Escape')closeShop();if(e.key==='Tab'){const items=ui.querySelectorAll('button,a[href]'),first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
 window.__SHOP=openShop;
+$('bHomeShop').addEventListener('click',openShop);
 window.__CLOUD=createCloud({save:()=>save,toast,test:TESTACC,
   grant:()=>{ if((save.coins||0)<999999){ save.coins=999999; setCoins(); META.syncHUD(); persist(); } toast('🧪 測試帳號：金幣 999,999','good',2600); },refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
   apply:obj=>{ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} location.reload(); }});
@@ -637,7 +646,7 @@ const UW=createUnderwater(W,P);
 const tvSea=new THREE.Vector3();
 window.__MDL=createModels(W); const MDL=window.__MDL; MDL.preload('lake');
 // 打開設定、商店等面板或新手指引時，鱷魚與女鬼都不會發動（玩家沒在看湖面）
-const uiBusy=()=>{ const sh=document.getElementById('sheet'); return (sh&&!sh.classList.contains('hidden'))||!!document.getElementById('tutOv'); };
+const uiBusy=()=>{ const sh=document.getElementById('sheet'); return (sh&&!sh.classList.contains('hidden'))||!$('shopUI').classList.contains('hidden')||!!document.getElementById('tutOv'); };
 const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,
   state:()=>uiBusy()?'menu':G.state, loc:()=>G.loc||'lake', kayak:()=>({on:!!SPOTS[G.spot].kayak,v:Math.abs(KY.v),yaw:G.head}),
   onBite:(pos)=>{ faceThreat(pos,{dur:2.6,pitch:-.25}); if(G.state==='wait'||G.state==='bite'){ G.state='lost'; G.stT=0; G.snapped=true; }   // 鱷魚咬船：斷線、連擊歸零、驚魂未定

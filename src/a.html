@@ -266,12 +266,32 @@ body.athome #homeUI .hb{flex-wrap:wrap;justify-content:center}#grillUI .gt{font-
 #grillPick{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:22;background:rgba(20,14,10,.85);border:1px solid rgba(255,200,140,.3);border-radius:16px;padding:12px;color:#f3e6d2;max-height:55vh;overflow:auto}
 #grillPick .it{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08)}
 body.grilling #homeUI,body.grilling #joy{display:none!important}
-#shopUI{position:fixed;inset:0;z-index:70;background:rgba(10,8,14,.88);display:flex;align-items:center;justify-content:center;padding:16px}
-#shopUI.hidden{display:none}#shopUI .box{max-width:420px;width:100%;max-height:90vh;overflow:auto;background:#1b1622;border:1px solid rgba(200,170,255,.35);border-radius:18px;padding:16px;color:#efe8f7}
-#shopUI h3{margin:0 0 4px;font-size:19px}#shopUI .sub{font-size:13px;opacity:.8;line-height:1.6;margin-bottom:10px}
-#shopUI .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}#shopUI .grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px}
-#shopUI .go{display:block;text-align:center;background:linear-gradient(135deg,#ee4d2d,#ff7337);color:#fff;font-weight:700;padding:13px;border-radius:12px;text-decoration:none;font-size:16px}
-#shopUI .x{display:block;margin:10px auto 0;background:none;border:0;color:#cbbfe0;font-size:14px}
+body.athome #homeUI .hb{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:min(100%,320px);gap:7px}body.athome #homeUI .hb .btn{padding:10px 4px;font-size:12px;white-space:nowrap}#homeUI .home-shop{grid-column:1/-1;background:#163a31;border:1px solid #b99b63;color:#f1dfba;font-size:13px}
+#shopUI{position:fixed;inset:0;z-index:70;background:rgba(5,16,15,.88);display:flex;align-items:center;justify-content:center;padding:12px;backdrop-filter:blur(8px);touch-action:auto}
+#shopUI.hidden{display:none}
+#shopUI .box{width:100%;max-width:560px;max-height:94vh;max-height:94dvh;display:flex;flex-direction:column;overflow:hidden;border:1px solid #9c8453;border-radius:20px;background:#f3eee3;color:#213832;box-shadow:0 24px 80px #0009}
+#shopUI .shop-head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:#102c29;color:#d8c496;font-size:10px;letter-spacing:1.6px;flex-shrink:0}
+#shopUI .shop-close{width:34px;height:34px;border:1px solid #ffffff36;border-radius:50%;background:transparent;color:#fff;font-size:25px;line-height:1;cursor:pointer}
+#shopUI .shop-scroll{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;min-height:0}
+#shopUI .shop-intro{padding:22px 22px 16px}
+#shopUI .shop-kicker{margin:0 0 8px;color:#6a7667;font-size:11px;letter-spacing:1px}
+#shopUI h3{margin:0;font-family:"Noto Serif TC","Songti TC",serif;font-size:38px;letter-spacing:5px;color:#173b32;font-weight:700}
+#shopUI .shop-line{font-size:18px;margin:10px 0;color:#886734}
+#shopUI .sub{font-size:12px;line-height:1.9;color:#58665b;margin:0}
+#shopUI .shop-featured{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;padding:0 18px 18px}
+#shopUI .shop-card{text-decoration:none;color:#23392f;border:1px solid #d9d0bd;background:#fffcf6;overflow:hidden;border-radius:8px}
+#shopUI .shop-card img{display:block;width:100%;aspect-ratio:1;object-fit:cover}
+#shopUI .shop-card span{display:block;padding:9px 7px;font-size:12px;font-weight:700}
+#shopUI .shop-card b{display:block;font-size:9px;margin-top:5px;color:#967247;font-weight:400}
+#shopUI .shop-details{display:flex;justify-content:center;gap:14px;padding:12px 8px;border-block:1px solid #dbd2c0;font-size:11px;color:#6c705d}
+#shopUI .shop-more{padding:16px 20px 10px}#shopUI h4{font-size:13px;font-weight:500;margin:0 0 12px;color:#536555}
+#shopUI .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}#shopUI .grid img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px}
+#shopUI .shop-small{font-size:10px;line-height:1.8;color:#7a7d70;margin:12px 0}
+#shopUI .shop-footer{padding:14px 18px calc(8px + env(safe-area-inset-bottom,0px));background:#fffaf1;border-top:1px solid #dfd7c8;flex-shrink:0}
+#shopUI .go{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:49px;padding:12px 15px;border-radius:10px;background:#ee4d2d;color:#fff;font-weight:700;text-decoration:none;font-size:15px;box-shadow:0 4px 14px #e055242b}
+#shopUI .x{display:block;margin:8px auto 0;min-height:32px;padding:4px 18px;border:0;background:none;color:#687467;font-size:12px;cursor:pointer}
+#shopUI a:focus-visible,#shopUI button:focus-visible{outline:3px solid #b48940;outline-offset:2px}
+@media(max-width:360px){#shopUI .shop-featured{gap:5px;padding-inline:10px}#shopUI .shop-intro{padding:17px}#shopUI .go{font-size:13px}#shopUI h3{font-size:33px}}
 @keyframes rubBlink{50%{box-shadow:0 0 0 3px #ff9a3c}}.rub{animation:rubBlink .4s infinite}
 @keyframes slackBlink{50%{box-shadow:0 0 0 3px #6ab8ff}}.slack{animation:slackBlink .5s infinite}
 body.fighting #top,body.fighting #top2,body.fighting #magWin,body.fighting .hotChip,body.fighting #hotChip{opacity:.12;transition:opacity .5s;pointer-events:none}
@@ -332,7 +352,7 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:lo
 <div id="grillPick" class="hidden"></div>
 <div id="shopUI" class="hidden"></div>
 <div id="homeView" class="hidden"><button class="btn" id="bViewBack">← 返回客廳</button><button class="btn" id="bDive">🤿 潛入缸內</button></div><div id="fishCard" class="hidden"></div>
-<div id="homeUI"><div class="hh">點水族箱可以靠近觀賞・拖曳畫面轉頭</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn" id="bGrillH">🔥 烤魚</button><button class="btn pri" id="bTankM">🏠 管理</button></div></div>
+<div id="homeUI"><div class="hh">點水族箱可以靠近觀賞・拖曳畫面轉頭</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn" id="bGrillH">🔥 烤魚</button><button class="btn pri" id="bTankM">🏠 管理</button><button class="btn home-shop" id="bHomeShop">💎 逛水晶小店</button></div></div>
 <div id="toast"></div>
 <div id="fight" class="hidden">
   <div class="hd"><span id="fName">上鉤了！</span><b id="fDist">0.0 m</b></div>

@@ -311,7 +311,17 @@ void main(){
   float px = length(fwidth(p));
   float fadeD = 1.0 - smoothstep(0.012, 0.03, px);
   float leaf = noise2(p*42.0)*0.6 + noise2(p*11.0)*0.4;
-  float dw = smoothstep(0.6, 0.64, dens + (leaf - 0.5)*0.16*fadeD)*(1.0 - uSea);
+  // Individual floating leaves, with open water between them even inside a patch.
+  vec2 leafP=p*38.0+vec2(sin(uTime*.055),cos(uTime*.043))*.08;
+  vec2 cell=floor(leafP), leafUV=fract(leafP)-.5;
+  vec2 leafOffset=vec2(hash21(cell+3.1),hash21(cell+19.7))*.45-.225;
+  float leafRadius=.12+.12*hash21(cell+7.9);
+  float aa=max(.012,length(fwidth(leafP))*.65);
+  float leafShape=1.0-smoothstep(leafRadius-aa,leafRadius+aa,length((leafUV-leafOffset)*vec2(1.0,1.35)));
+  float patch=smoothstep(.58,.79,dens);
+  float chosen=step(1.0-patch*.65,hash21(cell+41.2));
+  float dw=leafShape*chosen*fadeD*(1.0-uSea);
+  dw+=patch*.018*(1.0-fadeD)*(1.0-uSea);
   vec2 wd = normalize(uWind.xy + vec2(1e-4));
   float gust = smoothstep(0.35, 0.75, noise2(p*0.035 - uCloudOff*9.0)*0.7 + noise2(p*0.11 - uCloudOff*20.0)*0.3);
   float csh = 1.0 - 0.85*cloudSh(p);
@@ -379,9 +389,11 @@ void main(){
   refl = mix(refl, vec3(dot(refl, vec3(0.3, 0.59, 0.11))), 0.35*uRain*uSea);   // 雨打花的海面把天空反得糊而灰
   if(uReflOn > 0.5){
     vec4 rp = uReflMat*vec4(vW.x, 0.0, vW.z, 1.0);
-    vec2 ruv = rp.xy/rp.w + N.xz*(0.03 + 0.05*uSea)*(1.0 - smoothstep(30.0, 160.0, dist)*0.6);
+    vec4 displaced=uReflMat*vec4(vW.x+N.x*.06,0.0,vW.z+N.z*.06,1.0);
+    vec2 ruv=displaced.xy/max(displaced.w,.001);
+    float inReflection=step(0.0,ruv.x)*step(ruv.x,1.0)*step(0.0,ruv.y)*step(ruv.y,1.0)*step(.001,rp.w);
     vec4 rc = texture2D(uRefl, clamp(ruv, 0.002, 0.998));
-    refl = mix(refl, TM(rc.rgb)*0.92, clamp(rc.a, 0.0, 1.0)*(1.0 - 0.35*uRain));
+    refl = mix(refl, TM(rc.rgb)*0.92, clamp(rc.a, 0.0, 1.0)*inReflection*(1.0 - 0.35*uRain));
   }
   float sd = max(dot(R, uSunDir), 0.0);
   vec3 glint = uLightCol*(pow(sd, 1600.0)*28.0 + pow(sd, 160.0)*0.5)*uSunVis*csh;
@@ -635,11 +647,19 @@ function renderRefl(){
   _q.x=(Math.sign(_cpl.x)+pm.elements[8])/pm.elements[0]; _q.y=(Math.sign(_cpl.y)+pm.elements[9])/pm.elements[5]; _q.z=-1; _q.w=(1+pm.elements[10])/pm.elements[14];
   _cpl.multiplyScalar(2/_cpl.dot(_q)); pm.elements[2]=_cpl.x; pm.elements[6]=_cpl.y; pm.elements[10]=_cpl.z+1-.003; pm.elements[14]=_cpl.w;
   const hid=[water,seaGrid,sky,...reflHide].filter(o=>o&&o.visible); hid.forEach(o=>o.visible=false);
-  const oc=renderer.getClearColor(new T.Color()), oa=renderer.getClearAlpha(), ort=renderer.getRenderTarget(), bg=scene.background, sh=renderer.shadowMap.autoUpdate;
+  const oc=renderer.getClearColor(new T.Color()), oa=renderer.getClearAlpha(), ort=renderer.getRenderTarget(), bg=scene.background, sh=renderer.shadowMap.autoUpdate, tone=renderer.toneMapping, encoding=renderer.outputEncoding;
   scene.background=null; renderer.shadowMap.autoUpdate=false;
-  renderer.setRenderTarget(reflRT); renderer.setClearColor(0x000000,0); renderer.clear(); renderer.render(scene,reflCam);
-  renderer.setRenderTarget(ort); renderer.setClearColor(oc,oa); scene.background=bg; renderer.shadowMap.autoUpdate=sh;
-  hid.forEach(o=>o.visible=true); WU.uReflOn.value=1; }
+  try{
+    // Reflection target stores linear radiance, so the water shader applies exposure once.
+    renderer.toneMapping=T.NoToneMapping; renderer.outputEncoding=T.LinearEncoding;
+    renderer.setRenderTarget(reflRT);renderer.setClearColor(0x000000,0);renderer.clear();renderer.render(scene,reflCam);
+    WU.uReflOn.value=1;
+  }finally{
+    renderer.setRenderTarget(ort);renderer.setClearColor(oc,oa);scene.background=bg;renderer.shadowMap.autoUpdate=sh;
+    renderer.toneMapping=tone;renderer.outputEncoding=encoding;hid.forEach(o=>o.visible=true);
+  }
+}
+
 function render(){ if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } renderer.render(scene, camera); }
 
 function setIce(on){ water.visible=!on; if(on) seaGrid.visible=false; }
