@@ -41,7 +41,7 @@ function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
   function render(){
     WU.uSubmergedOn.value=0;if(!roots.size)return;
     camera.updateWorldMatrix(true,false);camera.matrixWorldInverse.copy(camera.matrixWorld).invert();cam.matrix.copy(camera.matrixWorld);cam.matrixWorld.copy(camera.matrixWorld);cam.matrixWorldInverse.copy(camera.matrixWorldInverse);cam.projectionMatrix.copy(camera.projectionMatrix);cam.projectionMatrixInverse.copy(camera.projectionMatrixInverse);cam.near=camera.near;cam.far=camera.far;
-    R.getDrawingBufferSize(size);const scale=window.__GFX==='low'?.5:.85,w=Math.max(64,Math.round(size.x*scale)),h=Math.max(64,Math.round(size.y*scale));
+    R.getDrawingBufferSize(size);const scale=window.__waterQuality??(window.__GFX==='low'?.5:.85),w=Math.max(64,Math.round(size.x*scale)),h=Math.max(64,Math.round(size.y*scale));
     if(rt.width!==w||rt.height!==h)rt.setSize(w,h);WU.uSubmergedSize.value.copy(size);
     scene.traverse(o=>{if(o.isLight)o.layers.enable(1);});
     const target=R.getRenderTarget(),color=R.getClearColor(new T.Color()),alpha=R.getClearAlpha(),background=scene.background,tone=R.toneMapping,encoding=R.outputEncoding,shadows=R.shadowMap.autoUpdate;

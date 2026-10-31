@@ -656,14 +656,15 @@ const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDim
 G.saveRef=save;
 window.__STORY=createStory({save,persist,toast,Snd,vib,goSpot:i=>goSpot(i),curSpot:()=>G.spot,idle:()=>G.state==='idle',pan:on=>{ G.cinePan=on; if(!on) G.yawT=0; },addXP:x=>META.addXP(x),setCoins:()=>setCoins(),syncHUD:()=>META.syncHUD()});
 const SKY=createNightSky(W,G); window.__SKY=SKY;
-/* 畫質：高／中／低，影響倒影、霧層光束、雨圈、草叢與解析度上限 */
-// 自動（預設）：特效全開，解析度依實際幀率上下調整；高／中／低：固定，不自動改
-window.__gfxCap=()=>Math.min(window.devicePixelRatio||1,2.5);
-window.__applyGfx=q=>{ window.__GFX=q; const dpr=window.devicePixelRatio||1;
-  // 高：手機原生解析度＋完整倒影；中：約 6 成解析度＋簡化倒影；低：約 4 成解析度、沒有倒影（最省電，畫面會明顯變糊）
-  const pr={high:Math.min(dpr,2.5),mid:Math.min(dpr,2.5)*.62,low:Math.min(dpr,2.5)*.42,auto:Math.min(dpr,2.5)}[q]||dpr;
-  if(W.setShadows) W.setShadows(q); if(W.setRefl) W.setRefl(q!=='low',q==='mid'?.32:q==='high'?.65:.5); W.setPR(Math.max(.6,pr));
-  document.body.dataset.gfx=q; if(window.__toastGfx) window.__toastGfx(q); };
+/* Adaptive profiles change resolution, reflection, shadow and effect budgets together. */
+window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;return Math.max(.35,Math.min(2.5,Math.max(1.5,window.devicePixelRatio||1),Math.sqrt(8000000/(w*h)),limit/w,limit/h));};
+const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,apply:s=>{
+  window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;
+  if(W.setShadows)W.setShadows(s.shadow);if(W.setRefl)W.setRefl(s.reflection>0,s.reflection);W.setPR(s.pr);
+  document.body.dataset.gfx=s.effect;document.body.dataset.gfxMode=s.mode;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);
+},onSample:s=>{window.__FPS=s.fps;window.__gfxStatus=s;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);}});
+window.__applyGfx=q=>{gfxAuto.configure(q);if(window.__toastGfx)window.__toastGfx(q);};
+window.addEventListener('resize',()=>gfxAuto.refresh());document.addEventListener('visibilitychange',()=>gfxAuto.pause());
 window.__applyGfx(save.gfx||'auto');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,held:()=>G.held,grind:()=>Snd.grind&&Snd.grind(),splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
 function iceDrop(){ G.noBait=false; const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=1.6; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
@@ -1084,21 +1085,11 @@ function onResize(){ W.resize(window.innerWidth,window.innerHeight); UW.resize(w
 window.addEventListener('resize',onResize); onResize();
 if(typeof save.hour==='number'&&isFinite(save.hour)) G.hour=save.hour;
 W.setTime(G.hour,true);
-let last=performance.now(), prAcc=0, prN=0, prChecks=0;
+let last=performance.now();
 function frame(now){
-  const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
+  const frameSeconds=Math.max(0,(now-last)/1000),dt=Math.min(.05,frameSeconds);last=now;
   try{ window.__UWON=UW.active(); update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
-  prAcc+=dt; prN++;
-  if(prAcc>2){ const fps=prN/prAcc, mode=save.gfx||'auto', ready=window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden;
-    if(ready){ G.gfxWarm=(G.gfxWarm||0)+1; }
-    // 載入與剛開始的前 3 個量測區間不算（下載、編譯著色器時本來就會卡），之後連續偏慢才降、連續很順才升
-    if(ready&&G.gfxWarm>3&&mode==='auto'){ const pr=W.getPR(), cap=window.__gfxCap();
-      if(fps<27){ G.gSlow=(G.gSlow||0)+1; G.gFast=0; } else if(fps>=50){ G.gFast=(G.gFast||0)+1; G.gSlow=0; } else { G.gSlow=0; G.gFast=0; }
-      if(G.gSlow>=2&&pr>1.01){ W.setPR(Math.max(1,pr-.25)); G.gSlow=0; }
-      else if(G.gSlow>=3&&pr<=1.01&&!G.gReflOff){ G.gReflOff=true; if(W.setRefl) W.setRefl(true,.22); G.gSlow=0; }
-      else if(G.gFast>=4&&pr<cap-.01){ W.setPR(Math.min(cap,pr+.25)); G.gFast=0; } }
-    else if(ready&&G.gfxWarm===8&&fps<27&&mode==='high'&&!G.gfxHint){ G.gfxHint=true; toast('畫面有點卡，可以到設定把畫質調成「自動」或「中」','warn',3500); }
-    window.__FPS=fps; prChecks++; prAcc=0; prN=0; }
+  gfxAuto.sample(frameSeconds,{ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':G.loc||'lake'});
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
