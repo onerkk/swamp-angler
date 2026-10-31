@@ -53,10 +53,7 @@ if(T.GLTFLoader) new T.GLTFLoader().load('rock_moss_set_01.glb',gl=>{
   }
 });
 const hullCollider=W.fishingPhysics.addBox({x:-HX,y:-.8,z:HZ0},{x:HX,y:1.7,z:HZ1},()=>yacht.visible,'船體');
-hullCollider.update=()=>{
-  const cs=Math.cos(G.head),sn=Math.sin(G.head),xs=[],zs=[];
-  for(const x of [-HX,HX])for(const z of [HZ0,HZ1]){xs.push(G.base.x+x*cs+z*sn);zs.push(G.base.z-x*sn+z*cs);}
-  const b=hullCollider.boxes[0]; Object.assign(b.min,{x:Math.min(...xs),y:-.8,z:Math.min(...zs)});Object.assign(b.max,{x:Math.max(...xs),y:1.7,z:Math.max(...zs)});
+hullCollider.update=()=>{const b=hullCollider.boxes[0];b.min={x:-HX,y:-.8,z:HZ0};b.max={x:HX,y:1.7,z:HZ1};b.frame={x:G.base.x,z:G.base.z,head:G.head};
 };
 /* ---------- 海豚 ---------- */
 const dTex=gradTex([62,74,90],[214,220,226],.42);

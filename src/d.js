@@ -381,7 +381,7 @@ function startJump(){ const f=G.f; f.jumpT=f.jumpDur=.85+.25*Math.sqrt(G.fd.L); 
 function dispDist(){ return Math.max(.42,G.fd.L*(G.fd.sp.sh.snout?3:2.6))*(W.camera.aspect<1?1:.8); }   // 拿在手上的魚約佔畫面寬度七成，看得清楚又不會塞滿
 function land(){
   if(!easy()&&G.loc==='sea'&&!G.fd.item&&!G.fd.sp.special&&G.fd.sp.id!=='shark'&&G.fd.sp.id!=='gwhite'&&Math.random()<.12*(1-.12*TR('sea'))&&!KK.busy()&&!(window.__ECO&&window.__ECO.fxOn('repel'))){ G.state='snatch'; fishPos(tv,-.05); toast('就在魚出水的瞬間……','warn',1200); KK.snatchOver(tv.clone(),()=>{ G.state='fight'; lose('shark'); }); return; }
-  G.state='land'; G.stT=0; G.netting=!!(G.f&&G.f.netted); endFightUI(); WL.endChase(); SEA.endChase(); G.combo=(G.combo||0)+1; FUN.combo(G.combo); save.maxCombo=Math.max(save.maxCombo||0,G.combo); fishPos(G.landFrom,-.05); P.splash(G.landFrom.x,0,G.landFrom.z,40,1.3); W.addRipple(G.landFrom.x,G.landFrom.z,1);
+  G.netAt=null;G.netSplash=false;G.state='land'; G.stT=0; G.netting=!!(G.f&&G.f.netted); endFightUI(); WL.endChase(); SEA.endChase(); G.combo=(G.combo||0)+1; FUN.combo(G.combo); save.maxCombo=Math.max(save.maxCombo||0,G.combo); fishPos(G.landFrom,-.05); P.splash(G.landFrom.x,0,G.landFrom.z,40,1.3); W.addRipple(G.landFrom.x,G.landFrom.z,1);
   Snd.splash(1.2); vib([30,40,30]); const g=G.fish.group; g.visible=G.fd.sp.special!=='mermaid'; if(g.parent!==W.scene) W.scene.attach(g);
   g.position.copy(G.landFrom); te.set(0,G.f.az0+G.f.theta+Math.PI/2,0); g.quaternion.setFromEuler(te); G.landQ.copy(g.quaternion); P.shadow.material.opacity=0;
 }
@@ -482,6 +482,7 @@ function actDown(){
   switch(G.state){
     case 'idle': if(G.loc==='ice'){ if(ICE.drilled()) iceDrop(); } else startCharge(); break;
     case 'lure': LURE.press(); break;
+    case 'fight': if(G.f&&G.f.netOn){ G.f.netGo=true;G.held=false;ui.act.classList.remove('held'); } break;
     case 'wait': if(G.snag){ break; }
       startRetrieve(G.dip>0?'太早了：剛剛只是魚在試咬，要等浮標整個沉下去再揚竿':'收線','warn'); break;
     case 'bite': { const r=FUN.hookPress(); if(r==='miss') missBite(); else hook(r==='perfect'); } break;
@@ -735,7 +736,20 @@ function guardUW(){ if(UW.active()&&!uwExiting&&G.state!=='wait'&&G.state!=='bit
 
 /* ---------- 每幀更新 ---------- */
 function updateFight(dt){
-  if(easy()){ const f=G.f; f.assistT=(f.assistT||0)+dt; f.T=.35; f.brk=0; f.slk=0; f.abr=0; f.lostWhy=null; if(f.assistT>=window.__ASSIST.policy.fishSeconds) land(); return; }
+  if(easy()){
+    const f=G.f,boat=!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht);f.assistT=(f.assistT||0)+dt;f.T=.35;f.brk=0;f.slk=0;f.abr=0;f.lostWhy=null;
+    if(boat&&!G.fd.item&&!G.fd.sp.special){
+      f.stam=0;f.run=false;
+      const target=fishingLandingTarget(PH,G.base,f.pos,G.fd.L),r=Math.max(.12,G.fd.L*.22),path=PH.route(f.pos,target,r+.04);
+      let budget=Math.max(8,Math.hypot(target.x-f.pos.x,target.z-f.pos.z)/Math.max(.08,window.__ASSIST.policy.fishSeconds-f.assistT))*dt;
+      for(let i=1;i<path.length&&budget>0;i++){const to=path[i],d=Math.hypot(to.x-f.pos.x,to.y-f.pos.y,to.z-f.pos.z),step=Math.min(d,budget),k=step/Math.max(.00001,d),want={x:f.pos.x+(to.x-f.pos.x)*k,y:f.pos.y+(to.y-f.pos.y)*k,z:f.pos.z+(to.z-f.pos.z)*k};setPoint(f.pos,PH.move(f.pos,want,r).pos);budget-=step;if(step<d)break;}
+      f.d=Math.hypot(f.pos.x-G.base.x,f.pos.z-G.base.z);f.theta=Math.atan2(-(f.pos.x-G.base.x),-(f.pos.z-G.base.z))-f.az0;
+      bob.position.set(f.pos.x,W.swell(f.pos.x,f.pos.z,G.t)-.08,f.pos.z);rod.end=G.endV.copy(f.pos);rod.bendT=.5;
+      setAct('自動收魚','魚靠船邊後自動使用抄網',false);
+      if(f.assistT>=window.__ASSIST.policy.fishSeconds&&fishingLanding(PH,G.base,f.pos,G.fd.L,true).near){f.netted=true;land();}
+    }else if(f.assistT>=window.__ASSIST.policy.fishSeconds)land();
+    return;
+  }
   const f=G.f, sp=G.fd.sp, fs=sp.f, fd=G.fd;
   if(f.pos&&G.loc!=='ice'){ f.d=Math.hypot(f.pos.x-G.base.x,f.pos.z-G.base.z); }
   f.ft=(f.ft||0)+dt; f.maxT=Math.max(f.maxT||0,f.T); if(f.run&&!f.wasRun) f.runs=(f.runs||0)+1; f.wasRun=f.run;   // 搏魚統計：時間、最高張力、衝刺次數
@@ -785,7 +799,8 @@ function updateFight(dt){
     want.x+=Math.cos(az)*G.rodSide*dt*1.6; want.z-=Math.sin(az)*G.rodSide*dt*1.6;
     if(G.loc!=='sea'){ const Rm=W.shoreR(Math.atan2(want.x,-want.z))-3,r=Math.hypot(want.x,want.z); if(r>Rm){want.x*=Rm/r;want.z*=Rm/r;} }
     const moved=PH.move(old,want,Math.max(.12,fd.L*.22)); setPoint(f.pos,moved.pos);
-    const lineHit=PH.hit(rod.tipW,f.pos,.025); f.cover=lineHit?1:0;
+    const landing=fishingLanding(PH,G.base,f.pos,fd.L,!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht),G.spot===0);
+    const lineHit=PH.hit(rod.tipW,f.pos,.025,box=>!(landing.near&&box.label==='船體')); f.cover=lineHit?1:0;
     if(moved.contact){ f.latDir=G.rodSide>.05?-1:G.rodSide<-.05?1:-f.latDir||1; f.theta+=f.latDir*dt*.3; }
     if(lineHit){
       f.abr+=dt*(.025+.22*f.T)*(G.held?1.7:.35)/((.7+.3*META.gear().line.s)*DF.line);
@@ -840,16 +855,21 @@ function updateFight(dt){
   if(f.lostWhy) return lose(f.lostWhy);
   if(f.d>maxLine()*.7) f.stam=Math.max(0,f.stam-dt*(f.d/maxLine())*8);   /* 線快放光時捲線器剩下的線越少、阻力越大，魚衝不動、體力掉得快 */
   if(f.d>maxLine()) return lose('spool');
-  if(f.cover<.5&&f.d<(G.spot===0?4.0:2.6)){
+  const landing=fishingLanding(PH,G.base,f.pos||tv,fd.L,!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht),G.spot===0);
+  if(G.loc==='ice')landing.near=f.d<2.6;
+  if(!landing.near||f.cover>=.5){f.netOn=false;f.netGo=false;f.calmT=0;f.runT=0;ui.netBtn.classList.add('hidden');}
+  if(landing.boat&&!landing.near&&landing.gap<1.5) setAct(G.held?'收線中':'按住<br>收線','魚靠在遠側船身，左右控竿把魚帶到船頭或近側船邊',false);
+  if(f.cover<.5&&landing.near){
     // 魚還有力氣就拉不上來：靠近時再衝出去，要遛到沒力才能收進來
     // 衝出去會消耗魚的體力，最多衝兩次；體力低於 45% 或衝過兩次就拉得上來
     f.surges=f.surges||0; if(f.stam<=45||f.surges>=2){
-      const big=!fd.item&&(fd.w>3||(fd.u>.9&&fd.w>1.5)||fd.boss); /* 3 公斤以上（或接近該魚種最大且超過 1.5 公斤）才需要抄網 */ if(!big) return land();
+      const big=!fd.item&&!fd.sp.special&&(landing.boat||fd.w>3||(fd.u>.9&&fd.w>1.5)||fd.boss); /* 船釣一般魚都可抄網；岸釣保留大魚抄網。 */ if(!big) return land();
       // 大魚要抄網：魚靠近又沒在衝刺時按「抄網」才算起魚；急著在牠衝刺時抄網會讓牠再衝出去
-      if(!f.netOn){ f.netOn=true; ui.netBtn.classList.remove('hidden'); toast('🥅 大魚靠近了！按鈕變亮時按「抄網」','good',2200); }
+      if(!f.netOn){ f.netOn=true; ui.netBtn.classList.remove('hidden'); toast('🥅 魚已靠邊！放開收線，等魚停下後按「抄網」','good',2200); }
       // 按鈕即時顯示能不能抄：魚在衝＝灰色等待；魚停下＝亮起並震一下。魚剛開始衝的 0.4 秒內按下仍算成功
       if(f.run){ f.calmT=0; f.runT=(f.runT||0)+dt; ui.netBtn.textContent='⏳ 魚在衝，等一下'; ui.netBtn.style.background='rgba(255,255,255,.22)'; ui.netBtn.style.color='#fff'; }
       else { if(!(f.calmT>0)) vib(25); f.calmT=(f.calmT||0)+dt; f.runT=0; ui.netBtn.textContent='🥅 現在抄網！'; ui.netBtn.style.background='#7dff9a'; ui.netBtn.style.color='#0b3a14'; }
+      setAct(f.run?'等待魚<br>停止衝刺':'🥅 抄網',f.run?'先放鬆，等魚穩定後再抄網':'魚在船邊，點擊主按鈕把網兜到魚身下方',false);
       if(f.netGo){ f.netGo=false; if(!f.run||f.runT<.4){ ui.netBtn.classList.add('hidden'); f.netted=true; return land(); } f.netOn=false; ui.netBtn.classList.add('hidden'); f.d+=3+Math.random()*2; surgeFish(); f.stam=Math.max(0,f.stam-10); toast('魚還在衝，被網子嚇到又衝出去了！','warn',1600); vib([30,30,60]); }
       return; }
     f.surges++; f.stam=Math.max(0,f.stam-25); f.d+=2+Math.random()*2; surgeFish(); f.run=true; f.phaseT=rand(1,1.8); P.splash(G.to.x,0,G.to.z,14,.8); vib([30,20,40]);
@@ -975,9 +995,14 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       // 抄網時低頭看水面（魚就在船邊），提起來後再抬頭
       n.visible=true; n.scale.setScalar(hoopR/.5); W.head.getWorldQuaternion(tq); const yaw=new THREE.Euler().setFromQuaternion(tq,'YXZ').y;
       const fishAt=G.landFrom, start=W.head.localToWorld(tv2.set(.7,-.35,-1.6)), lift=W.head.localToWorld(new THREE.Vector3(.15,-.05,-Math.max(1.6,L*2.2)));
-      const p1=Math.min(1,t/.7), p2=sstep(.7,1.15,t), p3=sstep(1.25,2.2,t);
-      if(!G.netAt){ const dx=fishAt.x-G.base.x, dz=fishAt.z-G.base.z, dd=Math.max(.01,Math.hypot(dx,dz)), r=Math.max(4.2,dd); G.netAt=new THREE.Vector3(G.base.x+dx/dd*r,0,G.base.z+dz/dd*r); G.fish.group.position.set(G.netAt.x,-.15,G.netAt.z); }
-      const pos=new THREE.Vector3().copy(start).lerp(new THREE.Vector3(G.netAt.x,.08,G.netAt.z),sstep(0,1,p1)); pos.y-=.2*p2*(1-p3); pos.lerp(lift,p3);   /* 網框貼著水面探過去，兜魚時半沉入水 */
+      const p2=sstep(.7,1.15,t), p3=sstep(1.25,2.1,t), p4=sstep(2.1,2.8,t);
+      if(!G.netAt) G.netAt=fishAt.clone();
+      const water=W.swell(G.netAt.x,G.netAt.z,G.t),rim=new THREE.Vector3(G.netAt.x,water+.08,G.netAt.z);
+      const railY=Math.max(start.y,W.player.position.y+.15),overRail=new THREE.Vector3(rim.x,railY,rim.z);
+      const pos=new THREE.Vector3().copy(start).lerp(overRail,sstep(0,.4,t));if(t>.4)pos.copy(overRail).lerp(rim,sstep(.4,.7,t));pos.y-=.2*p2*(1-p3);
+      // Extend above the rail, dip outside the hull, then lift the whole bag clear.
+      const onBoat=!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht);
+      pos.y+=(Math.max(lift.y,W.player.position.y+hoopR*2.1)-pos.y)*p3;if(!onBoat)pos.lerp(lift,p4);
       n.position.copy(pos); n.rotation.set(0,yaw-Math.PI/4,0,'YXZ'); n.rotateZ(-.25-(1-p3)*.2);   /* 手把朝向右下的自己，網框微微朝鏡頭傾斜看得到網袋 */
       NET.shape(p2*(1-.4*p3)+.15,t*6);
       const g=G.fish.group; if(t>.7){ const inBag=new THREE.Vector3(0,-.25*hoopR/.5,0).applyQuaternion(n.quaternion).add(n.position); g.position.lerp(inBag,Math.min(1,dt*10)); te.set(0,yaw+Math.PI/2,0,'YXZ'); g.quaternion.slerp(tq.setFromEuler(te).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),.5)),Math.min(1,dt*6)); }
@@ -985,7 +1010,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       if(p3>0&&p3<1&&Math.random()<dt*30) P.splash(n.position.x+rand(-.3,.3),n.position.y-.35*hoopR,n.position.z+rand(-.3,.3),1,.14);   // 網袋一路滴水
       G.fish.uni.uAmp.value=.08+.25*Math.max(0,Math.sin(t*7)); G.fish.uni.uSwim.value+=dt*14;
       rod.pitchT=.3; rod.bendT=.35;
-      if(t>=2.5){ G.netting=false; G.netSplash=false; G.netAt=null; n.visible=false; W.head.attach(g); g.position.set(0,.14*D,-D); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }
+      if(t>=3.0){ G.netting=false; G.netSplash=false; G.netAt=null; n.visible=false; W.head.attach(g); g.position.set(0,.14*D,-D); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }
     }
     else if(st==='land'){
       // 起魚三段：①竿子高舉，魚被線吊出水面、頭朝上掛在竿尖下甩動掙扎、身上滴水 ②把吊著的魚拉到眼前晃著 ③轉成展示角度

@@ -57,11 +57,7 @@ let padG=null; const paddleTilt={x:0,z:0};
 const PAD_Y=-.27, PAD_Z=-.82; let padOn=0;
 const boat=new T.Group(); boat.visible=false; S.add(boat);
 const canoeCollider=W.fishingPhysics.addBox({x:-.4,y:-.3,z:-2.45},{x:.4,y:.3,z:1.75},()=>boat.visible,'船體');
-canoeCollider.update=()=>{
-  const b=ctx.base(),h=ctx.head(),cs=Math.cos(h),sn=Math.sin(h),xs=[],zs=[];
-  for(const x of [-.4,.4])for(const z of [-2.45,1.75]){xs.push(b.x+x*cs+z*sn);zs.push(b.z-x*sn+z*cs);}
-  Object.assign(canoeCollider.boxes[0].min,{x:Math.min(...xs),y:-.3,z:Math.min(...zs)});
-  Object.assign(canoeCollider.boxes[0].max,{x:Math.max(...xs),y:.3,z:Math.max(...zs)});
+canoeCollider.update=()=>{const b=ctx.base();canoeCollider.boxes[0].frame={x:b.x,z:b.z,head:ctx.head()};
 };
 /* 原木獨木舟（依玩家設定圖生成）：載入後取代程式做的塑膠艇；船頭朝 −Z，長 4.2 米 */
 if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.85,metalness:0}); x.castShadow=false; } });

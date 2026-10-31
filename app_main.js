@@ -1,4 +1,4 @@
-/*APPV:20261031200632*/
+/*APPV:20261031202716*/
 /* Account assistance follows the authenticated Google identity, never a saved flag. */
 function createAccountAssist(){
   let enabled=false;
@@ -50,24 +50,26 @@ class FishingPhysics {
     });
   }
   refresh(){ this.boxes=[]; for(const i of this.items){ if(!i.enabled()) continue; if(i.update) i.update(); else if(i.dynamic) this.measure(i); this.boxes.push(...i.boxes); } }
-  static inside(p,b,r=0){ return ['x','y','z'].every(k=>p[k]>b.min[k]-r&&p[k]<b.max[k]+r); }
-  hit(a,b,r=0){
+  static local(p,b){ if(!b.frame)return {...p}; const f=b.frame,c=Math.cos(f.head),s=Math.sin(f.head),x=p.x-f.x,z=p.z-f.z;return{x:x*c-z*s,y:p.y,z:x*s+z*c}; }
+  static world(p,b){ if(!b.frame)return {...p};const f=b.frame,c=Math.cos(f.head),s=Math.sin(f.head);return{x:f.x+p.x*c+p.z*s,y:p.y,z:f.z-p.x*s+p.z*c}; }
+  static inside(p,b,r=0){ p=FishingPhysics.local(p,b); return ['x','y','z'].every(k=>p[k]>b.min[k]-r&&p[k]<b.max[k]+r); }
+  hit(a,b,r=0,accept=null){
     let best=null;
-    for(const box of this.boxes){ if(r===.025&&box.label==='睡蓮葉') continue; let lo=0,hi=1,axis=null,sign=0,valid=true;
-      for(const k of ['x','y','z']){ const d=b[k]-a[k], mn=box.min[k]-r,mx=box.max[k]+r;
-        if(Math.abs(d)<1e-10){ if(a[k]<=mn||a[k]>=mx){valid=false;break;} continue; }
-        let t0=(mn-a[k])/d,t1=(mx-a[k])/d,sg=-1; if(t0>t1){[t0,t1]=[t1,t0];sg=1;}
+    for(const box of this.boxes){ if(accept&&!accept(box))continue; const aa=FishingPhysics.local(a,box),bb=FishingPhysics.local(b,box); if(r===.025&&box.label==='睡蓮葉') continue; let lo=0,hi=1,axis=null,sign=0,valid=true;
+      for(const k of ['x','y','z']){ const d=bb[k]-aa[k], mn=box.min[k]-r,mx=box.max[k]+r;
+        if(Math.abs(d)<1e-10){ if(aa[k]<=mn||aa[k]>=mx){valid=false;break;} continue; }
+        let t0=(mn-aa[k])/d,t1=(mx-aa[k])/d,sg=-1; if(t0>t1){[t0,t1]=[t1,t0];sg=1;}
         if(t0>=lo){lo=t0;axis=k;sign=sg;} hi=Math.min(hi,t1); if(lo>hi){valid=false;break;}
       }
-      if(valid&&axis&&lo>=0&&lo<=1&&hi>1e-7&&(!best||lo<best.t)) best={t:lo,axis,sign,box};
+      if(valid&&axis&&lo>=0&&lo<=1&&hi>1e-7&&(!best||lo<best.t)) best={t:lo,axis,sign,box,normal:(()=>{const v={x:0,y:0,z:0};v[axis]=sign;if(!box.frame)return v;const c=Math.cos(box.frame.head),s=Math.sin(box.frame.head);return{x:v.x*c+v.z*s,y:v.y,z:-v.x*s+v.z*c};})()};
     } return best;
   }
   clear(p,r=0){ return !this.boxes.some(b=>FishingPhysics.inside(p,b,r)); }
-  resolve(p,r=0){ const q={...p};
+  resolve(p,r=0){ let q={...p};
     for(let n=0;n<16;n++){ const b=this.boxes.find(b=>FishingPhysics.inside(q,b,r)); if(!b) break;
       // Waterborne objects go around posts rather than being pushed onto their tops.
-      const choices=[]; for(const k of ['x','z']) for(const s of [-1,1]){const v=s<0?b.min[k]-r-.002:b.max[k]+r+.002; choices.push({k,v,d:Math.abs(v-q[k])});}
-      choices.sort((a,b)=>a.d-b.d); q[choices[0].k]=choices[0].v;
+      const local=FishingPhysics.local(q,b),choices=[]; for(const k of ['x','z']) for(const s of [-1,1]){const v=s<0?b.min[k]-r-.002:b.max[k]+r+.002; choices.push({k,v,d:Math.abs(v-local[k])});}
+      choices.sort((a,b)=>a.d-b.d); local[choices[0].k]=choices[0].v;q=FishingPhysics.world(local,b);
     } return q;
   }
   move(a,b,r=0,slide=true){
@@ -75,14 +77,14 @@ class FishingPhysics {
     for(let n=0;n<5;n++){ const h=this.hit(p,target,r); if(!h){p=target;break;} contact=contact||h;
       const t=Math.max(0,h.t-.001/Math.max(.001,Math.hypot(target.x-p.x,target.y-p.y,target.z-p.z)));
       const next={x:p.x+(target.x-p.x)*t,y:p.y+(target.y-p.y)*t,z:p.z+(target.z-p.z)*t};
-      if(!slide){p=next;break;} target[h.axis]=next[h.axis]; p=next;
+      if(!slide){p=next;break;} const n=h.normal,d=(target.x-next.x)*n.x+(target.y-next.y)*n.y+(target.z-next.z)*n.z;target.x-=d*n.x;target.y-=d*n.y;target.z-=d*n.z;p=next;
     } return {pos:p,contact};
   }
   // Visibility graph around real contact bounds. Every rendered line segment is checked.
   route(a,b,r=.025){
     if(!this.hit(a,b,r)) return [a,b];
-    const nodes=[a,b], blockers=this.boxes.filter(o=>(r!==.025||o.label!=='睡蓮葉')&&o.max.y>=Math.min(a.y,b.y)-.04&&o.min.y<=Math.max(a.y,b.y)+.04&&o.max.x>=Math.min(a.x,b.x)-8&&o.min.x<=Math.max(a.x,b.x)+8&&o.max.z>=Math.min(a.z,b.z)-8&&o.min.z<=Math.max(a.z,b.z)+8);
-    for(const o of blockers){ for(const x of [o.min.x-r-.05,o.max.x+r+.05]) for(const z of [o.min.z-r-.05,o.max.z+r+.05]){const p={x,y:b.y,z}; if(this.clear(p,r)) nodes.push(p);} }
+    const nodes=[a,b], blockers=this.boxes.filter(o=>(r!==.025||o.label!=='睡蓮葉')&&o.max.y>=Math.min(a.y,b.y)-.04&&o.min.y<=Math.max(a.y,b.y)+.04&&(o.frame||o.max.x>=Math.min(a.x,b.x)-8&&o.min.x<=Math.max(a.x,b.x)+8&&o.max.z>=Math.min(a.z,b.z)-8&&o.min.z<=Math.max(a.z,b.z)+8));
+    for(const o of blockers){for(const x of [o.min.x-r-.05,o.max.x+r+.05])for(const z of [o.min.z-r-.05,o.max.z+r+.05]){const p=FishingPhysics.world({x,y:b.y,z},o);if(this.clear(p,r))nodes.push(p);}}
     const dist=nodes.map(()=>Infinity),prev=[],done=new Set(); dist[0]=0;
     for(let step=0;step<nodes.length;step++){let u=-1;for(let i=0;i<nodes.length;i++)if(!done.has(i)&&(u<0||dist[i]<dist[u]))u=i;
       if(u<0||!Number.isFinite(dist[u])) break; if(u===1){const path=[];for(let i=1;i!==undefined;i=prev[i])path.unshift(nodes[i]);return path;}
@@ -94,6 +96,28 @@ class FishingPhysics {
   }
 }
 if(typeof module!=='undefined'&&module.exports) module.exports=FishingPhysics;
+/* Landing is measured from the reachable rail, never from the boat's centre. */
+function fishingLanding(physics,base,fish,length,boat,dock=false){
+ const radius=Math.max(.12,length*.22);
+ if(!boat)return{near:Math.hypot(fish.x-base.x,fish.z-base.z)<(dock?4:2.6),boat:false,gap:Infinity};
+ const hull=physics.boxes.find(b=>b.label==='船體');
+ if(!hull)return{near:false,boat:true,gap:Infinity};
+ const p=FishingPhysics.local(fish,hull),q={x:Math.max(hull.min.x,Math.min(hull.max.x,p.x)),y:fish.y,z:Math.max(hull.min.z,Math.min(hull.max.z,p.z))};
+ const edge=FishingPhysics.world(q,hull),gap=Math.hypot(p.x-q.x,p.z-q.z),reach=Math.hypot(edge.x-base.x,edge.z-base.z);
+ // The bow and nearby side rails are reachable; do not scoop across the whole yacht.
+ return{near:gap<=radius+.85&&reach<=5.8,boat:true,gap,reach,edge};
+}
+function fishingLandingTarget(physics,base,fish,length){
+ const hull=physics.boxes.find(b=>b.label==='船體');if(!hull)return{...fish};
+ const p=FishingPhysics.local(fish,hull),r=Math.max(.12,length*.22)+.2;
+ let q={x:Math.max(hull.min.x,Math.min(hull.max.x,p.x)),y:fish.y,z:Math.max(hull.min.z,Math.min(hull.max.z,p.z))};
+ const choices=[{x:hull.min.x-r,y:fish.y,z:q.z},{x:hull.max.x+r,y:fish.y,z:q.z},{x:q.x,y:fish.y,z:hull.min.z-r},{x:q.x,y:fish.y,z:hull.max.z+r}];
+ const reachable=choices.filter(v=>{const w=FishingPhysics.world(v,hull);return Math.hypot(w.x-base.x,w.z-base.z)<6.5;});
+ if(!reachable.length)reachable.push({x:p.x<0?hull.min.x-r:hull.max.x+r,y:fish.y,z:Math.max(hull.min.z,Math.min(0,p.z))});
+ reachable.sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z));
+ return physics.resolve(FishingPhysics.world(reachable[0],hull),Math.max(.12,length*.22));
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={fishingLanding,fishingLandingTarget};
 /* One brand composition shared by the physical wall and the mobile shop panel. */
 const SHOP_BRAND={name:'靜月之光',url:'https://tw.shp.ee/BcamsN2F',
   features:[{image:'shop1.jpg',label:'晶透光澤'},{image:'shop4.jpg',label:'金屬光感'},{image:'shop9.jpg',label:'暖色搭配'}]};
@@ -2652,11 +2676,7 @@ let padG=null; const paddleTilt={x:0,z:0};
 const PAD_Y=-.27, PAD_Z=-.82; let padOn=0;
 const boat=new T.Group(); boat.visible=false; S.add(boat);
 const canoeCollider=W.fishingPhysics.addBox({x:-.4,y:-.3,z:-2.45},{x:.4,y:.3,z:1.75},()=>boat.visible,'船體');
-canoeCollider.update=()=>{
-  const b=ctx.base(),h=ctx.head(),cs=Math.cos(h),sn=Math.sin(h),xs=[],zs=[];
-  for(const x of [-.4,.4])for(const z of [-2.45,1.75]){xs.push(b.x+x*cs+z*sn);zs.push(b.z-x*sn+z*cs);}
-  Object.assign(canoeCollider.boxes[0].min,{x:Math.min(...xs),y:-.3,z:Math.min(...zs)});
-  Object.assign(canoeCollider.boxes[0].max,{x:Math.max(...xs),y:.3,z:Math.max(...zs)});
+canoeCollider.update=()=>{const b=ctx.base();canoeCollider.boxes[0].frame={x:b.x,z:b.z,head:ctx.head()};
 };
 /* 原木獨木舟（依玩家設定圖生成）：載入後取代程式做的塑膠艇；船頭朝 −Z，長 4.2 米 */
 if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.85,metalness:0}); x.castShadow=false; } });
@@ -3502,10 +3522,7 @@ if(T.GLTFLoader) new T.GLTFLoader().load('rock_moss_set_01.glb',gl=>{
   }
 });
 const hullCollider=W.fishingPhysics.addBox({x:-HX,y:-.8,z:HZ0},{x:HX,y:1.7,z:HZ1},()=>yacht.visible,'船體');
-hullCollider.update=()=>{
-  const cs=Math.cos(G.head),sn=Math.sin(G.head),xs=[],zs=[];
-  for(const x of [-HX,HX])for(const z of [HZ0,HZ1]){xs.push(G.base.x+x*cs+z*sn);zs.push(G.base.z-x*sn+z*cs);}
-  const b=hullCollider.boxes[0]; Object.assign(b.min,{x:Math.min(...xs),y:-.8,z:Math.min(...zs)});Object.assign(b.max,{x:Math.max(...xs),y:1.7,z:Math.max(...zs)});
+hullCollider.update=()=>{const b=hullCollider.boxes[0];b.min={x:-HX,y:-.8,z:HZ0};b.max={x:HX,y:1.7,z:HZ1};b.frame={x:G.base.x,z:G.base.z,head:G.head};
 };
 /* ---------- 海豚 ---------- */
 const dTex=gradTex([62,74,90],[214,220,226],.42);
@@ -6311,7 +6328,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261031200632'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261031202716'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8170,7 +8187,7 @@ function startJump(){ const f=G.f; f.jumpT=f.jumpDur=.85+.25*Math.sqrt(G.fd.L); 
 function dispDist(){ return Math.max(.42,G.fd.L*(G.fd.sp.sh.snout?3:2.6))*(W.camera.aspect<1?1:.8); }   // 拿在手上的魚約佔畫面寬度七成，看得清楚又不會塞滿
 function land(){
   if(!easy()&&G.loc==='sea'&&!G.fd.item&&!G.fd.sp.special&&G.fd.sp.id!=='shark'&&G.fd.sp.id!=='gwhite'&&Math.random()<.12*(1-.12*TR('sea'))&&!KK.busy()&&!(window.__ECO&&window.__ECO.fxOn('repel'))){ G.state='snatch'; fishPos(tv,-.05); toast('就在魚出水的瞬間……','warn',1200); KK.snatchOver(tv.clone(),()=>{ G.state='fight'; lose('shark'); }); return; }
-  G.state='land'; G.stT=0; G.netting=!!(G.f&&G.f.netted); endFightUI(); WL.endChase(); SEA.endChase(); G.combo=(G.combo||0)+1; FUN.combo(G.combo); save.maxCombo=Math.max(save.maxCombo||0,G.combo); fishPos(G.landFrom,-.05); P.splash(G.landFrom.x,0,G.landFrom.z,40,1.3); W.addRipple(G.landFrom.x,G.landFrom.z,1);
+  G.netAt=null;G.netSplash=false;G.state='land'; G.stT=0; G.netting=!!(G.f&&G.f.netted); endFightUI(); WL.endChase(); SEA.endChase(); G.combo=(G.combo||0)+1; FUN.combo(G.combo); save.maxCombo=Math.max(save.maxCombo||0,G.combo); fishPos(G.landFrom,-.05); P.splash(G.landFrom.x,0,G.landFrom.z,40,1.3); W.addRipple(G.landFrom.x,G.landFrom.z,1);
   Snd.splash(1.2); vib([30,40,30]); const g=G.fish.group; g.visible=G.fd.sp.special!=='mermaid'; if(g.parent!==W.scene) W.scene.attach(g);
   g.position.copy(G.landFrom); te.set(0,G.f.az0+G.f.theta+Math.PI/2,0); g.quaternion.setFromEuler(te); G.landQ.copy(g.quaternion); P.shadow.material.opacity=0;
 }
@@ -8271,6 +8288,7 @@ function actDown(){
   switch(G.state){
     case 'idle': if(G.loc==='ice'){ if(ICE.drilled()) iceDrop(); } else startCharge(); break;
     case 'lure': LURE.press(); break;
+    case 'fight': if(G.f&&G.f.netOn){ G.f.netGo=true;G.held=false;ui.act.classList.remove('held'); } break;
     case 'wait': if(G.snag){ break; }
       startRetrieve(G.dip>0?'太早了：剛剛只是魚在試咬，要等浮標整個沉下去再揚竿':'收線','warn'); break;
     case 'bite': { const r=FUN.hookPress(); if(r==='miss') missBite(); else hook(r==='perfect'); } break;
@@ -8524,7 +8542,20 @@ function guardUW(){ if(UW.active()&&!uwExiting&&G.state!=='wait'&&G.state!=='bit
 
 /* ---------- 每幀更新 ---------- */
 function updateFight(dt){
-  if(easy()){ const f=G.f; f.assistT=(f.assistT||0)+dt; f.T=.35; f.brk=0; f.slk=0; f.abr=0; f.lostWhy=null; if(f.assistT>=window.__ASSIST.policy.fishSeconds) land(); return; }
+  if(easy()){
+    const f=G.f,boat=!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht);f.assistT=(f.assistT||0)+dt;f.T=.35;f.brk=0;f.slk=0;f.abr=0;f.lostWhy=null;
+    if(boat&&!G.fd.item&&!G.fd.sp.special){
+      f.stam=0;f.run=false;
+      const target=fishingLandingTarget(PH,G.base,f.pos,G.fd.L),r=Math.max(.12,G.fd.L*.22),path=PH.route(f.pos,target,r+.04);
+      let budget=Math.max(8,Math.hypot(target.x-f.pos.x,target.z-f.pos.z)/Math.max(.08,window.__ASSIST.policy.fishSeconds-f.assistT))*dt;
+      for(let i=1;i<path.length&&budget>0;i++){const to=path[i],d=Math.hypot(to.x-f.pos.x,to.y-f.pos.y,to.z-f.pos.z),step=Math.min(d,budget),k=step/Math.max(.00001,d),want={x:f.pos.x+(to.x-f.pos.x)*k,y:f.pos.y+(to.y-f.pos.y)*k,z:f.pos.z+(to.z-f.pos.z)*k};setPoint(f.pos,PH.move(f.pos,want,r).pos);budget-=step;if(step<d)break;}
+      f.d=Math.hypot(f.pos.x-G.base.x,f.pos.z-G.base.z);f.theta=Math.atan2(-(f.pos.x-G.base.x),-(f.pos.z-G.base.z))-f.az0;
+      bob.position.set(f.pos.x,W.swell(f.pos.x,f.pos.z,G.t)-.08,f.pos.z);rod.end=G.endV.copy(f.pos);rod.bendT=.5;
+      setAct('自動收魚','魚靠船邊後自動使用抄網',false);
+      if(f.assistT>=window.__ASSIST.policy.fishSeconds&&fishingLanding(PH,G.base,f.pos,G.fd.L,true).near){f.netted=true;land();}
+    }else if(f.assistT>=window.__ASSIST.policy.fishSeconds)land();
+    return;
+  }
   const f=G.f, sp=G.fd.sp, fs=sp.f, fd=G.fd;
   if(f.pos&&G.loc!=='ice'){ f.d=Math.hypot(f.pos.x-G.base.x,f.pos.z-G.base.z); }
   f.ft=(f.ft||0)+dt; f.maxT=Math.max(f.maxT||0,f.T); if(f.run&&!f.wasRun) f.runs=(f.runs||0)+1; f.wasRun=f.run;   // 搏魚統計：時間、最高張力、衝刺次數
@@ -8574,7 +8605,8 @@ function updateFight(dt){
     want.x+=Math.cos(az)*G.rodSide*dt*1.6; want.z-=Math.sin(az)*G.rodSide*dt*1.6;
     if(G.loc!=='sea'){ const Rm=W.shoreR(Math.atan2(want.x,-want.z))-3,r=Math.hypot(want.x,want.z); if(r>Rm){want.x*=Rm/r;want.z*=Rm/r;} }
     const moved=PH.move(old,want,Math.max(.12,fd.L*.22)); setPoint(f.pos,moved.pos);
-    const lineHit=PH.hit(rod.tipW,f.pos,.025); f.cover=lineHit?1:0;
+    const landing=fishingLanding(PH,G.base,f.pos,fd.L,!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht),G.spot===0);
+    const lineHit=PH.hit(rod.tipW,f.pos,.025,box=>!(landing.near&&box.label==='船體')); f.cover=lineHit?1:0;
     if(moved.contact){ f.latDir=G.rodSide>.05?-1:G.rodSide<-.05?1:-f.latDir||1; f.theta+=f.latDir*dt*.3; }
     if(lineHit){
       f.abr+=dt*(.025+.22*f.T)*(G.held?1.7:.35)/((.7+.3*META.gear().line.s)*DF.line);
@@ -8629,16 +8661,21 @@ function updateFight(dt){
   if(f.lostWhy) return lose(f.lostWhy);
   if(f.d>maxLine()*.7) f.stam=Math.max(0,f.stam-dt*(f.d/maxLine())*8);   /* 線快放光時捲線器剩下的線越少、阻力越大，魚衝不動、體力掉得快 */
   if(f.d>maxLine()) return lose('spool');
-  if(f.cover<.5&&f.d<(G.spot===0?4.0:2.6)){
+  const landing=fishingLanding(PH,G.base,f.pos||tv,fd.L,!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht),G.spot===0);
+  if(G.loc==='ice')landing.near=f.d<2.6;
+  if(!landing.near||f.cover>=.5){f.netOn=false;f.netGo=false;f.calmT=0;f.runT=0;ui.netBtn.classList.add('hidden');}
+  if(landing.boat&&!landing.near&&landing.gap<1.5) setAct(G.held?'收線中':'按住<br>收線','魚靠在遠側船身，左右控竿把魚帶到船頭或近側船邊',false);
+  if(f.cover<.5&&landing.near){
     // 魚還有力氣就拉不上來：靠近時再衝出去，要遛到沒力才能收進來
     // 衝出去會消耗魚的體力，最多衝兩次；體力低於 45% 或衝過兩次就拉得上來
     f.surges=f.surges||0; if(f.stam<=45||f.surges>=2){
-      const big=!fd.item&&(fd.w>3||(fd.u>.9&&fd.w>1.5)||fd.boss); /* 3 公斤以上（或接近該魚種最大且超過 1.5 公斤）才需要抄網 */ if(!big) return land();
+      const big=!fd.item&&!fd.sp.special&&(landing.boat||fd.w>3||(fd.u>.9&&fd.w>1.5)||fd.boss); /* 船釣一般魚都可抄網；岸釣保留大魚抄網。 */ if(!big) return land();
       // 大魚要抄網：魚靠近又沒在衝刺時按「抄網」才算起魚；急著在牠衝刺時抄網會讓牠再衝出去
-      if(!f.netOn){ f.netOn=true; ui.netBtn.classList.remove('hidden'); toast('🥅 大魚靠近了！按鈕變亮時按「抄網」','good',2200); }
+      if(!f.netOn){ f.netOn=true; ui.netBtn.classList.remove('hidden'); toast('🥅 魚已靠邊！放開收線，等魚停下後按「抄網」','good',2200); }
       // 按鈕即時顯示能不能抄：魚在衝＝灰色等待；魚停下＝亮起並震一下。魚剛開始衝的 0.4 秒內按下仍算成功
       if(f.run){ f.calmT=0; f.runT=(f.runT||0)+dt; ui.netBtn.textContent='⏳ 魚在衝，等一下'; ui.netBtn.style.background='rgba(255,255,255,.22)'; ui.netBtn.style.color='#fff'; }
       else { if(!(f.calmT>0)) vib(25); f.calmT=(f.calmT||0)+dt; f.runT=0; ui.netBtn.textContent='🥅 現在抄網！'; ui.netBtn.style.background='#7dff9a'; ui.netBtn.style.color='#0b3a14'; }
+      setAct(f.run?'等待魚<br>停止衝刺':'🥅 抄網',f.run?'先放鬆，等魚穩定後再抄網':'魚在船邊，點擊主按鈕把網兜到魚身下方',false);
       if(f.netGo){ f.netGo=false; if(!f.run||f.runT<.4){ ui.netBtn.classList.add('hidden'); f.netted=true; return land(); } f.netOn=false; ui.netBtn.classList.add('hidden'); f.d+=3+Math.random()*2; surgeFish(); f.stam=Math.max(0,f.stam-10); toast('魚還在衝，被網子嚇到又衝出去了！','warn',1600); vib([30,30,60]); }
       return; }
     f.surges++; f.stam=Math.max(0,f.stam-25); f.d+=2+Math.random()*2; surgeFish(); f.run=true; f.phaseT=rand(1,1.8); P.splash(G.to.x,0,G.to.z,14,.8); vib([30,20,40]);
@@ -8764,9 +8801,14 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       // 抄網時低頭看水面（魚就在船邊），提起來後再抬頭
       n.visible=true; n.scale.setScalar(hoopR/.5); W.head.getWorldQuaternion(tq); const yaw=new THREE.Euler().setFromQuaternion(tq,'YXZ').y;
       const fishAt=G.landFrom, start=W.head.localToWorld(tv2.set(.7,-.35,-1.6)), lift=W.head.localToWorld(new THREE.Vector3(.15,-.05,-Math.max(1.6,L*2.2)));
-      const p1=Math.min(1,t/.7), p2=sstep(.7,1.15,t), p3=sstep(1.25,2.2,t);
-      if(!G.netAt){ const dx=fishAt.x-G.base.x, dz=fishAt.z-G.base.z, dd=Math.max(.01,Math.hypot(dx,dz)), r=Math.max(4.2,dd); G.netAt=new THREE.Vector3(G.base.x+dx/dd*r,0,G.base.z+dz/dd*r); G.fish.group.position.set(G.netAt.x,-.15,G.netAt.z); }
-      const pos=new THREE.Vector3().copy(start).lerp(new THREE.Vector3(G.netAt.x,.08,G.netAt.z),sstep(0,1,p1)); pos.y-=.2*p2*(1-p3); pos.lerp(lift,p3);   /* 網框貼著水面探過去，兜魚時半沉入水 */
+      const p2=sstep(.7,1.15,t), p3=sstep(1.25,2.1,t), p4=sstep(2.1,2.8,t);
+      if(!G.netAt) G.netAt=fishAt.clone();
+      const water=W.swell(G.netAt.x,G.netAt.z,G.t),rim=new THREE.Vector3(G.netAt.x,water+.08,G.netAt.z);
+      const railY=Math.max(start.y,W.player.position.y+.15),overRail=new THREE.Vector3(rim.x,railY,rim.z);
+      const pos=new THREE.Vector3().copy(start).lerp(overRail,sstep(0,.4,t));if(t>.4)pos.copy(overRail).lerp(rim,sstep(.4,.7,t));pos.y-=.2*p2*(1-p3);
+      // Extend above the rail, dip outside the hull, then lift the whole bag clear.
+      const onBoat=!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht);
+      pos.y+=(Math.max(lift.y,W.player.position.y+hoopR*2.1)-pos.y)*p3;if(!onBoat)pos.lerp(lift,p4);
       n.position.copy(pos); n.rotation.set(0,yaw-Math.PI/4,0,'YXZ'); n.rotateZ(-.25-(1-p3)*.2);   /* 手把朝向右下的自己，網框微微朝鏡頭傾斜看得到網袋 */
       NET.shape(p2*(1-.4*p3)+.15,t*6);
       const g=G.fish.group; if(t>.7){ const inBag=new THREE.Vector3(0,-.25*hoopR/.5,0).applyQuaternion(n.quaternion).add(n.position); g.position.lerp(inBag,Math.min(1,dt*10)); te.set(0,yaw+Math.PI/2,0,'YXZ'); g.quaternion.slerp(tq.setFromEuler(te).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),.5)),Math.min(1,dt*6)); }
@@ -8774,7 +8816,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       if(p3>0&&p3<1&&Math.random()<dt*30) P.splash(n.position.x+rand(-.3,.3),n.position.y-.35*hoopR,n.position.z+rand(-.3,.3),1,.14);   // 網袋一路滴水
       G.fish.uni.uAmp.value=.08+.25*Math.max(0,Math.sin(t*7)); G.fish.uni.uSwim.value+=dt*14;
       rod.pitchT=.3; rod.bendT=.35;
-      if(t>=2.5){ G.netting=false; G.netSplash=false; G.netAt=null; n.visible=false; W.head.attach(g); g.position.set(0,.14*D,-D); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }
+      if(t>=3.0){ G.netting=false; G.netSplash=false; G.netAt=null; n.visible=false; W.head.attach(g); g.position.set(0,.14*D,-D); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }
     }
     else if(st==='land'){
       // 起魚三段：①竿子高舉，魚被線吊出水面、頭朝上掛在竿尖下甩動掙扎、身上滴水 ②把吊著的魚拉到眼前晃著 ③轉成展示角度

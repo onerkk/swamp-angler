@@ -421,7 +421,7 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:lo
 <div id="intro">
   <h1>濕地垂釣</h1>
   <div class="en">SWAMP ANGLER</div>
-  <p><b>按住</b>按鈕蓄力，在力道最滿時放開拋竿。浮標被拉進水裡時<b>立刻點擊</b>提竿。拉扯時<b>按住收線</b>；魚衝刺就放手，並往魚游走的<b>反方向滑動</b>拉竿，別讓張力爆表。拖曳畫面可以轉向瞄準。先觀察倒木、睡蓮與礁岩，避開障礙物拋投；卡住時先放手，再向側邊拖曳改變拉線角度，持續硬拉會斷線。</p>
+  <p><b>按住</b>按鈕蓄力，在力道最滿時放開拋竿。浮標被拉進水裡時<b>立刻點擊</b>提竿。拉扯時<b>按住收線</b>；魚衝刺就放手，並往魚游走的<b>反方向滑動</b>拉竿，別讓張力爆表。船釣時把魚帶到船頭或近側船邊，等牠停止衝刺後點「抄網」起魚；不用把魚硬拉到船底。拖曳畫面可以轉向瞄準。先觀察倒木、睡蓮與礁岩，避開障礙物拋投；卡住時先放手，再向側邊拖曳改變拉線角度，持續硬拉會斷線。</p>
   <button id="startBtn">開始釣魚</button>
   <script>
 // 錯誤直接顯示在載入畫面上（手機看不到主控台）：有問題時截圖就能看出原因
@@ -438,7 +438,7 @@ function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classLi
 </script>
 <script>
 /* 主程式載入器：先試 CDN（快），檢查版本號一致才執行；不一致或失敗就改從本站下載。依序執行兩個檔案 */
-(function(){ var V='20261031200632', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
+(function(){ var V='20261031202716', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
   var note=function(t){ var e=document.getElementById('loadTip'); if(e&&t) e.textContent=t; };
   function run(code){ var b=new Blob([code],{type:'text/javascript'}), s=document.createElement('script'); s.src=URL.createObjectURL(b); return new Promise(function(ok){ s.onload=ok; s.onerror=ok; document.body.appendChild(s); }); }
   function get(u){ return fetch(u,{cache:'no-cache'}).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }); }

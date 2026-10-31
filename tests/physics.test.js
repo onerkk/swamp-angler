@@ -15,3 +15,10 @@ test('inactive lake obstacles cannot collide in the sea',()=>{let lake=true;cons
 test('embedded spawn resolves to safe water without jumping to top',()=>{const w=new Physics();wall(w);const q=w.resolve(p(0),.1);assert(w.clear(q,.1));assert.equal(q.y,0);});
 test('moving away from a touching surface is not another collision',()=>{const w=new Physics();wall(w);assert(!w.move(p(-.2),p(-2),.1).contact);});
 test('random swept movements always stop outside geometry',()=>{const w=new Physics();wall(w);for(let i=0;i<2000;i++){const a=p(-2,0,Math.sin(i)*4),b=p(2,0,Math.cos(i*3)*4),q=w.move(a,b,.1);assert(w.clear(q.pos,.099));}});
+test('rotated moving hull has exact local collisions without phantom enclosing corners',()=>{
+ const w=new Physics(),h=w.addBox(p(-2,-1,-4.5),p(2,2,21.5),()=>true,'船體');h.boxes[0].frame={x:30,z:-40,head:Math.PI/4};w.refresh();const box=h.boxes[0],world=q=>Physics.world(q,box);
+ const q=w.move(world(p(0,-.35,-8)),world(p(0,-.35,0)),.2);assert(q.contact);assert(w.clear(q.pos,.199));assert(Physics.local(q.pos,box).z< -4.69);
+ assert(w.clear(world(p(2.5,0,-3)),.2));
+ const slide=w.move(world(p(3,0,-3)),world(p(0,0,-1)),.2);assert(w.clear(slide.pos,.199));assert(Physics.local(slide.pos,box).z> -2.9);
+ const path=w.route(world(p(-4,0,-2)),world(p(4,0,-2)),.2);assert(path.length>2);assert.deepEqual(path.at(-1),world(p(4,0,-2)));for(let i=1;i<path.length;i++)assert(!w.hit(path[i-1],path[i],.2));
+});
