@@ -139,13 +139,7 @@ function specialK(sp){ if(!sp.special) return 1;
 /* 魚群警覺：同一個方向一直釣，魚會變少、變小、變慢咬；換方向或換釣點就恢復（每分鐘消退 1） */
 /* 透水：水下物體在水面之後繪製，越深越透明、越帶水色（湖底沒有地形，所以讓物體透出來，而不是讓水變透明） */
 const SEE_U={value:new THREE.Vector3(.04,.13,.15)}, SEE_K={value:1}; window.__SEE_K=SEE_K;
-function seeThrough(obj){ if(!obj) return; obj.traverse(m=>{ if(!m.isMesh&&!m.isSkinnedMesh) return; m.renderOrder=10;
-  (Array.isArray(m.material)?m.material:[m.material]).forEach(mat=>{ if(!mat||mat.userData.see) return; mat.userData.see=true; mat.transparent=true;
-    const prev=mat.onBeforeCompile, prevKey=mat.customProgramCacheKey?mat.customProgramCacheKey.bind(mat):null;
-    mat.onBeforeCompile=(s,r)=>{ if(prev) prev(s,r); s.uniforms.uSeeCol=SEE_U; s.uniforms.uSeeK=SEE_K;
-      s.vertexShader='varying float vWy_;\n'+s.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\nvWy_=(modelMatrix*vec4(transformed,1.0)).y;');
-      s.fragmentShader='uniform vec3 uSeeCol;\nuniform float uSeeK;\nvarying float vWy_;\n'+s.fragmentShader.replace(/}\s*$/,'  { float d_=max(0.0,-vWy_)*uSeeK; gl_FragColor.rgb=mix(gl_FragColor.rgb,uSeeCol,1.0-exp(-d_*1.3)); gl_FragColor.a*=exp(-d_*1.1); }\n}'); };
-    mat.customProgramCacheKey=()=>(prevKey?prevKey():'')+'|see'; mat.needsUpdate=true; }); }); }
+function seeThrough(obj){ if(obj&&W.submerged)W.submerged.add(obj); }
 window.__seeThrough=seeThrough;
 const DEPL={}; const TR=b=>window.__TAL?window.__TAL.rank(b):0;
 function depKey(){ const A=((G.head+G.yaw)%(2*Math.PI)+2*Math.PI)%(2*Math.PI); return (WL.zoneId?WL.zoneId():'')+':'+Math.floor(A/(Math.PI/3)); }
@@ -226,16 +220,13 @@ function landBobber(){
 const AMB={list:[],app:null};
 function ambMake(sp,L){ let f=null; try{ if(window.__MDL&&window.__MDL.fishReady(sp.id)) f=window.__MDL.fish(sp); }catch(e){} if(!f) return null;
   f.group.scale.setScalar(L); seeThrough(f.group); W.scene.add(f.group);
-  // 隔著水看魚：只看得到被水染色、半透明的暗影，不是清清楚楚浮在水面上的魚
-  f.group.traverse(m=>{ if(!m.isMesh||!m.material) return; const conv=mm=>{ const k=mm.clone(); k.transparent=true; k.opacity=.32; k.depthWrite=false; if(k.color) k.color.multiply(new THREE.Color(.42,.5,.46)); if(k.emissive) k.emissive.setRGB(0,0,0); k.roughness=1; k.metalness=0; return k; };
-    m.material=Array.isArray(m.material)?m.material.map(conv):conv(m.material); m.renderOrder=-1; });
   // 每尾魚自己對這次的餌有多少興趣：魚餌偏好 × 水層對不對
   const bt=G.baitUsed||BAITS[0], aff=bt.aff&&bt.aff[sp.id]!=null?bt.aff[sp.id]:1, lay=layerK(sp), want=Math.min(2,aff)*lay;
   return {f,sp,L,pos:new THREE.Vector3(),h:Math.random()*6.28,sp0:rand(.25,.55),dep:rand(.45,1.1),wt:0,flee:0,want,aff,lay,insp:0}; }
 function ambStart(){ ambClear(); if(G.loc==='ice'||(G.baitUsed&&G.baitUsed.lure)) return; const n=Math.floor(rand(2,4.99)), seen={};
   for(let i=0;i<n;i++){ const sp=pickSpecies(); if(!sp||sp.special||seen[sp.id]) continue; seen[sp.id]=1; const L=lerp(sp.len[0],sp.len[1],Math.random()*.7)/100, a=ambMake(sp,L); if(!a) continue;
     const ang=rand(0,6.28), r=rand(2.2,6); a.pos.set(G.to.x+Math.cos(ang)*r,-a.dep,G.to.z+Math.sin(ang)*r); setPoint(a.pos,PH.resolve(a.pos,Math.max(.1,L*.22))); AMB.list.push(a); } }
-function ambClear(){ AMB.told=false; AMB.inspT=null; AMB.list.forEach(a=>{ a.f.group.visible=false; if(a.f.group.parent) a.f.group.parent.remove(a.f.group); }); AMB.list=[]; AMB.app=null; }
+function ambClear(){ AMB.told=false; AMB.inspT=null; AMB.list.forEach(a=>{ a.f.group.visible=false; W.submerged.remove(a.f.group); if(a.f.group.parent) a.f.group.parent.remove(a.f.group); }); AMB.list=[]; AMB.app=null; }
 function ambScare(x,z){ AMB.list.forEach(a=>{ a.flee=3; a.h=Math.atan2(a.pos.z-z,a.pos.x-x); }); }
 function ambUpdate(dt){ if(!AMB.list.length) return; if(G.state!=='wait'&&G.state!=='bite'){ ambClear(); return; }
   // 巡游的魚會輪流過來看餌：有興趣的在旁邊多待（咬口來得快一點）；沒興趣的看一眼就走，並告訴玩家可能的原因（每次拋竿最多提示一次）
@@ -647,7 +638,7 @@ window.__HOME=createHome({save,persist:()=>persist(),toast:(...a)=>toastHome(...
 const META=createMeta({W,save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS,goSpot,curSpot:()=>G.spot,setHour:h=>{ G.hour=h; W.setTime(h,true); }});
 const UW=createUnderwater(W,P);
 const tvSea=new THREE.Vector3();
-window.__MDL=createModels(W); const MDL=window.__MDL; MDL.preload('lake');
+window.__MDL=createModels(W); const MDL=window.__MDL; MDL.preload('lake'); const RESIDENTS=createSurfaceResidents(W,P,MDL);
 // 打開設定、商店等面板或新手指引時，鱷魚與女鬼都不會發動（玩家沒在看湖面）
 const uiBusy=()=>{ const sh=document.getElementById('sheet'); return (sh&&!sh.classList.contains('hidden'))||!$('shopUI').classList.contains('hidden')||!!document.getElementById('tutOv'); };
 const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,
@@ -1071,7 +1062,7 @@ W.setTime(G.hour,true);
 let last=performance.now(), prAcc=0, prN=0, prChecks=0;
 function frame(now){
   const dt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
-  try{ window.__UWON=UW.active(); update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
+  try{ window.__UWON=UW.active(); update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   prAcc+=dt; prN++;
   if(prAcc>2){ const fps=prN/prAcc, mode=save.gfx||'auto', ready=window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden;
     if(ready){ G.gfxWarm=(G.gfxWarm||0)+1; }

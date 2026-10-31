@@ -99,11 +99,11 @@ const gator=new T.Group(); gator.visible=false; S.add(gator);
     const e=new T.Mesh(new T.SphereGeometry(.027,12,8),gEye); e.position.set(s*.088,.076,-.2); gator.add(e); }
   const no=new T.Mesh(new T.SphereGeometry(.035,12,8),gm); no.scale.set(1.3,.6,1); no.position.set(0,.035,.5); gator.add(no);
   for(let i=0;i<14;i++){ const k=1-i/18, sc=new T.Mesh(new T.SphereGeometry(.055*k,10,6),gm); sc.scale.set(1,.45,1.4); sc.position.set(i<9?(i%2?.11:-.11)*k:0,-.008,-.78-i*.23); gator.add(sc); } }
-const gH=window.__MDL?window.__MDL.attach(gator,'gator',{len:3.3,target:'+z',top:.07}):null;
+const gH=window.__MDL?window.__MDL.attach(gator,'gator',{len:3.3,target:'+z',top:.06,anim:false}):null;
 // 鱷魚游動：模型沒有骨架，用頂點著色器做身體的 S 形擺動（頭幾乎不動、越往尾巴擺越大，波從頭傳到尾）
 const GU={uGT:{value:0},uGA:{value:.3}}; let gPatched=false, gYaw=0, gYawInit=false;
-function patchGator(){ if(gPatched) return; let hit=false;
-  gator.traverse(o=>{ if(!o.isMesh||!o.material||o.userData.gw) return; o.geometry.computeBoundingBox(); const bb=o.geometry.boundingBox; if(bb.max.x-bb.min.x<2) return; hit=true; o.userData.gw=1;
+function patchGator(){ if(gPatched||(gH&&!gH.loaded)) return; let hit=false;
+  gator.traverse(o=>{ if(!o.isMesh||!o.material||o.userData.gw) return; o.geometry.computeBoundingBox(); const bb=o.geometry.boundingBox; if(bb.max.x-bb.min.x<.001) return; hit=true; o.userData.gw=1;
     const head=bb.max.x, len=bb.max.x-bb.min.x, m=o.material=o.material.clone();
     m.onBeforeCompile=sh=>{ sh.uniforms.uGT=GU.uGT; sh.uniforms.uGA=GU.uGA;
       sh.vertexShader='uniform float uGT;\nuniform float uGA;\n'+sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
@@ -112,10 +112,10 @@ function patchGator(){ if(gPatched) return; let hit=false;
         transformed.z+=uGA*w_*${(len*0.11).toFixed(3)}*sin(uGT-tl_*6.2);
         transformed.y+=uGA*${(len*0.006).toFixed(3)}*sin(uGT*0.5+tl_*2.0);`); };
     m.customProgramCacheKey=()=>'gatorswim'; m.needsUpdate=true; });
-  if(hit) gPatched=true; }
+  if(hit){gPatched=true;W.submerged.add(gator);} }
 let gs={mode:'off'}, gTimer=rand(40,90), gRip=0, chaseDelay=-1, chaseGet=null, stolenF=false;
 const gS=new T.Vector3(), gE=new T.Vector3(), gP=new T.Vector3();
-function placeGator(p,yaw){ gator.position.set(p.x,-.03+Math.sin(performance.now()*.0015)*.008,p.z);
+function placeGator(p,yaw){ patchGator(); gator.position.set(p.x,W.swell(p.x,p.z,W.U.uTime.value)-.025,p.z);
   if(!gYawInit||!gator.visible){ gYaw=yaw; gYawInit=true; } else { let d=yaw-gYaw; while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2; gYaw+=d*Math.min(1,.016*3); }
   gator.rotation.y=gYaw+Math.sin(GU.uGT.value)*.04*GU.uGA.value; gator.visible=true; }
 function spawnPass(){ const s=sp(), bx=s.pos[0], bz=s.pos[1], sg=Math.random()<.5?1:-1;
@@ -155,7 +155,7 @@ function updateGator(dt){
     gP.addScaledVector(tv,Math.min(d,1.15*dt)); placeGator(gP,Math.atan2(tv.x,tv.z)); gs.d=d;
     if(d<1.1){ stolenF=true; gs={mode:'sink',t:0}; vib([100,50,150]); } }
   else if(gs.mode==='leave'){ gs.t+=dt; gP.addScaledVector(gs.dir,dt); placeGator(gP,Math.atan2(gs.dir.x,gs.dir.z)); if(gs.t>3) gs={mode:'sink',t:0}; }
-  else if(gs.mode==='sink'){ gs.t+=dt; gator.position.y-=dt*.12; if(gs.t>1.6){ gator.visible=false; gs={mode:'off'}; } }
+  else if(gs.mode==='sink'){ gs.t+=dt; gator.position.y-=dt*.45; if(gs.t>1.6){ gator.visible=false; gs={mode:'off'}; } }
   if(gator.visible&&gs.mode!=='sink'){ const fast=gs.mode==='chase'||gs.mode==='raid'||gs.mode==='flee'; gRip-=dt; if(gRip<=0){ W.addRipple(gator.position.x,gator.position.z,fast?.3:.14); gRip=fast?.45:1.7; } }
   if(chaseDelay>0){ chaseDelay-=dt; if(chaseDelay<=0){ chaseDelay=-1; const fp=chaseGet(), s=sp();
       tv.set(fp.x-s.pos[0],0,fp.z-s.pos[1]).normalize(); const side=Math.random()<.5?1:-1;

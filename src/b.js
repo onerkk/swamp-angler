@@ -263,6 +263,9 @@ varying float vH;
 uniform vec4 uRip[12];
 uniform vec3 uDeep;
 uniform sampler2D uLakeBed;
+uniform sampler2D uSubmerged;
+uniform vec2 uSubmergedSize;
+uniform float uSubmergedOn;
 uniform vec3 uScatter;
 uniform float uWave;
 uniform float uSunVis;
@@ -439,6 +442,11 @@ void main(){
     #endif
     refl *= vec3(0.74, 0.88, 1.0); F *= 0.82;
     bodyD *= mix(1.0, 0.1, uNight);
+  }
+  if(uSubmergedOn>.5){
+    vec2 subUV=gl_FragCoord.xy/uSubmergedSize+N.xz*.002;
+    vec4 subColor=texture2D(uSubmerged,clamp(subUV,vec2(.001),vec2(.999)));
+    if(subColor.a>.001)bodyD=mix(bodyD,TM(subColor.rgb/max(subColor.a,.001)),subColor.a*(1.0-dw));
   }
   float surfaceRough=clamp(.12+.3*uWind.z+.2*uRain,.12,.65);
   F*=1.0-surfaceRough*.42;
@@ -666,7 +674,8 @@ function renderRefl(){
   }
 }
 
-function render(){ if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } renderer.render(scene, camera); }
+const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
+function render(){ submerged.render(); if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } renderer.render(scene, camera); }
 
 function setIce(on){water.visible=!on;seaGrid.visible=!on;}
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=water.visible; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
@@ -678,5 +687,5 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }

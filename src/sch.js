@@ -14,12 +14,12 @@ const MATS={lake:new T.MeshStandardMaterial({color:0x6d7a64,roughness:.35,metaln
 // 水面上的閃光：魚轉身時鱗片反光
 const glintTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=32; const g=cv.getContext('2d'), rg=g.createRadialGradient(16,16,0,16,16,16); rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(.3,'rgba(230,245,255,.5)'); rg.addColorStop(1,'rgba(230,245,255,0)'); g.fillStyle=rg; g.fillRect(0,0,32,32); return new T.CanvasTexture(cv); })();
 const N=36, schools=[], M=new T.Matrix4(), Q=new T.Quaternion(), V=new T.Vector3(), SC=new T.Vector3(), E=new T.Euler(0,0,0,'YXZ'), cam=new T.Vector3();
-for(let s=0;s<3;s++){ const im=new T.InstancedMesh(GEO,MATS.lake,N); im.frustumCulled=false; im.visible=false; S.add(im);
+for(let s=0;s<3;s++){ const im=new T.InstancedMesh(GEO,MATS.lake,N); im.frustumCulled=false; im.visible=false; S.add(im); W.submerged.add(im);
   const gl=new T.Points(new T.BufferGeometry(),new T.PointsMaterial({map:glintTex,size:.35,transparent:true,depthWrite:false,blending:T.AdditiveBlending,opacity:.9}));
   gl.geometry.setAttribute('position',new T.BufferAttribute(new Float32Array(6*3),3)); gl.frustumCulled=false; gl.visible=false; S.add(gl);
   const off=[]; for(let i=0;i<N;i++) off.push({x:rand(-1.6,1.6),z:rand(-.9,.9),d:rand(0,.12),ph:rand(0,6.28),sz:rand(.75,1.25)});
   schools.push({im,gl,off,on:false,t:0,life:0,x:0,z:0,h:0,sp:0,turn:0,fear:0,depth:0,next:rand(4,14)+s*6,jump:null,gt:0}); }
-function waterY(x,z,t){ return (c.loc()==='sea'&&W.swell)?W.swell(x,z,t):0; }
+function waterY(x,z,t){ return W.swell?W.swell(x,z,t):0; }
 function spawn(s){ s.off.forEach(o=>{o.prev=null;}); W.camera.getWorldPosition(cam); const a=rand(0,6.28), d=rand(16,42), x=cam.x+Math.sin(a)*d, z=cam.z+Math.cos(a)*d;
   if(c.loc()!=='sea'&&W.shoreR&&Math.hypot(x,z)>W.shoreR(Math.atan2(x,-z))-6) return false;
   const sea=c.loc()==='sea'; s.im.material=sea?MATS.sea:MATS.lake; s.scale=sea?rand(.28,.42):rand(.16,.26);
@@ -64,7 +64,7 @@ function comeBack(x,z){ const s=schools.find(q=>!q.on)||schools[0]; if(!spawn(s)
 function force(d){ const s=schools.find(q=>!q.on)||schools[0]; W.camera.getWorldPosition(cam); const dir=new T.Vector3(); W.camera.getWorldDirection(dir); dir.y=0; dir.normalize();
   spawn(s); s.x=cam.x+dir.x*(d||12); s.z=cam.z+dir.z*(d||12); s.h=Math.atan2(dir.z,dir.x); s.t=3; }
 // 受驚炸水：一群小魚從落點往外跳出水面逃開（每尾一道弧線＋入水水花）
-const BN=14, burstIM=new T.InstancedMesh(GEO,MATS.lake,BN); burstIM.frustumCulled=false; burstIM.visible=false; S.add(burstIM); const BU=[];
+const BN=14, burstIM=new T.InstancedMesh(GEO,MATS.lake,BN); burstIM.frustumCulled=false; burstIM.visible=false; S.add(burstIM); W.submerged.add(burstIM); const BU=[];
 function burst(x,z,n){ BU.length=0; burstIM.material=c.loc()==='sea'?MATS.sea:MATS.lake; n=Math.min(BN,n||10);
   for(let i=0;i<n;i++){ const a=rand(0,6.28), sp=rand(1.4,3.2); BU.push({x:x+Math.cos(a)*rand(0,.6),z:z+Math.sin(a)*rand(0,.6),vx:Math.cos(a)*sp,vz:Math.sin(a)*sp,vy:rand(1.6,2.8),y:-.05,t:-rand(0,.45),sz:rand(.13,.22),done:false}); }
   burstIM.visible=true; }
