@@ -50,3 +50,12 @@ test('aquarium fish cloning keeps hidden fallback models hidden',()=>{
  const c={T,window:{},BENTHIC:{},rigFish:()=>[],c:{species:()=>({}),getFish:()=>({group}),isReal:()=>true}};vm.createContext(c);vm.runInContext(s.slice(s.indexOf('function fishObj('),s.indexOf('// 執行時綁骨：')),c);
  const o=c.fishObj({id:'test',L:1});assert(aquariumModelBounds(T,o).getSize(new T.Vector3()).length()<2);assert.equal(o.children[0].children[1].visible,false);
 });
+test('complete skinned tail strokes and maximum bends stay inside the collision envelope',()=>{
+ const fs=require('fs'),vm=require('vm'),s=fs.readFileSync(require.resolve('../src/w.js'),'utf8'),c={T};vm.createContext(c);vm.runInContext('const NB_=7;\n'+s.slice(s.indexOf('function rigFish('),s.indexOf('// 依缸深')),c);
+ const root=new T.Group();root.add(new T.Mesh(new T.BoxGeometry(1,.3,.22,36,2,2),new T.MeshStandardMaterial()));root.userData.bones=c.rigFish(root);
+ const {aquariumBodyBounds}=require('../src/aquarium.js'),body=aquariumBodyBounds(aquariumModelBounds(T,root),1);
+ for(const turn of [-.5,.5])for(let phase=0;phase<200;phase++){
+  c.swimBones({o:root,v:.17,sw:phase*.04,turnRate:turn},0);root.updateMatrixWorld(true);
+  root.traverse(o=>{if(!o.isSkinnedMesh)return;o.skeleton.update();const p=o.geometry.attributes.position,v=new T.Vector3();for(let i=0;i<p.count;i++){o.boneTransform(i,v);assert(body.containsPoint(v),'animated fin or tail exceeds collider');}});
+ }
+});

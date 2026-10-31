@@ -11,6 +11,10 @@ function aquariumModelBounds(T,root){
   if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
  });return box;
 }
+function aquariumBodyBounds(box,length,bottom=false){
+ const body=box.clone(),x=length*.08,z=length*(bottom?.08:.25),y=length*.025;
+ body.min.x-=x;body.max.x+=x;body.min.z-=z;body.max.z+=z;body.min.y-=y;body.max.y+=y;return body;
+}
 function createAquariumMotion(T,{min,max,floor}){
  const bodies=[],obstacles=[],matrix=new T.Matrix4(),one=new T.Vector3(1,1,1),temp=new T.Box3(),margin=-.004;
  function shape(f,pos=f.o.position,q=f.o.quaternion){return f.body.clone().applyMatrix4(matrix.compose(pos,q,one));}
@@ -76,4 +80,4 @@ function createAquariumMotion(T,{min,max,floor}){
  }
  return{add,addObstacle,place,pack,valid,move,steer,ground,refresh,shape,bodies,obstacles};
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={aquariumSpecs,aquariumDisplayLength,aquariumModelBounds,createAquariumMotion};
+if(typeof module!=='undefined'&&module.exports)module.exports={aquariumSpecs,aquariumDisplayLength,aquariumModelBounds,aquariumBodyBounds,createAquariumMotion};

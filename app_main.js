@@ -1,4 +1,4 @@
-/*APPV:20261031221104*/
+/*APPV:20261031221106*/
 /* Aquarium collision uses complete, rotated model bounds, with room for the tail stroke.
    Steering anticipates contact; the swept pose check is the final non-penetration guard. */
 function aquariumSpecs(){return [{w:2,h:1,d:.95,st:.7},{w:2.7,h:1.25,d:1.2,st:.65},{w:3.3,h:1.45,d:1.45,st:.6},{w:3.9,h:1.65,d:1.65,st:.55}];}
@@ -11,6 +11,10 @@ function aquariumModelBounds(T,root){
   if(!o.isMesh||!o.geometry)return;for(let p=o;p;p=p.parent)if(!p.visible)return;
   if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
  });return box;
+}
+function aquariumBodyBounds(box,length,bottom=false){
+ const body=box.clone(),x=length*.08,z=length*(bottom?.08:.25),y=length*.025;
+ body.min.x-=x;body.max.x+=x;body.min.z-=z;body.max.z+=z;body.min.y-=y;body.max.y+=y;return body;
 }
 function createAquariumMotion(T,{min,max,floor}){
  const bodies=[],obstacles=[],matrix=new T.Matrix4(),one=new T.Vector3(1,1,1),temp=new T.Box3(),margin=-.004;
@@ -77,7 +81,7 @@ function createAquariumMotion(T,{min,max,floor}){
  }
  return{add,addObstacle,place,pack,valid,move,steer,ground,refresh,shape,bodies,obstacles};
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={aquariumSpecs,aquariumDisplayLength,aquariumModelBounds,createAquariumMotion};
+if(typeof module!=='undefined'&&module.exports)module.exports={aquariumSpecs,aquariumDisplayLength,aquariumModelBounds,aquariumBodyBounds,createAquariumMotion};
 /* Account assistance follows the authenticated Google identity, never a saved flag. */
 function createAccountAssist(){
   let enabled=false;
@@ -5900,8 +5904,7 @@ function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.s
       if(modelBox.isEmpty()) return;
       const bottom=!!BENTHIC[rec.id], length=aquariumDisplayLength(tk.spec,rec.L,list.length)*(bottom?.65:1);
       o.scale.setScalar(length/Math.max(modelSize.x,modelSize.y,modelSize.z,.001));
-      const body=aquariumModelBounds(T,o), pad=length*(bottom?.025:.14);
-      body.min.z-=pad;body.max.z+=pad;body.min.y-=length*.025;body.max.y+=length*.025;
+      const body=aquariumBodyBounds(aquariumModelBounds(T,o),length,bottom);
       const f={o,rec,body,bottom,yaw:Math.random()<.5?0:Math.PI,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni};
       o.rotation.y=f.yaw; const b=bounds(tk,rec.L);o.position.set(0,(b.y0+b.y1)/2,tk.spec.d*.2);
       tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.fish.push(f);tk.motion.add(f);
@@ -6596,7 +6599,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261031221104'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261031221106'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

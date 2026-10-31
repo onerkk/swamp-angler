@@ -507,8 +507,7 @@ function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.s
       if(modelBox.isEmpty()) return;
       const bottom=!!BENTHIC[rec.id], length=aquariumDisplayLength(tk.spec,rec.L,list.length)*(bottom?.65:1);
       o.scale.setScalar(length/Math.max(modelSize.x,modelSize.y,modelSize.z,.001));
-      const body=aquariumModelBounds(T,o), pad=length*(bottom?.025:.14);
-      body.min.z-=pad;body.max.z+=pad;body.min.y-=length*.025;body.max.y+=length*.025;
+      const body=aquariumBodyBounds(aquariumModelBounds(T,o),length,bottom);
       const f={o,rec,body,bottom,yaw:Math.random()<.5?0:Math.PI,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni};
       o.rotation.y=f.yaw; const b=bounds(tk,rec.L);o.position.set(0,(b.y0+b.y1)/2,tk.spec.d*.2);
       tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.fish.push(f);tk.motion.add(f);
