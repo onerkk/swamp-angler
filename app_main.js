@@ -1,4 +1,83 @@
-/*APPV:20261031221102*/
+/*APPV:20261031221104*/
+/* Aquarium collision uses complete, rotated model bounds, with room for the tail stroke.
+   Steering anticipates contact; the swept pose check is the final non-penetration guard. */
+function aquariumSpecs(){return [{w:2,h:1,d:.95,st:.7},{w:2.7,h:1.25,d:1.2,st:.65},{w:3.3,h:1.45,d:1.45,st:.6},{w:3.9,h:1.65,d:1.65,st:.55}];}
+function aquariumDisplayLength(spec,length,count=1){
+ const cap=Math.min(spec.w*.25,spec.d*.58,spec.h*.58)*Math.min(1,Math.pow(12/Math.max(1,count),1/3));
+ return Math.min(Math.max(.025,length),cap);
+}
+function aquariumModelBounds(T,root){
+ root.updateMatrixWorld(true);const box=new T.Box3();root.traverse(o=>{
+  if(!o.isMesh||!o.geometry)return;for(let p=o;p;p=p.parent)if(!p.visible)return;
+  if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
+ });return box;
+}
+function createAquariumMotion(T,{min,max,floor}){
+ const bodies=[],obstacles=[],matrix=new T.Matrix4(),one=new T.Vector3(1,1,1),temp=new T.Box3(),margin=-.004;
+ function shape(f,pos=f.o.position,q=f.o.quaternion){return f.body.clone().applyMatrix4(matrix.compose(pos,q,one));}
+ function overlap(a,b){return a.min.x<b.max.x-margin&&a.max.x>b.min.x+margin&&a.min.y<b.max.y-margin&&a.max.y>b.min.y+margin&&a.min.z<b.max.z-margin&&a.max.z>b.min.z+margin;}
+ function bottom(box){let y=min.y;if(floor)for(const x of [box.min.x,box.max.x])for(const z of [box.min.z,box.max.z])y=Math.max(y,floor(x,z));return y;}
+ function valid(f,pos=f.o.position,q=f.o.quaternion){
+  const box=shape(f,pos,q);if(box.min.x<min.x||box.max.x>max.x||box.min.z<min.z||box.max.z>max.z||box.min.y<bottom(box)||box.max.y>max.y)return false;
+  if(obstacles.some(b=>overlap(box,b)))return false;
+  return !bodies.some(g=>g!==f&&overlap(box,g.box||shape(g)));
+ }
+ function add(f){bodies.push(f);f.box=shape(f);}
+ function refresh(f){f.box=shape(f);}
+ function ground(f,liftOnly=false){const b=shape(f),dy=bottom(b)-b.min.y+.002;f.o.position.y+=liftOnly?Math.max(0,dy):dy;refresh(f);}
+ function place(f,near=false){
+  const start=f.o.position.clone(),size=f.body.getSize(new T.Vector3()),center=f.body.getCenter(new T.Vector3());
+  for(let i=0;i<600;i++){
+   if(i===0&&valid(f)){refresh(f);return true;}
+   f.o.position.set(min.x+Math.random()*(max.x-min.x),min.y+Math.random()*(max.y-min.y),min.z+Math.random()*(max.z-min.z));
+   if(near&&i<100)f.o.position.copy(start).add(new T.Vector3((Math.random()-.5)*size.length()*3,(Math.random()-.5)*size.length(),(Math.random()-.5)*size.length()*3));
+   if(f.bottom)ground(f);
+   if(valid(f)){refresh(f);return true;}
+  }
+  // Deterministic fallback explores the free volume even if random candidates were unlucky.
+  const step=Math.max(.04,Math.min(size.x,size.y,size.z)*.65),yStep=f.bottom?max.y-min.y+1:Math.max(.05,size.y*.8);
+  for(let y=min.y;y<max.y;y+=yStep)for(let z=min.z;z<max.z;z+=step)for(let x=min.x;x<max.x;x+=step){
+   f.o.position.set(x-center.x,y-center.y,z-center.z);if(f.bottom)ground(f);if(valid(f)){refresh(f);return true;}
+  }
+  f.o.position.copy(start);refresh(f);return false;
+ }
+ function pack(){
+  // Repack after async scenery/model loads. No creature is hidden or dropped to make space.
+  for(let attempt=0;attempt<18;attempt++){
+   bodies.forEach(f=>{f.box=null;});let ok=true;
+   for(const f of bodies){const index=bodies.indexOf(f);const later=bodies.splice(index+1);if(!place(f,true))ok=false;bodies.push(...later);if(!ok)break;}
+   if(ok){bodies.forEach(refresh);return true;}
+   for(const f of bodies){f.o.scale.multiplyScalar(.92);f.body.min.multiplyScalar(.92);f.body.max.multiplyScalar(.92);}
+  }
+  return false;
+ }
+ function addObstacle(root,parent){
+  root.updateWorldMatrix(true,true);parent.updateWorldMatrix(true,false);const inv=parent.matrixWorld.clone().invert();
+  root.traverse(o=>{if(!o.isMesh||!o.geometry)return;for(let p=o;p&&p!==parent;p=p.parent)if(!p.visible)return;
+   if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();const b=o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv,o.matrixWorld));if(!b.isEmpty())obstacles.push(b.expandByScalar(.008));});
+  if(bodies.length)pack();
+ }
+ function steer(f,direction){
+  const size=f.body.getSize(new T.Vector3()),ahead=Math.max(.12,size.x*.6),box=f.box||shape(f),center=box.getCenter(new T.Vector3()),probe=center.clone().addScaledVector(direction,ahead),force=new T.Vector3();
+  const half=box.getSize(new T.Vector3()).multiplyScalar(.5).addScalar(.035);
+  for(const b of [...obstacles,...bodies.filter(g=>g!==f).map(g=>g.box||shape(g))]){
+   temp.copy(b);temp.min.sub(half);temp.max.add(half);if(!temp.containsPoint(probe))continue;
+   let best=Infinity,axis='x',sign=1;for(const k of ['x','y','z'])for(const s of [-1,1]){const distance=s<0?probe[k]-temp.min[k]:temp.max[k]-probe[k];if(distance<best){best=distance;axis=k;sign=s;}}
+   force[axis]+=sign*2.5;
+  }
+  for(const k of ['x','y','z']){const cushion=half[k]+ahead*.6;if(center[k]<min[k]+cushion)force[k]+=2;if(center[k]>max[k]-cushion)force[k]-=2;}
+  if(f.bottom)force.y=0;return direction.add(force).normalize();
+ }
+ function move(f,from,rotation){
+  const end=f.o.position.clone(),q=f.o.quaternion.clone(),distance=from.distanceTo(end),angle=rotation.angleTo(q),size=f.body.getSize(new T.Vector3());
+  const step=Math.max(.004,Math.min(size.x,size.y,size.z)*.25),n=Math.max(1,Math.ceil(distance/step),Math.ceil(angle/.035)),pos=new T.Vector3(),quat=new T.Quaternion();
+  let accepted=0;
+  for(let i=1;i<=n;i++){pos.lerpVectors(from,end,i/n);quat.copy(rotation).slerp(q,i/n);if(!valid(f,pos,quat))break;accepted=i/n;}
+  f.o.position.lerpVectors(from,end,accepted);f.o.quaternion.copy(rotation).slerp(q,accepted);refresh(f);return accepted===1;
+ }
+ return{add,addObstacle,place,pack,valid,move,steer,ground,refresh,shape,bodies,obstacles};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={aquariumSpecs,aquariumDisplayLength,aquariumModelBounds,createAquariumMotion};
 /* Account assistance follows the authenticated Google identity, never a saved flag. */
 function createAccountAssist(){
   let enabled=false;
@@ -5672,7 +5751,7 @@ const fillL=new T.AmbientLight(0xffe6ce,.19); scene.add(fillL);   // 用一盞�
 const lampL=new T.PointLight(0xffd8a0,1.2,5,1.4); lampL.position.set(LV.x+.2,.9,LV.z-.3); lampL.visible=false; scene.add(lampL);   // 煤油燈
 
 // 水族箱：尺寸跟著等級變；淡水缸在後牆中央，有海水缸時放在右側
-const TSPEC=[{w:1.2,h:.6,d:.45,st:.85},{w:1.8,h:.75,d:.55,st:.85},{w:2.6,h:1.0,d:.7,st:.7},{w:3.4,h:1.2,d:.8,st:.55}], SEA_SPEC={w:1.25,h:.62,d:.5,st:.85}, SEA_SPECS=TSPEC;   /* 海水缸每一級的尺寸和淡水缸相同 */
+const TSPEC=aquariumSpecs(), SEA_SPECS=TSPEC;   // 加深加寬的展示缸，保留前景游道與完整轉身空間
 // 底砂壓暗成自然溪砂的灰褐色（原本在缸燈下太白、像雪）
 const sandTex={fresh:pbr('clean_pebbles',2,1,{color:0x9c8f78}),sea:pbr('coral_gravel',2,1,{color:0xc8bca6})};
 const rockM=new T.MeshStandardMaterial({color:0x6a665e,roughness:.95});
@@ -5712,8 +5791,9 @@ function standCabinet(g,W,Hs,D){ const add=(geo,m,px,py,pz)=>{ const o=new T.Mes
     for(const [w2,h2,ox,oy] of [[dw-.06,.035,0,dh/2-.045],[dw-.06,.035,0,-dh/2+.045],[.035,dh-.06,-(dw-.06)/2+.0175,0],[.035,dh-.06,(dw-.06)/2-.0175,0]]) add(new T.BoxGeometry(w2,h2,.016),body,cx+ox,cy+oy,fz+.017);
     const kb=add(new T.SphereGeometry(.014,12,8),brassM,cx+(i%2?-1:1)*(dw/2-.07),cy+.02,fz+.03); kb.scale.z=.7; } }
 function buildTank(water,spec,x){
-  const old=tanks[water]; if(old){ scene.remove(old.g); for(let i=causList.length-1;i>=0;i--) if(causList[i].g===old.g) causList.splice(i,1); for(let i=shaftList.length-1;i>=0;i--) if(shaftList[i].g===old.g) shaftList.splice(i,1); }
+  const old=tanks[water]; if(old){ dropObs(old.g); scene.remove(old.g); for(let i=causList.length-1;i>=0;i--) if(causList[i].g===old.g) causList.splice(i,1); for(let i=shaftList.length-1;i>=0;i--) if(shaftList[i].g===old.g) shaftList.splice(i,1); }
   const g=new T.Group(), z=ROOM.zb+spec.d/2+.08, y=spec.st||.85, W=spec.w, D=spec.d, Hh=spec.h; g.position.set(x,0,z); scene.add(g);
+  const motion=createAquariumMotion(T,{min:new T.Vector3(-W/2+.035,y+.025,-D/2+.035),max:new T.Vector3(W/2-.035,y+Hh-.1,D/2-.035),floor:(px,pz)=>y+hAt(px,pz)+.009});
   const add=(geo,m,px,py,pz)=>{ const o=new T.Mesh(geo,m); o.position.set(px,py,pz); g.add(o); return o; };
   standCabinet(g,W+.06,y,D+.06);
   // 背景板
@@ -5729,9 +5809,9 @@ function buildTank(water,spec,x){
   const rocks=[['rock04',-.19,-.14,.5,0],['rock02',.13,-.18,.3,1.3],['rock05',-.02,.02,.2,2.4],['rock06',.34,-.06,.22,4.1],['rock03',-.38,.06,.18,.7]].slice(0,W>2.5?5:W>1.5?4:3);
   rocks.forEach(([nm,fx,fz,hk,ry])=>GL.load('rock_moss_set_01.glb',gg=>{ const src=gg.scene.getObjectByName('rock_moss_set_01_'+nm); if(!src) return; const k=src.clone(true); k.position.set(0,0,0);
     const b=new T.Box3().setFromObject(k), ctr=b.getCenter(new T.Vector3()); k.position.set(-ctr.x,0,-ctr.z); const o=new T.Group(); o.add(k);
-    const px=W*fx, pz=D*fz, sz=b.getSize(new T.Vector3()), sc=Math.min(Hh*hk/Math.max(.2,b.max.y),W*hk*.7/Math.max(sz.x,sz.z)); o.position.set(px,y+hAt(px,pz)-.01,pz); o.rotation.y=ry; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); }));
+    const px=W*fx, pz=D*fz, sz=b.getSize(new T.Vector3()), sc=Math.min(Hh*hk/Math.max(.2,b.max.y),W*hk*.7/Math.max(sz.x,sz.z)); o.position.set(px,y+hAt(px,pz)-.01,pz); o.rotation.y=ry; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); motion.addObstacle(o,g); }));
   const woods=W>2.5?[[-.3,-.1,.6,.3],[.28,.05,2.6,.26]]:W>1.1?[[-.22,-.1,.6,.28]]:[];
-  woods.forEach(([fx,fz,ry,sc])=>GL.load('dry_branches_medium_01.glb',gg=>{ const o=gg.scene.clone(true); const px=W*fx, pz=D*fz; o.position.set(px,y+hAt(px,pz),pz); o.rotation.set(0,ry,0); o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); }));
+  woods.forEach(([fx,fz,ry,sc])=>GL.load('dry_branches_medium_01.glb',gg=>{ const o=gg.scene.clone(true); const px=W*fx, pz=D*fz; o.position.set(px,y+hAt(px,pz),pz); o.rotation.set(0,ry,0); o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); motion.addObstacle(o,g); }));
   const plants=[];
   // 水草分三層：後景高的有莖草（真實蕁麻草模型）、中景蕨類、前景低矮的草皮
   const putP=(file,pick,px,pz,sc,ry)=>GL.load(file,gg=>{ let o; if(pick){ const src=gg.scene.getObjectByName(pick); if(!src) return; o=new T.Group(); const k=src.clone(true); k.position.set(0,0,0); k.updateMatrixWorld(true); const c2=new T.Box3().setFromObject(k).getCenter(new T.Vector3()); k.position.set(-c2.x,0,-c2.z); o.add(k); } else o=gg.scene.clone(true);
@@ -5775,14 +5855,14 @@ function buildTank(water,spec,x){
   if(false&&W>2.5){ const L2=new T.PointLight(0x9ad8ff,.6,3,1.4); L2.position.set(-W*.3,y+Hh-.05,0); g.add(L2); const L3=L2.clone(); L3.position.x=W*.3; g.add(L3); }
   const L=new T.PointLight(water==='sea'?0x8ad0ff:0x9ad8ff,.75,3,1.4); L.position.set(0,y+Hh-.05,0); g.add(L);
   const tankOptics=createWaterOptics({uTime:tankLightTime,uWind:{value:new T.Vector3(1,0,0)},uSea:{value:0},uLightCol:{value:new T.Vector3(.5,.72,.85)},uSunDir:{value:new T.Vector3(.1,1,.1)},uDay:{value:1}},{surface:y+Hh-.07,flat:true,bounds:{min:new T.Vector3(x-W/2,y,z-D/2),max:new T.Vector3(x+W/2,y+Hh,z+D/2)}});tankOptics.add(g);
-  tanks[water]={g,spec,x,y,z,fish:[],plants,bub,glass:gl,sig:'',hAt,optics:tankOptics};
+  tanks[water]={g,spec,x,y,z,fish:[],plants,bub,glass:gl,sig:'',hAt,optics:tankOptics,motion}; addObs(g);
 }
 
 // 把水族箱裡記錄的魚做成會游的模型（用遊戲同一個魚模型，按實際體長縮放）
 function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null;
   if(window.__TIDE&&window.__TIDE.makeModel&&BENTHIC[rec.id]){ const m=window.__TIDE.makeModel(rec.id); if(m){ m.group.userData.uni=m.uni; return m.group; } }   // 貝類用兩片真殼的模型
   const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
-  src.traverse(o=>{ o.visible=true; o.frustumCulled=false; if(o.isMesh&&o.material){ const mats=Array.isArray(o.material)?o.material:[o.material];
+  src.traverse(o=>{ o.frustumCulled=false; if(o.isMesh&&o.material){ const mats=Array.isArray(o.material)?o.material:[o.material];
       const nm=mats.map(m=>{ const k=m.clone(); k.onBeforeCompile=()=>{}; k.customProgramCacheKey=()=>'tank'; const see=m.transparent&&m.opacity<.95; k.transparent=see; k.opacity=see?m.opacity:1; k.depthWrite=!see; k.needsUpdate=true; return k; });   // 半透明的幽靈魚保持半透明
       o.material=Array.isArray(o.material)?nm:nm[0]; o.renderOrder=1; } });
   const w=new T.Group(); w.add(src); const bones=rigFish(src); w.scale.setScalar(rec.L); w.userData.rec=rec; w.userData.real=c.isReal(rec.id); w.userData.bones=bones; return w; }
@@ -5806,18 +5886,27 @@ const qb_=new T.Quaternion();
 function swimBones(f,dt){ const rig=f.o.userData.bones; if(!rig||!rig.length) return; const spd=Math.min(1,f.v*10);
   f.sw=(f.sw||0)+dt*(2.2+spd*7.5); const A=.05+.13*spd, bend=Math.max(-.5,Math.min(.5,f.turnRate||0))*.22;
   rig.forEach(r=>{ r.bones.forEach((b,k)=>{ const u=k/(NB_-1); const amp=k===0?A*.12:A*(.25+.95*u*u); const ang=amp*Math.sin(f.sw-k*.9)+(k>0?bend*u:0); qb_.setFromAxisAngle(r.up,ang); b.quaternion.copy(qb_); }); }); }
-// 缸內顯示長度：超過缸寬三成的大魚等比例壓小（保留大小順序），每條魚才有空間真的游來游去
-function dispL(tk,L){ const cap=tk.spec.w*.3; return L<=cap?L:cap+(L-cap)*.18; }
-function bounds(tk,L){ L=dispL(tk,L); const s=tk.spec, m=Math.min(L*.55,s.w*.4); return {x0:-s.w/2+m+.03,x1:s.w/2-m-.03,y0:tk.y+.16+L*.22,y1:tk.y+s.h-.12-L*.18,z0:-s.d/2+.06+L*.12,z1:s.d/2-.06-L*.12}; }
+// 依缸深、缸高與數量限制展示尺寸，讓完整魚身能轉彎，保留模型比例與原始紀錄。
+function dispL(tk,L){ return aquariumDisplayLength(tk.spec,L,tk.fish.length||1); }
+function bounds(tk,L){ L=dispL(tk,L); const s=tk.spec, m=L*.6+.035; return {x0:-s.w/2+m,x1:s.w/2-m,y0:tk.y+.24+L*.3,y1:tk.y+s.h-.14-L*.3,z0:-s.d/2+m,z1:s.d/2-m}; }
 function pickTarget(f,tk){ const b=bounds(tk,f.rec.L), r=(a,b)=>a+Math.random()*Math.max(0,b-a); const cy=f.o?f.o.position.y:(b.y0+b.y1)/2, dyMax=(b.y1-b.y0)*.3; f.tgt.set(r(b.x0,b.x1),Math.max(b.y0,Math.min(b.y1,cy+(Math.random()-.5)*2*dyMax)),r(Math.min(b.z0,b.z1),Math.max(b.z0,b.z1))); }
 function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.sea:[]};
   const tierSig='t'+hd.tier+(hd.seaTank?'s'+(hd.seaTier||0):'');
-  if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?-ROOM.x*.42:0);   /* 有海水缸時兩缸左右對稱並排 */ if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,ROOM.x*.42); } else if(tanks.sea){ scene.remove(tanks.sea.g); delete tanks.sea; } }
+  if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?-ROOM.x*.48:0);   /* 有海水缸時兩缸左右對稱並排 */ if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,ROOM.x*.48); } else if(tanks.sea){ dropObs(tanks.sea.g); scene.remove(tanks.sea.g); delete tanks.sea; } }
   for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=want[w]||[], sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|');
-    if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[];
-    list.forEach(rec=>{ try{ c.want(rec.id); const o=fishObj(rec); if(!o) return; o.scale.setScalar(BENTHIC[rec.id]?Math.max(.1,dispL(tk,rec.L)*1.6):dispL(tk,rec.L));   /* 小小的螃蟹、貝類在缸裡放大一點才看得到 */ const f={o,rec,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni}; const b=bounds(tk,rec.L);
-      o.position.set(b.x0+Math.random()*(b.x1-b.x0),b.y0+Math.random()*(b.y1-b.y0),(Math.random()-.5)*.1); o.rotation.y=Math.random()<.5?0:Math.PI; f.yaw=o.rotation.y; f.o=o; pickTarget(f,tk); tk.g.add(o);if(tk.optics)tk.optics.add(o); tk.fish.push(f);
-      }catch(err){ console.error('tank fish',rec&&rec.id,err); } }); } }
+    if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[]; tk.motion.bodies.length=0;
+    list.forEach(rec=>{ try{ c.want(rec.id); const o=fishObj(rec); if(!o) return;
+      o.scale.setScalar(1); const modelBox=aquariumModelBounds(T,o), modelSize=modelBox.getSize(new T.Vector3());
+      if(modelBox.isEmpty()) return;
+      const bottom=!!BENTHIC[rec.id], length=aquariumDisplayLength(tk.spec,rec.L,list.length)*(bottom?.65:1);
+      o.scale.setScalar(length/Math.max(modelSize.x,modelSize.y,modelSize.z,.001));
+      const body=aquariumModelBounds(T,o), pad=length*(bottom?.025:.14);
+      body.min.z-=pad;body.max.z+=pad;body.min.y-=length*.025;body.max.y+=length*.025;
+      const f={o,rec,body,bottom,yaw:Math.random()<.5?0:Math.PI,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni};
+      o.rotation.y=f.yaw; const b=bounds(tk,rec.L);o.position.set(0,(b.y0+b.y1)/2,tk.spec.d*.2);
+      tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.fish.push(f);tk.motion.add(f);
+      pickTarget(f,tk);
+      }catch(err){ console.error('tank fish',rec&&rec.id,err); } }); tk.motion.pack(); } }
 // 標本牆：右牆、壁爐後方，兩排各四個；大魚統一縮到木板放得下的長度
 const MSLOT=[]; for(const y of [1.5,2.15]) for(const z of [-3.65,-2.85,-2.05,-1.25]) MSLOT.push({y,z});   // 先掛視線高度那一排
 const mountG=new T.Group(); scene.add(mountG); let mountSig='';
@@ -5837,12 +5926,10 @@ function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.i
 const tv=new T.Vector3();
 // 底棲生物：貝類躺在沙上不動（偶爾微微張殼）、竹蟶半埋直立、螃蟹在缸底橫著走、沙蠶在沙上爬、彈塗魚趴著偶爾一跳——不會像魚一樣在水中游
 const BENTHIC={hardclam:'shell',gomphina:'shell',tellin:'shell',razor:'razor',ghostcrab:'crab',fiddler:'crab',hermit:'crab',ragworm:'worm',mudskip:'skip'};
-function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.rec.L), sc=o.scale.x, u=f.uni||{}; f.t=(f.t||0)+dt;
-  if(!f.bInit){ f.bInit=1; f.yaw=Math.random()*6.28; o.rotation.set(0,f.yaw,0); f.bt=0; o.scale.multiplyScalar(1.6);
-    o.position.x=b.x0+Math.random()*(b.x1-b.x0); o.position.z=(Math.random()-.5)*tk.spec.d*.6; f.wait=Math.random()*3; }   // 一開始散在缸底各處（原本全疊在同一點），畫面上放大一點
-  const floorY=(x,z)=>tk.y+tk.hAt(x,z);
-  if(kind==='shell'){ o.position.y=floorY(o.position.x,o.position.z)+sc*.05; o.rotation.set(0,f.yaw,0); if(u.uAmp){ u.uAmp.value=Math.max(0,Math.sin(f.t*.25+f.ph))*.12; u.uSwim.value+=dt*.5; } return; }
-  if(kind==='razor'){ o.position.y=floorY(o.position.x,o.position.z)+sc*.18; o.rotation.set(0,f.yaw,Math.PI/2); return; }
+function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.rec.L), u=f.uni||{}; f.t=(f.t||0)+dt;
+  const floorY=(x,z)=>tk.y+tk.hAt(x,z)-f.body.min.y+.012;
+  if(kind==='shell'){ o.position.y=floorY(o.position.x,o.position.z); o.rotation.set(0,f.yaw,0); if(u.uAmp){ u.uAmp.value=Math.max(0,Math.sin(f.t*.25+f.ph))*.12; u.uSwim.value+=dt*.5; } return; }
+  if(kind==='razor'){ o.position.y=floorY(o.position.x,o.position.z); o.rotation.set(0,f.yaw,0); return; }
   // 會走動的：在缸底慢慢走向一個點，到了停一下再換點
   f.bt-=dt; if(f.bt<=0||!f.bT){ f.bT=new T.Vector3(b.x0+Math.random()*(b.x1-b.x0),0,(Math.random()-.5)*tk.spec.d*.6); f.bt=4+Math.random()*6; f.wait=Math.random()*2.5; }
   if(f.wait>0){ f.wait-=dt; if(u.uAmp) u.uAmp.value=.02; }
@@ -5851,21 +5938,21 @@ function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.re
       else { let dy=head-f.yaw; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2; f.yaw+=dy*Math.min(1,dt*2); }
       o.position.x+=dx/dd*sp*dt; o.position.z+=dz/dd*sp*dt; if(u.uAmp){ u.uAmp.value=kind==='crab'?.18:kind==='worm'?.15:.06; u.uSwim.value+=dt*(kind==='crab'?10:6); } } }
   let hop=0; if(kind==='skip'){ f.hp=(f.hp||0)-dt; if(f.hp<=0&&Math.random()<dt*.3){ f.hp=.5; } if(f.hp>0) hop=Math.sin((1-f.hp/.5)*Math.PI)*.04; }
-  o.position.y=floorY(o.position.x,o.position.z)+(kind==='crab'?0:sc*.02)+hop; o.rotation.set(0,f.yaw,0); }   /* 貼著缸底，不浮在水中 */
+  o.position.y=floorY(o.position.x,o.position.z)+hop; o.rotation.set(0,f.yaw,0); }   /* 貼著缸底，不浮在水中 */
 function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
   tk.plants.forEach(p=>{ p.o.rotation.z=Math.sin(t*1.2+p.ph)*.06; p.o.rotation.x=Math.sin(t*.9+p.ph)*.04; });
   causList.forEach(c2=>{ c2.m.map.offset.set(t*.012,t*.009); c2.m.map.repeat.set(c2.s*1.6,1.2); });
   shaftList.forEach(q=>{ q.m.opacity=.05+.035*Math.sin(t*.35+q.ph); });
   const bp=tk.bub.geometry.attributes.position; for(let i=0;i<bp.count;i++){ let yy=bp.getY(i)+dt*(.12+(i%5)*.03); if(yy>tk.y+tk.spec.h-.08) yy=tk.y+.1; bp.setY(i,yy); } bp.needsUpdate=true;
   const fs=tk.fish;
-  fs.forEach(f=>{ const o=f.o; f.v=f.v||0; f.rest=f.rest||0; if(BENTHIC[f.rec.id]){ benthic(f,tk,dt); return; }
+  fs.forEach(f=>{ const o=f.o, from=o.position.clone(), rotation=o.quaternion.clone(); f.v=f.v||0; f.rest=f.rest||0; if(BENTHIC[f.rec.id]){ benthic(f,tk,dt);tk.motion.ground(f,true);if(!tk.motion.move(f,from,rotation)){f.yaw=o.rotation.y;f.bt=0;} return; }
     // 偶爾停下來懸浮一會兒
     if(f.rest>0){ f.rest-=dt; f.v+=(0.015-f.v)*Math.min(1,dt*2); }
     else if(Math.random()<dt*.06){ f.rest=1.5+Math.random()*3; }
     tv.subVectors(f.tgt,o.position); const d=tv.length(); if(d<.06){ pickTarget(f,tk); }
     tv.normalize();
-    // 跟其他魚保持距離
-    fs.forEach(g2=>{ if(g2===f) return; tv2.subVectors(o.position,g2.o.position); const dd=tv2.length(), need=(dispL(tk,f.rec.L)+dispL(tk,g2.rec.L))*.5; if(dd<need&&dd>1e-4){ const k=(need-dd)/need; tv.addScaledVector(tv2.normalize(),k*3.2); if(k>.5) o.position.addScaledVector(tv2,dt*.08*k); } });
+    // 提前避讓完整魚身、造景及玻璃；最後仍由掃掠碰撞攔住接觸。
+    tk.motion.steer(f,tv);
     tv.y*=.6; tv.normalize();
     // 航向與俯仰分開控制：航向平滑轉，俯仰限制在 ±17 度內，不會再垂直朝上
     f.yaw=f.yaw===undefined?o.rotation.y:f.yaw; f.pitch=f.pitch||0;
@@ -5877,7 +5964,9 @@ function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!t
     o.rotation.order='YZX'; o.rotation.set(roll,f.yaw,f.pitch);
     swimBones(f,dt);
     const cp=Math.cos(f.pitch); const fwd=tv3.set(Math.cos(f.yaw)*cp,Math.sin(f.pitch),-Math.sin(f.yaw)*cp); o.position.addScaledVector(fwd,f.v*dt);
-    const b=bounds(tk,f.rec.L); o.position.x=Math.max(b.x0,Math.min(b.x1,o.position.x)); o.position.y=Math.max(b.y0,Math.min(b.y1,o.position.y)); o.position.z=Math.max(Math.min(b.z0,b.z1),Math.min(Math.max(b.z0,b.z1),o.position.z)); }); } }
+    if(!tk.motion.move(f,from,rotation)){ f.yaw=o.rotation.y;f.pitch=o.rotation.z;f.v*=.35;pickTarget(f,tk); }
+  }); } }
+
 // 環境光：白天從窗戶進來的光多、夜裡靠爐火和檯燈
 const hemi=new T.HemisphereLight(0xfff0dd,0x3a2a1a,.5); scene.add(hemi);
 const sun=new T.DirectionalLight(0xfff4e0,.8); sun.position.set(-4.05,2.2,.5); sun.target.position.set(.8,.25,-1.25);
@@ -6507,7 +6596,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261031221102'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261031221104'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
