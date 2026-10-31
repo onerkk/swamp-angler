@@ -10,7 +10,7 @@ const SEA_TANK=SEA_TANKS[0], seaT=()=>SEA_TANKS[Math.min(SEA_TANKS.length-1,H().
 const CHILLER={n:'冷水機',price:12000,lv:10}, MOUNT_MAX=8;
 function H(){ const h=S.home=S.home||{}; h.fresh=h.fresh||[]; h.sea=h.sea||[]; h.mounts=h.mounts||[]; h.tier=h.tier||0; return h; }
 // 小屋在完成主線第一章後開放（開場就說老漁人留下了小屋）
-const unlocked=()=>!!(S.story&&S.story.done&&S.story.done.includes('c1'));
+const unlocked=()=>!!(window.__ASSIST&&window.__ASSIST.active())||!!(S.story&&S.story.done&&S.story.done.includes('c1'));
 const tank=()=>TANKS[H().tier];
 const waterOf=sp=>{ const w=sp.water||sp.loc||'lake'; return w==='sea'||w==='tide'?'sea':'fresh'; };   // 潮間帶生物養在海水缸   // 月光灣的海水魚雖然在湖區，仍要放海水缸
 // 這條魚能不能帶回家：回傳是否可以、是否改做標本、原因、標本費用
@@ -795,6 +795,7 @@ function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
   const heat=(1/GR.need)*(fireM.opacity+.3)/1.15*(c.grillHeat?c.grillHeat():1);
   GR.uCurl.value=Math.min(1,(GR.a+GR.b)*.5);
   if(GR.flipT<=0){ if(GR.face===0) GR.a+=heat*dt; else GR.b+=heat*dt; }
+  if(window.__ASSIST&&window.__ASSIST.active()&&GR.t>.5){ GR.a=.84; GR.b=.84; }
   GR.uA.value=GR.a; GR.uB.value=GR.b;
   const top=GR.face===0?GR.a:GR.b, oth=GR.face===0?GR.b:GR.a;
   document.getElementById('gA').style.left=Math.min(100,top*82)+'%'; document.getElementById('gB').style.left=Math.min(100,oth*82)+'%';

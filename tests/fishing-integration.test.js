@@ -8,7 +8,7 @@ function fixture(){
  const G={state:'fight',loc:'lake',spot:1,head:0,yawT:0,rodSide:0,t:0,held:true,bottom:false,base:V(),to:V(),endV:V(),fish:{group:obj(),uni:{uAmp:{value:0},uSwim:{value:0}}},fd:{sp:{id:'test',rar:0,f:{pow:.4,spd:1,agi:1,jump:0,stam:1}},L:.5,w:.2}};
  G.f={pos:new T.Vector3(0,-.35,-12),d:12,az0:0,theta:0,latDir:0,phaseT:999,run:false,stam:100,T:.4,drag:1,brk:0,slk:0,abr:0,jumpT:0,ripT:99,vibT:99,clickA:0,hq:1};
  const ui={};for(const k of ['tBar','tFill','fTens','sFill','fStam','fDist','fName','steer'])ui[k]={style:{},classList:{toggle:no,add:no,remove:no}};
- const context={T,G,PH,ui,window:{},tv:V(),te:new T.Euler(),tq:new T.Quaternion(),rod:{tipW:new T.Vector3(0,2,0),spin:0},bob:obj(),P:{shadow:obj(),splash:no},W:{shoreR:()=>1000,addRipple:no,swell:()=>0},WL:{stolen:()=>false,chaseTxt:()=>''},SEA:{stolen:()=>false},Snd:{click:no,splash:no,snap:no},D:()=>({line:1,stam:1,slack:1,jit:0}),styOf:()=>({spd:1,lat:1,mul:1}),META:{gear:()=>({line:{s:1},rod:{tens:1},reel:{spd:2,drag:1}})},TR:()=>0,clamp,sstep:(a,b,x)=>clamp((x-a)/(b-a),0,1),rand:(a,b)=>(a+b)/2,vib:no,toast:no,setAct:no,stars:()=>'',sizeWord:()=>'',maxLine:()=>80,lose:r=>{G.state='lost';G.reason=r;},land:()=>{G.state='land';},setPoint:(v,p)=>v.set(p.x,p.y,p.z),LURE:{end:no},startRetrieve:()=>{G.state='retrieve';}};
+ const context={easy:()=>!!context.window.__ASSIST?.active(),T,G,PH,ui,window:{},tv:V(),te:new T.Euler(),tq:new T.Quaternion(),rod:{tipW:new T.Vector3(0,2,0),spin:0},bob:obj(),P:{shadow:obj(),splash:no},W:{shoreR:()=>1000,addRipple:no,swell:()=>0},WL:{stolen:()=>false,chaseTxt:()=>''},SEA:{stolen:()=>false},Snd:{click:no,splash:no,snap:no},D:()=>({line:1,stam:1,slack:1,jit:0}),styOf:()=>({spd:1,lat:1,mul:1}),META:{gear:()=>({line:{s:1},rod:{tens:1},reel:{spd:2,drag:1}})},TR:()=>0,clamp,sstep:(a,b,x)=>clamp((x-a)/(b-a),0,1),rand:(a,b)=>(a+b)/2,vib:no,toast:no,setAct:no,stars:()=>'',sizeWord:()=>'',maxLine:()=>80,lose:r=>{G.state='lost';G.reason=r;},land:()=>{G.state='land';},setPoint:(v,p)=>v.set(p.x,p.y,p.z),LURE:{end:no},startRetrieve:()=>{G.state='retrieve';}};
  context.P.shadow.material={opacity:0}; vm.createContext(context);
  vm.runInContext(extract('fishPos','surgeFish')+'\n'+extract('surgeFish','sizeWord')+'\n'+extract('snagTick','startCharge')+'\n'+extract('updateFight','update'),context);
  return context;
@@ -28,3 +28,20 @@ test('unloading and changing angle backs tackle out of the contact',()=>{const c
 test('ice fishing retains line depth rather than horizontal hole distance',()=>{const c=fixture();c.G.loc='ice';c.G.f.pos.set(0,-.35,-2);c.PH.refresh();c.updateFight(.05);assert(c.G.f.d>11);assert.equal(c.G.state,'fight');});
 
 test('fighting bobber follows the shared animated water height',()=>{const a=fixture(),b=fixture();a.W.swell=()=>.7;b.W.swell=()=>0;a.PH.refresh();b.PH.refresh();a.updateFight(.02);b.updateFight(.02);assert(Math.abs(a.bob.position.y-b.bob.position.y-.7)<1e-6);});
+
+const {createAccountAssist}=require('../src/assist.js');
+test('verified account lands ordinary, legendary and boss fish without equipment or timing failures',()=>{
+ for(const loc of ['lake','sea','ice']) for(const special of [undefined,'mermaid','king','seabeast']){
+  const c=fixture(), assist=createAccountAssist();
+  assist.authenticate({email:'crazyice5240@gmail.com',emailVerified:true,providerData:[{providerId:'google.com'}]});
+  c.window.__ASSIST=assist;c.G.loc=loc;c.G.fd.sp.special=special;c.G.fd.boss=special==='king';c.G.fd.L=12;c.G.fd.w=1200;
+  c.G.held=false;c.G.f.brk=100;c.G.f.slk=100;c.G.f.abr=100;c.G.f.lostWhy='spool';
+  for(let i=0;i<11&&c.G.state==='fight';i++)c.updateFight(.1);
+  assert.equal(c.G.state,'land');assert.equal(c.G.f.brk,0);assert.equal(c.G.f.lostWhy,null);
+ }
+});
+test('signing out removes automatic landing immediately',()=>{
+ const c=fixture(), assist=createAccountAssist();c.window.__ASSIST=assist;
+ assist.authenticate({email:'crazyice5240@gmail.com',emailVerified:true,providerData:[{providerId:'google.com'}]});
+ assist.authenticate(null);c.PH.refresh();c.updateFight(.02);assert.equal(c.G.state,'fight');assert.equal(c.G.f.assistT,undefined);
+});

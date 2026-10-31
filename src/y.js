@@ -16,9 +16,9 @@ async function init(){ if(inited) return inited; if(!window.FIREBASE_CFG) return
     firebase.initializeApp(window.FIREBASE_CFG); auth=firebase.auth(); db=firebase.firestore();
     try{ await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
     try{ const r=await auth.getRedirectResult(); if(r&&r.user) c.toast('已登入 '+(r.user.displayName||''),'good',2000); }catch(e){ c.toast('登入失敗：'+(e.message||e),'bad',3000); }
-    auth.onAuthStateChanged(u=>{ user=u; owner=isOwner(u); if(u) localStorage.setItem(KEY,'1');
+    auth.onAuthStateChanged(u=>{ user=u; owner=isOwner(u); if(window.__ASSIST) window.__ASSIST.authenticate(u); if(u) localStorage.setItem(KEY,'1');
       if(TEST){ showGate(); if(owner){ if(!c.save().testSeeded) copyMain(true); else onLogin().then(()=>{ if(c.grant) c.grant(); }); } }
-      else if(u) onLogin();
+      else if(u) onLogin().then(r=>{ if(user===u&&r!=='applied'&&c.assistGrant) c.assistGrant(); });
       c.refresh&&c.refresh(); }); return true; })();
   return inited; }
 async function login(){ if(!window.FIREBASE_CFG){ c.toast('Google 登入尚未設定（需要專案擁有者填入 Firebase 設定）','warn',3200); return; }
@@ -36,7 +36,7 @@ async function onLogin(){ try{ const d=await docRef().get(); const local=c.save(
     const sl=score(local), sc=score(cloud);
     // 雲端進度較高：預設就是載入雲端（不再有「沒按到確認就把雲端蓋掉」的情況）；本機進度先備份
     if(sc>sl+1){ try{ localStorage.setItem(BK,JSON.stringify(local)); }catch(e){}
-      c.toast(`已載入雲端存檔（Lv ${cloud.lv||1}），本機原本的進度已備份`,'good',3200); c.apply(cloud); return; }
+      c.toast(`已載入雲端存檔（Lv ${cloud.lv||1}），本機原本的進度已備份`,'good',3200); c.apply(cloud); return 'applied'; }
     // 要用本機蓋過雲端前，先把雲端原本那份留一份在伺服器上（prevSave），隨時可以救回
     try{ await docRef().set({['prev_'+FIELD]:cloud,['prevT_'+FIELD]:Date.now()},{merge:true}); }catch(e){}
     await push(); }catch(e){ console.warn('cloud pull',e); c.toast('雲端存檔讀取失敗，使用本機進度','warn',2600); } }

@@ -2,7 +2,7 @@
 # 組裝 index.html，並替這次部署蓋上同一個版本號：網頁內 APP_VER、version.json、sw.js 的快取版本
 set -e
 cd "$(dirname "$0")"
-JS="physics.js shop.js water.js b.js mer.js human.js c.js e.js f.js g.js h.js i.js j.js k.js l.js m.js stars.js n.js o.js p.js q.js r.js s.js t.js u.js v.js w.js x.js y.js z.js tut.js sch.js tide.js d.js"
+JS="assist.js physics.js shop.js water.js b.js mer.js human.js c.js e.js f.js g.js h.js i.js j.js k.js l.js m.js stars.js n.js o.js p.js q.js r.js s.js t.js u.js v.js w.js x.js y.js z.js tut.js sch.js tide.js d.js"
 cat scan.js $JS > /tmp/all.js && node --check /tmp/all.js
 python3 tools/lintc.py >/dev/null
 STAMP=$(date +%Y%m%d%H%M%S)

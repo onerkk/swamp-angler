@@ -61,7 +61,7 @@ const byId=id=>CH.find(x=>x.id===id), isDone=id=>st.done.indexOf(id)>=0;
 function avail(ch){ if(window.__UNLOCK) return true; const o=ch.open; return (!o.after||isDone(o.after))&&(!o.lv||S.lv>=o.lv); }
 function why(ch){ const o=ch.open, r=[]; if(o.after&&!isDone(o.after)) r.push('完成「'+byId(o.after).name.replace(/^.*　/,'')+'」'); if(o.lv&&S.lv<o.lv) r.push('Lv '+o.lv); if(o.kayak&&!S.kayak) r.push('獨木舟'); if(o.yacht&&!S.yacht) r.push('漁船'); return r; }
 /* 地圖開放：以章節為準；舊存檔已開放的維持開放 */
-function lock(i){ if(window.__UNLOCK) return null; const id=SPOT_IDS[i]; if(id==='dock'||st.grand.indexOf(id)>=0) return null; const ch=CH.find(x=>x.spot===id); if(!ch) return null;
+function lock(i){ if(window.__ASSIST&&window.__ASSIST.active()) return null; if(window.__UNLOCK) return null; const id=SPOT_IDS[i]; if(id==='dock'||st.grand.indexOf(id)>=0) return null; const ch=CH.find(x=>x.spot===id); if(!ch) return null;
   const r=why(ch).filter(x=>x!=='獨木舟'&&x!=='漁船'); return r.length?'需要：'+r.join('、'):null; }
 function active(){ return CH.filter(ch=>!isDone(ch.id)&&avail(ch)); }
 function prog(ch){ let p=st.prog[ch.id]; if(!Array.isArray(p)) p=[]; if(p.length!==ch.tasks.length) p=ch.tasks.map((t,i)=>Math.min(t.n,+p[i]||0)); return st.prog[ch.id]=p; }
