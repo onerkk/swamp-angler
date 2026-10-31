@@ -244,20 +244,31 @@ function razorModel(){ if(!shellTex.razor){ const t=new T.TextureLoader().load('
   return {group,uni,shell:true}; }
 /* ---------- 螃蟹（程式組裝）：背甲、眼柄、8 隻三節腳、一對螯，各部位貼使用者提供的實拍分件照片 ----------
    每隻腳都有髖、膝、腳尖三個關節，走路時左右交替抬腳；招潮蟹雄蟹的大螯會舉起來揮 */
-const CRAB_TEX={}, crabTex=f=>{ if(!CRAB_TEX[f]){ const t=new T.TextureLoader().load('models/tide/crab/'+f+'.webp'); t.encoding=T.sRGBEncoding; t.anisotropy=8; CRAB_TEX[f]=t; } return CRAB_TEX[f]; };
-const CRAB_DEF={ghostcrab:{cara:'ghost_cara',leg:'ghost_leg',clawR:'ghost_claw',clawL:'ghost_claw',cl:.86,cw:1,ch:.26,legL:1.25,clawRS:.62,clawLS:.62,eye:.34,eyeTall:1},
-  fiddler:{cara:'fid_cara',leg:'fid_leg',clawR:'fid_major',clawL:'fid_minor',cl:.72,cw:1,ch:.22,legL:1.05,clawRS:1.35,clawLS:.42,eye:.4,eyeTall:.85,wave:1}};
+const CRAB_TEX={}, crabTex=f=>{ if(!CRAB_TEX[f]){ const t=new T.TextureLoader().load('models/tide/crab/'+f+(/\.(png|webp)$/.test(f)?'':'.webp')); t.encoding=T.sRGBEncoding; t.anisotropy=8; CRAB_TEX[f]=t; } return CRAB_TEX[f]; };
+const CRAB_DEF={ghostcrab:{cara:'ghost_cara',belly:'ghost_bottom.png',leg:'ghost_leg',clawR:'ghost_claw',clawL:'ghost_claw',cl:.86,cw:1,ch:.26,legL:1.25,clawRS:.62,clawLS:.62,eye:.34,eyeTall:1},
+  fiddler:{cara:'fid_cara',belly:'fid_bottom.png',leg:'fid_leg',clawR:'fid_major',clawL:'fid_minor',cl:.72,cw:1,ch:.22,legL:1.05,clawRS:1.35,clawLS:.42,eye:.4,eyeTall:.85,wave:1}};
 function partMat(f){ return new T.MeshStandardMaterial({map:crabTex(f),alphaTest:.45,side:T.DoubleSide,roughness:.55,metalness:0}); }
 // 一段腳／螯：照片中某一段（u0～u1）貼在十字交叉的兩片上（從上面、側面看都有形狀）
-function seg(f,u0,u1,len,thick){ const g=new T.Group(), mat=partMat(f);
+function seg(f,u0,u1,len,thick,coreTex,coreScale=1){ const g=new T.Group(), mat=partMat(f);
   const mk=(rx)=>{ const pg=new T.PlaneGeometry(len,thick); const uv=pg.attributes.uv; for(let i=0;i<uv.count;i++) uv.setX(i,u0+(u1-u0)*uv.getX(i)); pg.translate(len/2,0,0); const m=new T.Mesh(pg,mat); m.rotation.x=rx; return m; };
-  g.add(mk(0)); g.add(mk(Math.PI/2)); return g; }
+  g.add(mk(0)); g.add(mk(Math.PI/2));
+  // Photo silhouettes provide fine hairs; a continuous shell gives the limb real volume.
+  if(coreTex){const material=new T.MeshStandardMaterial({map:crabTex(coreTex),roughness:.62,metalness:0});
+    const cg=new T.CylinderGeometry(thick*.19*coreScale,thick*.24*coreScale,len,12),uv=cg.attributes.uv;
+    for(let i=0;i<uv.count;i++)uv.setXY(i,.4+uv.getX(i)*.2,.4+uv.getY(i)*.2);
+    cg.rotateZ(-Math.PI/2);cg.translate(len/2,0,0);const core=new T.Mesh(cg,material);core.name='Crab solid limb';g.add(core);
+    for(const x of [0,len]){const joint=new T.Mesh(new T.SphereGeometry(thick*.24*coreScale,12,8),material);joint.position.x=x;joint.name='Crab joint';const jUV=joint.geometry.attributes.uv;for(let i=0;i<jUV.count;i++)jUV.setXY(i,.4+jUV.getX(i)*.2,.4+jUV.getY(i)*.2);g.add(joint);}}
+  return g; }
 function crabModel(id){ const D=CRAB_DEF[id], group=new T.Group(), body=new T.Group(); group.add(body);
   // 背甲：拱起的殼，殼面照片從正上方投影；照片上方＝前（+X）
-  const cg=new T.SphereGeometry(.5,40,16,0,Math.PI*2,0,Math.PI/2), P=cg.attributes.position, uv=cg.attributes.uv;
-  for(let i=0;i<P.count;i++){ const x=P.getX(i)*D.cl, y=P.getY(i)*D.ch*2, z=P.getZ(i)*D.cw; P.setXYZ(i,x,y,z); uv.setXY(i,.5-z/D.cw,.5+x/D.cl); }
-  cg.computeVertexNormals(); const cara=new T.Mesh(cg,partMat(D.cara)); cara.position.y=.16; body.add(cara);
-  const belly=new T.Mesh(new T.CircleGeometry(.5,24).rotateX(Math.PI/2),new T.MeshStandardMaterial({color:0xd9cbb0,roughness:.7})); belly.scale.set(D.cl*.92,1,D.cw*.92); belly.position.y=.15; body.add(belly);
+  const cg=new T.SphereGeometry(.5,40,16,0,Math.PI*2,0,Math.PI*.58), P=cg.attributes.position, uv=cg.attributes.uv;
+  for(let i=0;i<P.count;i++){ const x=P.getX(i)*D.cl, y=P.getY(i)*D.ch*2, z=P.getZ(i)*D.cw; P.setXYZ(i,x,y,z); uv.setXY(i,.5-z/D.cw*.62,.5+x/D.cl*.62); }
+  cg.computeVertexNormals(); const cara=new T.Mesh(cg,new T.MeshStandardMaterial({map:crabTex(D.cara),roughness:.58,metalness:0}));cara.name='Crab solid carapace'; cara.position.y=.16; body.add(cara);
+  // Closed ventral shell: the underside photo belongs on a volume, not a single-sided disc.
+  const bg=new T.SphereGeometry(1,40,20),bp=bg.attributes.position,bu=bg.attributes.uv;
+  for(let i=0;i<bp.count;i++){const x=bp.getX(i)*D.cl*.465,y=bp.getY(i)*.09,z=bp.getZ(i)*D.cw*.465;bp.setXYZ(i,x,y,z);bu.setXY(i,.5-z/D.cw*.6,.42+x/D.cl*.5);}bg.computeVertexNormals();
+  const belly=new T.Mesh(bg,new T.MeshStandardMaterial({map:crabTex(D.belly),roughness:.7,metalness:0}));belly.name='Crab closed underside';belly.position.y=.13;body.add(belly);
+
   // 眼柄＋眼睛
   const eyeM=new T.MeshStandardMaterial({color:0x111111,roughness:.15}), stalkM=new T.MeshStandardMaterial({color:id==='fiddler'?0xc8b48a:0xe0cfa8,roughness:.6});
   for(const s of [-1,1]){ const st=new T.Mesh(new T.CylinderGeometry(.022,.028,D.eye,8),stalkM); st.position.set(D.cl*.44,.2+D.eye*.42*D.eyeTall,s*.13); st.rotation.z=-.25; st.rotation.x=s*.12; body.add(st);
@@ -265,14 +276,14 @@ function crabModel(id){ const D=CRAB_DEF[id], group=new T.Group(), body=new T.Gr
   // 8 隻腳：左右各 4，沿殼的側緣從前到後排開，向外張開
   const legs=[], L=D.legL;
   for(const s of [-1,1]) for(let i=0;i<4;i++){ const hip=new T.Group(); const ax=D.cl*(.22-i*.17); hip.position.set(ax,.13,s*D.cw*.44); hip.rotation.y=-s*(Math.PI/2)+s*(i-1.5)*.32;
-    const thigh=seg(D.leg,.06,.45,L*.42,.13*L); thigh.rotation.z=.5; hip.add(thigh);   // 大腿往上抬
-    const knee=new T.Group(); knee.position.x=L*.42; thigh.add(knee); const shin=seg(D.leg,.45,.8,L*.34,.11*L); shin.rotation.z=-1.25; knee.add(shin);   // 小腿往下彎
-    const ank=new T.Group(); ank.position.x=L*.34; shin.add(ank); const tip=seg(D.leg,.8,1,L*.24,.09*L); tip.rotation.z=-.45; ank.add(tip);
+    const thigh=seg(D.leg,.06,.45,L*.42,.13*L,D.cara); thigh.rotation.z=.5; hip.add(thigh);   // 大腿往上抬
+    const knee=new T.Group(); knee.position.x=L*.42; thigh.add(knee); const shin=seg(D.leg,.45,.8,L*.34,.11*L,D.cara); shin.rotation.z=-1.25; knee.add(shin);   // 小腿往下彎
+    const ank=new T.Group(); ank.position.x=L*.34; shin.add(ank); const tip=seg(D.leg,.8,1,L*.24,.09*L,D.cara); tip.rotation.z=-.45; ank.add(tip);
     if(s<0) hip.scale.z=-1; body.add(hip); legs.push({hip,thigh,shin,tip,s,i,y0:hip.rotation.y}); }
   // 一對螯（右邊大、左邊小；沙蟹兩邊一樣）
   const claws=[];
   for(const s of [-1,1]){ const f=s>0?D.clawR:D.clawL, sc=s>0?D.clawRS:D.clawLS, root=new T.Group(); root.position.set(D.cl*.4,.12,s*D.cw*.26); root.rotation.y=s*.55;
-    const arm=seg(f,0,.35,.42*sc,.2*sc), hand=seg(f,.35,1,.78*sc,.36*sc); arm.rotation.z=.35; root.add(arm); const wr=new T.Group(); wr.position.x=.42*sc; arm.add(wr); hand.rotation.z=-.55; hand.rotation.y=-s*1.2; wr.add(hand);
+    const arm=seg(f,0,.35,.42*sc,.2*sc,f,.65), hand=seg(f,.35,1,.78*sc,.36*sc,f,.65); arm.rotation.z=.35; root.add(arm); const wr=new T.Group(); wr.position.x=.42*sc; arm.add(wr); hand.rotation.z=-.55; hand.rotation.y=-s*1.2; wr.add(hand);
     body.add(root); claws.push({root,arm,hand,s,big:sc>1}); }
   // 正規化：整體長度約 1（跟其他生物模型一樣的尺寸慣例）
   body.scale.setScalar(.8);
