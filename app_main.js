@@ -1,4 +1,4 @@
-/*APPV:20261030230054*/
+/*APPV:20261030231950*/
 /* Shared swept collision for tackle, fish and line. Bounds follow visible scene meshes.
    No zone-based dice rolls: only physical contact can snag or abrade a line. */
 class FishingPhysics {
@@ -89,6 +89,37 @@ function createShopWallTexture(T){
   return tx;
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={SHOP_BRAND,drawShopPoster};
+/* One animated surface model for mesh displacement, normals, bobbers and boat motion. */
+const WATER_WAVES={
+ lake:[[4.8,.028,0,.3],[2.7,.016,.72,2.1],[1.45,.009,-.85,4.7],[.8,.004,1.4,1.4],[3.67,.011,-.39,3.6],[1.93,.006,.28,5.9],[.56,.002,-1.9,.9],[.35,.001,2.4,4.1]],
+ sea:[[38,.26,0,1.7],[23,.17,.69,4.1],[15,.11,-.69,.6],[9,.065,1.22,2.8],[5.5,.036,.35,5.3],[3.2,.018,-1.05,3.7],[11.7,.038,-.23,4.6],[7.6,.024,.92,.2],[2.3,.009,-.35,2.3],[1.2,.004,.47,5.7],[.7,.0014,-1.8,1.1]]
+};
+function sampleWater(x,z,t,wind,sea){
+  const len=Math.hypot(wind.x,wind.y),wx=len>.001?wind.x/len:1,wz=len>.001?wind.y/len:0;
+  const strength=sea?.55+1.3*wind.z+1.5*Math.max(0,wind.z-.6):.45+1.8*wind.z;
+  let height=0,dx=0,dz=0;
+  for(const [L,A,angle,offset] of WATER_WAVES[sea?'sea':'lake']){
+    const cs=Math.cos(angle),sn=Math.sin(angle),ux=wx*cs-wz*sn,uz=wx*sn+wz*cs,k=2*Math.PI/L;
+    const phase=k*(ux*x+uz*z)-Math.sqrt(9.81*k)*t+offset,a=A*strength;
+    height+=a*Math.sin(phase);dx+=ux*k*a*Math.cos(phase);dz+=uz*k*a*Math.cos(phase);
+  }
+  return {height,dx,dz};
+}
+function waterWaveGLSL(){
+  const n=v=>Number(v).toFixed(9);
+  const lines=sea=>WATER_WAVES[sea?'sea':'lake'].map(([L,A,angle,offset])=>`waterTerm(p,clock,vec2(wd.x*${n(Math.cos(angle))}-wd.y*${n(Math.sin(angle))},wd.x*${n(Math.sin(angle))}+wd.y*${n(Math.cos(angle))}),${n(L)},${n(A)}*strength,${n(offset)},s);`).join('\n');
+  return `void waterTerm(vec2 p,float clock,vec2 d,float L,float A,float offset,inout vec3 s){float k=6.283185307/L;float phase=k*dot(d,p)-sqrt(9.81*k)*clock+offset;float slope=k*A*cos(phase);s+=vec3(d.x*slope,A*sin(phase),d.y*slope);}
+vec3 waterSample(vec2 p,float clock,vec3 wind,float sea){vec2 wd=length(wind.xy)>.001?normalize(wind.xy):vec2(1.0,0.0);vec3 s=vec3(0.0);float strength;
+if(sea>.5){strength=.55+1.3*wind.z+1.5*max(0.0,wind.z-.6);${lines(true)}}else{strength=.45+1.8*wind.z;${lines(false)}}return s;}`;
+}
+function makeWaterGrid(T,radius=150,rings=112,segments=192){
+  const points=[0,0,0],indices=[];
+  for(let r=1;r<=rings;r++){const distance=radius*Math.pow(r/rings,1.8);for(let i=0;i<segments;i++){const a=2*Math.PI*i/segments;points.push(Math.sin(a)*distance,0,-Math.cos(a)*distance);}}
+  for(let i=0;i<segments;i++)indices.push(0,1+(i+1)%segments,1+i);
+  for(let r=1;r<rings;r++)for(let i=0;i<segments;i++){const j=(i+1)%segments,a=1+(r-1)*segments+i,b=1+(r-1)*segments+j,c=1+r*segments+i,d=1+r*segments+j;indices.push(a,b,c,b,d,c);}
+  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(points,3));g.setIndex(indices);return g;
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={WATER_WAVES,sampleWater,waterWaveGLSL,makeWaterGrid};
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
 const SH = {};
 SH.common = `
@@ -332,30 +363,18 @@ void main(){ vec4 wp = modelMatrix*vec4(position, 1.0); vW = wp.xyz; gl_Position
 SH.seaVS = `
 uniform float uTime;
 uniform vec3 uWind;
+uniform float uSea;
 varying vec3 vW;
 varying vec3 vNs;
 varying float vH;
-vec3 gW(vec2 p0, vec2 d, float L, float A, float Q, inout vec3 n){
-  float k = 6.2831853/L; float w = sqrt(9.81*k); float th = k*dot(d, p0) - w*uTime; float c = cos(th); float s = sin(th);
-  n.x -= d.x*k*A*c; n.z -= d.y*k*A*c; n.y -= Q*k*A*s;
-  return vec3(Q*A*d.x*c, A*s, Q*A*d.y*c);
-}
+${waterWaveGLSL()}
 void main(){
-  vec4 wp = modelMatrix*vec4(position, 1.0); vec2 p0 = wp.xz;
-  vec2 rel = wp.xz - modelMatrix[3].xz;
-  float edge = 1.0 - smoothstep(105.0, 148.0, max(abs(rel.x), abs(rel.y)));
-  vec2 wd = normalize(uWind.xy + vec2(1e-4)); float s = (0.45 + 1.1*uWind.z + 1.7*max(0.0, uWind.z - 0.6))*edge;
-  vec2 d2 = vec2(wd.x*0.77 - wd.y*0.64, wd.y*0.77 + wd.x*0.64); vec2 d3 = vec2(wd.x*0.77 + wd.y*0.64, wd.y*0.77 - wd.x*0.64);
-  vec2 d4 = vec2(wd.x*0.34 - wd.y*0.94, wd.y*0.34 + wd.x*0.94);
-  vec3 n = vec3(0.0, 1.0, 0.0); vec3 off = vec3(0.0);
-  off += gW(p0, wd, 38.0, 0.42*s, 0.45, n);
-  off += gW(p0, d2, 23.0, 0.28*s, 0.5, n);
-  off += gW(p0, d3, 15.0, 0.18*s, 0.5, n);
-  off += gW(p0, d4, 9.0, 0.11*s, 0.55, n);
-  off += gW(p0, vec2(0.6, 0.8), 5.5, 0.06*s, 0.6, n);
-  off += gW(p0, vec2(-0.8, 0.6), 3.2, 0.035*s, 0.6, n);
-  wp.xyz += off; vW = wp.xyz; vNs = normalize(n); vH = off.y/(1.1*s + 1e-3);
-  gl_Position = projectionMatrix*viewMatrix*wp;
+  vec4 wp=modelMatrix*vec4(position,1.0);
+  vec3 surfaceValue=waterSample(wp.xz,uTime,uWind,uSea);
+  float edge=1.0-smoothstep(118.0,149.0,length(position.xz));
+  wp.y+=surfaceValue.y*edge;
+  vW=wp.xyz;vNs=normalize(vec3(-surfaceValue.x,1.0,-surfaceValue.z));vH=surfaceValue.y;
+  gl_Position=projectionMatrix*viewMatrix*wp;
 }
 `;
 SH.waterFS = `
@@ -377,10 +396,12 @@ float causF(vec2 p, float t){
 }
 vec2 wv(vec2 p, vec2 d, float len, float amp, float dist){
   float k = 6.2831853/len; float w = sqrt(9.81*k);
-  float ph = dot(d, p)*k - w*uTime;
+  float irregular=noise2(p*.73+vec2(uTime*.09,-uTime*.07))*2.1+noise2(p*1.91-vec2(uTime*.12,uTime*.05))*.8;
+  float ph=dot(d,p)*k-w*uTime+irregular;
   float fade = 1.0 - smoothstep(len*22.0*(1.0 + 3.0*uSea), len*80.0*(1.0 + 4.0*uSea), dist);
   return d*(amp*k*cos(ph)*fade);
 }
+${waterWaveGLSL()}
 vec3 noised(vec2 x){
   vec2 i = floor(x); vec2 f = fract(x); vec2 u = f*f*(3.0 - 2.0*f); vec2 du = 6.0*f*(1.0 - f);
   float a = hash21(i); float b = hash21(i + vec2(1.0, 0.0)); float c = hash21(i + vec2(0.0, 1.0)); float d = hash21(i + vec2(1.0, 1.0));
@@ -389,7 +410,7 @@ vec3 noised(vec2 x){
 void main(){
   vec3 Vv = cameraPosition - vW; float dist = length(Vv); vec3 V = Vv/dist;
   #ifndef SEAGRID
-  if(uSea > 0.5 && length(vW.xz - cameraPosition.xz) < 138.0) discard;
+  if(length(vW.xz - cameraPosition.xz) < 139.0) discard;
   #endif
   if(uPhoto > 0.5){ vec3 dv = normalize(vW - uEye); float ev = asin(clamp(dv.y, -1.0, 1.0));
     if(ev > -0.2094){ float uu = fract(atan(dv.x, -dv.z)*0.15915494 + uYaw); if(texture2D(uMask, vec2(uu, clamp((ev + 0.2094)/0.2094, 0.0, 1.0))).r < 0.5) discard; } }
@@ -409,28 +430,21 @@ void main(){
   float leafRadius=.12+.12*hash21(cell+7.9);
   float aa=max(.012,length(fwidth(leafP))*.65);
   float leafShape=1.0-smoothstep(leafRadius-aa,leafRadius+aa,length((leafUV-leafOffset)*vec2(1.0,1.35)));
-  float patch=smoothstep(.58,.79,dens);
-  float chosen=step(1.0-patch*.65,hash21(cell+41.2));
+  float leafPatch=smoothstep(.58,.79,dens);
+  float chosen=step(1.0-leafPatch*.65,hash21(cell+41.2));
   float dw=leafShape*chosen*fadeD*(1.0-uSea);
-  dw+=patch*.018*(1.0-fadeD)*(1.0-uSea);
+  dw+=leafPatch*.018*(1.0-fadeD)*(1.0-uSea);
   vec2 wd = normalize(uWind.xy + vec2(1e-4));
   float gust = smoothstep(0.35, 0.75, noise2(p*0.035 - uCloudOff*9.0)*0.7 + noise2(p*0.11 - uCloudOff*20.0)*0.3);
   float csh = 1.0 - 0.85*cloudSh(p);
   float ruff = mix(0.15, 1.0, smoothstep(0.35, 0.7, noise2(p*0.03 + vec2(uTime*0.015, -uTime*0.01))))*(0.35 + 0.65*uWind.z) + gust*uWind.z*1.4;
   float amp = uWave*ruff*(1.0 - 0.85*dw);
-  vec2 g = vec2(0.0);
-  g += wv(p, vec2(0.958, 0.287), 5.3, 0.010, dist);
-  g += wv(p, vec2(0.6, -0.8), 3.1, 0.006, dist);
-  g += wv(p, vec2(-0.316, 0.949), 1.9, 0.004, dist);
-  g += wv(p, vec2(0.894, 0.447), 1.1, 0.0022, dist);
-  g += wv(p, vec2(-0.857, 0.514), 0.63, 0.0012, dist);
-  g += wv(p, vec2(0.196, -0.981), 0.37, 0.0007, dist);
-  g += wv(p, wd, 0.8, 0.0035*uWind.z, dist) + wv(p, vec2(wd.x*0.9 - wd.y*0.42, wd.y*0.9 + wd.x*0.42), 0.5, 0.0022*uWind.z, dist);
-  g *= amp;
-  #ifndef SEAGRID
-  g += uSea*(wv(p, vec2(0.8, 0.6), 18.0, 0.32, dist) + wv(p, vec2(0.3, -0.954), 11.0, 0.18, dist) + wv(p, vec2(-0.707, 0.707), 7.0, 0.1, dist))*(0.6 + 0.8*uWind.z);
-  #endif
-  vec2 gd = vec2(0.0); float na = 0.005; float nf = 1.4;
+  vec3 waveSample=waterSample(p,uTime,uWind,uSea);
+  vec2 g=waveSample.xz;
+  // Wind ripples change the surface normal between geometry vertices.
+  g+=wv(p,wd,.42,.0008+.0018*uWind.z,dist);
+  g+=wv(p,vec2(wd.y,-wd.x),.23,.0004+.0009*uWind.z,dist);
+  vec2 gd = vec2(0.0); float na = 0.014; float nf = 1.4;
   vec2 drift = vec2(uTime*0.11, uTime*0.07);
   for(int i = 0; i < 4; i++){
     float fade = 1.0 - smoothstep(50.0*(1.0 + 2.0*uSea)/nf, 180.0*(1.0 + 2.0*uSea)/nf, dist);
@@ -469,18 +483,16 @@ void main(){
       float m0 = noise2(pq2), mx = noise2(pq2 + vec2(e, 0.0)), mz = noise2(pq2 + vec2(0.0, e));
       g += (vec2(nx - n0, nz - n0)*0.55 + vec2(mx - m0, mz - m0)*0.45)/e*0.06*pf; }
   }
-  #ifdef SEAGRID
-  g += vec2(-vNs.x, -vNs.z)/max(vNs.y, 0.2);
-  #endif
   vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
   float NdV = max(dot(N, V), 0.0);
   float F = (0.02 + 0.98*pow(1.0 - NdV, 5.0))*(1.0 - 0.3*uRain*uSea);   // 雨中的海面粗糙，鏡面反光變弱，浪坡不會反出一條條亮線
-  vec3 R = reflect(-V, N); R.y = max(R.y, 0.003); R = normalize(R);
+  vec3 R = reflect(-V, N); R.y = max(R.y, .015); R = normalize(R);
   vec3 refl = envRay(vW, R, false, true);
   refl = mix(refl, vec3(dot(refl, vec3(0.3, 0.59, 0.11))), 0.35*uRain*uSea);   // 雨打花的海面把天空反得糊而灰
   if(uReflOn > 0.5){
     vec4 rp = uReflMat*vec4(vW.x, 0.0, vW.z, 1.0);
-    vec4 displaced=uReflMat*vec4(vW.x+N.x*.06,0.0,vW.z+N.z*.06,1.0);
+    float reflectionReach=mix(.22,.65,uSea)*clamp(dist*.12,1.0,4.0);
+    vec4 displaced=uReflMat*vec4(vW.x+N.x*reflectionReach,0.0,vW.z+N.z*reflectionReach,1.0);
     vec2 ruv=displaced.xy/max(displaced.w,.001);
     float inReflection=step(0.0,ruv.x)*step(ruv.x,1.0)*step(0.0,ruv.y)*step(ruv.y,1.0)*step(.001,rp.w);
     vec4 rc = texture2D(uRefl, clamp(ruv, 0.002, 0.998));
@@ -531,7 +543,12 @@ void main(){
     refl *= vec3(0.74, 0.88, 1.0); F *= 0.82;
     bodyD *= mix(1.0, 0.1, uNight);
   }
-  vec3 col = mix(bodyD, refl, F) + TM(glint*(0.25 + 0.75*F));
+  float surfaceRough=clamp(.12+.3*uWind.z+.2*uRain,.12,.65);
+  F*=1.0-surfaceRough*.42;
+  float slopeLight=clamp(.8+.32*dot(N,normalize(vec3(uSunDir.x,.7,uSunDir.z))),.52,1.15);
+  vec3 col=mix(bodyD*slopeLight,refl,F)+TM(glint*(.25+.75*F));
+  float crestLight=smoothstep(.04,.2,length(waveSample.xz))*(.02+.045*uWind.z);
+  col+=TM(mix(uHorizon,vec3(.32,.48,.5),.6)*crestLight)*(1.0-F*.7);
   if(uMoonK > 0.01){ float md = max(dot(R, uMoonDir), 0.0);
     col += vec3(0.78, 0.84, 1.0)*(pow(md, 700.0)*3.5 + pow(md, 40.0)*0.05)*uMoonK*(0.3 + 0.7*F); }
   if(uBio > 0.01){ float bn = noise2(p*4.2 + vec2(uTime*0.23, -uTime*0.19))*noise2(p*1.1 - uTime*0.05);
@@ -611,7 +628,7 @@ for(let i=1;i<=SEG;i++) widx.push(0, i+1, i);
 const wgeo = new T.BufferGeometry(); wgeo.setAttribute('position', new T.Float32BufferAttribute(wpos,3)); wgeo.setIndex(widx);
 const water = new T.Mesh(wgeo, waterMat); water.frustumCulled = false; scene.add(water);
 const seaMat = new T.ShaderMaterial({uniforms:WU, vertexShader:SH.seaVS, fragmentShader:SH.common+SH.waterFS, defines:{SEAGRID:1}, extensions:{derivatives:true}, depthWrite:false});
-const seaGrid = new T.Mesh(new T.PlaneGeometry(300,300,220,220).rotateX(-Math.PI/2), seaMat); seaGrid.visible=false; seaGrid.frustumCulled=false; scene.add(seaGrid);
+const seaGrid = new T.Mesh(makeWaterGrid(T), seaMat); seaGrid.visible=true; seaGrid.frustumCulled=false; scene.add(seaGrid);
 
 // 光源
 const sunLight = new T.DirectionalLight(0xffffff, 0.9); scene.add(sunLight); scene.add(sunLight.target);
@@ -700,13 +717,12 @@ function setTime(hour, force){
 
 const ripS = []; for(let i=0;i<12;i++) ripS.push({x:0,z:0,age:9,amp:0}); let ripI = 0;
 function addRipple(x, z, amp){ const r = ripS[ripI]; ripI = (ripI+1)%12; r.x=x; r.z=z; r.age=0; r.amp=amp; }
-function seaH(x,z,t){ const w=U.uWind.value, L=Math.hypot(w.x,w.y)||1, dx=w.x/L, dz=w.y/L, s=.45+1.1*w.z+1.7*Math.max(0,w.z-.6);   /* 大風時浪高非線性增加：暴風雨約兩倍 */
-  const D=[[dx,dz],[dx*.77-dz*.64,dz*.77+dx*.64],[dx*.77+dz*.64,dz*.77-dx*.64],[dx*.34-dz*.94,dz*.34+dx*.94],[.6,.8],[-.8,.6]], LL=[38,23,15,9,5.5,3.2], A=[.42,.28,.18,.11,.06,.035];
-  let h=0; for(let i=0;i<6;i++){ const k=6.2831853/LL[i]; h+=A[i]*s*Math.sin(k*(D[i][0]*x+D[i][1]*z)-Math.sqrt(9.81*k)*t); } return h; }
-function swell(x, z, t){ if(seaMode) return seaH(x,z,t); return 0.006*Math.sin(t*1.9+x*0.7) + 0.004*Math.sin(t*2.6+z*0.9+1.3); }
+function seaH(x,z,t){ return sampleWater(x,z,t,U.uWind.value,true).height; }
+function swell(x,z,t){return sampleWater(x,z,t,U.uWind.value,seaMode).height;}
+
 function update(dt, t){
   U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
-  if(seaGrid.visible) seaGrid.position.set(Math.round(U.uEye.value.x/1.5)*1.5, 0, Math.round(U.uEye.value.z/1.5)*1.5);
+  if(seaGrid.visible) seaGrid.position.set(U.uEye.value.x,0,U.uEye.value.z);
   { const w=U.uWind.value, k=(.002+.01*w.z)*dt; U.uCloudOff.value.x+=w.x*k; U.uCloudOff.value.y+=w.y*k; }
   for(let i=0;i<12;i++){ const r = ripS[i]; r.age += dt; rip[i].set(r.x, r.z, r.age, r.age < 5 ? r.amp : 0); }
 }
@@ -753,8 +769,8 @@ function renderRefl(){
 
 function render(){ if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } renderer.render(scene, camera); }
 
-function setIce(on){ water.visible=!on; if(on) seaGrid.visible=false; }
-function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=on; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
+function setIce(on){water.visible=!on;seaGrid.visible=!on;}
+function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=water.visible; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
 let photoHook=null;
 function setPhotoHook(f){ photoHook=f; }
 function setPhotoActive(){ U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; seaMat.toneMapped=false; seaMat.needsUpdate=true; }
@@ -4346,7 +4362,7 @@ const hT=hud.querySelector('.t'), hC=hud.querySelector('.chase'), hBand=hud.quer
 function bobberVis(v){ P.bobber.children.forEach(o=>{ o.visible=v; }); }
 function start(at,bait,base){ const k=bait.lure, cf=LURE_CFG[k]; getModel(k); show(k);
   cur={k,cf,base:base.clone(),depth:0,heldT:0,pause:0,speed:0,twitchV:0,chase:null,delay:2+Math.random()*3,interest:0,maxSp:c.reelSpd()*.55,pressT:0};
-  pos.copy(at); pos.y=0; holder.position.copy(at); holder.position.y=-.05; holder.visible=true; bobberVis(false); hud.classList.remove('hidden');
+  pos.copy(at); pos.y=0; holder.position.copy(at); holder.position.y=W.swell(at.x,at.z,G.t)-.05; holder.visible=true; bobberVis(false); hud.classList.remove('hidden');
   hT.textContent=bait.icon+' '+bait.name; hC.textContent='';
   const mx=2.4; hBand.style.left=(cf.band[0]/mx*100)+'%'; hBand.style.width=((cf.band[1]-cf.band[0])/mx*100)+'%';
   c.toast(cf.tip,'',2600); }
@@ -4366,7 +4382,7 @@ function update(dt,held){ if(!cur) return null; const cf=cur.cf;
   if(q.contact){ cur.hit=q.contact; cur.incoming=old; holder.position.set(q.pos.x,q.pos.y,q.pos.z); return 'snag'; }
   const want=cur.speed>.2?cf.dive*Math.min(1,cur.speed/cf.band[1]):(cf.sink?Math.min(2.5,cur.depth+dt*.4):(cf.float?0:cur.depth));
   cur.depth+=(want-cur.depth)*Math.min(1,dt*1.5);
-  { const q=W.fishingPhysics.move(holder.position,{x:pos.x,y:-cur.depth-.05,z:pos.z},.06); holder.position.set(q.pos.x,q.pos.y,q.pos.z); if(q.contact){cur.hit=q.contact;cur.incoming=old;return 'snag';} } holder.lookAt(tmp.set(cur.base.x,holder.position.y,cur.base.z));
+  { const q=W.fishingPhysics.move(holder.position,{x:pos.x,y:W.swell(pos.x,pos.z,G.t)-cur.depth-.05,z:pos.z},.06); holder.position.set(q.pos.x,q.pos.y,q.pos.z); if(q.contact){cur.hit=q.contact;cur.incoming=old;return 'snag';} } holder.lookAt(tmp.set(cur.base.x,holder.position.y,cur.base.z));
   holder.rotateZ(Math.sin(performance.now()*.02)*(.15+.6*cur.twitchV)); holder.rotateY(Math.sin(performance.now()*.013)*.25*Math.min(1,v));
   hDot.style.left=Math.min(98,v/2.4*100)+'%';
   /* 魚：先等一段時間才有魚注意到；之後依收線方式調整興趣 */
@@ -5979,7 +5995,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261030230054'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261030231950'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8271,7 +8287,7 @@ function updateFight(dt){
   sh.material.opacity=f.jumpT>0?0:.4*(1-sstep(3,10,f.d));
   // 浮標與釣竿
   { const pull=clamp(f.T*1.1+(f.run?.15:0),0,1);   // 浮標被拖進水裡、朝釣竿方向傾斜
-    { const rt=rod.tipW, k=Math.min(.35,1.2/Math.max(2,f.d)); bob.position.set(tv.x+(rt.x-tv.x)*k,-.03-.28*pull+Math.sin(G.t*9)*.012*(f.run?1:.4),tv.z+(rt.z-tv.z)*k); const q=PH.move(tv,bob.position,.065); setPoint(bob.position,q.pos); }   // 浮標沿魚線移動並避開實體
+    { const rt=rod.tipW, k=Math.min(.35,1.2/Math.max(2,f.d)); bob.position.set(tv.x+(rt.x-tv.x)*k,W.swell(tv.x,tv.z,G.t)-.03-.28*pull+Math.sin(G.t*9)*.012*(f.run?1:.4),tv.z+(rt.z-tv.z)*k); const q=PH.move(tv,bob.position,.065); setPoint(bob.position,q.pos); }   // 浮標沿魚線移動並避開實體
     bob.rotation.set(-.6*pull,0,Math.sin(G.t*7)*.25*(1-pull*.6)); bob.visible=!(f.jumpT>0)&&!G.bottom; }
   { const load=clamp(.25+.35*Math.min(1,fd.w/3),.25,.6), jit=(f.run||shake)?Math.sin(G.t*38)*.05*(.5+f.T):0;   // 掛上魚就有弧度，張力再加深，衝刺甩頭時竿尖抖動
     rod.end=G.endV.copy(f.pos||tv); rod.pitchT=.18+.08*f.T; rod.bendT=clamp(load+.85*f.T+(f.run?.12:0)+jit,0,1.25);

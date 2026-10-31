@@ -47,7 +47,7 @@ const hT=hud.querySelector('.t'), hC=hud.querySelector('.chase'), hBand=hud.quer
 function bobberVis(v){ P.bobber.children.forEach(o=>{ o.visible=v; }); }
 function start(at,bait,base){ const k=bait.lure, cf=LURE_CFG[k]; getModel(k); show(k);
   cur={k,cf,base:base.clone(),depth:0,heldT:0,pause:0,speed:0,twitchV:0,chase:null,delay:2+Math.random()*3,interest:0,maxSp:c.reelSpd()*.55,pressT:0};
-  pos.copy(at); pos.y=0; holder.position.copy(at); holder.position.y=-.05; holder.visible=true; bobberVis(false); hud.classList.remove('hidden');
+  pos.copy(at); pos.y=0; holder.position.copy(at); holder.position.y=W.swell(at.x,at.z,G.t)-.05; holder.visible=true; bobberVis(false); hud.classList.remove('hidden');
   hT.textContent=bait.icon+' '+bait.name; hC.textContent='';
   const mx=2.4; hBand.style.left=(cf.band[0]/mx*100)+'%'; hBand.style.width=((cf.band[1]-cf.band[0])/mx*100)+'%';
   c.toast(cf.tip,'',2600); }
@@ -67,7 +67,7 @@ function update(dt,held){ if(!cur) return null; const cf=cur.cf;
   if(q.contact){ cur.hit=q.contact; cur.incoming=old; holder.position.set(q.pos.x,q.pos.y,q.pos.z); return 'snag'; }
   const want=cur.speed>.2?cf.dive*Math.min(1,cur.speed/cf.band[1]):(cf.sink?Math.min(2.5,cur.depth+dt*.4):(cf.float?0:cur.depth));
   cur.depth+=(want-cur.depth)*Math.min(1,dt*1.5);
-  { const q=W.fishingPhysics.move(holder.position,{x:pos.x,y:-cur.depth-.05,z:pos.z},.06); holder.position.set(q.pos.x,q.pos.y,q.pos.z); if(q.contact){cur.hit=q.contact;cur.incoming=old;return 'snag';} } holder.lookAt(tmp.set(cur.base.x,holder.position.y,cur.base.z));
+  { const q=W.fishingPhysics.move(holder.position,{x:pos.x,y:W.swell(pos.x,pos.z,G.t)-cur.depth-.05,z:pos.z},.06); holder.position.set(q.pos.x,q.pos.y,q.pos.z); if(q.contact){cur.hit=q.contact;cur.incoming=old;return 'snag';} } holder.lookAt(tmp.set(cur.base.x,holder.position.y,cur.base.z));
   holder.rotateZ(Math.sin(performance.now()*.02)*(.15+.6*cur.twitchV)); holder.rotateY(Math.sin(performance.now()*.013)*.25*Math.min(1,v));
   hDot.style.left=Math.min(98,v/2.4*100)+'%';
   /* 魚：先等一段時間才有魚注意到；之後依收線方式調整興趣 */

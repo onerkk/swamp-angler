@@ -1,0 +1,6 @@
+const fs=require('fs'),vm=require('vm'),T=require(process.cwd()+'/vendor/three.min.js'),{makeWaterGrid}=require(process.cwd()+'/src/water.js');const ctx={};vm.createContext(ctx);const src=fs.readFileSync('src/b.js','utf8');vm.runInContext(fs.readFileSync('src/water.js','utf8')+'\n'+src.slice(0,src.indexOf('function createWorld'))+'\nthis.sh=SH;',ctx);
+const expand=s=>s.replace(/#include <(\w+)>/g,(_,k)=>expand(T.ShaderChunk[k]));
+const vp='precision highp float;uniform mat4 modelMatrix;uniform mat4 projectionMatrix;uniform mat4 viewMatrix;attribute vec3 position;';
+const fp='#extension GL_OES_standard_derivatives : enable\nprecision highp float;uniform vec3 cameraPosition;\n#define SEAGRID\n'+T.ShaderChunk.encodings_pars_fragment+'\nvec4 linearToOutputTexel(vec4 value){return LinearTosRGB(value); }\n';
+const camera=new T.PerspectiveCamera(66,512/384,.04,2000);camera.position.set(0,1.4,0);camera.lookAt(0,0,-14);camera.updateMatrixWorld(true);const g=makeWaterGrid(T);
+process.stdout.write(JSON.stringify({vs:vp+ctx.sh.seaVS,fs:fp+expand(ctx.sh.common+ctx.sh.waterFS),position:[...g.attributes.position.array],index:[...g.index.array],model:new T.Matrix4().elements,view:camera.matrixWorldInverse.elements,projection:camera.projectionMatrix.elements,farVS:vp+ctx.sh.waterVS,farFS:fp.replace('#define SEAGRID\n','')+expand(ctx.sh.common+ctx.sh.waterFS)}));
