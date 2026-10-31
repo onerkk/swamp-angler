@@ -59,3 +59,28 @@ test('complete skinned tail strokes and maximum bends stay inside the collision 
   root.traverse(o=>{if(!o.isSkinnedMesh)return;o.skeleton.update();const p=o.geometry.attributes.position,v=new T.Vector3();for(let i=0;i<p.count;i++){o.boneTransform(i,v);assert(body.containsPoint(v),'animated fin or tail exceeds collider');}});
  }
 });
+test('display scaling preserves relative lengths and leaves room for every body shape to turn',()=>{
+ const {aquariumFitScale,aquariumBodyBounds}=require('../src/aquarium.js');for(const spec of aquariumSpecs()){
+  const records=[{L:50},{L:10},{L:1}],scale=aquariumFitScale(spec,records);assert(Math.abs((records[0].L*scale)/(records[1].L*scale)-5)<1e-10);assert(records[0].L*scale<spec.d*.3);
+  for(const ratio of [[1,.25,.12],[1,.95,.12],[1,.1,.9]]){const L=records[0].L*scale,b=aquariumBodyBounds(new T.Box3(new T.Vector3(-L/2,-L*ratio[1]/2,-L*ratio[2]/2),new T.Vector3(L/2,L*ratio[1]/2,L*ratio[2]/2)),L);assert(b.getSize(new T.Vector3()).length()<spec.d*.65);}
+ }
+});
+test('real home swimming and bottom crawling keep all 30 creatures moving within fixed tanks',()=>{
+ const fs=require('fs'),vm=require('vm'),source=fs.readFileSync(require.resolve('../src/w.js'),'utf8'),A=require('../src/aquarium.js'),spec=aquariumSpecs()[3],floor=(x,z)=>.07+(spec.d/2-z)/spec.d*.1;
+ const tank=new T.Group(),motion=createAquariumMotion(T,{min:new T.Vector3(-spec.w/2+.035,.025,-spec.d/2+.035),max:new T.Vector3(spec.w/2-.035,spec.h-.1,spec.d/2-.035),floor});
+ for(const [x,z,size]of [[-.7,-.35,.55],[.5,-.3,.4],[1.2,-.3,.25]]){const o=new T.Mesh(new T.BoxGeometry(size,size,size));o.position.set(x,.08+size/2,z);tank.add(o);motion.addObstacle(o,tank);}
+ const records=Array.from({length:30},(_,i)=>({id:i%7===0?'ghostcrab':'fish',L:i%3===0?50:i%3===1?10:3})),scale=A.aquariumFitScale(spec,records),tk={g:tank,motion,spec,y:0,fitScale:scale,fish:[],plants:[],hAt:floor,bub:new T.Points(new T.BufferGeometry().setAttribute('position',new T.BufferAttribute(new Float32Array(0),3)))};
+ for(const rec of records){const length=Math.max(.018,rec.L*scale),bottom=rec.id==='ghostcrab',o=new T.Group(),h=length*(bottom?.3:.55),d=length*(bottom?.8:.2);o.add(new T.Mesh(new T.BoxGeometry(length,h,d)));const body=A.aquariumBodyBounds(aquariumModelBounds(T,o),length,bottom),f={o,body,rec,bottom,tgt:new T.Vector3(),sp:.16,yaw:0};o.position.set(0,.7,0);motion.add(f);tk.fish.push(f);}
+ assert(motion.pack());const context={T,t:0,tanks:{fresh:tk},causList:[],shaftList:[],BENTHIC:{ghostcrab:'crab'},tv:new T.Vector3(),tv2:new T.Vector3(),tv3:new T.Vector3(),swimBones:()=>{}};vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function dispL('),source.indexOf('function syncFish('))+source.slice(source.indexOf('function benthic('),source.indexOf('// 環境光：')),context);
+ const distance=new Map(tk.fish.map(f=>[f,0]));for(let i=0;i<2400;i++){context.t=i/60;const prev=tk.fish.map(f=>f.o.position.clone());context.updTanks(1/60);tk.fish.forEach((f,j)=>{assert(motion.valid(f));distance.set(f,distance.get(f)+f.o.position.distanceTo(prev[j]));});}
+ for(const f of tk.fish)assert(distance.get(f)>.07,`${f.rec.id} length ${f.rec.L} stuck; distance ${distance.get(f)} position ${f.o.position.toArray()} path ${JSON.stringify(f.path)} turn ${motion.turnClear(f,f.o.position)} v ${f.v} yaw ${f.yaw}`);
+});
+test('already-skinned native fish receive independent aquarium bones without changing their bind pose',()=>{
+ const fs=require('fs'),vm=require('vm'),s=fs.readFileSync(require.resolve('../src/w.js'),'utf8'),c={T};vm.createContext(c);vm.runInContext('const NB_=7;\n'+s.slice(s.indexOf('function rigFish('),s.indexOf('// 依缸深')),c);
+ const root=new T.Group(),old=new T.SkinnedMesh(new T.BoxGeometry(1,.3,.2,16,2,2),new T.MeshStandardMaterial());old.rotation.y=.4;old.position.set(.2,.3,-.1);root.add(old);const bones=c.rigFish(root);assert.equal(bones.length,1);
+ const skinned=root.children[0];root.updateMatrixWorld(true);skinned.skeleton.update();const p=skinned.geometry.attributes.position,v=new T.Vector3(),a=new T.Vector3();for(let i=0;i<p.count;i++){a.fromBufferAttribute(p,i);skinned.boneTransform(i,v);assert(v.distanceTo(a)<1e-6,'bind pose distorts source');}
+});
+test('a blocked forward step still lets a fish pivot away from a wall',()=>{
+ const {motion}=fixture(),f=fish(motion,1.5,1,0,.5);assert(motion.pack());let x=1;while(motion.turnClear(f,new T.Vector3(x+.001,1,0)))x+=.001;f.o.position.set(x-.00001,1,0);motion.refresh(f);
+ const old=f.o.position.clone(),q=f.o.quaternion.clone();f.o.position.x+=.05;f.o.rotation.y=.08;assert(!motion.move(f,old,q));assert(f.o.rotation.y>.04,'blocked translation froze the turn');assert(motion.valid(f));
+});

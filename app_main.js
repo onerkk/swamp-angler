@@ -1,11 +1,12 @@
-/*APPV:20261031221106*/
+/*APPV:20261031221107*/
 /* Aquarium collision uses complete, rotated model bounds, with room for the tail stroke.
    Steering anticipates contact; the swept pose check is the final non-penetration guard. */
 function aquariumSpecs(){return [{w:2,h:1,d:.95,st:.7},{w:2.7,h:1.25,d:1.2,st:.65},{w:3.3,h:1.45,d:1.45,st:.6},{w:3.9,h:1.65,d:1.65,st:.55}];}
 function aquariumDisplayLength(spec,length,count=1){
- const cap=Math.min(spec.w*.25,spec.d*.58,spec.h*.58)*Math.min(1,Math.pow(12/Math.max(1,count),1/3));
- return Math.min(Math.max(.025,length),cap);
+ const cap=Math.min(spec.w*.14,spec.d*.27,spec.h*.27)*Math.min(1,Math.pow(16/Math.max(1,count),1/3));
+ return Math.min(Math.max(.018,length),cap);
 }
+function aquariumFitScale(spec,records){const longest=Math.max(.001,...records.map(r=>r.L||.001));return Math.min(1,aquariumDisplayLength(spec,longest,records.length)/longest);}
 function aquariumModelBounds(T,root){
  root.updateMatrixWorld(true);const box=new T.Box3();root.traverse(o=>{
   if(!o.isMesh||!o.geometry)return;for(let p=o;p;p=p.parent)if(!p.visible)return;
@@ -17,7 +18,7 @@ function aquariumBodyBounds(box,length,bottom=false){
  body.min.x-=x;body.max.x+=x;body.min.z-=z;body.max.z+=z;body.min.y-=y;body.max.y+=y;return body;
 }
 function createAquariumMotion(T,{min,max,floor}){
- const bodies=[],obstacles=[],matrix=new T.Matrix4(),one=new T.Vector3(1,1,1),temp=new T.Box3(),margin=-.004;
+ const bodies=[],obstacles=[],matrix=new T.Matrix4(),one=new T.Vector3(1,1,1),margin=-.004;
  function shape(f,pos=f.o.position,q=f.o.quaternion){return f.body.clone().applyMatrix4(matrix.compose(pos,q,one));}
  function overlap(a,b){return a.min.x<b.max.x-margin&&a.max.x>b.min.x+margin&&a.min.y<b.max.y-margin&&a.max.y>b.min.y+margin&&a.min.z<b.max.z-margin&&a.max.z>b.min.z+margin;}
  function bottom(box){let y=min.y;if(floor)for(const x of [box.min.x,box.max.x])for(const z of [box.min.z,box.max.z])y=Math.max(y,floor(x,z));return y;}
@@ -29,19 +30,43 @@ function createAquariumMotion(T,{min,max,floor}){
  function add(f){bodies.push(f);f.box=shape(f);}
  function refresh(f){f.box=shape(f);}
  function ground(f,liftOnly=false){const b=shape(f),dy=bottom(b)-b.min.y+.002;f.o.position.y+=liftOnly?Math.max(0,dy):dy;refresh(f);}
+ function radius(f){const b=f.body;return Math.sqrt(Math.max(b.min.x*b.min.x,b.max.x*b.max.x)+Math.max(b.min.z*b.min.z,b.max.z*b.max.z)+(f.bottom?0:Math.max(b.min.y*b.min.y,b.max.y*b.max.y)))+.015;}
+ function navPoint(f,p){const r=radius(f),v=p.clone();if(f.bottom){const b=f.body;let y=min.y;for(const x of [p.x-r,p.x+r])for(const z of [p.z-r,p.z+r])if(floor)y=Math.max(y,floor(x,z));v.y=y-b.min.y+.004;}return v;}
+ function turnClear(f,p){const r=radius(f),v=navPoint(f,p),lo=v.clone().add(new T.Vector3(-r,f.bottom?f.body.min.y:-r,-r)),hi=v.clone().add(new T.Vector3(r,f.bottom?f.body.max.y:r,r));
+  if(lo.x<min.x||hi.x>max.x||lo.z<min.z||hi.z>max.z||lo.y<bottom({min:lo,max:hi})-.001||hi.y>max.y)return false;
+  return !obstacles.some(b=>overlap({min:lo,max:hi},b));
+ }
+ function clearLeg(f,a,b){const n=Math.max(1,Math.ceil(a.distanceTo(b)/Math.max(.04,radius(f)*.5)));for(let i=0;i<=n;i++)if(!turnClear(f,a.clone().lerp(b,i/n)))return false;return true;}
+ function plan(f){
+  const r=radius(f);
+  for(let i=0;i<24;i++){const p=navPoint(f,new T.Vector3(min.x+r+Math.random()*(max.x-min.x-2*r),min.y+r+Math.random()*(max.y-min.y-2*r),min.z+r+Math.random()*(max.z-min.z-2*r)));if(p.distanceTo(f.o.position)>Math.max(.2,r*2)&&clearLeg(f,f.o.position,p)){f.path=[p];f.blockedTime=0;return true;}}
+  const step=Math.max(.17,r*1.1),nx=Math.max(2,Math.ceil((max.x-min.x-2*r)/step)+1),nz=Math.max(2,Math.ceil((max.z-min.z-2*r)/step)+1),ny=f.bottom?1:Math.max(2,Math.ceil((max.y-min.y-2*r)/step)+1),points=[];
+  const at=(x,y,z)=>(y*nz+z)*nx+x;
+  for(let y=0;y<ny;y++)for(let z=0;z<nz;z++)for(let x=0;x<nx;x++){const p=navPoint(f,new T.Vector3(min.x+r+(max.x-min.x-2*r)*x/(nx-1),f.bottom?0:min.y+r+(max.y-min.y-2*r)*y/(ny-1),min.z+r+(max.z-min.z-2*r)*z/(nz-1)));points.push(turnClear(f,p)?p:null);}
+  let start=-1,near=Infinity;for(let i=0;i<points.length;i++)if(points[i]){const d=points[i].distanceToSquared(f.o.position);if(d<near&&clearLeg(f,f.o.position,points[i])){near=d;start=i;}}
+  if(start<0){f.path=[];return false;}
+  const queue=[start],prev=new Map([[start,-1]]);for(let j=0;j<queue.length;j++){const i=queue[j],x=i%nx,z=Math.floor(i/nx)%nz,y=Math.floor(i/(nx*nz));for(const [dx,dy,dz]of [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],...(f.bottom?[]:[[0,1,0],[0,-1,0]])]){const xx=x+dx,yy=y+dy,zz=z+dz;if(xx<0||xx>=nx||yy<0||yy>=ny||zz<0||zz>=nz)continue;const k=at(xx,yy,zz);if(prev.has(k)||!points[k]||!clearLeg(f,points[i],points[k]))continue;prev.set(k,i);queue.push(k);}}
+  const candidates=queue.filter(i=>points[i].distanceTo(f.o.position)>Math.max(.18,r*2));if(!candidates.length){f.path=[];return false;}
+  const goal=candidates[Math.floor(Math.random()*candidates.length)],path=[];for(let i=goal;i>=0;i=prev.get(i))path.unshift(points[i]);
+  const short=[];let anchor=f.o.position;while(path.length){let k=path.length-1;while(k>0&&!clearLeg(f,anchor,path[k]))k--;short.push(path[k]);anchor=path[k];path.splice(0,k+1);}f.path=short;f.blockedTime=0;return true;
+ }
+ function direction(f){if(!f.path||!f.path.length)plan(f);while(f.path&&f.path.length&&f.o.position.distanceTo(f.path[0])<.06)f.path.shift();if(!f.path||!f.path.length){plan(f);}
+  if(f.path&&f.path.length){return f.path[0].clone().sub(f.o.position).normalize();}return new T.Vector3();}
+ function spawnClear(f){return turnClear(f,f.o.position)&&!bodies.some(g=>g!==f&&f.o.position.distanceTo(g.o.position)<radius(f)+radius(g)+.025);}
  function place(f,near=false){
+  if(f.bottom)ground(f);
   const start=f.o.position.clone(),size=f.body.getSize(new T.Vector3()),center=f.body.getCenter(new T.Vector3());
   for(let i=0;i<600;i++){
-   if(i===0&&valid(f)){refresh(f);return true;}
+   if(i===0&&valid(f)&&spawnClear(f)){refresh(f);return true;}
    f.o.position.set(min.x+Math.random()*(max.x-min.x),min.y+Math.random()*(max.y-min.y),min.z+Math.random()*(max.z-min.z));
    if(near&&i<100)f.o.position.copy(start).add(new T.Vector3((Math.random()-.5)*size.length()*3,(Math.random()-.5)*size.length(),(Math.random()-.5)*size.length()*3));
    if(f.bottom)ground(f);
-   if(valid(f)){refresh(f);return true;}
+   if(valid(f)&&spawnClear(f)){refresh(f);f.path=[];return true;}
   }
   // Deterministic fallback explores the free volume even if random candidates were unlucky.
   const step=Math.max(.04,Math.min(size.x,size.y,size.z)*.65),yStep=f.bottom?max.y-min.y+1:Math.max(.05,size.y*.8);
   for(let y=min.y;y<max.y;y+=yStep)for(let z=min.z;z<max.z;z+=step)for(let x=min.x;x<max.x;x+=step){
-   f.o.position.set(x-center.x,y-center.y,z-center.z);if(f.bottom)ground(f);if(valid(f)){refresh(f);return true;}
+   f.o.position.set(x-center.x,y-center.y,z-center.z);if(f.bottom)ground(f);if(valid(f)&&spawnClear(f)){refresh(f);f.path=[];return true;}
   }
   f.o.position.copy(start);refresh(f);return false;
  }
@@ -61,27 +86,32 @@ function createAquariumMotion(T,{min,max,floor}){
    if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();const b=o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv,o.matrixWorld));if(!b.isEmpty())obstacles.push(b.expandByScalar(.008));});
   if(bodies.length)pack();
  }
+ function socialClear(f,p){return !bodies.some(g=>g!==f&&p.distanceTo(g.o.position)<radius(f)+radius(g)+.01);}
  function steer(f,direction){
-  const size=f.body.getSize(new T.Vector3()),ahead=Math.max(.12,size.x*.6),box=f.box||shape(f),center=box.getCenter(new T.Vector3()),probe=center.clone().addScaledVector(direction,ahead),force=new T.Vector3();
-  const half=box.getSize(new T.Vector3()).multiplyScalar(.5).addScalar(.035);
-  for(const b of [...obstacles,...bodies.filter(g=>g!==f).map(g=>g.box||shape(g))]){
-   temp.copy(b);temp.min.sub(half);temp.max.add(half);if(!temp.containsPoint(probe))continue;
-   let best=Infinity,axis='x',sign=1;for(const k of ['x','y','z'])for(const s of [-1,1]){const distance=s<0?probe[k]-temp.min[k]:temp.max[k]-probe[k];if(distance<best){best=distance;axis=k;sign=s;}}
-   force[axis]+=sign*2.5;
+  const ahead=Math.max(.1,radius(f)*.8),probe=f.o.position.clone().addScaledVector(direction,ahead),force=new T.Vector3();
+  for(const g of bodies){if(g===f)continue;const need=radius(f)+radius(g)+.08,d=probe.distanceTo(g.o.position);if(d>=need)continue;
+   const away=f.o.position.clone().sub(g.o.position).normalize();if(f.bottom)away.y=0;force.addScaledVector(away,3*(need-d)/need);
   }
-  for(const k of ['x','y','z']){const cushion=half[k]+ahead*.6;if(center[k]<min[k]+cushion)force[k]+=2;if(center[k]>max[k]-cushion)force[k]-=2;}
   if(f.bottom)force.y=0;return direction.add(force).normalize();
  }
  function move(f,from,rotation){
   const end=f.o.position.clone(),q=f.o.quaternion.clone(),distance=from.distanceTo(end),angle=rotation.angleTo(q),size=f.body.getSize(new T.Vector3());
   const step=Math.max(.004,Math.min(size.x,size.y,size.z)*.25),n=Math.max(1,Math.ceil(distance/step),Math.ceil(angle/.035)),pos=new T.Vector3(),quat=new T.Quaternion();
   let accepted=0;
-  for(let i=1;i<=n;i++){pos.lerpVectors(from,end,i/n);quat.copy(rotation).slerp(q,i/n);if(!valid(f,pos,quat))break;accepted=i/n;}
-  f.o.position.lerpVectors(from,end,accepted);f.o.quaternion.copy(rotation).slerp(q,accepted);refresh(f);return accepted===1;
+  for(let i=1;i<=n;i++){pos.lerpVectors(from,end,i/n);quat.copy(rotation).slerp(q,i/n);if(!valid(f,pos,quat)||!turnClear(f,pos)||!socialClear(f,pos))break;accepted=i/n;}
+  f.o.position.lerpVectors(from,end,accepted);f.o.quaternion.copy(rotation).slerp(q,accepted);
+  // A blocked forward step must not prevent turning away in place.
+  if(accepted<1){const pivot=f.o.quaternion.clone();for(let i=1;i<=Math.max(1,Math.ceil(angle/.035));i++){quat.copy(pivot).slerp(q,i/Math.max(1,Math.ceil(angle/.035)));if(!valid(f,f.o.position,quat))break;f.o.quaternion.copy(quat);}}
+  refresh(f);return accepted===1;
  }
- return{add,addObstacle,place,pack,valid,move,steer,ground,refresh,shape,bodies,obstacles};
+ function recover(f,dt){
+  const from=f.o.position.clone(),q=f.o.quaternion.clone(),away=new T.Vector3();for(const g of bodies){if(g===f)continue;const d=from.distanceToSquared(g.o.position);if(d<.5)away.addScaledVector(from.clone().sub(g.o.position),1/Math.max(.002,d));}
+  const dirs=[away.normalize()];for(let i=0;i<12;i++)dirs.push(new T.Vector3(Math.cos(i*Math.PI/6),0,Math.sin(i*Math.PI/6)));if(!f.bottom)dirs.push(new T.Vector3(0,1,0),new T.Vector3(0,-1,0));
+  for(const dir of dirs){if(dir.lengthSq()<.01)continue;const to=from.clone().addScaledVector(dir,(f.bottom?.035:.06)*dt);f.o.position.copy(f.bottom?navPoint(f,to):to);if(move(f,from,q)&&f.o.position.distanceTo(from)>1e-7){f.path=[];return true;}f.o.position.copy(from);f.o.quaternion.copy(q);refresh(f);}return false;
+ }
+ return{add,addObstacle,place,pack,valid,move,steer,ground,refresh,shape,bodies,obstacles,plan,direction,turnClear,recover};
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={aquariumSpecs,aquariumDisplayLength,aquariumModelBounds,aquariumBodyBounds,createAquariumMotion};
+if(typeof module!=='undefined'&&module.exports)module.exports={aquariumSpecs,aquariumDisplayLength,aquariumFitScale,aquariumModelBounds,aquariumBodyBounds,createAquariumMotion};
 /* Account assistance follows the authenticated Google identity, never a saved flag. */
 function createAccountAssist(){
   let enabled=false;
@@ -111,6 +141,22 @@ function homeActionPose(T,root,kind,room,blocked=()=>false,scene){const bounds=h
  else{const height=kind==='herb'?1.3:kind==='chest'?1.35:1.55;for(const angle of[0,.35,-.35,.7,-.7,1.2,-1.2,Math.PI]){const d=dir.clone().applyAxisAngle(new T.Vector3(0,1,0),angle),reach=Math.abs(d.x)*size.x/2+Math.abs(d.z)*size.z/2+.75,p=center.clone().addScaledVector(d,reach);p.y=height;if(Math.abs(p.x)>room.x-.4||p.z<room.zb+.4||p.z>room.zf-.4||blocked(p.x,p.z))continue;position=p;break;}}
  if(!position)return null;return{pos:position.toArray(),look:look.toArray(),tag:new T.Vector3(center.x,kind==='light'?bounds.min.y-.15:Math.min(room.h-.16,bounds.max.y+.16),center.z),bounds};}
 if(typeof module!=='undefined'&&module.exports)module.exports={homeObjectVisible,homeVisibleBounds,homeActionPose};
+
+// Explicit furniture footprints keep every upgrade tier outside the reserved aquarium wall.
+function homeFurnitureSlots(room){return {
+ shelf:{x:-room.x+.48,z:-.85,w:.65,h:1.95,d:1.25},
+ chest:{x:room.x-.7,z:-1.45,w:.72,h:.65,d:.64},
+ chestCrateA:{x:room.x-1.3,z:-1.7,w:.32,h:.35,d:.32},
+ chestCrateB:{x:room.x-1.3,z:-1.05,w:.32,h:.35,d:.32},
+ herb:{x:-room.x+.48,z:1.1,w:.55,h:1.1,d:.9},
+ sofa:{x:-1.9,z:.25,w:1.1,h:1.15,d:1.9},
+ ottoman:{x:-1.25,z:1.5,w:.55,h:.4,d:.55},
+ rock:{x:1.5,z:.15,w:.85,h:1.2,d:1.1},
+ rockTable:{x:2.55,z:.4,w:.6,h:.6,d:.6},
+ rockBasket:{x:2.55,z:-.6,w:.4,h:.5,d:.4}
+};}
+function homeFitFurniture(T,root,slot){const bounds=homeVisibleBounds(T,root);if(bounds.isEmpty())return;const size=bounds.getSize(new T.Vector3()),scale=Math.min(1,slot.w/Math.max(.001,size.x),slot.h/Math.max(.001,size.y),slot.d/Math.max(.001,size.z));root.scale.multiplyScalar(scale);root.updateMatrixWorld(true);const b=homeVisibleBounds(T,root),center=b.getCenter(new T.Vector3());root.position.add(new T.Vector3(slot.x-center.x,(slot.y||0)-b.min.y,slot.z-center.z));root.updateMatrixWorld(true);return homeVisibleBounds(T,root);}
+if(typeof module!=='undefined'&&module.exports)Object.assign(module.exports,{homeFurnitureSlots,homeFitFurniture});
 /* Freeze the active frame directly; rasterize only visible HTML, not another copy of WebGL. */
 function captureDimensions(width,height,dpr=1){const scale=Math.min(Math.max(1,dpr),1920/Math.max(width,height));return{width:Math.max(1,Math.round(width*scale)),height:Math.max(1,Math.round(height*scale)),scale};}
 function screenshotIgnores(element,canvas,style=getComputedStyle){
@@ -5656,7 +5702,7 @@ const LV={x:-.9,z:-.45};   /* 客廳區往前移：魚缸前留 1.4 公尺走道
 // 碰撞：落地的家具用實際模型的外框當障礙（升級換模型也自動跟著變），走路時不能穿過去
 const OBS=[];
 const contactTex=(()=>{const cv=document.createElement('canvas');cv.width=cv.height=128;const g=cv.getContext('2d'),r=g.createRadialGradient(64,64,18,64,64,64);r.addColorStop(0,'rgba(12,8,5,.32)');r.addColorStop(1,'rgba(12,8,5,0)');g.fillStyle=r;g.fillRect(0,0,128,128);return new T.CanvasTexture(cv);})();
-function addObs(o){ o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o); if(b.isEmpty()||b.min.y>.25||b.max.y-b.min.y<.12) return;
+function addObs(o){ o.updateMatrixWorld(true); const b=homeVisibleBounds(T,o,scene); if(b.isEmpty()||b.min.y>.25||b.max.y-b.min.y<.12) return;
   const shadow=new T.Mesh(new T.PlaneGeometry(Math.max(.14,b.max.x-b.min.x)*1.18,Math.max(.14,b.max.z-b.min.z)*1.18).rotateX(-Math.PI/2),new T.MeshBasicMaterial({map:contactTex,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1}));
   shadow.position.set((b.min.x+b.max.x)/2,.009,(b.min.z+b.max.z)/2);scene.add(shadow);
   OBS.push({o,shadow,x0:b.min.x,x1:b.max.x,z0:b.min.z,z1:b.max.z}); }
@@ -5682,7 +5728,7 @@ put('vintage_cabinet_01',0,0,0,Math.PI,1,o=>{
   put('potted_plant_01',0,0,0,0,1,k=>settle(k,3.3,b.max.y,ROOM.zf-.42,.46));
   put('wooden_lantern_01',0,0,0,.2,1,k=>settle(k,2.55,b.max.y,ROOM.zf-.42,.26));
 });
-put('wicker_basket_01',0,0,0,-.2,1,o=>settle(o,-3.35,0,1.9,.43));
+put('wicker_basket_01',0,0,0,-.2,1,o=>{dropObs(o);homeFitFurniture(T,o,{x:1.65,z:ROOM.zf-.4,w:.4,h:.38,d:.4});addObs(o);});
 put('wooden_crate_01',0,0,0,.16,1,o=>{
   const b=settle(o,-2.75,0,ROOM.zf-.43,.3);
   put('pot_enamel_01',0,0,0,.2,1,k=>settle(k,-2.75,b.max.y,ROOM.zf-.43,.18));
@@ -5707,23 +5753,24 @@ for(const [x,z,rot,img] of [[-ROOM.x+.025,-2.25,Math.PI/2,'env_dawn_full.jpg'],[
   const tx=TL.load(img);tx.encoding=T.sRGBEncoding;const art=new T.Mesh(new T.PlaneGeometry(.6,.37),new T.MeshStandardMaterial({map:tx,roughness:.9}));art.position.copy(fr.position);art.position.x+=.022;art.rotation.y=rot;scene.add(art);
 }
 // 家具依等級擺放：每一項標明屬於哪件家具、在哪幾級出現；升級時換模型或加擺件
+const FSLOT=homeFurnitureSlots(ROOM);
 const FITEMS=[
- {f:'sofa',lv:[0,1],m:'sofa_02',p:[LV.x-1.0,0,LV.z,Math.PI/2,1]},
- {f:'sofa',lv:[0,1],m:'throw_pillows_01',p:[LV.x-1.0,.42,LV.z+.1,Math.PI/2,.9]},
- {f:'sofa',lv:[1,2],m:'Ottoman_01',p:[LV.x-.65,0,LV.z+1.15,Math.PI/2,.8]},
- {f:'sofa',lv:[2,2],m:'sofa_03',p:[LV.x-1.05,0,LV.z,Math.PI/2,.72]},
- {f:'shelf',lv:[0,1],m:'wooden_bookshelf_worn',p:[-ROOM.x+.32,0,-2.2,Math.PI/2,1]},
- {f:'shelf',lv:[1,1],m:'book_encyclopedia_set_01',p:[-ROOM.x+.32,2.06,-2.2,Math.PI/2,.8]},
- {f:'shelf',lv:[2,2],m:'vintage_cabinet_01',p:[-ROOM.x+.3,0,-2.25,Math.PI/2,.8]},
- {f:'rock',lv:[0,2],m:'Rockingchair_01',p:[1.7,-.1,-.2,-Math.PI/2+.4,1]},
- {f:'rock',lv:[1,2],m:'side_table_01',p:[2.4,0,.55,-.3,.85],tint:0x8a6448},
- {f:'rock',lv:[2,2],m:'wicker_basket_01',p:[2.5,0,-1.0,.4,1.7]},
- {f:'herb',lv:[0,2],m:'potted_plant_01',p:[-ROOM.x+.5,0,ROOM.zf-.55,0,.9]},
- {f:'herb',lv:[1,2],m:'planter_box_01',p:[-ROOM.x+.24,0,-.15,Math.PI/2,1],herbs:.46},
- {f:'herb',lv:[2,2],m:'planter_box_02',p:[-ROOM.x+.25,0,1.0,Math.PI/2,1],herbs:.62},
- {f:'chest',lv:[0,2],m:'treasure_chest',p:[ROOM.x-.5,0,-2.55,-Math.PI/2,.8]},   /* 漁具箱：原本被升級變大的海水缸蓋住，移到右牆邊 */
- {f:'chest',lv:[1,2],m:'wooden_crate_01',p:[ROOM.x-.25,0,-1.75,Math.PI/2,.75]},
- {f:'chest',lv:[2,2],m:'wooden_crate_02',p:[ROOM.x-.35,0,-1.15,0,1]},
+ {f:'sofa',lv:[0,1],m:'sofa_02',slot:'sofa',p:[LV.x-1.0,0,LV.z,Math.PI/2,1]},
+ {f:'sofa',lv:[0,1],m:'throw_pillows_01',slot:'sofa',decor:true,p:[-1.9,.4,.25,Math.PI/2,.45]},
+ {f:'sofa',lv:[1,2],m:'Ottoman_01',slot:'ottoman',p:[LV.x-.65,0,LV.z+1.15,Math.PI/2,.8]},
+ {f:'sofa',lv:[2,2],m:'sofa_03',slot:'sofa',p:[LV.x-1.05,0,LV.z,Math.PI/2,.72]},
+ {f:'shelf',lv:[0,1],m:'wooden_bookshelf_worn',slot:'shelf',p:[-ROOM.x+.32,0,-2.2,Math.PI/2,1]},
+ {f:'shelf',lv:[1,1],m:'book_encyclopedia_set_01',slot:'shelf',decor:true,p:[-ROOM.x+.48,1.5,-.85,Math.PI/2,.5]},
+ {f:'shelf',lv:[2,2],m:'vintage_cabinet_01',slot:'shelf',p:[-ROOM.x+.48,0,-.85,Math.PI/2,.8]},
+ {f:'rock',lv:[0,2],m:'Rockingchair_01',slot:'rock',p:[1.7,-.1,-.2,-Math.PI/2+.4,1]},
+ {f:'rock',lv:[1,2],m:'side_table_01',slot:'rockTable',p:[2.4,0,.55,-.3,.85],tint:0x8a6448},
+ {f:'rock',lv:[2,2],m:'wicker_basket_01',slot:'rockBasket',p:[2.5,0,-1.0,.4,1.7]},
+ {f:'herb',lv:[0,0],m:'potted_plant_01',slot:'herb',p:[-ROOM.x+.5,0,ROOM.zf-.55,0,.9]},
+ {f:'herb',lv:[1,1],m:'planter_box_01',slot:'herb',p:[-ROOM.x+.24,0,-.15,Math.PI/2,1],herbs:.46},
+ {f:'herb',lv:[2,2],m:'planter_box_02',slot:'herb',p:[-ROOM.x+.25,0,1.0,Math.PI/2,1],herbs:.62},
+ {f:'chest',lv:[0,2],m:'treasure_chest',slot:'chest',p:[ROOM.x-.5,0,-2.55,-Math.PI/2,.8]},   /* 漁具箱：原本被升級變大的海水缸蓋住，移到右牆邊 */
+ {f:'chest',lv:[1,2],m:'wooden_crate_01',slot:'chestCrateA',p:[ROOM.x-.25,0,-1.75,Math.PI/2,.75]},
+ {f:'chest',lv:[2,2],m:'wooden_crate_02',slot:'chestCrateB',p:[ROOM.x-.35,0,-1.15,0,1]},
  {f:'fire',lv:[1,2],m:'pot_enamel_01',p:[ROOM.x-.35,0,FP.z+1.55,0,1.4]},
  {f:'fire',lv:[2,2],m:'brass_pan_01',p:[ROOM.x-.3,0,FP.z-1.05,.8,1.4]}];
 // 香草箱裡種真實的蕁麻草模型（Poly Haven nettle_plant），沿著木箱長邊排一排
@@ -5734,7 +5781,7 @@ function plantHerbs(o,half){ const ld=g=>{ const names=['nettle_plant_tall_a_LOD
 function syncFurn(){ const H=c.home&&c.home(); if(!H) return;
   for(const it of FITEMS){ const lv=H.furnLv(it.f), want=lv>=it.lv[0]&&lv<=it.lv[1];
     if(want&&!it.obj&&!it.loading){ it.loading=true; const [x,y,z,ry,sc]=it.p;
-      put(it.m,x,y,z,ry,sc,o=>{ it.loading=false; o.userData.furn=it.f; if(it.herbs) plantHerbs(o,it.herbs);
+      put(it.m,x,y,z,ry,sc,o=>{ it.loading=false; o.userData.furn=it.f; if(it.slot){dropObs(o);homeFitFurniture(T,o,{...FSLOT[it.slot],...(it.decor?{y:it.p[1],h:.2,w:.4,d:.4}:{})});addObs(o);} if(it.herbs) plantHerbs(o,it.herbs);
         // 新木色太亮的家具壓暗成老木屋的舊木色
         if(it.tint) o.traverse(m=>{ if(m.isMesh){ m.material=m.material.clone(); m.material.color.multiply(new T.Color(it.tint)); } });
         if(!(H.furnLv(it.f)>=it.lv[0]&&H.furnLv(it.f)<=it.lv[1])){ scene.remove(o); dropObs(o); return; } it.obj=o;updFurnTags(); }); }
@@ -5813,9 +5860,9 @@ function buildTank(water,spec,x){
   const rocks=[['rock04',-.19,-.14,.5,0],['rock02',.13,-.18,.3,1.3],['rock05',-.02,.02,.2,2.4],['rock06',.34,-.06,.22,4.1],['rock03',-.38,.06,.18,.7]].slice(0,W>2.5?5:W>1.5?4:3);
   rocks.forEach(([nm,fx,fz,hk,ry])=>GL.load('rock_moss_set_01.glb',gg=>{ const src=gg.scene.getObjectByName('rock_moss_set_01_'+nm); if(!src) return; const k=src.clone(true); k.position.set(0,0,0);
     const b=new T.Box3().setFromObject(k), ctr=b.getCenter(new T.Vector3()); k.position.set(-ctr.x,0,-ctr.z); const o=new T.Group(); o.add(k);
-    const px=W*fx, pz=D*fz, sz=b.getSize(new T.Vector3()), sc=Math.min(Hh*hk/Math.max(.2,b.max.y),W*hk*.7/Math.max(sz.x,sz.z)); o.position.set(px,y+hAt(px,pz)-.01,pz); o.rotation.y=ry; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); motion.addObstacle(o,g); }));
+    const px=W*fx, pz=D*Math.min(fz,-.22), sz=b.getSize(new T.Vector3()), sc=Math.min(Hh*hk*.72/Math.max(.2,b.max.y),W*hk*.55/Math.max(sz.x,sz.z),D*.36/Math.max(sz.x,sz.z)); o.position.set(px,y+hAt(px,pz)-.01,pz); o.rotation.y=ry; o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); motion.addObstacle(o,g); }));
   const woods=W>2.5?[[-.3,-.1,.6,.3],[.28,.05,2.6,.26]]:W>1.1?[[-.22,-.1,.6,.28]]:[];
-  woods.forEach(([fx,fz,ry,sc])=>GL.load('dry_branches_medium_01.glb',gg=>{ const o=gg.scene.clone(true); const px=W*fx, pz=D*fz; o.position.set(px,y+hAt(px,pz),pz); o.rotation.set(0,ry,0); o.scale.setScalar(sc); o.traverse(m=>{ m.frustumCulled=false; }); g.add(o); motion.addObstacle(o,g); }));
+  woods.forEach(([fx,fz,ry,sc])=>GL.load('dry_branches_medium_01.glb',gg=>{ const o=gg.scene.clone(true),px=W*fx,pz=-D*.28;o.rotation.set(0,ry,0);o.scale.setScalar(sc);o.updateMatrixWorld(true);const size=homeVisibleBounds(T,o).getSize(new T.Vector3());o.scale.multiplyScalar(Math.min(1,W*.4/Math.max(.001,size.x),Hh*.48/Math.max(.001,size.y),D*.36/Math.max(.001,size.z)));o.position.set(px,y+hAt(px,pz),pz);o.traverse(m=>{m.frustumCulled=false;});g.add(o);motion.addObstacle(o,g); }));
   const plants=[];
   // 水草分三層：後景高的有莖草（真實蕁麻草模型）、中景蕨類、前景低矮的草皮
   const putP=(file,pick,px,pz,sc,ry)=>GL.load(file,gg=>{ let o; if(pick){ const src=gg.scene.getObjectByName(pick); if(!src) return; o=new T.Group(); const k=src.clone(true); k.position.set(0,0,0); k.updateMatrixWorld(true); const c2=new T.Box3().setFromObject(k).getCenter(new T.Vector3()); k.position.set(-c2.x,0,-c2.z); o.add(k); } else o=gg.scene.clone(true);
@@ -5872,7 +5919,7 @@ function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null;
   const w=new T.Group(); w.add(src); const bones=rigFish(src); w.scale.setScalar(rec.L); w.userData.rec=rec; w.userData.real=c.isReal(rec.id); w.userData.bones=bones; return w; }
 // 執行時綁骨：魚頭朝群組的 +x；在每個網格的本地座標裡找出「往前」與「往上」的方向，沿長軸放 7 節骨頭，依前後位置線性分配權重
 const NB_=7;
-function rigFish(root){ root.updateMatrixWorld(true); const inv=new T.Matrix4(), all=[]; const meshes=[]; root.traverse(o=>{ if(o.isMesh&&!o.isSkinnedMesh&&o.geometry&&o.geometry.attributes.position) meshes.push(o); });
+function rigFish(root){ root.updateMatrixWorld(true); const inv=new T.Matrix4(), all=[]; const meshes=[]; root.traverse(o=>{ if(o.isMesh&&o.geometry&&o.geometry.attributes.position) meshes.push(o); });
   meshes.forEach(o=>{ const g=o.geometry.clone(); const pos=g.attributes.position;
     inv.copy(o.matrixWorld).invert(); const fw=new T.Vector3(1,0,0).transformDirection(inv).normalize(), up=new T.Vector3(0,1,0).transformDirection(inv).normalize();
     let lo=Infinity, hi=-Infinity; for(let i=0;i<pos.count;i++){ const s=pos.getX(i)*fw.x+pos.getY(i)*fw.y+pos.getZ(i)*fw.z; if(s<lo) lo=s; if(s>hi) hi=s; } const len=Math.max(1e-6,hi-lo);
@@ -5881,9 +5928,9 @@ function rigFish(root){ root.updateMatrixWorld(true); const inv=new T.Matrix4(),
     g.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); g.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
     const bones=[]; const c0=new T.Vector3(); g.computeBoundingBox(); g.boundingBox.getCenter(c0); const off=c0.clone().sub(fw.clone().multiplyScalar(c0.dot(fw))); 
     for(let k=0;k<NB_;k++){ const b=new T.Bone(); if(k===0) b.position.copy(off).addScaledVector(fw,hi); else b.position.copy(fw).multiplyScalar(-len/(NB_-1)); if(k>0) bones[k-1].add(b); bones.push(b); }
-    const sm=new T.SkinnedMesh(g,o.material); sm.add(bones[0]); sm.bind(new T.Skeleton(bones)); sm.position.copy(o.position); sm.quaternion.copy(o.quaternion); sm.scale.copy(o.scale); sm.frustumCulled=false; sm.renderOrder=1;
+    const sm=new T.SkinnedMesh(g,o.material); sm.position.copy(o.position); sm.quaternion.copy(o.quaternion); sm.scale.copy(o.scale); sm.add(bones[0]); sm.frustumCulled=false; sm.renderOrder=1;
     const mats=Array.isArray(sm.material)?sm.material:[sm.material]; mats.forEach(m=>{ m.skinning=true; m.needsUpdate=true; });
-    o.parent.add(sm); o.parent.remove(o); all.push({bones,up}); });
+    o.parent.add(sm); o.parent.remove(o); root.updateMatrixWorld(true); sm.bind(new T.Skeleton(bones)); all.push({bones,up}); });
   return all; }
 const qb_=new T.Quaternion();
 // 骨架游泳：擺動波從頭傳到尾，頭幾乎不動、尾巴擺最大；速度越快擺越快越大；轉彎時身體彎成 C 形
@@ -5891,18 +5938,19 @@ function swimBones(f,dt){ const rig=f.o.userData.bones; if(!rig||!rig.length) re
   f.sw=(f.sw||0)+dt*(2.2+spd*7.5); const A=.05+.13*spd, bend=Math.max(-.5,Math.min(.5,f.turnRate||0))*.22;
   rig.forEach(r=>{ r.bones.forEach((b,k)=>{ const u=k/(NB_-1); const amp=k===0?A*.12:A*(.25+.95*u*u); const ang=amp*Math.sin(f.sw-k*.9)+(k>0?bend*u:0); qb_.setFromAxisAngle(r.up,ang); b.quaternion.copy(qb_); }); }); }
 // 依缸深、缸高與數量限制展示尺寸，讓完整魚身能轉彎，保留模型比例與原始紀錄。
-function dispL(tk,L){ return aquariumDisplayLength(tk.spec,L,tk.fish.length||1); }
+function dispL(tk,L){ return Math.max(.018,L*(tk.fitScale||1)); }
 function bounds(tk,L){ L=dispL(tk,L); const s=tk.spec, m=L*.6+.035; return {x0:-s.w/2+m,x1:s.w/2-m,y0:tk.y+.24+L*.3,y1:tk.y+s.h-.14-L*.3,z0:-s.d/2+m,z1:s.d/2-m}; }
 function pickTarget(f,tk){ const b=bounds(tk,f.rec.L), r=(a,b)=>a+Math.random()*Math.max(0,b-a); const cy=f.o?f.o.position.y:(b.y0+b.y1)/2, dyMax=(b.y1-b.y0)*.3; f.tgt.set(r(b.x0,b.x1),Math.max(b.y0,Math.min(b.y1,cy+(Math.random()-.5)*2*dyMax)),r(Math.min(b.z0,b.z1),Math.max(b.z0,b.z1))); }
 function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.sea:[]};
   const tierSig='t'+hd.tier+(hd.seaTank?'s'+(hd.seaTier||0):'');
   if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?-ROOM.x*.48:0);   /* 有海水缸時兩缸左右對稱並排 */ if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,ROOM.x*.48); } else if(tanks.sea){ dropObs(tanks.sea.g); scene.remove(tanks.sea.g); delete tanks.sea; } }
   for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=want[w]||[], sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|');
-    if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[]; tk.motion.bodies.length=0;
+    if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[]; tk.motion.bodies.length=0; tk.fitScale=aquariumFitScale(tk.spec,list);
     list.forEach(rec=>{ try{ c.want(rec.id); const o=fishObj(rec); if(!o) return;
       o.scale.setScalar(1); const modelBox=aquariumModelBounds(T,o), modelSize=modelBox.getSize(new T.Vector3());
       if(modelBox.isEmpty()) return;
-      const bottom=!!BENTHIC[rec.id], length=aquariumDisplayLength(tk.spec,rec.L,list.length)*(bottom?.65:1);
+      const center=modelBox.getCenter(new T.Vector3());o.children.forEach(child=>child.position.sub(center));
+      const bottom=!!BENTHIC[rec.id], length=Math.max(.018,rec.L*tk.fitScale)*(bottom?.8:1);
       o.scale.setScalar(length/Math.max(modelSize.x,modelSize.y,modelSize.z,.001));
       const body=aquariumBodyBounds(aquariumModelBounds(T,o),length,bottom);
       const f={o,rec,body,bottom,yaw:Math.random()<.5?0:Math.PI,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni};
@@ -5911,8 +5959,8 @@ function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.s
       pickTarget(f,tk);
       }catch(err){ console.error('tank fish',rec&&rec.id,err); } }); tk.motion.pack(); } }
 // 標本牆：右牆、壁爐後方，兩排各四個；大魚統一縮到木板放得下的長度
-const MSLOT=[]; for(const y of [1.5,2.15]) for(const z of [-3.65,-2.85,-2.05,-1.25]) MSLOT.push({y,z});   // 先掛視線高度那一排
-const mountG=new T.Group(); scene.add(mountG); let mountSig='';
+const MSLOT=[]; for(const y of [1.8,2.45]) for(const z of [-3.95,-3.25,-2.55,-1.85]) MSLOT.push({y,z});   // 先掛視線高度那一排
+const mountG=new T.Group(); mountG.rotation.y=-Math.PI/2;mountG.position.z=ROOM.zf-ROOM.x;scene.add(mountG); let mountSig='';
 const plaqueM=new T.MeshStandardMaterial({color:0x3a2416,roughness:.6}), plaqueEdge=new T.MeshStandardMaterial({color:0x8a6a3a,roughness:.4,metalness:.3});
 function nameTex(t1,t2){ const cv=document.createElement('canvas'); cv.width=256; cv.height=64; const g=cv.getContext('2d');
   g.fillStyle='#c8a050'; g.fillRect(0,0,256,64); g.fillStyle='#3a2410'; g.font='bold 24px sans-serif'; g.textAlign='center'; g.fillText(t1,128,28); g.font='18px sans-serif'; g.fillText(t2,128,54);
@@ -5934,7 +5982,8 @@ function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.re
   if(kind==='shell'){ o.position.y=floorY(o.position.x,o.position.z); o.rotation.set(0,f.yaw,0); if(u.uAmp){ u.uAmp.value=Math.max(0,Math.sin(f.t*.25+f.ph))*.12; u.uSwim.value+=dt*.5; } return; }
   if(kind==='razor'){ o.position.y=floorY(o.position.x,o.position.z); o.rotation.set(0,f.yaw,0); return; }
   // 會走動的：在缸底慢慢走向一個點，到了停一下再換點
-  f.bt-=dt; if(f.bt<=0||!f.bT){ f.bT=new T.Vector3(b.x0+Math.random()*(b.x1-b.x0),0,(Math.random()-.5)*tk.spec.d*.6); f.bt=4+Math.random()*6; f.wait=Math.random()*2.5; }
+  f.bt=(f.bt||0)-dt;if(f.bt<=0||!f.path||!f.path.length){tk.motion.plan(f);f.bt=6+Math.random()*6;f.wait=0;}
+  const walk=tk.motion.steer(f,tk.motion.direction(f));f.bT=o.position.clone().add(walk);
   if(f.wait>0){ f.wait-=dt; if(u.uAmp) u.uAmp.value=.02; }
   else { const dx=f.bT.x-o.position.x, dz=f.bT.z-o.position.z, dd=Math.hypot(dx,dz); if(dd>.02){ const sp=(kind==='crab'?.05:kind==='worm'?.015:.03)*Math.min(1,dd*4);
       const head=Math.atan2(-dz,dx); if(kind==='crab'){ const want=head+Math.PI/2; let dy=want-f.yaw; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2; f.yaw+=dy*Math.min(1,dt*1.5); }   // 螃蟹橫著走：身體側面朝前進方向
@@ -5948,12 +5997,11 @@ function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!t
   shaftList.forEach(q=>{ q.m.opacity=.05+.035*Math.sin(t*.35+q.ph); });
   const bp=tk.bub.geometry.attributes.position; for(let i=0;i<bp.count;i++){ let yy=bp.getY(i)+dt*(.12+(i%5)*.03); if(yy>tk.y+tk.spec.h-.08) yy=tk.y+.1; bp.setY(i,yy); } bp.needsUpdate=true;
   const fs=tk.fish;
-  fs.forEach(f=>{ const o=f.o, from=o.position.clone(), rotation=o.quaternion.clone(); f.v=f.v||0; f.rest=f.rest||0; if(BENTHIC[f.rec.id]){ benthic(f,tk,dt);tk.motion.ground(f,true);if(!tk.motion.move(f,from,rotation)){f.yaw=o.rotation.y;f.bt=0;} return; }
+  fs.forEach(f=>{ const o=f.o, from=o.position.clone(), rotation=o.quaternion.clone(); f.v=f.v||0; f.rest=f.rest||0; if(BENTHIC[f.rec.id]){ benthic(f,tk,dt);tk.motion.ground(f,true);if(!tk.motion.move(f,from,rotation)){tk.motion.recover(f,dt);f.yaw=o.rotation.y;f.blockedTime=(f.blockedTime||0)+dt;if(f.blockedTime>.7){f.bt=0;f.path=[];}} return; }
     // 偶爾停下來懸浮一會兒
     if(f.rest>0){ f.rest-=dt; f.v+=(0.015-f.v)*Math.min(1,dt*2); }
     else if(Math.random()<dt*.06){ f.rest=1.5+Math.random()*3; }
-    tv.subVectors(f.tgt,o.position); const d=tv.length(); if(d<.06){ pickTarget(f,tk); }
-    tv.normalize();
+    tv.copy(tk.motion.direction(f));
     // 提前避讓完整魚身、造景及玻璃；最後仍由掃掠碰撞攔住接觸。
     tk.motion.steer(f,tv);
     tv.y*=.6; tv.normalize();
@@ -5967,7 +6015,7 @@ function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!t
     o.rotation.order='YZX'; o.rotation.set(roll,f.yaw,f.pitch);
     swimBones(f,dt);
     const cp=Math.cos(f.pitch); const fwd=tv3.set(Math.cos(f.yaw)*cp,Math.sin(f.pitch),-Math.sin(f.yaw)*cp); o.position.addScaledVector(fwd,f.v*dt);
-    if(!tk.motion.move(f,from,rotation)){ f.yaw=o.rotation.y;f.pitch=o.rotation.z;f.v*=.35;pickTarget(f,tk); }
+    if(!tk.motion.move(f,from,rotation)){ tk.motion.recover(f,dt);f.yaw=o.rotation.y;f.pitch=o.rotation.z;f.v=Math.max(.025,f.v*.7);f.blockedTime=(f.blockedTime||0)+dt;if(f.blockedTime>.7){f.path=[];f.rest=0;} }
   }); } }
 
 // 環境光：白天從窗戶進來的光多、夜裡靠爐火和檯燈
@@ -6113,8 +6161,8 @@ furnUI.addEventListener('click',e=>{ const b=e.target.closest('[data-f]'); if(!b
   if(a==='use'){ const id=furnId, st=H.furnInfo(id).st; if(!st.ok&&id!=='rock'){ c.toast&&c.toast(st.txt,'warn',1800); return; }
     ACT_OPT=b.dataset.o!=null?+b.dataset.o:null; actFor(id); } });
 // 每件能點的家具上方都有提示標籤；有東西可以領、可以採、可以用時變成金色
-const FTAG=[['sofa',[LV.x-1.0,1.3,LV.z]],['rock',[1.7,1.48,-.2]],['shelf',[-ROOM.x+.35,2.45,-2.2]],['chest',[ROOM.x-.5,1.32,-2.55]],['herb',[-2.75,1.05,.35]],['light',[0,2.52,-1.15]],['clock',[ROOM.x-.4,2.0,FP.z+.6]],['mount',[ROOM.x-.12,2.62,-2.45]]];
-const furnTags=FTAG.map(([f,pos])=>{ const tg=makeTag(''); tg.position.set(...pos); scene.add(tg); const r={s:tg,y:pos[1],k:'f_'+f,f,ready:false}; tags.push(r); return r; });
+const FTAG=['sofa','rock','shelf','chest','herb','light','clock','mount'].map(f=>[f,[0,0,0]]);
+const furnTags=FTAG.map(([f,pos])=>{ const tg=makeTag(''); tg.position.set(...pos); tg.visible=false; scene.add(tg); const r={s:tg,y:pos[1],k:'f_'+f,f,ready:false}; tags.push(r); return r; });
 function tagTxt(f,H){ if(f==='light') return [lightsOff()?'💡 點吊燈開燈':'💡 點吊燈關燈',false];
   if(f==='clock') return ['🕰 點時鐘看時間',false];
   if(f==='mount') return ['🖼 點標本看資料',false];
@@ -6599,7 +6647,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261031221106'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261031221107'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
