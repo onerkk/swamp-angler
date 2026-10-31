@@ -6,9 +6,19 @@ function aquariumDisplayLength(spec,length,count=1){
  return Math.min(Math.max(.018,length),cap);
 }
 function aquariumFitScale(spec,records){const longest=Math.max(.001,...records.map(r=>r.L||.001));return Math.min(1,aquariumDisplayLength(spec,longest,records.length)/longest);}
-function aquariumModelBounds(T,root){
+// Small residents need a readable display size even alongside a very large fish.
+function aquariumResidentLength(spec,record,fishScale,bottom,count=1){
+ if(!bottom)return Math.max(Math.min(.08,spec.h*.08),Math.max(.001,record.L||.001)*fishScale);
+ const minimum=Math.min(.18,spec.d*.12,spec.h*.14),maximum=Math.max(minimum,Math.min(spec.w*.1,spec.d*.22,spec.h*.24)*Math.min(1,Math.sqrt(12/Math.max(1,count))));
+ return Math.max(minimum,Math.min(maximum,Math.max(.001,record.L||.001)*1.6));
+}
+function aquariumCenterModel(T,model,includeHidden=false){
+ const box=aquariumModelBounds(T,model,includeHidden);if(box.isEmpty())return null;
+ const outer=new T.Group(),pivot=new T.Group();pivot.position.copy(box.getCenter(new T.Vector3())).negate();pivot.add(model);outer.add(pivot);outer.userData={...model.userData};return outer;
+}
+function aquariumModelBounds(T,root,includeHidden=false){
  root.updateMatrixWorld(true);const box=new T.Box3();root.traverse(o=>{
-  if(!o.isMesh||!o.geometry)return;for(let p=o;p;p=p.parent)if(!p.visible)return;
+  if(!o.isMesh||!o.geometry)return;if(!includeHidden)for(let p=o;p;p=p.parent)if(!p.visible)return;
   if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
  });return box;
 }
@@ -38,7 +48,7 @@ function createAquariumMotion(T,{min,max,floor}){
  function clearLeg(f,a,b){const n=Math.max(1,Math.ceil(a.distanceTo(b)/Math.max(.04,radius(f)*.5)));for(let i=0;i<=n;i++)if(!turnClear(f,a.clone().lerp(b,i/n)))return false;return true;}
  function plan(f){
   const r=radius(f);
-  for(let i=0;i<24;i++){const p=navPoint(f,new T.Vector3(min.x+r+Math.random()*(max.x-min.x-2*r),min.y+r+Math.random()*(max.y-min.y-2*r),min.z+r+Math.random()*(max.z-min.z-2*r)));if(p.distanceTo(f.o.position)>Math.max(.2,r*2)&&clearLeg(f,f.o.position,p)){f.path=[p];f.blockedTime=0;return true;}}
+  for(let i=0;i<24;i++){const p=navPoint(f,new T.Vector3(min.x+r+Math.random()*(max.x-min.x-2*r),min.y+r+Math.random()*(max.y-min.y-2*r),(f.bottom?min.z+(max.z-min.z)*.52: min.z+r)+Math.random()*(f.bottom?(max.z-min.z)*.48-r:max.z-min.z-2*r)));if(p.distanceTo(f.o.position)>Math.max(.2,r*2)&&clearLeg(f,f.o.position,p)){f.path=[p];f.blockedTime=0;return true;}}
   const step=Math.max(.17,r*1.1),nx=Math.max(2,Math.ceil((max.x-min.x-2*r)/step)+1),nz=Math.max(2,Math.ceil((max.z-min.z-2*r)/step)+1),ny=f.bottom?1:Math.max(2,Math.ceil((max.y-min.y-2*r)/step)+1),points=[];
   const at=(x,y,z)=>(y*nz+z)*nx+x;
   for(let y=0;y<ny;y++)for(let z=0;z<nz;z++)for(let x=0;x<nx;x++){const p=navPoint(f,new T.Vector3(min.x+r+(max.x-min.x-2*r)*x/(nx-1),f.bottom?0:min.y+r+(max.y-min.y-2*r)*y/(ny-1),min.z+r+(max.z-min.z-2*r)*z/(nz-1)));points.push(turnClear(f,p)?p:null);}
@@ -59,7 +69,7 @@ function createAquariumMotion(T,{min,max,floor}){
    if(i===0&&valid(f)&&spawnClear(f)){refresh(f);return true;}
    f.o.position.set(min.x+Math.random()*(max.x-min.x),min.y+Math.random()*(max.y-min.y),min.z+Math.random()*(max.z-min.z));
    if(near&&i<100)f.o.position.copy(start).add(new T.Vector3((Math.random()-.5)*size.length()*3,(Math.random()-.5)*size.length(),(Math.random()-.5)*size.length()*3));
-   if(f.bottom)ground(f);
+   if(f.bottom){if(i<240)f.o.position.z=min.z+(max.z-min.z)*(.58+Math.random()*.38);ground(f);}
    if(valid(f)&&spawnClear(f)){refresh(f);f.path=[];return true;}
   }
   // Deterministic fallback explores the free volume even if random candidates were unlucky.
@@ -110,4 +120,4 @@ function createAquariumMotion(T,{min,max,floor}){
  }
  return{add,addObstacle,place,pack,valid,move,steer,ground,refresh,shape,bodies,obstacles,plan,direction,turnClear,recover};
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={aquariumSpecs,aquariumDisplayLength,aquariumFitScale,aquariumModelBounds,aquariumBodyBounds,createAquariumMotion};
+if(typeof module!=='undefined'&&module.exports)module.exports={aquariumSpecs,aquariumDisplayLength,aquariumFitScale,aquariumResidentLength,aquariumCenterModel,aquariumModelBounds,aquariumBodyBounds,createAquariumMotion};

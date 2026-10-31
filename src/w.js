@@ -468,7 +468,7 @@ function buildTank(water,spec,x){
 
 // 把水族箱裡記錄的魚做成會游的模型（用遊戲同一個魚模型，按實際體長縮放）
 function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null;
-  if(window.__TIDE&&window.__TIDE.makeModel&&BENTHIC[rec.id]){ const m=window.__TIDE.makeModel(rec.id); if(m){ m.group.userData.uni=m.uni; return m.group; } }   // 貝類用兩片真殼的模型
+  if(BENTHIC[rec.id]){if(!window.__TIDE||!window.__TIDE.makeModel)return null;const m=window.__TIDE.makeModel(rec.id);if(!m)return null;m.group.userData.uni=m.uni;m.group.userData.aquariumProcedural=true;return m.group;}
   const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
   src.traverse(o=>{ o.frustumCulled=false; if(o.isMesh&&o.material){ const mats=Array.isArray(o.material)?o.material:[o.material];
       const nm=mats.map(m=>{ const k=m.clone(); k.onBeforeCompile=()=>{}; k.customProgramCacheKey=()=>'tank'; const see=m.transparent&&m.opacity<.95; k.transparent=see; k.opacity=see?m.opacity:1; k.depthWrite=!see; k.needsUpdate=true; return k; });   // 半透明的幽靈魚保持半透明
@@ -501,20 +501,20 @@ function pickTarget(f,tk){ const b=bounds(tk,f.rec.L), r=(a,b)=>a+Math.random()*
 function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.sea:[]};
   const tierSig='t'+hd.tier+(hd.seaTank?'s'+(hd.seaTier||0):'');
   if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?-ROOM.x*.48:0);   /* 有海水缸時兩缸左右對稱並排 */ if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,ROOM.x*.48); } else if(tanks.sea){ dropObs(tanks.sea.g); scene.remove(tanks.sea.g); delete tanks.sea; } }
-  for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=want[w]||[], sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|');
-    if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[]; tk.motion.bodies.length=0; tk.fitScale=aquariumFitScale(tk.spec,list);
-    list.forEach(rec=>{ try{ c.want(rec.id); const o=fishObj(rec); if(!o) return;
-      o.scale.setScalar(1); const modelBox=aquariumModelBounds(T,o), modelSize=modelBox.getSize(new T.Vector3());
-      if(modelBox.isEmpty()) return;
-      const center=modelBox.getCenter(new T.Vector3());o.children.forEach(child=>child.position.sub(center));
-      const bottom=!!BENTHIC[rec.id], length=Math.max(.018,rec.L*tk.fitScale)*(bottom?.8:1);
-      o.scale.setScalar(length/Math.max(modelSize.x,modelSize.y,modelSize.z,.001));
-      const body=aquariumBodyBounds(aquariumModelBounds(T,o),length,bottom);
+  for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=want[w]||[], sig=list.map(r=>r.id+r.d+':'+r.L+(c.isReal(r.id)?'r':'')).join('|')+':'+!!(window.__TIDE&&window.__TIDE.makeModel);
+    if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[]; tk.motion.bodies.length=0; tk.fitScale=aquariumFitScale(tk.spec,list);let complete=true;
+    list.forEach(rec=>{ try{ c.want(rec.id);const model=fishObj(rec);if(!model){complete=false;return;}
+      model.scale.setScalar(1);const bottom=!!BENTHIC[rec.id],procedural=!!model.userData.aquariumProcedural;
+      const o=aquariumCenterModel(T,model,procedural);if(!o){complete=false;return;}
+      const modelBox=aquariumModelBounds(T,o,procedural),modelSize=modelBox.getSize(new T.Vector3());
+      const length=aquariumResidentLength(tk.spec,rec,tk.fitScale,bottom,list.length);
+      o.scale.setScalar(length/Math.max(modelSize.x,modelSize.y,modelSize.z,.001));o.userData.rec=rec;
+      const body=aquariumBodyBounds(aquariumModelBounds(T,o,procedural),length,bottom);
       const f={o,rec,body,bottom,yaw:Math.random()<.5?0:Math.PI,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni};
       o.rotation.y=f.yaw; const b=bounds(tk,rec.L);o.position.set(0,(b.y0+b.y1)/2,tk.spec.d*.2);
       tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.fish.push(f);tk.motion.add(f);
       pickTarget(f,tk);
-      }catch(err){ console.error('tank fish',rec&&rec.id,err); } }); tk.motion.pack(); } }
+      }catch(err){ complete=false;console.error('tank fish',rec&&rec.id,err); } }); if(!complete)tk.sig='';tk.motion.pack(); } }
 // 標本牆：右牆、壁爐後方，兩排各四個；大魚統一縮到木板放得下的長度
 const MSLOT=[]; for(const y of [1.8,2.45]) for(const z of [-3.95,-3.25,-2.55,-1.85]) MSLOT.push({y,z});   // 先掛視線高度那一排
 const mountG=new T.Group(); mountG.rotation.y=-Math.PI/2;mountG.position.z=ROOM.zf-ROOM.x;scene.add(mountG); let mountSig='';
