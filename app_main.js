@@ -1,4 +1,4 @@
-/*APPV:20261031221058*/
+/*APPV:20261031221101*/
 /* Account assistance follows the authenticated Google identity, never a saved flag. */
 function createAccountAssist(){
   let enabled=false;
@@ -28,28 +28,45 @@ function homeActionPose(T,root,kind,room,blocked=()=>false,scene){const bounds=h
  else{const height=kind==='herb'?1.3:kind==='chest'?1.35:1.55;for(const angle of[0,.35,-.35,.7,-.7,1.2,-1.2,Math.PI]){const d=dir.clone().applyAxisAngle(new T.Vector3(0,1,0),angle),reach=Math.abs(d.x)*size.x/2+Math.abs(d.z)*size.z/2+.75,p=center.clone().addScaledVector(d,reach);p.y=height;if(Math.abs(p.x)>room.x-.4||p.z<room.zb+.4||p.z>room.zf-.4||blocked(p.x,p.z))continue;position=p;break;}}
  if(!position)return null;return{pos:position.toArray(),look:look.toArray(),tag:new T.Vector3(center.x,kind==='light'?bounds.min.y-.15:Math.min(room.h-.16,bounds.max.y+.16),center.z),bounds};}
 if(typeof module!=='undefined'&&module.exports)module.exports={homeObjectVisible,homeVisibleBounds,homeActionPose};
-/* Capture the frame the active scene just rendered, then composite its current HTML UI. */
+/* Freeze the active frame directly; rasterize only visible HTML, not another copy of WebGL. */
+function captureDimensions(width,height,dpr=1){const scale=Math.min(Math.max(1,dpr),1920/Math.max(width,height));return{width:Math.max(1,Math.round(width*scale)),height:Math.max(1,Math.round(height*scale)),scale};}
+function screenshotIgnores(element,canvas,style=getComputedStyle){
+ if(element===canvas||element.hasAttribute('data-screenshot-ignore'))return true;
+ if(['HTML','HEAD','BODY','STYLE','LINK','SCRIPT'].includes(element.tagName))return false;
+ const s=style(element);return s.display==='none'||s.visibility==='hidden'||Number(s.opacity)===0;
+}
 function createScreenCapture({canvas,button,report=()=>{},onCaptured=()=>{},scene=()=>''}){
- let pending=null,busy=false;
- async function take(){if(busy)return;busy=true;button.disabled=true;try{
+ let pending=null,busy=false;const label=button.textContent||'📷';
+ async function take(){if(busy)return;busy=true;button.disabled=true;button.textContent='⏳';button.setAttribute('aria-busy','true');try{
    const frozen=await new Promise((resolve,reject)=>{pending={resolve,reject};});
    if(typeof window.html2canvas!=='function')throw Error('截圖元件尚未載入，請稍後再試');
-   const image=await window.html2canvas(document.body,{width:innerWidth,height:innerHeight,windowWidth:innerWidth,windowHeight:innerHeight,scrollX:0,scrollY:0,x:0,y:0,scale:Math.min(window.devicePixelRatio||1,3),useCORS:true,allowTaint:false,logging:false,backgroundColor:null,ignoreElements:e=>e.hasAttribute('data-screenshot-ignore'),onclone:async doc=>{
-     const old=doc.getElementById(canvas.id);if(!old)return;const img=doc.createElement('img');img.id=old.id;img.className=old.className;img.style.cssText=old.style.cssText;img.src=frozen.url;old.replaceWith(img);if(img.decode)await img.decode();
-   }});
-   const blob=await new Promise((resolve,reject)=>image.toBlob(b=>b?resolve(b):reject(Error('截圖儲存失敗')),'image/jpeg',.95));
+   const overlay=await window.html2canvas(document.body,{width:innerWidth,height:innerHeight,windowWidth:innerWidth,windowHeight:innerHeight,scrollX:0,scrollY:0,x:0,y:0,scale:frozen.size.scale,useCORS:true,allowTaint:false,imageTimeout:1200,logging:false,backgroundColor:null,ignoreElements:e=>screenshotIgnores(e,canvas),onclone:doc=>{doc.body.style.background='transparent';doc.documentElement.style.background='transparent';}});
+   frozen.image.getContext('2d').drawImage(overlay,0,0,frozen.size.width,frozen.size.height);
+   const blob=await new Promise((resolve,reject)=>frozen.image.toBlob(b=>b?resolve(b):reject(Error('截圖儲存失敗')),'image/jpeg',.9));
    const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='濕地垂釣_截圖_'+Date.now()+'.jpg';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-   report('📷 截圖已儲存到下載資料夾','good');onCaptured(frozen.scene);
- }catch(error){report(error.message||'截圖失敗，請重試','warn');}finally{busy=false;button.disabled=false;pending=null;}}
- function afterFrame(){if(!pending)return;const job=pending;pending=null;try{const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;copy.getContext('2d').drawImage(canvas,0,0);job.resolve({url:copy.toDataURL('image/png'),scene:scene()});}catch(e){job.reject(e);}}
+   report('📷 截圖已送出下載','good');onCaptured(frozen.scene);
+ }catch(error){report(error.message||'截圖失敗，請重試','warn');}finally{busy=false;button.disabled=false;button.textContent=label;button.setAttribute('aria-busy','false');pending=null;}}
+ function afterFrame(){if(!pending)return;const job=pending;pending=null;try{const size=captureDimensions(innerWidth,innerHeight,window.devicePixelRatio||1),image=document.createElement('canvas');image.width=size.width;image.height=size.height;image.getContext('2d').drawImage(canvas,0,0,size.width,size.height);job.resolve({image,size,scene:scene()});}catch(e){job.reject(e);}}
  button.addEventListener('pointerdown',e=>e.stopPropagation());button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();take();});
  return{take,afterFrame,isBusy:()=>busy};
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={createScreenCapture};
+function cameraButtonPosition(slot,top,width,safeTop=0,obstacles=[],height=900){
+ const clear=p=>!obstacles.some(r=>p.left<r.right+6&&p.left+p.width>r.left-6&&p.top<r.bottom+6&&p.top+p.height>r.top-6);
+ if(slot&&slot.width>0&&slot.height>0){const p={left:slot.left,top:slot.top,width:slot.width,height:slot.height};if(clear(p))return p;}
+ const start=top&&top.height>0?top.bottom+10:safeTop+12;
+ for(let y=start;y<height-70;y+=52)for(const x of[Math.max(8,width-56),12]){const p={left:x,top:y,width:44,height:44};if(clear(p))return p;}
+ return{left:Math.max(8,width-56),top:start,width:44,height:44};
+}
+function dockCameraButton(button,slot,top){let queued=false;const obstacles=['magWin','tdCoach','tdClock','tdBag','tdShore','homeView','grillUI','furnPick','fishCard','act','joy'].map(id=>document.getElementById(id)).filter(Boolean);
+ function update(){queued=false;const rects=obstacles.filter(el=>{const s=getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&Number(s.opacity)>.05;}).map(el=>el.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0),p=cameraButtonPosition(slot.getBoundingClientRect(),top.getBoundingClientRect(),innerWidth,0,rects,innerHeight);Object.assign(button.style,{left:p.left+'px',top:p.top+'px',width:p.width+'px',height:p.height+'px',right:'auto'});}
+ function schedule(){if(queued)return;queued=true;requestAnimationFrame(update);}
+ window.addEventListener('resize',schedule);if(typeof ResizeObserver!=='undefined'){const ro=new ResizeObserver(schedule);for(const el of[slot,top,...obstacles])ro.observe(el);}if(typeof MutationObserver!=='undefined')new MutationObserver(schedule).observe(document.body,{attributes:true,attributeFilter:['class','data-fishing-state']});schedule();return update;
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={createScreenCapture,captureDimensions,screenshotIgnores,cameraButtonPosition};
 /* Raw RAF timing, independent of the simulation's capped timestep. */
 function graphicsProfiles(cap){
- const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','high'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
- return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i]}));
+ const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
+ return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
 }
 function createAdaptiveGraphics({cap,apply,onSample=()=>{}}){
  let mode='auto',level=4,scope='',elapsed=0,frames=0,slow=0,warm=3,cool=0,fast=0,bad=0,clock=0,blocked=-1,blockedUntil=0,probe=null,fps=0,reason='初始化';
@@ -79,6 +96,16 @@ function createAdaptiveGraphics({cap,apply,onSample=()=>{}}){
 }
 function graphicsStatusText(s){return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS`;}
 if(typeof module!=='undefined'&&module.exports)module.exports={graphicsProfiles,createAdaptiveGraphics,graphicsStatusText};
+
+function waterDetailSettings(quality){return{low:[64,128],mid:[112,192],high:[160,256],ultra:[224,320]}[quality]||[112,192];}
+function tuneTextureSampling(T,texture,maxAnisotropy,atlas=false){
+ if(!texture||texture.isRenderTargetTexture)return;
+ const image=texture.image,w=image&&(image.width||image.videoWidth),h=image&&(image.height||image.videoHeight),pot=n=>n>0&&(n&(n-1))===0;
+ const anisotropy=Math.min(16,maxAnisotropy||1);let changed=texture.anisotropy!==anisotropy;texture.anisotropy=anisotropy;
+ if(!atlas&&!texture.isCompressedTexture&&pot(w)&&pot(h)){changed=changed||texture.minFilter!==T.LinearMipmapLinearFilter||!texture.generateMipmaps;texture.generateMipmaps=true;texture.minFilter=T.LinearMipmapLinearFilter;texture.magFilter=T.LinearFilter;}
+ if(changed)texture.needsUpdate=true;
+}
+if(typeof module!=='undefined'&&module.exports)Object.assign(module.exports,{waterDetailSettings,tuneTextureSampling});
 /* Camera framing shared by the surface view and its projection checks. */
 const FISHING_VIEW={fovPortrait:62,fovLandscape:50,rodBase:[-.22,-.62,-.94],rodDirection:[-.12,.42,-.9],idlePitch:-.34};
 function fishingViewPitch(state,distance,eyeHeight,sea){
@@ -1022,8 +1049,11 @@ const seaGrid = new T.Mesh(makeWaterGrid(T), seaMat); seaGrid.visible=true; seaG
 const sunLight = new T.DirectionalLight(0xffffff, 0.9); scene.add(sunLight); scene.add(sunLight.target);
 renderer.shadowMap.type=T.PCFSoftShadowMap;sunLight.castShadow=true;sunLight.shadow.bias=-.00018;sunLight.shadow.normalBias=.012;sunLight.shadow.radius=2;
 Object.assign(sunLight.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.2,far:130});sunLight.shadow.camera.updateProjectionMatrix();
-function setShadows(q){renderer.shadowMap.enabled=q!=='low';const n=q==='high'?2048:q==='mid'?512:1024;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
+function setShadows(q){renderer.shadowMap.enabled=q!=='low';const n=q==='ultra'?Math.min(4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='mid'?512:1024;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
 const hemi = new T.HemisphereLight(0xffffff, 0x223322, 0.55); scene.add(hemi);
+
+function qualityTextures(root){const max=renderer.capabilities.getMaxAnisotropy();root.traverse(m=>{if(!m.isMesh)return;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))if(mat)for(const key of['map','normalMap','roughnessMap','metalnessMap','bumpMap','emissiveMap'])tuneTextureSampling(T,mat[key],max,!!(mat.userData&&mat.userData.packedAtlas));});}
+let waterDetail='mid';function setWaterDetail(q){if(q===waterDetail)return;let [rings,segments]=waterDetailSettings(q);if(rings*segments>65535&&!renderer.capabilities.isWebGL2&&!renderer.extensions.get('OES_element_index_uint'))[rings,segments]=waterDetailSettings('high');const old=seaGrid.geometry;seaGrid.geometry=makeWaterGrid(T,150,rings,segments);old.dispose();waterDetail=q;}
 
 // 環境光照貼圖（由同一套天空/樹林產生）
 const pmrem = new T.PMREMGenerator(renderer);
@@ -1121,7 +1151,7 @@ function update(dt, t){
 
 let pr = Math.min(window.devicePixelRatio || 1, 2), lw = 1, lh = 1;
 function resize(w, h){ lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ? FISHING_VIEW.fovPortrait : FISHING_VIEW.fovLandscape; camera.updateProjectionMatrix(); renderer.setPixelRatio(pr); renderer.setSize(w, h); }
-function setPR(v){ pr = v; renderer.setPixelRatio(pr); renderer.setSize(lw, lh); }
+function setPR(v){if(Math.abs(v-pr)<.001)return; pr = v; renderer.setPixelRatio(pr); renderer.setSize(lw, lh); }
 /* 水面倒影：鏡像相機只拍物體（不含天空、水面），水面依波紋扭曲取樣 */
 const reflRT=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true});
 const reflCam=new T.PerspectiveCamera(), reflTM=new T.Matrix4();
@@ -1173,7 +1203,7 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
 /* ===== 美人魚的骨架與表情（依新設定圖生成的模型，載入後在執行時自動加骨架）=====
    骨架：臀→腰→胸→頸→頭；左右肩→上臂→前臂→手；尾巴 6 節＋尾鰭；頭髮 3 節
@@ -2790,7 +2820,7 @@ const canoeCollider=W.fishingPhysics.addBox({x:-.4,y:-.3,z:-2.45},{x:.4,y:.3,z:1
 canoeCollider.update=()=>{const b=ctx.base();canoeCollider.boxes[0].frame={x:b.x,z:b.z,head:ctx.head()};
 };
 /* 原木獨木舟（依玩家設定圖生成）：載入後取代程式做的塑膠艇；船頭朝 −Z，長 4.2 米 */
-if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const mp=x.material.map; if(mp){ mp.generateMipmaps=false; mp.minFilter=T.LinearFilter; } x.material=new T.MeshStandardMaterial({map:mp||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.85,metalness:0}); x.castShadow=false; } });
+if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const source=x.material,mp=source.map; if(mp){ tuneTextureSampling(T,mp,W.renderer.capabilities.getMaxAnisotropy()); } x.material=new T.MeshStandardMaterial({map:mp||null,normalMap:source.normalMap||null,roughnessMap:source.roughnessMap||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.85,metalness:0}); x.castShadow=x.receiveShadow=true; } });
   const w=new T.Group(); w.add(o); w.rotation.y=Math.PI; w.updateMatrixWorld(true); let b=new T.Box3().setFromObject(w); const sz=b.getSize(new T.Vector3()); w.scale.set(.78/Math.max(sz.x,1e-6),.42/Math.max(sz.y,1e-6),4.2/Math.max(sz.z,1e-6));   // 長寬高分開縮放成真實獨木舟比例
   w.updateMatrixWorld(true); b=new T.Box3().setFromObject(w); const c=b.getCenter(new T.Vector3()); w.position.set(-c.x,-.2-b.min.y,-.35-c.z);
   boat.children.forEach(ch=>{ if(ch!==padG) ch.visible=false; }); boat.add(w); });   // 只藏舊塑膠艇的船身，槳要留著
@@ -2982,8 +3012,8 @@ function update(dt,t){
   snagRipT-=dt; if(snagRipT<=0&&SNAG_RIP.length&&!(W.isSea&&W.isSea())){ snagRipT=.7+Math.random()*.9; const r=SNAG_RIP[Math.floor(Math.random()*SNAG_RIP.length)]; W.addRipple(r[0]+(Math.random()-.5)*.4,r[1]+(Math.random()-.5)*.4,.22); }   // 樹幹入水處的小漣漪
   const s=sp(), bx=s.pos[0], bz=s.pos[1];
   if(s.kayak){ const sw=W.swell(bx,bz,t)*2.2; boat.visible=true; boat.position.set(bx,sw,bz); boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
-    W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=Math.sin(t*1.1)*.012+paddleTilt.z*.5; }
-  else if(s.yacht){ boat.visible=false; const sw=W.swell(bx,bz,t)*.9; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=(W.swell(bx+1.5,bz,t)-W.swell(bx-1.5,bz,t))*-.12; }
+    W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
+  else if(s.yacht){ boat.visible=false; const sw=W.swell(bx,bz,t)*.9; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
   else { boat.visible=false; W.player.position.set(0,2.4,0); W.head.rotation.z=0; }
   updateWeather(dt); updateRain(dt); updateGator(dt); updateEagle(dt,t);
   gEye.emissiveIntensity=(1-W.info.day)*2.2;
@@ -4254,6 +4284,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
       if((opt.mer||opt.king)&&n.map){ n.emissive=new T.Color(0xdde6ff); n.emissiveMap=n.map; n.emissiveIntensity=.15; GLOW.push(n); }   // 夜裡用自己的顏色微微發光
       if(opt.king){ n.roughness=.42; n.metalness=.35; n.emissive=new T.Color(0x0a3a5a); n.emissiveIntensity=.35; }
       if(mm.normalScale) n.normalScale.copy(mm.normalScale);
+      if(BAKED.has(c[0]))n.userData.packedAtlas=true;
       if(n.map&&BAKED.has(c[0])){ n.map.generateMipmaps=false; n.map.minFilter=T.LinearFilter; n.map.needsUpdate=true; }   // 烘焙貼圖（三角形成對打包）關閉多層級縮圖，避免方格之間滲色
       [n.map,n.normalMap,n.roughnessMap,n.metalnessMap].forEach(t=>{ if(t&&t.channel) t.channel=0; });
       if(opt.gold){ n.color=new T.Color(0xffc23a); n.emissive=new T.Color(0xffa010); n.emissiveIntensity=.18; n.metalness=.55; n.roughness=.25; }
@@ -4265,7 +4296,7 @@ function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0])
     else if(c[1]==='up'){ if(typeof autoRig==='function'){ grp.children.forEach(m=>{ if(m.isMesh) (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.onBeforeCompile=()=>{}; }); });
         const rg=autoRig(grp,'tail'); FRIGS.add({grp,uni,up:rg,idle:0}); } }
     else { grp.userData.cutWhite=CUTWHITE.has(sp.id); grp.userData.bigClaw=sp.id==='fiddler'; rigFish(grp,uni,opt.king||opt.mer?.15:1,SWIMK[sp.id]||(FLAT.has(sp.id)?'flat':'fish')); } cloneSafe(grp); }catch(e){ console.warn('fish rig',sp.id,e); }
-  return {group:grp,uni,sp,real:true}; }
+  if(W.qualityTextures)W.qualityTextures(grp);return {group:grp,uni,sp,real:true}; }
 
 function measure(root){ root.updateMatrixWorld(true); const b=new T.Box3(), v=new T.Vector3();
   root.traverse(m=>{ if(!m.isMesh||!m.visible) return; const pa=m.geometry.attributes.position, step=Math.max(1,Math.floor(pa.count/4000));
@@ -4284,7 +4315,7 @@ function attach(host,key,o){ const h={host,loaded:false,actions:{},mixer:null,pl
     obj.traverse(m=>{ m.frustumCulled=false; if(m.isMesh&&m.material){ (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=1.1; }); } });
     if(host.isMesh){ host.material=new T.MeshBasicMaterial({visible:false}); }
     host.children.slice().forEach(c=>{ c.visible=false; });
-    host.add(wrap); host.userData.real=true; h.wrap=wrap;
+    host.add(wrap);if(typeof W!=='undefined'&&W.qualityTextures)W.qualityTextures(wrap); host.userData.real=true; h.wrap=wrap;
     if(g.animations&&g.animations.length&&o.anim!==false){ const mx=new T.AnimationMixer(obj); h.mixer=mx; mixers.push(mx);
       g.animations.forEach(cl=>{ h.actions[cl.name]=mx.clipAction(cl); });
       const first=(o.clip&&Object.keys(h.actions).find(k=>k.indexOf(o.clip)>=0))||Object.keys(h.actions)[0];
@@ -5519,7 +5550,7 @@ function put(name,x,y,z,ry,sc,fn){ const place=g=>{ const o=g.scene.clone(true);
         if(/_artwork$/.test(mm.name)&&ART[name]){ const nm=mm.clone(); const tx=TL.load(ART[name]); tx.encoding=T.sRGBEncoding; tx.flipY=false; nm.map=tx; nm.color.set(0xffffff); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_glass$/.test(mm.name)){ m.castShadow=false; const nm=new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.12,roughness:.05,metalness:0,depthWrite:false}); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_lamp$/.test(mm.name)){ const nm=mm.clone(); nm.emissive=new T.Color(0xffd080); nm.emissiveIntensity=1.2; if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; glowM.push(nm); } }); });
-    scene.add(o); addObs(o); if(fn) fn(o); };
+    if(W.qualityTextures)W.qualityTextures(o);scene.add(o); addObs(o); if(fn) fn(o); };
   if(mcache[name]) place(mcache[name]); else GL.load('models/home/'+name+'.glb',g=>{ mcache[name]=g; place(g); },undefined,()=>console.warn('home model',name)); }
 const LV={x:-.9,z:-.45};   /* 客廳區往前移：魚缸前留 1.4 公尺走道，可以走到玻璃前面看 */
 // 碰撞：落地的家具用實際模型的外框當障礙（升級換模型也自動跟著變），走路時不能穿過去
@@ -6134,7 +6165,7 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
   { const rk=c.rain?Math.min(1,c.rain()*1.6):0; rainGlass.tick(dt,rk); viewM.color.setScalar((.35+.65*daylight())*(1-.35*rk)); }   // 下雨：窗上有水珠、水痕往下滑，外面變暗變霧
   sparkles.forEach(q=>{ const k=Math.max(0,Math.sin(t*1.7+q.ph)); q.sp.material.opacity=Math.pow(k,8); q.sp.scale.setScalar(.03+.05*Math.pow(k,4)); if(k<.02&&Math.random()<.02) q.sp.position.set((Math.random()-.5)*1.5,(Math.random()-.5)*1.2,.0); });   // 水晶閃光
   updTanks(dt);for(const k of ['fresh','sea'])if(tanks[k]&&tanks[k].optics)tanks[k].optics.update();
-  const shadowSize=window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
+  const shadowSize=window.__gfxStatus&&window.__gfxStatus.shadow==='ultra'?4096:window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
   const exposure=R.toneMappingExposure,shadows=R.shadowMap.enabled,shadowType=R.shadowMap.type;
   try{
     R.toneMappingExposure=.88;R.shadowMap.enabled=window.__GFX!=='low';R.shadowMap.type=T.PCFSoftShadowMap;
@@ -6459,7 +6490,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261031221058'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261031221101'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -7921,7 +7952,7 @@ let t=0;
 let rspawn=0;
 function render(dt){ if(!on) return;
   const daylight=Math.max(0,Math.min(1,W.U.uDay.value));sun.color.setRGB(W.U.uLightCol.value.x,W.U.uLightCol.value.y,W.U.uLightCol.value.z);sun.intensity=.7;sun.target.position.set(pos.x,0,pos.z);sun.position.copy(sun.target.position).addScaledVector(W.U.uSunDir.value,60);sun.target.updateMatrixWorld();tideHemi.intensity=.2+.7*daylight;tideHemi.color.setRGB(.25+.5*daylight,.32+.5*daylight,.45+.45*daylight);S.environment=W.scene.environment;if(tideDome)tideDome.material.color.setScalar(.06+.94*daylight);S.fog.color.copy(sky).multiplyScalar(.08+.92*daylight);
-  if((tideLightTick-=dt)<=0){tideLightTick=1;const shadowSize=window.__GFX==='high'?2048:512;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}S.traverse(o=>{if(o.isMesh){o.receiveShadow=true;if(o.geometry.type!=='PlaneGeometry'&&o.material&&o.material.isMeshStandardMaterial)o.castShadow=true;}});}
+  if((tideLightTick-=dt)<=0){tideLightTick=1;const shadowSize=window.__gfxStatus&&window.__gfxStatus.shadow==='ultra'?4096:window.__GFX==='high'?2048:512;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}S.traverse(o=>{if(o.isMesh){o.receiveShadow=true;if(o.geometry.type!=='PlaneGeometry'&&o.material&&o.material.isMeshStandardMaterial)o.castShadow=true;}});}
  if(!dig) dropTick(dt); jetTick(dt); t+=dt; if(!roamers.length&&(rspawn-=dt)<=0){ rspawn=2; spawnRoamers(); } /* 模型下載好就放出泥面上的生物 */ const h=c.hour(), left=(endH-h)*60;   // 剩下幾分鐘（遊戲時間）
   $('tdClock').innerHTML=left>40?`🌊 退潮中・離漲潮還有 ${Math.floor(left)} 分`:`<span style="color:#ffb39a">⚠️ 漲潮倒數 ${Math.max(0,Math.floor(left))} 分</span>`;
   if(left<=40&&warned<1){ warned=1; warnEl.innerHTML='🌊 潮水開始回漲了！<br><small>跟著地上發亮的箭頭往岸邊走</small>'; warnEl.style.display='block'; setTimeout(()=>warnEl.style.display='none',3800); vib([80,60,80]); /* 不再插旗子 */ }
@@ -8608,14 +8639,15 @@ G.saveRef=save;
 window.__STORY=createStory({save,persist,toast,Snd,vib,goSpot:i=>goSpot(i),curSpot:()=>G.spot,idle:()=>G.state==='idle',pan:on=>{ G.cinePan=on; if(!on) G.yawT=0; },addXP:x=>META.addXP(x),setCoins:()=>setCoins(),syncHUD:()=>META.syncHUD()});
 const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* Adaptive profiles change resolution, reflection, shadow and effect budgets together. */
-window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;return Math.max(.35,Math.min(2.5,Math.max(1.5,window.devicePixelRatio||1),Math.sqrt(8000000/(w*h)),limit/w,limit/h));};
+window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;return Math.max(.35,Math.min(3.25,Math.max(2,window.devicePixelRatio||1),Math.sqrt(12000000/(w*h)),limit/w,limit/h));};
 const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,apply:s=>{
   window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;
-  if(W.setShadows)W.setShadows(s.shadow);if(W.setRefl)W.setRefl(s.reflection>0,s.reflection);W.setPR(s.pr);
+  if(W.setWaterDetail)W.setWaterDetail(s.geometry);if(W.setShadows)W.setShadows(s.shadow);if(W.setRefl)W.setRefl(s.reflection>0,s.reflection);W.setPR(s.pr);
   document.body.dataset.gfx=s.effect;document.body.dataset.gfxMode=s.mode;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);
 },onSample:s=>{window.__FPS=s.fps;window.__gfxStatus=s;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);}});
 window.__applyGfx=q=>{gfxAuto.configure(q);if(window.__toastGfx)window.__toastGfx(q);};
 window.addEventListener('resize',()=>gfxAuto.refresh());document.addEventListener('visibilitychange',()=>gfxAuto.pause());
+if(W.qualityTextures)W.qualityTextures(W.scene);
 window.__applyGfx(save.gfx||'auto');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,held:()=>G.held,grind:()=>Snd.grind&&Snd.grind(),splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
 function iceDrop(){ G.noBait=false; const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=1.6; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
@@ -9023,7 +9055,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
   { const f=G.state==='fight'?G.f:null, want=(f?((f.run?.45:0)+(f.ev&&f.ev.k==='shake'?.6:0)+(f.T>.85?.35:0)):0)+(G.gShake||0); G.shk=(G.shk||0)+(want-(G.shk||0))*Math.min(1,dt*6);
     const viewPitch=fishingViewPitch(G.state,G.state==='fight'&&G.f?G.f.d:G.castDist,W.player.position.y,G.loc==='sea');
     G.viewPitch=(G.viewPitch??viewPitch)+(viewPitch-(G.viewPitch??viewPitch))*(1-Math.exp(-dt*3));
-    W.head.rotation.x=G.viewPitch+(G.pitch||0)+Math.sin(G.t*.5)*.004+Math.sin(G.t*29)*.005*G.shk; W.camera.rotation.z=Math.sin(G.t*.37)*.003+Math.sin(G.t*23+1.7)*.004*G.shk; }
+    W.head.rotation.z=0;W.head.rotation.x=G.viewPitch+(G.pitch||0)+Math.sin(G.t*.5)*.004+Math.sin(G.t*29)*.005*G.shk; W.camera.rotation.z=0; }
   showLightSet(showing);
   const hh=((G.hour%24)+24)%24, cl=String(Math.floor(hh)).padStart(2,'0')+':'+String(Math.floor((hh%1)*60)).padStart(2,'0');
   if(ui.clock.textContent!==cl) ui.clock.textContent=cl;
@@ -9036,6 +9068,7 @@ function onResize(){ W.resize(window.innerWidth,window.innerHeight); UW.resize(w
 window.addEventListener('resize',onResize); onResize();
 if(typeof save.hour==='number'&&isFinite(save.hour)) G.hour=save.hour;
 W.setTime(G.hour,true);
+dockCameraButton($('bCam'),$('cameraSlot'),$('top'));
 const screenCapture=createScreenCapture({canvas:W.renderer.domElement,button:$('bCam'),report:(m,k)=>toast(m,k,2200),onCaptured:scene=>SEA.recordPhoto(scene),scene:()=>TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':END.on()?'ending':G.loc||'lake'});
 let last=performance.now();
 function frame(now){

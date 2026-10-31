@@ -1,7 +1,7 @@
 /* Raw RAF timing, independent of the simulation's capped timestep. */
 function graphicsProfiles(cap){
- const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','high'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
- return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i]}));
+ const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
+ return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
 }
 function createAdaptiveGraphics({cap,apply,onSample=()=>{}}){
  let mode='auto',level=4,scope='',elapsed=0,frames=0,slow=0,warm=3,cool=0,fast=0,bad=0,clock=0,blocked=-1,blockedUntil=0,probe=null,fps=0,reason='初始化';
@@ -31,3 +31,13 @@ function createAdaptiveGraphics({cap,apply,onSample=()=>{}}){
 }
 function graphicsStatusText(s){return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS`;}
 if(typeof module!=='undefined'&&module.exports)module.exports={graphicsProfiles,createAdaptiveGraphics,graphicsStatusText};
+
+function waterDetailSettings(quality){return{low:[64,128],mid:[112,192],high:[160,256],ultra:[224,320]}[quality]||[112,192];}
+function tuneTextureSampling(T,texture,maxAnisotropy,atlas=false){
+ if(!texture||texture.isRenderTargetTexture)return;
+ const image=texture.image,w=image&&(image.width||image.videoWidth),h=image&&(image.height||image.videoHeight),pot=n=>n>0&&(n&(n-1))===0;
+ const anisotropy=Math.min(16,maxAnisotropy||1);let changed=texture.anisotropy!==anisotropy;texture.anisotropy=anisotropy;
+ if(!atlas&&!texture.isCompressedTexture&&pot(w)&&pot(h)){changed=changed||texture.minFilter!==T.LinearMipmapLinearFilter||!texture.generateMipmaps;texture.generateMipmaps=true;texture.minFilter=T.LinearMipmapLinearFilter;texture.magFilter=T.LinearFilter;}
+ if(changed)texture.needsUpdate=true;
+}
+if(typeof module!=='undefined'&&module.exports)Object.assign(module.exports,{waterDetailSettings,tuneTextureSampling});
