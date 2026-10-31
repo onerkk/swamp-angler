@@ -247,15 +247,11 @@ function updChase(dt){ if(!chase) return; if(chase.delay>0){ chase.delay-=dt; if
 function endChase(){ chase=null; if(ev.id!=='shark') sfin.visible=false; }
 
 /* ---------- 拍照收集 ---------- */
-$('bCam').addEventListener('click',()=>{ if(window.__GHOST&&window.__GHOST.onPhoto&&window.__GHOST.onPhoto()) toast('……照片裡好像多了什麼','warn',2400); try{
-  W.render(); const src=W.renderer.domElement, cv=document.createElement('canvas'); cv.width=src.width; cv.height=src.height; const x=cv.getContext('2d'); x.drawImage(src,0,0);
-  const s=cv.width/400, lbl=ev.id?SCENES[ev.id]:(loc==='sea'?'外海':'濕地'); x.fillStyle='rgba(0,0,0,.45)'; x.fillRect(0,cv.height-44*s,cv.width,44*s);
-  x.fillStyle='#fff'; x.font=`800 ${15*s}px sans-serif`; x.fillText('濕地垂釣・'+lbl+'・'+new Date().toLocaleDateString('zh-TW'),14*s,cv.height-17*s);
-  const a=document.createElement('a'); a.download='濕地垂釣_美景_'+Date.now()+'.jpg'; a.href=cv.toDataURL('image/jpeg',.92); document.body.appendChild(a); a.click(); a.remove();
+function recordPhoto(scene){if(scene!=='sea'&&scene!=='lake')return;if(window.__GHOST&&window.__GHOST.onPhoto&&window.__GHOST.onPhoto())c.toast('……照片裡好像多了什麼','warn',2400);
   if(ev.id&&!ev.shot){ ev.shot=true; const sv=c.save; sv.scenes=sv.scenes||{}; const first=!sv.scenes[ev.id]; sv.scenes[ev.id]=(sv.scenes[ev.id]||0)+1; if(window.__STORY) window.__STORY.onScene(ev.id);
     const rw=first?1000:200; sv.coins+=rw; c.persist(); c.setCoins(); c.Snd.coin(); c.toast((first?'📸 新美景收錄：':'📸 美景照片：')+SCENES[ev.id]+'　🪙'+rw,'good',2400); }
-  else c.toast('照片已存到下載資料夾','good');
-}catch(e){ c.toast('這個瀏覽器不支援拍照存檔','bad'); } });
+
+}
 
 let marineWakeT=0;
 function update(dt,t){
@@ -269,5 +265,5 @@ function update(dt,t){
     const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);
     yacht.position.set(b.x,h0*.9-.05,b.z); yacht.rotation.set((hf-h0)/3*.7,G.head,(hs-h0)/1.5*-.5,'YXZ'); }
 }
-return {hullClear,hullOut,hullDims:()=>({HX,HZ0,HZ1}),setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
+return {recordPhoto,hullClear,hullOut,hullDims:()=>({HX,HZ0,HZ1}),setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
 }

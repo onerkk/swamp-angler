@@ -1085,11 +1085,13 @@ function onResize(){ W.resize(window.innerWidth,window.innerHeight); UW.resize(w
 window.addEventListener('resize',onResize); onResize();
 if(typeof save.hour==='number'&&isFinite(save.hour)) G.hour=save.hour;
 W.setTime(G.hour,true);
+const screenCapture=createScreenCapture({canvas:W.renderer.domElement,button:$('bCam'),report:(m,k)=>toast(m,k,2200),onCaptured:scene=>SEA.recordPhoto(scene),scene:()=>TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':END.on()?'ending':G.loc||'lake'});
 let last=performance.now();
 function frame(now){
   const frameSeconds=Math.max(0,(now-last)/1000),dt=Math.min(.05,frameSeconds);last=now;
   try{ window.__UWON=UW.active(); update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
-  gfxAuto.sample(frameSeconds,{ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':G.loc||'lake'});
+  screenCapture.afterFrame();
+  gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':G.loc||'lake'});
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

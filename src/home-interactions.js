@@ -1,0 +1,10 @@
+/* Visible geometry is the source of truth for tags, picking and action poses. */
+function homeObjectVisible(object,scene){let o=object;for(;o;o=o.parent){if(!o.visible)return false;if(o===scene)return true;}return !scene;}
+function homeVisibleBounds(T,roots,scene){const box=new T.Box3();for(const root of(Array.isArray(roots)?roots:[roots])){if(!root||!homeObjectVisible(root,scene))continue;root.updateWorldMatrix(true,true);root.traverse(o=>{if(!o.isMesh||!o.geometry||!homeObjectVisible(o,scene))return;const mats=Array.isArray(o.material)?o.material:[o.material];if(mats.every(m=>!m||m.visible===false))return;if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));});}return box;}
+function homeActionPose(T,root,kind,room,blocked=()=>false,scene){const bounds=homeVisibleBounds(T,root,scene);if(bounds.isEmpty())return null;const center=bounds.getCenter(new T.Vector3()),size=bounds.getSize(new T.Vector3()),seated=kind==='rock'||kind==='sofa',dir=new T.Vector3(-center.x,0,(room.zb+room.zf)/2-center.z);if(dir.lengthSq()<.001)dir.set(0,0,1);dir.normalize();
+ const look=center.clone();look.y=bounds.min.y+size.y*(kind==='chest'?.65:.55);
+ let position;
+ if(seated){position=center.clone();position.y=bounds.min.y+Math.min(.55,size.y*.34)+.62;look.copy(position).addScaledVector(dir,2);look.y=position.y+.05;}
+ else{const height=kind==='herb'?1.3:kind==='chest'?1.35:1.55;for(const angle of[0,.35,-.35,.7,-.7,1.2,-1.2,Math.PI]){const d=dir.clone().applyAxisAngle(new T.Vector3(0,1,0),angle),reach=Math.abs(d.x)*size.x/2+Math.abs(d.z)*size.z/2+.75,p=center.clone().addScaledVector(d,reach);p.y=height;if(Math.abs(p.x)>room.x-.4||p.z<room.zb+.4||p.z>room.zf-.4||blocked(p.x,p.z))continue;position=p;break;}}
+ if(!position)return null;return{pos:position.toArray(),look:look.toArray(),tag:new T.Vector3(center.x,kind==='light'?bounds.min.y-.15:Math.min(room.h-.16,bounds.max.y+.16),center.z),bounds};}
+if(typeof module!=='undefined'&&module.exports)module.exports={homeObjectVisible,homeVisibleBounds,homeActionPose};

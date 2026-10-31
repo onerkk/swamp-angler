@@ -213,6 +213,7 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #scene{position:fixed;left:12px;top:calc(var(--hudY,150px) + 8px);z-index:4;padding:5px 12px;border-radius:999px;background:linear-gradient(90deg,rgba(255,200,90,.82),rgba(255,140,170,.82));color:#2a1406;font-weight:900;font-size:13px;max-width:62vw;box-shadow:0 2px 10px rgba(0,0,0,.25);transition:padding .3s,font-size .3s;pointer-events:none}
 #scene small{display:block;font-size:10px;font-weight:700;opacity:.85}
 #scene.mini{padding:4px 9px;font-size:12px}#scene.mini small{display:none}
+#bCam{position:fixed;right:12px;top:calc(env(safe-area-inset-top,0px) + 158px);z-index:150;pointer-events:auto;opacity:1;min-width:44px;min-height:44px}#bCam:disabled{opacity:.5}
 #bCam.pulse{animation:camp .8s ease-in-out infinite alternate;box-shadow:0 0 0 2px #ffd56a,0 0 14px rgba(255,213,106,.8)}@keyframes camp{from{transform:scale(1)}to{transform:scale(1.12)}}
 #actSub.fade{animation:subfade 6s forwards}@keyframes subfade{0%,65%{opacity:1}100%{opacity:0}}
 @keyframes sceneIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
@@ -238,7 +239,7 @@ body.sheetOn #homeUI,body.sheetOn #homeView,body.sheetOn #fishCard{display:none!
 #homeView{position:fixed;left:12px;top:calc(64px + env(safe-area-inset-top,0px));z-index:21;display:flex;gap:8px}#homeView.hidden,#fishCard.hidden{display:none}
 #fishCard{position:fixed;left:16px;right:16px;bottom:calc(90px + env(safe-area-inset-bottom,0px));z-index:22;padding:14px 16px;border-radius:14px;background:rgba(14,22,26,.88);color:#fff;border:1px solid rgba(255,255,255,.12);box-shadow:0 6px 24px rgba(0,0,0,.4)}
 #fishCard b{font-size:19px;color:var(--rc,#e9c46a)}#fishCard small{opacity:.7;margin-left:6px}#fishCard .fg{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;margin-top:8px;font-size:14px}#fishCard .fg span{opacity:.6}
-body.athome #drops,body.athome #flare,body.athome #act,body.athome #fight,body.athome #top2,body.athome #hotChip,body.athome #combo,body.athome #castTag,body.athome #fxBar,body.athome #bCam,body.athome #bTour,body.athome #pop,body.athome #bGoal{display:none!important}
+body.athome #drops,body.athome #flare,body.athome #act,body.athome #fight,body.athome #top2,body.athome #hotChip,body.athome #combo,body.athome #castTag,body.athome #fxBar,body.athome #bTour,body.athome #pop,body.athome #bGoal{display:none!important}
 .btn.home{display:block;width:100%;margin-top:8px;padding:10px;font-size:15px;background:rgba(120,90,50,.55);border:1px solid rgba(255,220,160,.35)}.btn.home.dim{opacity:.45}.btn.home.hidden{display:none}
 #scare{position:fixed;inset:0;z-index:60;background:#000;display:none;align-items:center;justify-content:center;overflow:hidden;pointer-events:none}
 #scare.on{display:flex;animation:scareBg 1.4s steps(1) forwards}#scare img{width:160vw;max-width:none;animation:scareIn 1.4s cubic-bezier(.1,.9,.2,1) forwards;filter:contrast(1.25) brightness(.9)}
@@ -359,8 +360,8 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:lo
   <button class="chip sm" id="baitChip" aria-label="更換魚餌"><span id="baitI">🪱</span><span id="baitN">蚯蚓</span><small id="baitC">∞</small></button><button class="chip" id="depthChip" aria-label="調整釣棚">🎚️ <span id="depthTxt">中層</span></button>
   <button class="chip sm" id="bTour" aria-label="釣魚大賽">🏆</button>
   <button class="chip sm" id="bGoal" aria-label="目標與成就">🎯</button>
-  <button class="chip sm" id="bCam" aria-label="拍照">📷</button>
 </div>
+<button class="chip sm" id="bCam" aria-label="截圖目前畫面" title="截圖目前畫面" data-screenshot-ignore>📷</button>
 <div id="scare"><img src="ghost_face.jpg" alt=""></div>
 <div id="grillUI" class="hidden"><div class="gt" id="gTitle">烤魚</div>
 <div class="gb"><span>靠火這面</span><div class="bar"><i id="gA"></i><b></b></div></div>
@@ -436,3 +437,5 @@ window.addEventListener('unhandledrejection',e=>{ try{ const r=e.reason, m=(r&&(
 <script>
 function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classList.remove('hidden');}
 </script>
+
+<script defer src="vendor/html2canvas.min.js"></script>

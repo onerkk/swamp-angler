@@ -1,4 +1,4 @@
-/*APPV:20261031221055*/
+/*APPV:20261031221058*/
 /* Account assistance follows the authenticated Google identity, never a saved flag. */
 function createAccountAssist(){
   let enabled=false;
@@ -18,6 +18,34 @@ function createAccountAssist(){
 }
 if(typeof window!=='undefined') window.__ASSIST=createAccountAssist();
 if(typeof module!=='undefined'&&module.exports) module.exports={createAccountAssist};
+/* Visible geometry is the source of truth for tags, picking and action poses. */
+function homeObjectVisible(object,scene){let o=object;for(;o;o=o.parent){if(!o.visible)return false;if(o===scene)return true;}return !scene;}
+function homeVisibleBounds(T,roots,scene){const box=new T.Box3();for(const root of(Array.isArray(roots)?roots:[roots])){if(!root||!homeObjectVisible(root,scene))continue;root.updateWorldMatrix(true,true);root.traverse(o=>{if(!o.isMesh||!o.geometry||!homeObjectVisible(o,scene))return;const mats=Array.isArray(o.material)?o.material:[o.material];if(mats.every(m=>!m||m.visible===false))return;if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));});}return box;}
+function homeActionPose(T,root,kind,room,blocked=()=>false,scene){const bounds=homeVisibleBounds(T,root,scene);if(bounds.isEmpty())return null;const center=bounds.getCenter(new T.Vector3()),size=bounds.getSize(new T.Vector3()),seated=kind==='rock'||kind==='sofa',dir=new T.Vector3(-center.x,0,(room.zb+room.zf)/2-center.z);if(dir.lengthSq()<.001)dir.set(0,0,1);dir.normalize();
+ const look=center.clone();look.y=bounds.min.y+size.y*(kind==='chest'?.65:.55);
+ let position;
+ if(seated){position=center.clone();position.y=bounds.min.y+Math.min(.55,size.y*.34)+.62;look.copy(position).addScaledVector(dir,2);look.y=position.y+.05;}
+ else{const height=kind==='herb'?1.3:kind==='chest'?1.35:1.55;for(const angle of[0,.35,-.35,.7,-.7,1.2,-1.2,Math.PI]){const d=dir.clone().applyAxisAngle(new T.Vector3(0,1,0),angle),reach=Math.abs(d.x)*size.x/2+Math.abs(d.z)*size.z/2+.75,p=center.clone().addScaledVector(d,reach);p.y=height;if(Math.abs(p.x)>room.x-.4||p.z<room.zb+.4||p.z>room.zf-.4||blocked(p.x,p.z))continue;position=p;break;}}
+ if(!position)return null;return{pos:position.toArray(),look:look.toArray(),tag:new T.Vector3(center.x,kind==='light'?bounds.min.y-.15:Math.min(room.h-.16,bounds.max.y+.16),center.z),bounds};}
+if(typeof module!=='undefined'&&module.exports)module.exports={homeObjectVisible,homeVisibleBounds,homeActionPose};
+/* Capture the frame the active scene just rendered, then composite its current HTML UI. */
+function createScreenCapture({canvas,button,report=()=>{},onCaptured=()=>{},scene=()=>''}){
+ let pending=null,busy=false;
+ async function take(){if(busy)return;busy=true;button.disabled=true;try{
+   const frozen=await new Promise((resolve,reject)=>{pending={resolve,reject};});
+   if(typeof window.html2canvas!=='function')throw Error('截圖元件尚未載入，請稍後再試');
+   const image=await window.html2canvas(document.body,{width:innerWidth,height:innerHeight,windowWidth:innerWidth,windowHeight:innerHeight,scrollX:0,scrollY:0,x:0,y:0,scale:Math.min(window.devicePixelRatio||1,3),useCORS:true,allowTaint:false,logging:false,backgroundColor:null,ignoreElements:e=>e.hasAttribute('data-screenshot-ignore'),onclone:async doc=>{
+     const old=doc.getElementById(canvas.id);if(!old)return;const img=doc.createElement('img');img.id=old.id;img.className=old.className;img.style.cssText=old.style.cssText;img.src=frozen.url;old.replaceWith(img);if(img.decode)await img.decode();
+   }});
+   const blob=await new Promise((resolve,reject)=>image.toBlob(b=>b?resolve(b):reject(Error('截圖儲存失敗')),'image/jpeg',.95));
+   const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='濕地垂釣_截圖_'+Date.now()+'.jpg';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+   report('📷 截圖已儲存到下載資料夾','good');onCaptured(frozen.scene);
+ }catch(error){report(error.message||'截圖失敗，請重試','warn');}finally{busy=false;button.disabled=false;pending=null;}}
+ function afterFrame(){if(!pending)return;const job=pending;pending=null;try{const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;copy.getContext('2d').drawImage(canvas,0,0);job.resolve({url:copy.toDataURL('image/png'),scene:scene()});}catch(e){job.reject(e);}}
+ button.addEventListener('pointerdown',e=>e.stopPropagation());button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();take();});
+ return{take,afterFrame,isBusy:()=>busy};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={createScreenCapture};
 /* Raw RAF timing, independent of the simulation's capped timestep. */
 function graphicsProfiles(cap){
  const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','high'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
@@ -3799,15 +3827,11 @@ function updChase(dt){ if(!chase) return; if(chase.delay>0){ chase.delay-=dt; if
 function endChase(){ chase=null; if(ev.id!=='shark') sfin.visible=false; }
 
 /* ---------- 拍照收集 ---------- */
-$('bCam').addEventListener('click',()=>{ if(window.__GHOST&&window.__GHOST.onPhoto&&window.__GHOST.onPhoto()) toast('……照片裡好像多了什麼','warn',2400); try{
-  W.render(); const src=W.renderer.domElement, cv=document.createElement('canvas'); cv.width=src.width; cv.height=src.height; const x=cv.getContext('2d'); x.drawImage(src,0,0);
-  const s=cv.width/400, lbl=ev.id?SCENES[ev.id]:(loc==='sea'?'外海':'濕地'); x.fillStyle='rgba(0,0,0,.45)'; x.fillRect(0,cv.height-44*s,cv.width,44*s);
-  x.fillStyle='#fff'; x.font=`800 ${15*s}px sans-serif`; x.fillText('濕地垂釣・'+lbl+'・'+new Date().toLocaleDateString('zh-TW'),14*s,cv.height-17*s);
-  const a=document.createElement('a'); a.download='濕地垂釣_美景_'+Date.now()+'.jpg'; a.href=cv.toDataURL('image/jpeg',.92); document.body.appendChild(a); a.click(); a.remove();
+function recordPhoto(scene){if(scene!=='sea'&&scene!=='lake')return;if(window.__GHOST&&window.__GHOST.onPhoto&&window.__GHOST.onPhoto())c.toast('……照片裡好像多了什麼','warn',2400);
   if(ev.id&&!ev.shot){ ev.shot=true; const sv=c.save; sv.scenes=sv.scenes||{}; const first=!sv.scenes[ev.id]; sv.scenes[ev.id]=(sv.scenes[ev.id]||0)+1; if(window.__STORY) window.__STORY.onScene(ev.id);
     const rw=first?1000:200; sv.coins+=rw; c.persist(); c.setCoins(); c.Snd.coin(); c.toast((first?'📸 新美景收錄：':'📸 美景照片：')+SCENES[ev.id]+'　🪙'+rw,'good',2400); }
-  else c.toast('照片已存到下載資料夾','good');
-}catch(e){ c.toast('這個瀏覽器不支援拍照存檔','bad'); } });
+
+}
 
 let marineWakeT=0;
 function update(dt,t){
@@ -3821,7 +3845,7 @@ function update(dt,t){
     const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);
     yacht.position.set(b.x,h0*.9-.05,b.z); yacht.rotation.set((hf-h0)/3*.7,G.head,(hs-h0)/1.5*-.5,'YXZ'); }
 }
-return {hullClear,hullOut,hullDims:()=>({HX,HZ0,HZ1}),setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
+return {recordPhoto,hullClear,hullOut,hullDims:()=>({HX,HZ0,HZ1}),setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
 }
 /* ===== 雨打水面、大白鯊奪魚、閃避 ===== */
 const SH4={};
@@ -5409,6 +5433,7 @@ const stoneM=pbr('castle_brick_07',1.2,1.2);
 // 壁爐（右牆）：左右石柱＋上方石樑，中間是真的爐口，爐火會閃爍
 const FP={z:.5}, FX=ROOM.x-.28;
 const fpParts=[];
+const fireBox=(...args)=>{const m=box(...args);m.userData.homeAction='grill';fpParts.push(m);return m;};
 // 場景裡的指引標籤：輕輕上下浮動，告訴玩家哪裡可以點
 function drawTag(g,text,hot){ g.clearRect(0,0,512,128);
   g.fillStyle=hot?'rgba(120,70,10,.85)':'rgba(20,14,10,.72)'; g.beginPath(); g.roundRect?g.roundRect(8,14,496,100,50):g.rect(8,14,496,100); g.fill(); g.strokeStyle=hot?'rgba(255,214,110,.95)':'rgba(255,210,150,.6)'; g.lineWidth=hot?7:4; g.stroke();
@@ -5421,7 +5446,7 @@ const tags=[];
 // A shallow framed shop window, with real product photos and one legible entry action.
 const shopParts=[],sparkles=[];let shopBase=null;
 {
-  const cab=new T.Group();cab.position.set(0,1.64,ROOM.zf-.105);cab.rotation.y=Math.PI;scene.add(cab);
+  const cab=new T.Group();cab.userData.homeAction='shop';cab.position.set(0,1.64,ROOM.zf-.105);cab.rotation.y=Math.PI;scene.add(cab);
   const walnut=wood(.5,1.4,0,0x69452f),metal=new T.MeshStandardMaterial({color:0xa88b52,metalness:.65,roughness:.48});
   const backing=new T.Mesh(new T.BoxGeometry(2.94,2.22,.065),walnut);cab.add(backing);
   for(const [w,h,x,y] of [[2.96,.055,0,1.09],[2.96,.055,0,-1.09],[.055,2.16,-1.45,0],[.055,2.16,1.45,0]]){
@@ -5430,7 +5455,7 @@ const shopParts=[],sparkles=[];let shopBase=null;
   const artwork=new T.Mesh(new T.PlaneGeometry(2.8,2.08),new T.MeshStandardMaterial({map:createShopWallTexture(T),roughness:.88,emissive:0xffffff,emissiveMap:null,emissiveIntensity:.035}));
   artwork.position.z=.046;cab.add(artwork);shopParts.push(artwork,backing);
   // A grounded sideboard makes the wall read as a furnished nook, not a floating box.
-  shopBase=new T.Group();shopBase.position.set(0,0,ROOM.zf-.28);scene.add(shopBase);
+  shopBase=new T.Group();shopBase.userData.homeAction='shop';shopBase.position.set(0,0,ROOM.zf-.28);scene.add(shopBase);
   for(const [w,h,d,x,y,z] of [[2.48,.055,.52,0,.53,-.03],[2.4,.38,.045,0,.31,-.255],[.055,.48,.47,-1.19,.26,-.03],[.055,.48,.47,1.19,.26,-.03],[2.4,.045,.47,0,.075,-.03]]){
     const m=new T.Mesh(new T.BoxGeometry(w,h,d),walnut);m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;shopBase.add(m);shopParts.push(m);
   }
@@ -5439,11 +5464,11 @@ const shopParts=[],sparkles=[];let shopBase=null;
   const glow=new T.PointLight(0xffe6bd,.45,3.2,2);glow.position.set(0,2.6,ROOM.zf-.55);scene.add(glow);
   const tg=makeTag('靜月之光｜點我逛蝦皮');tg.scale.set(1.08,.19,1);tg.position.set(0,2.84,ROOM.zf-.25);scene.add(tg);tags.push({s:tg,y:2.84,k:'shop'});
 }
-box(.55,1.3,.32,stoneM,FX,.65,FP.z-.66); box(.55,1.3,.32,stoneM,FX,.65,FP.z+.66);
-box(.55,.5,1.0,stoneM,FX,1.05,FP.z); box(.45,1.6,1.0,stoneM,ROOM.x-.22,2.1,FP.z);
-box(.75,.08,1.9,new T.MeshStandardMaterial({color:0x5a4030,roughness:.8}),ROOM.x-.36,1.34,FP.z);
-box(.06,.8,1.0,new T.MeshBasicMaterial({color:0x0a0604}),ROOM.x-.04,.4,FP.z);   // 爐口後壁燻黑，不受光
-box(.9,.06,1.8,stoneM,ROOM.x-.45,.03,FP.z);
+fireBox(.55,1.3,.32,stoneM,FX,.65,FP.z-.66); fireBox(.55,1.3,.32,stoneM,FX,.65,FP.z+.66);
+fireBox(.55,.5,1.0,stoneM,FX,1.05,FP.z); fireBox(.45,1.6,1.0,stoneM,ROOM.x-.22,2.1,FP.z);
+fireBox(.75,.08,1.9,new T.MeshStandardMaterial({color:0x5a4030,roughness:.8}),ROOM.x-.36,1.34,FP.z);
+fireBox(.06,.8,1.0,new T.MeshBasicMaterial({color:0x0a0604}),ROOM.x-.04,.4,FP.z);   // 爐口後壁燻黑，不受光
+fireBox(.9,.06,1.8,stoneM,ROOM.x-.45,.03,FP.z);
 // 火焰貼圖：底部亮黃、往上變橘紅再透明，兩片交叉擺放
 const flameTex=(()=>{ const cv=document.createElement('canvas'); cv.width=128; cv.height=128; const g=cv.getContext('2d');
   for(let i=0;i<5;i++){ const x=20+i*22, gr=g.createRadialGradient(x,118,2,x,80,46); gr.addColorStop(0,'rgba(255,240,170,1)'); gr.addColorStop(.35,'rgba(255,150,40,.9)'); gr.addColorStop(.7,'rgba(200,50,10,.5)'); gr.addColorStop(1,'rgba(120,20,0,0)');
@@ -5517,7 +5542,7 @@ function settle(o,x,y,z,height){
 }
 put('coffee_table_round_01',LV.x+.5,0,LV.z,0,.85,o=>{
   const table=settle(o,LV.x+.5,0,LV.z,.46);
-  put('book_encyclopedia_set_01',0,0,0,.3,.8,k=>settle(k,LV.x+.72,table.max.y,LV.z+.12,.18));
+  put('book_encyclopedia_set_01',0,0,0,.3,.8,k=>{settle(k,LV.x+.72,table.max.y,LV.z+.12,.18);k.userData.furn='shelf';});
   put('vintage_oil_lamp',0,0,0,0,.8,k=>settle(k,LV.x+.2,table.max.y,LV.z-.2,.3));
 });
 // Permanent storage and everyday objects keep the room lived in at every upgrade tier.
@@ -5581,9 +5606,10 @@ function syncFurn(){ const H=c.home&&c.home(); if(!H) return;
       put(it.m,x,y,z,ry,sc,o=>{ it.loading=false; o.userData.furn=it.f; if(it.herbs) plantHerbs(o,it.herbs);
         // 新木色太亮的家具壓暗成老木屋的舊木色
         if(it.tint) o.traverse(m=>{ if(m.isMesh){ m.material=m.material.clone(); m.material.color.multiply(new T.Color(it.tint)); } });
-        if(!(H.furnLv(it.f)>=it.lv[0]&&H.furnLv(it.f)<=it.lv[1])){ scene.remove(o); dropObs(o); return; } it.obj=o; }); }
+        if(!(H.furnLv(it.f)>=it.lv[0]&&H.furnLv(it.f)<=it.lv[1])){ scene.remove(o); dropObs(o); return; } it.obj=o;updFurnTags(); }); }
     else if(!want&&it.obj){ scene.remove(it.obj); dropObs(it.obj); it.obj=null; } } }
-put('mantel_clock_01',ROOM.x-.36,1.38,FP.z+.45,-Math.PI/2,1,o=>{ o.userData.furn='clock'; });  // 壁爐架上：時鐘與木燈籠
+let clockObj=null;
+put('mantel_clock_01',ROOM.x-.36,1.38,FP.z+.45,-Math.PI/2,1,o=>{ o.userData.furn='clock';clockObj=o; });  // 壁爐架上：時鐘與木燈籠
 put('wooden_lantern_01',ROOM.x-.36,1.38,FP.z-.5,0,.8);
 // 美人魚的畫像：要真的釣到過美人魚，牆上才會掛出來
 const merArt=[], merSeen=()=>!!(c.save&&c.save.mer&&c.save.mer.n>0), merArtSync=()=>merArt.forEach(o=>{ o.visible=merSeen(); });
@@ -5824,14 +5850,27 @@ let mode='room', viewTank=null, vb=0, pan=0, panT=0, down=null, dYaw=0, dPitch=0
 const ui={view:document.getElementById('homeView'),card:document.getElementById('fishCard'),hint:document.querySelector('#homeUI .hh'),btns:document.querySelector('#homeUI .hb')};
 function hit(e){ const r=el.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(ndc,cam); }
 function furnOf(o){ while(o&&!(o.userData&&o.userData.furn)) o=o.parent; return o?o.userData.furn:null; }
-function tapRoom(){ const gl=Object.keys(tanks).filter(k=>k!=='_tier').map(k=>tanks[k].glass), h=ray.intersectObjects(gl,false)[0], hm=ray.intersectObjects(mountG.children,true)[0];
-  // 家具：取最靠近鏡頭、看得見的那個物體；它屬於某件家具才算點到
-  const near=ray.intersectObjects(scene.children,true).find(x=>!x.object.isSprite&&x.object.visible&&!(x.object.material&&x.object.material.visible===false)), fu=near&&furnOf(near.object);
-  if(fu&&(!h||near.distance<h.distance)&&(!hm||near.distance<hm.distance)){ ui.card.classList.add('hidden'); tapFurn(fu); return; }
-  if(hm&&(!h||hm.distance<h.distance)){ let o=hm.object; while(o&&!o.userData.rec) o=o.parent; if(o){ c.showFish(o.userData.rec,ui.card); return; } }
-  ui.card.classList.add('hidden'); if(h){ enterView(h.object.userData.tank); return; }
-  const hf=ray.intersectObjects(fpParts,true)[0]; if(hf){ pickFish(); return; }
-  const hs=ray.intersectObjects(shopParts,false)[0]; if(hs&&c.openShop) c.openShop(); }
+function furnRoot(object){while(object&&!(object.userData&&object.userData.furn))object=object.parent;return object;}
+let focusedFurn=null;
+function currentFurnRoot(id){
+ if(id==='light')return lampObj;if(id==='clock')return clockObj;if(id==='mount')return mountG;
+ const list=FITEMS.filter(it=>it.f===id&&it.obj&&homeObjectVisible(it.obj,scene));
+ const main=list.filter(it=>id==='sofa'?/^sofa_/.test(it.m):id==='rock'?it.m==='Rockingchair_01':id==='chest'?it.m==='treasure_chest':id==='shelf'?!/book_/.test(it.m):true);
+ if(id==='herb')main.sort((a,b)=>b.lv[0]-a.lv[0]);return(main[0]||list[0]||{}).obj||null;
+}
+function actionPose(id){const root=focusedFurn&&focusedFurn.userData.furn===id&&homeObjectVisible(focusedFurn,scene)?focusedFurn:currentFurnRoot(id);return homeActionPose(T,root,id,ROOM,blocked,scene);}
+function tapRoom(){
+ scene.updateMatrixWorld(true);
+ const hits=ray.intersectObjects(scene.children,true).filter(h=>homeObjectVisible(h.object,scene)&&!(h.object.material&&(Array.isArray(h.object.material)?h.object.material[h.face?h.face.materialIndex:0]:h.object.material)?.visible===false));
+ const meshHit=hits.find(h=>h.object.isMesh),tagHit=hits.find(h=>h.object.isSprite&&tags.some(t=>t.s===h.object));
+ if(tagHit&&(!meshHit||tagHit.distance<meshHit.distance+.5)){const tag=tags.find(t=>t.s===tagHit.object);if(tag.f){tapFurn(tag.f,currentFurnRoot(tag.f));return;}if(tag.k==='grill'){pickFish();return;}if(tag.k==='shop'&&c.openShop){c.openShop();return;}if(tag.k&&tag.k.startsWith('tank_')){enterView(tag.k.slice(5));return;}}
+ if(!meshHit)return;const object=meshHit.object,root=furnRoot(object);ui.card.classList.add('hidden');let action=object;while(action&&!action.userData.homeAction)action=action.parent;if(action){if(action.userData.homeAction==='grill')pickFish();else if(action.userData.homeAction==='shop'&&c.openShop)c.openShop();return;}
+ if(root){tapFurn(root.userData.furn,root);return;}
+ let ancestor=object;while(ancestor&&!ancestor.userData.rec)ancestor=ancestor.parent;if(ancestor){c.showFish(ancestor.userData.rec,ui.card);return;}
+ const tank=Object.keys(tanks).filter(k=>k!=='_tier').find(k=>tanks[k].glass===object);if(tank){enterView(tank);return;}
+ if(fpParts.some(p=>p===object||p.getObjectById(object.id))){pickFish();return;}
+ if(shopParts.includes(object)&&c.openShop)c.openShop();
+}
 function tapView(){ const tk=tanks[viewTank]; if(!tk) return; const h=ray.intersectObjects(tk.fish.map(f=>f.o),true)[0];
   if(!h){ ui.card.classList.add('hidden'); return; } let o=h.object; while(o&&!o.userData.rec) o=o.parent; if(o) c.showFish(o.userData.rec,ui.card); }
 function enterView(w){ mode='view'; document.body.classList.add('tankview'); viewTank=w; pan=panT=0; ui.view.classList.remove('hidden'); ui.btns.classList.add('hidden'); ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
@@ -5848,7 +5887,7 @@ el.addEventListener('pointermove',e=>{ if(!on||!drag||mode==='act') return; cons
   if(mode==='dive'){ dYawT=drag.dy-dx*.005; dPitchT=Math.max(-.8,Math.min(.8,drag.dp-dy*.004)); return; }   // 缸裡可以 360 度轉頭
   if(mode==='view'){ const w=tanks[viewTank]?tanks[viewTank].spec.w:1; panT=Math.max(-w*.35,Math.min(w*.35,drag.pan-dx*.003)); return; }
   yawT=drag.yaw-dx*.006; pitchT=Math.max(-.7,Math.min(.6,drag.pitch-dy*.005)); });
-window.addEventListener('pointerup',e=>{ if(on&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<10&&performance.now()-down.t<450){ hit(e); if(mode==='room') tapRoom(); else if(mode!=='act') tapView(); } drag=null; down=null; });   // 移動很少、時間很短才算點擊
+window.addEventListener('pointerup',e=>{ if(on&&down&&!(e.target&&e.target.closest&&e.target.closest('button,.sheet,#furnPick,#homeUI,#shopUI'))&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<10&&performance.now()-down.t<450){ hit(e); if(mode==='room') tapRoom(); else if(mode!=='act') tapView(); } drag=null; down=null; });   // 移動很少、時間很短才算點擊
 /* ===== 家具使用的動作演出：鏡頭走到家具前（坐下時視線變低），家具本身也會動，做完再回到原位 ===== */
 let ACT=null;
 const actFade=document.createElement('div'); actFade.style.cssText='position:fixed;inset:0;z-index:21;background:#000;opacity:0;pointer-events:none;display:flex;align-items:center;justify-content:center;color:#cfd8ff;font-size:28px;letter-spacing:.3em;transition:none';
@@ -5878,25 +5917,25 @@ function updAct(dt){ updPops(dt); if(!ACT) return; const A=ACT; A.t+=dt;
     if(A.t>=A.hold&&!A.wait){ A.ph='back'; A.t=0; A.p0=cam.position.clone(); A.q0=cam.quaternion.clone(); } return; }
   if(A.ph==='back'){ const k=ease(A.t/A.back); if(A.anim) A.anim(A.hold+A.t,dt,true); cam.position.lerpVectors(A.p0,pRoom,k); cam.quaternion.copy(A.q0).slerp(qRoom,k); if(A.t>=A.back) endAct(); } }
 // 每件家具的演出
-function actFor(id){ if(ACT) return; const H=c.home(), lv=H.furnLv(id), toastR=r=>{ if(r&&r.msg) c.toast&&c.toast(r.msg,r.kind||'good',r.kind?1800:3400); };
-  if(id==='sofa'){ playAct({pos:[LV.x-.78,1.0,LV.z+.05],look:[0,1.3,ROOM.zb+.4],hold:3.4,txt:'窩在沙發上，看魚游來游去……',mid:()=>toastR(H.furnUse('sofa')),
-    anim:(t)=>{ cam.position.y=1.0+Math.sin(t*1.6)*.006; }}); return; }
-  if(id==='rock'){ const ch=objOf('Rockingchair_01'), ry=ch?ch.rotation.y:0; if(ch) ch.rotation.order='YXZ';
-    let res=null; playAct({pos:[1.72,1.06,-.15],look:[ROOM.x-.3,.55,FP.z],hold:5.2,txt:'搖著搖著，眼皮越來越重……',midAt:2.4,mid:()=>{ res=H.furnUse('rock',ACT.opt); syncTime(); actFade.textContent='💤'; },opt:ACT_OPT,
-      anim:(t,dt,back)=>{ const a=back?.12*Math.max(0,1-(t-5.2)/.8):.12; const sw=Math.sin(t*2.1)*a; if(ch){ ch.rotation.x=sw; ch.rotation.y=ry; } if(!back){ cam.position.y=1.06+sw*.25; cam.rotateX(sw*.35); }
+function actFor(id){ if(ACT) return;const pose=actionPose(id);if(!pose){c.toast&&c.toast('家具尚未就緒，或前方沒有可站的位置','warn',1800);return;}const H=c.home(), lv=H.furnLv(id), toastR=r=>{ if(r&&r.msg) c.toast&&c.toast(r.msg,r.kind||'good',r.kind?1800:3400); };
+  if(id==='sofa'){ playAct({pos:pose.pos,look:pose.look,hold:3.4,txt:'窩在沙發上，看魚游來游去……',mid:()=>toastR(H.furnUse('sofa')),
+    anim:(t)=>{ cam.position.y=pose.pos[1]+Math.sin(t*1.6)*.006; }}); return; }
+  if(id==='rock'){ const ch=focusedFurn&&focusedFurn.userData.furn==='rock'?focusedFurn:currentFurnRoot('rock'), ry=ch?ch.rotation.y:0; if(ch) ch.rotation.order='YXZ';
+    let res=null; playAct({pos:pose.pos,look:pose.look,hold:5.2,txt:'搖著搖著，眼皮越來越重……',midAt:2.4,mid:()=>{ res=H.furnUse('rock',ACT.opt); syncTime(); actFade.textContent='💤'; },opt:ACT_OPT,
+      anim:(t,dt,back)=>{ const a=back?.12*Math.max(0,1-(t-5.2)/.8):.12; const sw=Math.sin(t*2.1)*a; if(ch){ ch.rotation.x=sw; ch.rotation.y=ry; } if(!back){ cam.position.y=pose.pos[1]+sw*.25; cam.rotateX(sw*.35); }
         const f=t<1?0:t<2.3?(t-1)/1.3:t<3.6?1:t<4.8?1-(t-3.6)/1.2:0; actFade.style.opacity=back?0:f; if(t>=3.6&&actFade.textContent) actFade.textContent=''; },
       end:()=>{ if(ch) ch.rotation.x=0; toastR(res); }}); return; }
-  if(id==='shelf'){ playAct({pos:[-1.72,1.56,-2.2],look:[-ROOM.x+.3,1.3,-2.2],hold:.6,txt:'從書架抽出一本手記……',wait:true,mid:()=>{ const r=H.furnUse('shelf'); const m=(r.msg||'').replace(/^📚 /,'').split('　');
+  if(id==='shelf'){ playAct({pos:pose.pos,look:pose.look,hold:.6,txt:'從書架抽出一本手記……',wait:true,mid:()=>{ const r=H.furnUse('shelf'); const m=(r.msg||'').replace(/^📚 /,'').split('　');
       notePg.innerHTML=`<div style="font-size:13px;letter-spacing:.2em;opacity:.7;margin-bottom:8px">— 老漁人的手記 —</div><div>${m[0]||''}</div><div style="margin-top:14px;font-size:14px;color:#7a4a10;font-family:sans-serif">✨ ${m[1]||''}</div><div style="margin-top:12px;font-size:12px;opacity:.6;font-family:sans-serif;text-align:right">點一下闔上手記</div>`;
       notePg.classList.remove('hidden'); }}); return; }
   if(id==='chest'){ const ch=objOf('treasure_chest'), lid=ch&&ch.getObjectByName('treasure_chest_lid'), cur=H.furnInfo('chest').cur, IC={shrimp:'🦐',live:'🐟',moon:'🌙'};
-    playAct({pos:[ROOM.x-1.75,1.38,-2.35],look:[ROOM.x-.5,.42,-2.55],hold:2.8,txt:'打開老漁人的漁具箱……',midAt:.7,mid:()=>{ toastR(H.furnUse('chest')); popIcons(Object.keys(cur.g).map(k=>IC[k]||'🎣'),ROOM.x-.5,.85,-2.55); },
+    playAct({pos:pose.pos,look:pose.look,hold:2.8,txt:'打開老漁人的漁具箱……',midAt:.7,mid:()=>{ toastR(H.furnUse('chest')); popIcons(Object.keys(cur.g).map(k=>IC[k]||'🎣'),pose.look[0],pose.look[1]+.35,pose.look[2]); },
       anim:(t,dt,back)=>{ if(lid) lid.rotation.x=back?-1.15*(1-ease((t-2.8)/.6)):-1.15*ease(t/.6); }, end:()=>{ if(lid) lid.rotation.x=0; }}); return; }
   if(id==='herb'){ const sp=lv>0, pl=FITEMS.filter(it=>it.f==='herb'&&it.obj).map(it=>it.obj), F=H.furnInfo('herb').st;
-    const pos=sp?[-1.85,1.32,.4]:[-1.7,1.35,-2.75], look=sp?[-ROOM.x+.25,.38,.4]:[-2.5,.7,ROOM.zb+.5];
+    const pos=pose.pos,look=pose.look;
     playAct({pos,look,hold:2.4,txt:'彎下腰採收……',midAt:.6,mid:()=>{ toastR(H.furnUse('herb')); popIcons([...Array(Math.min(3,F.h||0)).fill('🌿'),...Array(Math.min(2,F.l||0)).fill('🍋')],look[0]+.15,look[1]+.45,look[2]); },
       anim:(t)=>{ pl.forEach((o,i)=>o.children.forEach((k,j)=>{ if(k.isGroup&&k.children.length===1) k.rotation.z=Math.sin(t*9+j+i)*.12*Math.max(0,1-t/2); })); }}); return; }
-  if(id==='clock'){ playAct({pos:[ROOM.x-1.45,1.55,FP.z+.45],look:[ROOM.x-.36,1.46,FP.z+.45],hold:2.6,txt:'',midAt:.2,mid:()=>clockToast()}); return; } }
+  if(id==='clock'){ playAct({pos:pose.pos,look:pose.look,hold:2.6,txt:'',midAt:.2,mid:()=>clockToast()}); return; } }
 let ACT_OPT=null;
 function clockToast(){ const h=((c.hour()%24)+24)%24, hh=Math.floor(h), mm=Math.floor((h-hh)*60), per=h>=4.8&&h<8.5?'清晨':h>=8.5&&h<16.5?'白天':h>=16.5&&h<19.8?'黃昏':'夜晚';
   const mi=window.__MOONPH&&window.__MOONPH.illum?Math.round(window.__MOONPH.illum()*100):null;
@@ -5908,10 +5947,10 @@ let lampObj=null;
 const furnUI=document.createElement('div'); furnUI.id='furnPick'; furnUI.className='hidden'; document.body.appendChild(furnUI);
 let furnId=null;
 function closeFurn(){ furnUI.classList.add('hidden'); document.body.classList.remove('furnOn'); furnId=null; }
-function tapFurn(id){ const H=c.home&&c.home(); if(!H||ACT) return;
+function tapFurn(id,source){focusedFurn=['sofa','rock','chest'].includes(id)?currentFurnRoot(id):source||currentFurnRoot(id); const H=c.home&&c.home(); if(!H||ACT) return;
   if(id==='light'){ const d=H.data(); d.lightOff=!d.lightOff; c.persist&&c.persist(); syncTime(); swingT=2.5; c.click&&c.click(); updFurnTags(); c.toast&&c.toast(d.lightOff?'💡 關燈了，只剩爐火和窗外的光':'💡 開燈','',1400); return; }
   if(id==='clock'){ actFor('clock'); return; }
-  if(id==='mount') return;
+  if(id==='mount'){const m=mountG.children.find(o=>o.userData.rec&&homeObjectVisible(o,scene));if(m)c.showFish(m.userData.rec,ui.card);return;}
   furnId=id; renderFurn(); furnUI.classList.remove('hidden'); document.body.classList.add('furnOn'); }
 function renderFurn(){ const H=c.home(), F=H.furnInfo(furnId), d=F.def, nx=F.next, lvS=c.save.lv||1, coins=c.save.coins||0;
   const stars='★'.repeat(F.lv+1)+'☆'.repeat(d.lv.length-1-F.lv);
@@ -5948,7 +5987,9 @@ function tagTxt(f,H){ if(f==='light') return [lightsOff()?'💡 點吊燈開燈'
   return ['',false]; }
 function updFurnTags(){ const H=c.home&&c.home(); if(!H) return; const mounts=(c.data().mounts||[]).length;
   furnTags.forEach(t=>{ const [txt,hot]=tagTxt(t.f,H); setTag(t.s,txt,hot); t.ready=t.f==='mount'?mounts>0:true;
-    if(t.f==='herb'){ if(H.furnLv('herb')===0){ t.s.position.set(-(ROOM.x-.7),1.6,ROOM.zb+.5); t.y=1.6; } else { t.s.position.set(-(ROOM.x-.45),1.05,.35); t.y=1.05; } } }); }
+    const root=currentFurnRoot(t.f),box=homeVisibleBounds(T,root,scene);if(box.isEmpty()){t.ready=false;return;}const center=box.getCenter(new T.Vector3());t.y=t.f==='light'?box.min.y-.15:Math.min(ROOM.h-.16,box.max.y+.16);t.s.position.set(center.x,t.y,center.z); });
+  for(const tag of tags.filter(t=>t.k==='shop'||t.k==='grill')){const b=homeVisibleBounds(T,tag.k==='grill'?fpParts:shopParts,scene);if(b.isEmpty())continue;const p=b.getCenter(new T.Vector3()),dir=new T.Vector3(-p.x,0,(ROOM.zb+ROOM.zf)/2-p.z).normalize();tag.y=tag.k==='grill'?Math.min(ROOM.h-.16,p.y+.2):Math.min(ROOM.h-.16,b.max.y+.16);tag.s.position.set(p.x+dir.x*.18,tag.y,p.z+dir.z*.18);}
+}
 let furnTick=0;
 // 開遊戲時就把目前等級的家具載好；其他等級的模型等一下在背景預先載入，升級時立刻換好，不用等
 setTimeout(()=>{ try{ syncFurn(); }catch(e){ console.warn('furn init',e); } },1500);
@@ -6072,7 +6113,7 @@ function render(dt){ t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pit
     pView.set(tk.x+pan,tk.y+s.h/2,tk.z+dist);
     // 觀賞模式：把鏡頭和魚缸之間的家具（茶几等）裁掉，畫面只留魚缸
     { const nr=mode==='view'?Math.max(.05,(dist-s.d/2-.35)*vb):.05; if(Math.abs(cam.near-nr)>.01){ cam.near=nr; cam.updateProjectionMatrix(); } } lookM.lookAt(pView,tv.set(tk.x+pan,tk.y+s.h/2,tk.z),cam.up); qView.setFromRotationMatrix(lookM); }
-  if(mode==='grill'){ pDive.set(ROOM.x-1.45,1.0,FP.z-.15); lookM.lookAt(pDive,tv.set(GP.x,GP.y-.05,GP.z),cam.up); qDive.setFromRotationMatrix(lookM); cam.position.lerp(pDive,Math.min(1,dt*3)); cam.quaternion.slerp(qDive,Math.min(1,dt*4)); }
+  if(mode==='grill'){const pose=homeActionPose(T,fpParts,'grill',ROOM,blocked,scene);if(pose)pDive.set(pose.pos[0],1.0,pose.pos[2]);else pDive.copy(pRoom); lookM.lookAt(pDive,tv.set(GP.x,GP.y-.05,GP.z),cam.up); qDive.setFromRotationMatrix(lookM); cam.position.lerp(pDive,Math.min(1,dt*3)); cam.quaternion.slerp(qDive,Math.min(1,dt*4)); }
   else if(mode==='dive'&&tk){ const s2=tk.spec; if(!DV.on){ DV.on=true; DV.p.set(tk.x,tk.y+s2.h*.5,tk.z+s2.d*.3); }
     // 缸內游動：搖桿前後游、左右轉向，拖曳畫面轉頭；碰到玻璃就停住
     if(c.joy){ const j=c.joy(); dYawT-=j.turn*dt*1.4; const sp=.35*j.thr*dt, cp=Math.cos(dPitch); DV.p.x+=-Math.sin(dYaw)*cp*sp; DV.p.z+=-Math.cos(dYaw)*cp*sp; DV.p.y+=Math.sin(dPitch)*sp; }
@@ -6418,7 +6459,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261031221055'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261031221058'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8995,11 +9036,13 @@ function onResize(){ W.resize(window.innerWidth,window.innerHeight); UW.resize(w
 window.addEventListener('resize',onResize); onResize();
 if(typeof save.hour==='number'&&isFinite(save.hour)) G.hour=save.hour;
 W.setTime(G.hour,true);
+const screenCapture=createScreenCapture({canvas:W.renderer.domElement,button:$('bCam'),report:(m,k)=>toast(m,k,2200),onCaptured:scene=>SEA.recordPhoto(scene),scene:()=>TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':END.on()?'ending':G.loc||'lake'});
 let last=performance.now();
 function frame(now){
   const frameSeconds=Math.max(0,(now-last)/1000),dt=Math.min(.05,frameSeconds);last=now;
   try{ window.__UWON=UW.active(); update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
-  gfxAuto.sample(frameSeconds,{ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':G.loc||'lake'});
+  screenCapture.afterFrame();
+  gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':G.loc||'lake'});
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
