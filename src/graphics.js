@@ -3,16 +3,16 @@ function graphicsProfiles(cap){
  const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
  return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
 }
-function createAdaptiveGraphics({cap,apply,onSample=()=>{}}){
+function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null}){
  let mode='auto',level=4,scope='',elapsed=0,frames=0,slow=0,warm=3,cool=0,fast=0,bad=0,clock=0,blocked=-1,blockedUntil=0,probe=null,fps=0,reason='初始化';
  const reset=()=>{elapsed=0;frames=0;slow=0;fast=0;bad=0;};
- function status(){return{mode,level,maxLevel:7,fps,reason,...graphicsProfiles(cap())[level]};}
+ function status(){const s={mode,level,maxLevel:7,fps,reason,...graphicsProfiles(cap())[level]};return profile?profile(s,scope,cap()):s;}
  function commit(next,why){level=Math.max(0,Math.min(7,next));reason=why;apply(status());reset();cool=4;}
  function configure(next){mode=['auto','high','mid','low'].includes(next)?next:'auto';probe=null;blocked=-1;warm=3;reset();level=mode==='auto'?4:mode==='high'?7:mode==='mid'?3:0;commit(level,mode==='auto'?'開始自動調整':'固定畫質');}
  function pause(){reset();warm=3;probe=null;}
  function sample(seconds,{ready=true,scene='',enabled=true}={}){
   if(!ready||!enabled||!Number.isFinite(seconds)||seconds<=0){pause();return;}
-  if(scene!==scope){scope=scene;pause();blocked=-1;}
+  if(scene!==scope){scope=scene;pause();blocked=-1;if(profile){if(mode==='auto')level=scope==='home-aquarium'?6:4;apply(status());}}
   clock+=seconds;cool=Math.max(0,cool-seconds);
   if(warm>0){warm-=seconds;return;}
   elapsed+=seconds;frames++;if(seconds>1/45)slow++;

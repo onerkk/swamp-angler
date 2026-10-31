@@ -1,0 +1,79 @@
+{
+  "license": "CC0-1.0",
+  "license_url": "https://polyhaven.com/license",
+  "note": "Original 2K source files, downloaded without resizing or sharpening.",
+  "assets": [
+    {
+      "file": "clean_pebbles_Diffuse_2k.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/clean_pebbles/clean_pebbles_diff_2k.jpg",
+      "asset_page": "https://polyhaven.com/a/clean_pebbles",
+      "width": 2048,
+      "height": 2048,
+      "sha256": "c895ca99e4dceb9d307acd0a9b502b06936f37382e032a0681c8bf14ff405904"
+    },
+    {
+      "file": "clean_pebbles_nor_gl_2k.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/clean_pebbles/clean_pebbles_nor_gl_2k.jpg",
+      "asset_page": "https://polyhaven.com/a/clean_pebbles",
+      "width": 2048,
+      "height": 2048,
+      "sha256": "118dbd1ce5875cd0a681a5120b63b4aba8468ad06c62b90107ae23a9654f295e"
+    },
+    {
+      "file": "clean_pebbles_Rough_2k.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/clean_pebbles/clean_pebbles_rough_2k.jpg",
+      "asset_page": "https://polyhaven.com/a/clean_pebbles",
+      "width": 2048,
+      "height": 2048,
+      "sha256": "c1b5f444f1f7c7d833be4394c261449c34d4a95394fa34f522662550cce7a35f"
+    },
+    {
+      "file": "coral_gravel_Diffuse_2k.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coral_gravel/coral_gravel_diff_2k.jpg",
+      "asset_page": "https://polyhaven.com/a/coral_gravel",
+      "width": 2048,
+      "height": 2048,
+      "sha256": "f1cef85165af97b22fe9d992bdcda08f0c24889d41aa54b918a7cb88b1bc4cf2"
+    },
+    {
+      "file": "coral_gravel_nor_gl_2k.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coral_gravel/coral_gravel_nor_gl_2k.jpg",
+      "asset_page": "https://polyhaven.com/a/coral_gravel",
+      "width": 2048,
+      "height": 2048,
+      "sha256": "7e1100f5dade34c07001ba82a28f13f3bbd1411d0fe1c7210a60c64900cd20d9"
+    },
+    {
+      "file": "coral_gravel_Rough_2k.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coral_gravel/coral_gravel_rough_2k.jpg",
+      "asset_page": "https://polyhaven.com/a/coral_gravel",
+      "width": 2048,
+      "height": 2048,
+      "sha256": "257ed8646a51f7b0ebd57f96bff23fab420e4992da075ccf4403082ff9a2f4f5"
+    },
+    {
+      "file": "rock_moss_set_01_Diffuse_2k.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rock_moss_set_01/rock_moss_set_01_diff_2k.jpg",
+      "asset_page": "https://polyhaven.com/a/rock_moss_set_01",
+      "width": 2048,
+      "height": 2048,
+      "sha256": "bdee6da8baba67bd7e85e414e669cd46aab9afaf755114fb5163f0e68775c3d6"
+    },
+    {
+      "file": "rock_moss_set_01_nor_gl_2k.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rock_moss_set_01/rock_moss_set_01_nor_gl_2k.jpg",
+      "asset_page": "https://polyhaven.com/a/rock_moss_set_01",
+      "width": 2048,
+      "height": 2048,
+      "sha256": "f11c238a203eebd5e82da3a50468040a78d25fd2e46783c4ad79b1022b144c0d"
+    },
+    {
+      "file": "rock_moss_set_01_Rough_2k.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rock_moss_set_01/rock_moss_set_01_rough_2k.jpg",
+      "asset_page": "https://polyhaven.com/a/rock_moss_set_01",
+      "width": 2048,
+      "height": 2048,
+      "sha256": "a05a8bd9f2563cf55b738484b894671df7b2391aa02d66451366c5ad38077cd2"
+    }
+  ]
+}
