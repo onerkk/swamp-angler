@@ -262,6 +262,7 @@ varying float vH;
 #endif
 uniform vec4 uRip[12];
 uniform vec3 uDeep;
+uniform sampler2D uLakeBed;
 uniform vec3 uScatter;
 uniform float uWave;
 uniform float uSunVis;
@@ -309,7 +310,7 @@ void main(){
   float aa=max(.012,length(fwidth(leafP))*.65);
   float leafShape=1.0-smoothstep(leafRadius-aa,leafRadius+aa,length((leafUV-leafOffset)*vec2(1.0,1.35)));
   float leafPatch=smoothstep(.58,.79,dens);
-  float chosen=step(1.0-leafPatch*.65,hash21(cell+41.2));
+  float chosen=step(1.0-leafPatch*.88,hash21(cell+41.2));
   float dw=leafShape*chosen*fadeD*(1.0-uSea);
   dw+=leafPatch*.018*(1.0-fadeD)*(1.0-uSea);
   vec2 wd = normalize(uWind.xy + vec2(1e-4));
@@ -386,6 +387,24 @@ void main(){
   body += uScatter*(amb*0.5 + uLightCol*0.3*uSunVis)*smoothstep(-0.2, 0.8, vH)*0.9;
   #endif
   vec3 bodyD = TM(body);
+  if(uSea < .5){
+    vec3 underRay=refract(-V,N,.75);
+    float bankDepth=mix(1.15,3.8,smoothstep(2.0,22.0,Rs-rp));
+    bankDepth=min(bankDepth,1.25+smoothstep(2.0,32.0,-p.y)*2.6);
+    float waterDepth=bankDepth+.22*noise2(p*.23);
+    float travel=waterDepth/max(.22,-underRay.y);
+    vec2 bedPoint=p+underRay.xz*travel;
+    vec3 gravel=texture2D(uLakeBed,bedPoint*.68).rgb;
+    gravel=pow(max(gravel,vec3(.001)),vec3(2.2));
+    float silt=noise2(bedPoint*.37)*.62+noise2(bedPoint*1.9)*.38;
+    gravel=mix(gravel,vec3(.085,.105,.046),smoothstep(.46,.7,silt)*.55);
+    float caustic=causF(bedPoint,uTime)*.28+causF(bedPoint*1.73+4.1,uTime*.79)*.12;
+    vec3 transmittance=exp(-vec3(.58,.27,.38)*travel);
+    vec3 bedLight=gravel*(.38+uLightK*.65+caustic*uSunVis*csh)*(1.0-.65*uRain);
+    vec3 transmitted=TM(bedLight*transmittance+body*(1.0-transmittance));
+    float clearWater=(1.0-smoothstep(6.0,30.0,dist))*(1.0-.55*uRain)*(1.0-dw);
+    bodyD=mix(bodyD,transmitted,clearWater*.92);
+  }
   if(uSea > 0.5){
     float lk = 0.22 + 0.78*uLightK;
     vec3 deepC = uSeaCol*lk*(0.72 + 0.56*clamp(dot(N, normalize(vec3(uSunDir.x, 0.6, uSunDir.z))), 0.0, 1.0));
@@ -498,7 +517,9 @@ sky.renderOrder = -10; sky.frustumCulled = false; sky.position.set(0, EYE_Y, 0);
 
 // 水面：形狀貼合岸線的圓盤
 const rip = []; for(let i=0;i<12;i++) rip.push(new T.Vector4(0,0,0,0));
-const WU = Object.assign({}, U, { uRip:{value:rip}, uDeep:{value:new T.Vector3(0.010,0.019,0.011)}, uScatter:{value:new T.Vector3(0.018,0.045,0.026)}, uWave:{value:1.0} });
+const bedTex=new T.TextureLoader().load('models/home/clean_pebbles_Diffuse.jpg');
+bedTex.wrapS=bedTex.wrapT=T.RepeatWrapping; bedTex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+const WU = Object.assign({}, U, {uLakeBed:{value:bedTex}, uRip:{value:rip}, uDeep:{value:new T.Vector3(0.010,0.019,0.011)}, uScatter:{value:new T.Vector3(0.018,0.045,0.026)}, uWave:{value:1.0} });
 const waterMat = new T.ShaderMaterial({uniforms:WU, vertexShader:SH.waterVS, fragmentShader:SH.common+SH.waterFS, extensions:{derivatives:true}, depthWrite:false});
 const SEG = 256, wpos = [0,0,0], widx = [];
 for(let i=0;i<=SEG;i++){ const az=-Math.PI+2*Math.PI*i/SEG, R=1500; wpos.push(Math.sin(az)*R, 0, -Math.cos(az)*R); }
@@ -606,7 +627,7 @@ function update(dt, t){
 }
 
 let pr = Math.min(window.devicePixelRatio || 1, 2), lw = 1, lh = 1;
-function resize(w, h){ lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ? 70 : 52; camera.updateProjectionMatrix(); renderer.setPixelRatio(pr); renderer.setSize(w, h); }
+function resize(w, h){ lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ? FISHING_VIEW.fovPortrait : FISHING_VIEW.fovLandscape; camera.updateProjectionMatrix(); renderer.setPixelRatio(pr); renderer.setSize(w, h); }
 function setPR(v){ pr = v; renderer.setPixelRatio(pr); renderer.setSize(lw, lh); }
 /* 水面倒影：鏡像相機只拍物體（不含天空、水面），水面依波紋扭曲取樣 */
 const reflRT=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true});

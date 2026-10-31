@@ -306,6 +306,18 @@ body.fighting #top,body.fighting #top2,body.fighting #magWin,body.fighting .hotC
   .chip{padding:5px 10px}
   #magWin{top:calc(env(safe-area-inset-top,0px) + 54px)!important}
 }
+/* Let the fishing scene carry the view; controls retain their original touch targets. */
+body.underwater #top2,body.underwater #joy,body.underwater #magWin,body.underwater #hotChip,body.underwater #castTag{opacity:0;pointer-events:none}
+body.underwater #top{opacity:.28}
+body.underwater #c{animation:waterLensIn .55s ease-out}
+@keyframes waterLensIn{from{filter:blur(3px) brightness(.72)}to{filter:none}}
+body.underwater #uwTag{left:18px;top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 190px);transform:none;max-width:calc(100vw - 36px);filter:drop-shadow(0 3px 8px #0008);border-left:3px solid var(--rc,#adc99c)}
+body.underwater #uwTag .lv{background:rgba(15,31,28,.82);color:#eceddf;padding:10px 12px;border-radius:0}
+body.underwater #uwTag .nm{background:rgba(15,31,28,.82);padding:10px 14px;border-radius:0 8px 8px 0;min-width:0}
+body.underwater #uwTag .nm b{color:#f4f3e8;font-size:19px}
+body.underwater #uwTag .nm span{font-size:10px;letter-spacing:.03em;color:#c3cfc0;max-width:62vw;white-space:normal}
+body[data-fishing-state="wait"] #top2,body[data-fishing-state="lure"] #top2{opacity:.7}
+@media (orientation:landscape){body.underwater #uwTag{bottom:26px;left:24px;max-width:46vw}}
 </style>
 <!-- 3D 引擎放在自己的網站上（不靠外部 CDN：手機網路連不到 CDN 時整個頁面會卡在載入畫面） -->
 <script>

@@ -97,7 +97,7 @@ reeds.userData.lake=true; scene.add(reeds);
 
 /* ---------- 釣竿（藍色碳纖竿、導環、紡車捲線器） ---------- */
 const rod={pitch:0, pitchT:0, side:0, bend:0, bendT:0, spin:0, end:null, tipW:new T.Vector3(), spoolW:new T.Vector3(), guidesW:[]};
-const R_BASE=new T.Vector3(0.21,-0.80,-0.78), R_DIR=new T.Vector3(-0.07,0.42,-0.9).normalize(), R_LEN=2.65, NS=20;
+const R_BASE=new T.Vector3(...FISHING_VIEW.rodBase), R_DIR=new T.Vector3(...FISHING_VIEW.rodDirection).normalize(), R_LEN=2.65, NS=20;
 // 真實釣竿材質：碳纖編織紋竿身＋透明亮光漆、EVA 發泡握把（細小氣孔）、捲線器線杯纏著一圈圈釣線
 const texC=(w,h,draw,rx,ry)=>{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; draw(cv.getContext('2d'),w,h); const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx||1,ry||1); return t; };
 const carbonTex=texC(64,64,(g,w,h)=>{ g.fillStyle='#16181c'; g.fillRect(0,0,w,h); for(let y=0;y<h;y+=8) for(let x=0;x<w;x+=8){ const on=((x+y)/8)%2===0, gr=g.createLinearGradient(x,y,on?x+8:x,on?y:y+8); gr.addColorStop(0,'#1c1f24'); gr.addColorStop(.5,on?'#3a414b':'#2c323a'); gr.addColorStop(1,'#1c1f24'); g.fillStyle=gr; g.fillRect(x+.5,y+.5,7,7); } },3,4);
@@ -110,7 +110,7 @@ const goldMat=new T.MeshStandardMaterial({color:0xd9b25a, metalness:1, roughness
 const spoolTex=texC(16,128,(g,w,h)=>{ for(let y=0;y<h;y++){ const v=170+Math.round(60*Math.abs(Math.sin(y*1.7))); g.fillStyle=`rgb(${v-30},${v},${v+10})`; g.fillRect(0,y,w,1); } },6,1);
 const blueAno=new T.MeshPhysicalMaterial({color:0xffffff,map:spoolTex,metalness:.2,roughness:.35,clearcoat:.6});   // 線杯上纏滿的透明尼龍線
 const rRad=s=>s<.1?.0155:s<.155?.0105:s<.21?.0128:lerp(.0082,.0021,(s-.21)/.79);
-const rodGroup=new T.Group(); player.add(rodGroup);
+const rodGroup=new T.Group(); W.head.add(rodGroup);
 const segs=[];
 for(let i=0;i<NS;i++){ const s0=i/NS, s1=(i+1)/NS, sm=(s0+s1)/2;
   const mat=sm<.1?gripMat:sm<.155?chromeMat:sm<.21?gripMat:blankMat;

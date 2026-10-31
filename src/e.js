@@ -73,7 +73,7 @@ const surf=new T.Mesh(new T.PlaneGeometry(120,120),new T.ShaderMaterial({uniform
 surf.rotation.x=Math.PI/2; scene.add(surf);
 
 // 湖底（泥沙、焦散光紋）
-const bottomY=(x,z)=>{ const r=Math.hypot(x,z); return -3.6+.35*Math.sin(x*.4)*Math.cos(z*.33)+.2*Math.sin(x*1.3+z*.7)+(r>10?(r-10)*.09:0); };
+const bottomY=(x,z)=>{ const r=Math.hypot(x,z); return -2.65+.28*Math.sin(x*.4)*Math.cos(z*.33)+.2*Math.sin(x*1.3+z*.7)+(r>10?(r-10)*.09:0); };
 const mud=dataTex(256,256,(u,v,o)=>{ const n=fbm(u*8,v*8,4), peb=sstep(.68,.74,fbm(u*40,v*40,2)), k=.6+.6*n;
   o[0]=(70+40*peb)*k; o[1]=(64+34*peb)*k; o[2]=(40+30*peb)*k; });
 mud.repeat.set(10,10);
@@ -82,14 +82,22 @@ const bgeo=new T.PlaneGeometry(70,70,80,80); bgeo.rotateX(-Math.PI/2);
 const cau={value:new T.Color(0,0,0)};
 const TLu=new T.TextureLoader(), pbrT=(n,rep)=>{ const f=k=>{ const t=TLu.load('models/home/'+n+'_'+k+'.jpg'); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rep,rep); if(k==='Diffuse') t.encoding=T.sRGBEncoding; return t; }; return {map:f('Diffuse'),normalMap:f('nor_gl'),roughnessMap:f('Rough')}; };
 const BED={lake:pbrT('clean_pebbles',18),sea:pbrT('coral_gravel',14)};   // 湖底與海底改用實拍的卵石、珊瑚砂貼圖
-const botMat=new T.MeshStandardMaterial(Object.assign({roughness:1,color:0x9a9488},BED.lake));
-// 真實水草：湖底散佈實際掃描的植物模型（蕁麻草叢、蕨類），隨水流輕輕搖
+const botMat=new T.MeshStandardMaterial(Object.assign({roughness:1,color:new T.Color(0xb0aa97).convertSRGBToLinear()},BED.lake));
+// Local habitat uses wet scanned wood and stone. Aquatic ribbon leaves are built below.
 const plants=new T.Group(); scene.add(plants); const plantList=[];
-if(T.GLTFLoader){ const L=new T.GLTFLoader(), put=(g,pick,n,sc)=>{ for(let i=0;i<n;i++){ const src=pick?g.scene.getObjectByName(pick[i%pick.length]):g.scene; if(!src) continue; const o=src.clone(true); o.position.set(0,0,0); const w=new T.Group(); w.add(o);
-      const a=Math.random()*6.28, r=1.5+Math.random()*9; w.position.set(Math.cos(a)*r,0,Math.sin(a)*r); w.position.y=bottomY(w.position.x,w.position.z); w.rotation.y=Math.random()*6.28; w.scale.setScalar(sc*(.7+Math.random()*.6));
-      w.traverse(m=>{ m.frustumCulled=false; if(m.isMesh&&m.material){ m.material=m.material.clone(); m.material.color&&m.material.color.multiplyScalar(.75); } }); plants.add(w); plantList.push({w,ph:Math.random()*6}); } };
-  L.load('models/home/nettle_plant.glb',g=>put(g,['nettle_plant_tall_a_LOD0','nettle_plant_tall_b_LOD0','nettle_plant_medium_a_LOD0'],26,5.5));
-  L.load('fern_02.glb',g=>put(g,null,10,.9)); }
+const habitatRoot=new T.Group(); scene.add(habitatRoot); const habitatPhysics=new FishingPhysics();
+if(T.GLTFLoader){ const loader=new T.GLTFLoader();
+  const habitat=(file,placements)=>loader.load(file,g=>{ for(const [x,z,width,ry] of placements){
+    const o=g.scene.clone(true),wrap=new T.Group();wrap.add(o);wrap.updateMatrixWorld(true);
+    const box=new T.Box3().setFromObject(o),size=box.getSize(new T.Vector3()),center=box.getCenter(new T.Vector3());
+    const scale=width/Math.max(size.x,size.z,.001);o.position.sub(center);wrap.scale.setScalar(scale);wrap.rotation.y=ry;
+    wrap.position.set(x,bottomY(x,z)+size.y*scale*.32,z);
+    o.traverse(m=>{if(m.isMesh){const wet=mt=>{const k=mt.clone();k.roughness=Math.max(.75,k.roughness||.8);k.envMapIntensity=.55;return k;};m.material=Array.isArray(m.material)?m.material.map(wet):wet(m.material);}});
+    habitatRoot.add(wrap);habitatPhysics.addObject(wrap,()=>true,'水下沉木岩石');
+  }});
+  habitat('dry_branches_medium_01.glb',[[-1.8,-1.4,3.1,.8],[3,2,2.5,2.1]]);
+  habitat('rock_moss_set_01.glb',[[1.9,-2.2,2.3,1.5],[-3.2,1.5,2.8,.5],[-1.2,-5,3.8,2.3]]);
+}
 botMat.onBeforeCompile=s=>{ s.uniforms.uTime=W.U.uTime; s.uniforms.uCau=cau;
   s.vertexShader='varying vec3 vWp;\n'+s.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvWp = (modelMatrix*vec4(transformed, 1.0)).xyz;');
   s.fragmentShader='uniform float uTime;\nuniform vec3 uCau;\nvarying vec3 vWp;\nfloat cau_(vec2 p, float t){ vec2 q = p*1.1; float c = 0.0; for(int i = 0; i < 3; i++){ q += vec2(sin(q.y*1.7 + t*0.9), cos(q.x*1.5 - t*0.7))*0.6; c += pow(abs(sin(q.x + q.y)), 10.0); q *= 1.7; } return c; }\n'
@@ -97,8 +105,8 @@ botMat.onBeforeCompile=s=>{ s.uniforms.uTime=W.U.uTime; s.uniforms.uCau=cau;
 scene.add(new T.Mesh(bgeo,botMat));
 
 // 水草
-const wg=new T.PlaneGeometry(.05,1,1,6); wg.translate(0,.5,0);
-{ const p=wg.attributes.position; for(let i=0;i<p.count;i++){ const y=p.getY(i); p.setX(i,p.getX(i)*(1-y*.85)); p.setZ(i,y*y*.12); } wg.computeVertexNormals(); }
+const wg=new T.PlaneGeometry(.075,1,2,10); wg.translate(0,.5,0);
+{ const p=wg.attributes.position; for(let i=0;i<p.count;i++){ const y=p.getY(i); p.setX(i,p.getX(i)*(1-y*.85)); p.setZ(i,Math.sin(y*Math.PI)*.12); } wg.computeVertexNormals(); }
 const weedMat=new T.MeshStandardMaterial({color:0xffffff,roughness:.7,side:T.DoubleSide});
 weedMat.onBeforeCompile=s=>{ s.uniforms.uTime=W.U.uTime; s.vertexShader='uniform float uTime;\n'+s.vertexShader.replace('#include <begin_vertex>',
  `#include <begin_vertex>
@@ -108,9 +116,9 @@ weedMat.onBeforeCompile=s=>{ s.uniforms.uTime=W.U.uTime; s.vertexShader='uniform
  #endif
  transformed.x += sin(uTime*0.9 + wp_)*position.y*position.y*0.18;
  transformed.z += cos(uTime*0.7 + wp_*1.3)*position.y*position.y*0.1;`); };
-const NW=420, weeds=new T.InstancedMesh(wg,weedMat,NW);
+const NW=640, weeds=new T.InstancedMesh(wg,weedMat,NW);
 { const m4=new T.Matrix4(), q=new T.Quaternion(), e=new T.Euler(), p=new T.Vector3(), s=new T.Vector3();
-  for(let i=0;i<NW;i++){ const a=Math.random()*6.283, r=1.8+Math.pow(Math.random(),.7)*13, x=Math.cos(a)*r, z=Math.sin(a)*r;
+  for(let i=0;i<NW;i++){ const a=Math.random()*6.283, r=.75+Math.pow(Math.random(),.7)*9, x=Math.cos(a)*r, z=Math.sin(a)*r;
     e.set((Math.random()-.5)*.3,Math.random()*6.283,(Math.random()-.5)*.3); q.setFromEuler(e); p.set(x,bottomY(x,z)-.05,z); s.set(1,rand(.5,2.6),1);
     m4.compose(p,q,s); weeds.setMatrixAt(i,m4); const t=Math.random(); weeds.setColorAt(i,new T.Color().setRGB(lerp(.16,.34,t),lerp(.3,.5,t),lerp(.07,.14,t))); } }
 scene.add(weeds);
@@ -118,17 +126,16 @@ scene.add(weeds);
 const rockMat=new T.MeshStandardMaterial({map:mud,color:0x8a8a78,roughness:.95});
 for(let i=0;i<12;i++){ const g=new T.IcosahedronGeometry(1,3), p=g.attributes.position; for(let k=0;k<p.count;k++){ const vx=p.getX(k), vy=p.getY(k), vz=p.getZ(k), f=.8+.35*fbm(vx*1.7+i,vz*1.7+vy,3); p.setXYZ(k,p.getX(k)*f,p.getY(k)*f*.7,p.getZ(k)*f); }
   g.computeVertexNormals(); const m=new T.Mesh(g,rockMat), a=Math.random()*6.283, r=2.2+Math.random()*9, x=Math.cos(a)*r, z=Math.sin(a)*r;
-  m.scale.setScalar(rand(.2,.7)); m.position.set(x,bottomY(x,z)-m.scale.x*.25,z); m.rotation.y=Math.random()*6; scene.add(m); }
+  m.scale.setScalar(rand(.2,.7)); m.position.set(x,bottomY(x,z)-m.scale.x*.25,z); m.rotation.y=Math.random()*6; scene.add(m); habitatPhysics.addObject(m,()=>true,'水下岩石'); }
 const barkTex=dataTex(64,128,(u,v,o)=>{ const n=fbm(u*14,v*3,3), k=.55+.6*n; o[0]=58*k; o[1]=46*k; o[2]=34*k; });
-const log=new T.Mesh(new T.CylinderGeometry(.22,.27,7,12),new T.MeshStandardMaterial({map:barkTex,roughness:.9}));
-log.rotation.set(0,.6,Math.PI/2-.15); log.position.set(-2.6,bottomY(-2.6,-3.4)+.2,-3.4); scene.add(log);
+// Scanned branches above replace the straight cylinder placeholder.
 
 // 懸浮微粒
 const NP=700, pp=new Float32Array(NP*3);
 for(let i=0;i<NP;i++){ pp[i*3]=rand(-8,8); pp[i*3+1]=rand(-3.4,-.1); pp[i*3+2]=rand(-8,8); }
 const pgeo=new T.BufferGeometry(); pgeo.setAttribute('position',new T.BufferAttribute(pp,3));
 const soft=dataTex(32,32,(u,v,o)=>{ const d=Math.max(0,1-Math.hypot(u-.5,v-.5)*2); o[0]=o[1]=o[2]=255; o[3]=255*d*d; },false);
-const pm=new T.PointsMaterial({size:.022,map:soft,transparent:true,depthWrite:false,opacity:.75});
+const pm=new T.PointsMaterial({size:.022,map:soft,transparent:true,depthWrite:false,opacity:.3});
 const parts=new T.Points(pgeo,pm); parts.frustumCulled=false; scene.add(parts);
 
 // 光束
@@ -158,9 +165,32 @@ function merSprite(){ if(merG) return merG; const g=new T.Group();
   mk('mer_front2.png',0); mk('mer_back2.png',Math.PI); g.userData.mer=true; merG=g; return g; }
 
 // 魚
-let on=false, fish=null, uni=null, fd=null, prog=0, biteT=-1, camA=0, yaw=0, tt=0;
+let on=false, fish=null, uni=null, fd=null, prog=0, biteT=-1, camA=0, yaw=0, tt=0, cameraReady=false;
 const S=new T.Vector3(), C=new T.Vector3(), dirv=new T.Vector3(), perp=new T.Vector3(), pos=new T.Vector3(), prev=new T.Vector3(), focus=new T.Vector3();
-const cDark=lin('#07110d'), cMid=lin('#2a5240'), cSea=lin('#1d5a7a'), cTint=lin('#3c4a1c'), tmpC=new T.Color();
+const cDark=lin('#09140f'), cMid=lin('#385849'), cSea=lin('#225a70'), cTint=lin('#3c4a1c'), tmpC=new T.Color();
+// Independent background fish keep their own animation uniforms and never replace the hooked fish.
+const shoal=[]; let shoalRetry=0;
+function clearShoal(){ for(const a of shoal){scene.remove(a.group);a.group.traverse(m=>{if(m.isMesh){m.geometry.dispose();(Array.isArray(m.material)?m.material:[m.material]).forEach(mt=>mt.dispose());}});}shoal.length=0;shoalRetry=0; }
+function populateShoal(){
+  if(!fd||!window.__MDL) return;
+  const sea=W.isSea&&W.isSea(),ids=sea?['amber','grouper2','mahi','sail']:['bluegill','crappie','reba','perch'];
+  const count=window.__GFX==='low'?3:window.__GFX==='mid'?5:8;
+  for(let i=shoal.length;i<count;i++){
+    const id=ids[i%ids.length],sp=P.SPECIES.find(s=>s.id===id);if(!sp||!window.__MDL.fishReady(id))continue;
+    const f=window.__MDL.fish(sp);if(!f)continue;
+    f.group.scale.setScalar(.16+(i%4)*.075);scene.add(f.group);
+    shoal.push({...f,angle:i*2.399,radius:2.4+(i%3)*.85,phase:i*1.71,speed:.065+(i%4)*.013});
+  }
+}
+function shoalTick(dt){
+  shoalRetry-=dt;if(shoalRetry<=0&&shoal.length<8){shoalRetry=1.2;populateShoal();}
+  for(const a of shoal){a.angle+=dt*a.speed;const x=Math.cos(a.angle)*a.radius,z=Math.sin(a.angle)*a.radius;
+    const target=new T.Vector3(x,bottomY(x,z)+.65+.25*Math.sin(tt*.45+a.phase),z);
+    const safe=a.last?habitatPhysics.move(a.last,target,.08).pos:habitatPhysics.resolve(target,.08);a.group.position.set(safe.x,safe.y,safe.z);a.last=a.group.position.clone();
+    a.group.rotation.set(0,-a.angle-Math.PI/2,Math.sin(tt*.6+a.phase)*.035);
+    a.uni.uSwim.value+=dt*(4+a.speed*15);a.uni.uAmp.value=.035;
+  }
+}
 function start(fdIn){
   end(); fd=fdIn; const merReal=fd.sp.special==='mermaid'&&window.__MDL&&window.__MDL.fishReady(fd.sp.id); if(fd.sp.special==='mermaid'&&!merReal){ fish=merSprite(); uni=merUni; } else {   /* 美人魚：有 3D 模型就用有骨架的真模型（水下趴平游泳），沒有才用平面圖 */ let src=null; try{ if(window.__MDL&&window.__MDL.fishReady(fd.sp.id)) src=window.__MDL.fish(fd.sp); }catch(e){}   // 用真實的 3D 魚模型（有骨架），不是簡化的魚
     if(src){ uni=src.uni; fish=src.group; } else { src=P.getFish(fd.sp); uni=src.uni; fish=src.group.clone(); } fish.traverse(o=>{ o.frustumCulled=false; if(o.isMesh&&o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ m.fog=true; }); } }); }
@@ -170,19 +200,19 @@ function start(fdIn){
   dirv.subVectors(BAIT,S); dirv.y=0; dirv.normalize(); perp.set(-dirv.z,0,dirv.x);
   C.copy(BAIT).addScaledVector(dirv,-(fd.L*(fd.sp.sh.snout?.72:.5)+.02)); C.y=BAIT.y-.02;
   camA=Math.atan2(perp.z,perp.x)+rand(-.35,.35); prog=0; biteT=-1; worm.visible=true;
-  pos.copy(S); prev.copy(S); yaw=Math.atan2(-dirv.z,dirv.x); tt=0; on=true; scene.environment=W.scene.environment;
+  pos.copy(S); prev.copy(S); yaw=Math.atan2(-dirv.z,dirv.x); tt=0; cameraReady=false; on=true; populateShoal(); scene.environment=W.scene.environment;
 }
-function end(){ on=false; if(fish){ scene.remove(fish); fish=null; } }
+function end(){ on=false; clearShoal(); if(fish){ scene.remove(fish); fish=null; } }
 function update(dt){
-  if(!on) return; tt+=dt;
+  if(!on) return; tt+=dt; habitatPhysics.refresh();
   const L=Math.max(clamp(W.info.light,0,1.2),.62), day=W.info.day;   // 夜裡水下鏡頭保留月光亮度，才看得清楚魚
   const sea=W.isSea&&W.isSea(); weeds.visible=!sea; plants.visible=!sea; { const bd=sea?BED.sea:BED.lake; if(botMat.map!==bd.map){ Object.assign(botMat,bd); botMat.needsUpdate=true; } } const mid=tmpC.copy(cDark).lerp(sea?cSea:cMid,clamp(L,0,1));
-  fog.density+=((biteT<0?.3:.09)-fog.density)*Math.min(1,dt*3); { const tt=performance.now()/1000; plantList.forEach(p=>{ p.w.rotation.z=Math.sin(tt*.7+p.ph)*.08; p.w.rotation.x=Math.cos(tt*.55+p.ph)*.06; }); }   // 能見度約 10 公尺，看得到魚從遠處游過來
+  fog.density+=((sea?.065:.115)-fog.density)*Math.min(1,dt*3); shoalTick(dt); surfU.uDen.value=fog.density; { const tt=performance.now()/1000; plantList.forEach(p=>{ p.w.rotation.z=Math.sin(tt*.7+p.ph)*.08; p.w.rotation.x=Math.cos(tt*.55+p.ph)*.06; }); }   // 能見度約 10 公尺，看得到魚從遠處游過來
   fog.color.copy(mid); bgU.uMid.value.copy(mid); bgU.uTop.value.copy(mid).multiplyScalar(2.4).add(cTint.clone().multiplyScalar(L*.6)); bgU.uBot.value.copy(mid).multiplyScalar(.35);
   surfU.uCol.value.copy(mid).multiplyScalar(5); surfU.uFog.value.copy(mid);
-  hemi.color.copy(mid).multiplyScalar(3.2); hemi.groundColor.copy(mid).multiplyScalar(.6);
-  const lc=W.U.uLightCol.value; sunL.color.setRGB(lc.x*.5,lc.y*.55,lc.z*.45);
-  cau.value.setRGB(.5,.6,.45).multiplyScalar(L*.9*clamp(day,0,1));
+  hemi.color.setRGB(.36,.44,.37); hemi.intensity=.7+L*.35; hemi.groundColor.setRGB(.12,.105,.075);
+  const lc=W.U.uLightCol.value; sunL.color.setRGB(lc.x*.65,lc.y*.65,lc.z*.65); sunL.intensity=.3+L*.6;
+  cau.value.setRGB(.58,.68,.48).multiplyScalar(L*.65*clamp(day,0,1));
   pm.color.copy(mid).multiplyScalar(4); camLight.intensity=(1-day)*.9;
   parts.position.y=Math.sin(tt*.1)*.1; parts.rotation.y=tt*.01;
   // 魚的動作
@@ -194,6 +224,7 @@ function update(dt){
     if(biteT>.15) worm.visible=false;
     if(biteT>.3){ const s=biteT-.3; pos.addScaledVector(perp,s*.7).addScaledVector(dirv,-s*.2); pos.y-=s*.15; }
   }
+  const safe=habitatPhysics.move(prev,pos,Math.max(.04,Math.min(.4,fd.L*.16))).pos;pos.set(safe.x,safe.y,safe.z);
   const vx=pos.x-prev.x, vz=pos.z-prev.z, sp=Math.hypot(vx,vz)/Math.max(dt,1e-4);
   if(sp>.02){ let ty=Math.atan2(-vz,vx), d=ty-yaw; while(d>Math.PI) d-=6.283; while(d<-Math.PI) d+=6.283; yaw+=d*Math.min(1,dt*4); }
   fish.position.copy(pos); fish.rotation.set(0,yaw,clamp((pos.y-prev.y)/Math.max(dt,1e-4)*.4,-.3,.3)); prev.copy(pos);
@@ -203,13 +234,14 @@ function update(dt){
   uni.uSwim.value+=dt*(5+sp*14); uni.uAmp.value=.035+clamp(sp*.05,0,.08)+(biteT>=0&&biteT<.6?.06:0);
   worm.rotation.y=Math.sin(tt*3)*.25; rig.rotation.z=Math.sin(tt*.8)*.02;
   // 鏡頭
-  camA+=dt*.05; focus.copy(BAIT).lerp(pos,.5); const cd=Math.max(1.3,pos.distanceTo(BAIT)*.95+fd.L*1.8);
-  cam.position.set(focus.x+Math.cos(camA)*cd,focus.y+.18+Math.sin(tt*.7)*.03,focus.z+Math.sin(camA)*cd); cam.lookAt(focus);
+  camA+=dt*.035; focus.copy(BAIT).lerp(pos,.94); const cd=underwaterViewDistance(fd.L,cam.aspect,cam.fov,pos.distanceTo(BAIT));
+  const aim=new T.Vector3(focus.x+Math.cos(camA)*cd,focus.y+.24+Math.sin(tt*.7)*.018,focus.z+Math.sin(camA)*cd);
+  if(!cameraReady){cam.position.copy(aim);cameraReady=true;}else cam.position.lerp(aim,1-Math.exp(-dt*3.2)); cam.lookAt(focus);
   bg.position.copy(cam.position);
   for(const r of rays){ r.rotation.set(0,Math.atan2(cam.position.x-r.position.x,cam.position.z-r.position.z),.18); r.material.opacity=.09*L*(.6+.4*Math.sin(tt*.5+r.userData.ph)); r.material.color.setRGB(.8,1,.75); }
 }
-function resize(w,h){ cam.aspect=w/h; cam.fov=w<h?62:48; cam.updateProjectionMatrix(); }
-return { start, end, update, resize, active:()=>on, setProgress:a=>{ prog=clamp(a,0,1); }, bite:()=>{ if(on&&biteT<0) biteT=0; }, render:()=>R.render(scene,cam) };
+function resize(w,h){ cam.aspect=w/h; cam.fov=w<h?54:46; cam.updateProjectionMatrix(); }
+return { scene,cam,start, end, update, resize, active:()=>on, setProgress:a=>{ prog=clamp(a,0,1); }, bite:()=>{ if(on&&biteT<0) biteT=0; }, render:()=>R.render(scene,cam) };
 }
 
 /* ---------- 釣具與魚餌資料 ---------- */

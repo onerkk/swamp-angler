@@ -306,6 +306,18 @@ body.fighting #top,body.fighting #top2,body.fighting #magWin,body.fighting .hotC
   .chip{padding:5px 10px}
   #magWin{top:calc(env(safe-area-inset-top,0px) + 54px)!important}
 }
+/* Let the fishing scene carry the view; controls retain their original touch targets. */
+body.underwater #top2,body.underwater #joy,body.underwater #magWin,body.underwater #hotChip,body.underwater #castTag{opacity:0;pointer-events:none}
+body.underwater #top{opacity:.28}
+body.underwater #c{animation:waterLensIn .55s ease-out}
+@keyframes waterLensIn{from{filter:blur(3px) brightness(.72)}to{filter:none}}
+body.underwater #uwTag{left:18px;top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 190px);transform:none;max-width:calc(100vw - 36px);filter:drop-shadow(0 3px 8px #0008);border-left:3px solid var(--rc,#adc99c)}
+body.underwater #uwTag .lv{background:rgba(15,31,28,.82);color:#eceddf;padding:10px 12px;border-radius:0}
+body.underwater #uwTag .nm{background:rgba(15,31,28,.82);padding:10px 14px;border-radius:0 8px 8px 0;min-width:0}
+body.underwater #uwTag .nm b{color:#f4f3e8;font-size:19px}
+body.underwater #uwTag .nm span{font-size:10px;letter-spacing:.03em;color:#c3cfc0;max-width:62vw;white-space:normal}
+body[data-fishing-state="wait"] #top2,body[data-fishing-state="lure"] #top2{opacity:.7}
+@media (orientation:landscape){body.underwater #uwTag{bottom:26px;left:24px;max-width:46vw}}
 </style>
 <!-- 3D 引擎放在自己的網站上（不靠外部 CDN：手機網路連不到 CDN 時整個頁面會卡在載入畫面） -->
 <script>
@@ -420,7 +432,7 @@ function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classLi
 </script>
 <script>
 /* 主程式載入器：先試 CDN（快），檢查版本號一致才執行；不一致或失敗就改從本站下載。依序執行兩個檔案 */
-(function(){ var V='20261031154327', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
+(function(){ var V='20261031045051', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
   var note=function(t){ var e=document.getElementById('loadTip'); if(e&&t) e.textContent=t; };
   function run(code){ var b=new Blob([code],{type:'text/javascript'}), s=document.createElement('script'); s.src=URL.createObjectURL(b); return new Promise(function(ok){ s.onload=ok; s.onerror=ok; document.body.appendChild(s); }); }
   function get(u){ return fetch(u,{cache:'no-cache'}).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }); }

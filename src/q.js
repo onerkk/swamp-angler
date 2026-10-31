@@ -5,7 +5,7 @@ const T=THREE, S=W.scene, reel=P.reelObj, crank=P.crankObj, rod=P.rod;
 const arms=[]; let ready=false;
 // 左手：往前握前握把末端；右手：轉右側搖柄把手（捲線器座標：x 沿竿向前、y 向上、z 搖柄側）
 const GRIP=new T.Vector3(-.2,-.012,-.006), KNOB=new T.Vector3(0,-.05,.03);
-const SH_R=new T.Vector3(.2,-.8,.15), SH_L=new T.Vector3(-.28,-.8,.12);
+const SH_R=new T.Vector3(.18,-.88,.12), SH_L=new T.Vector3(-.38,-.86,.1);
 const CURL=[.7,1,.8];                       // 手指三節的彎曲比例（−X 為握拳方向，實測）
 function setup(g){
   for(const side of ['R','L']){
@@ -64,7 +64,7 @@ function update(show,st,power,dt,pad){
     if(a.side==='R') roll+=.45*Math.sin(rod.spin||0)*reelK;                    // 收線：前臂隨搖柄轉動
     q2.setFromAxisAngle(wd,roll); q.premultiply(q2);
     if(a.side==='R'&&reelK>.01){ sd.crossVectors(wd,upW).normalize(); q2.setFromAxisAngle(sd,.22*Math.cos(rod.spin||0)*reelK); q.premultiply(q2); }  // 手腕上下擺
-    const s=.62/a.L0; a.grp.scale.setScalar(s); a.grp.quaternion.copy(q);
+    const s=.5/a.L0; a.grp.scale.setScalar(s); a.grp.quaternion.copy(q);
     // 用掌心對準握點，竿子穿過掌心與手指之間
     upM.set(0,1,0).applyQuaternion(q);
     a.grp.position.copy(tg).sub(tmp.copy(a.pl).multiplyScalar(s).applyQuaternion(q)).addScaledVector(upM,.018);
