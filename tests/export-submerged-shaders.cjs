@@ -32,4 +32,9 @@ out.opticsVS=defs+vp+expand(wetShader.vertexShader);out.opticsFS=defs+fp+expand(
 out.opticsSkinVS=defs+'#define USE_SKINNING\n#define MAX_BONES 16\nattribute vec4 skinIndex,skinWeight;\n'+vp+expand(wetShader.vertexShader);
 const wetPhysical=new T.MeshPhysicalMaterial();optics.patch(wetPhysical);const physicalShader={uniforms:{},vertexShader:T.ShaderLib.physical.vertexShader,fragmentShader:T.ShaderLib.physical.fragmentShader};wetPhysical.onBeforeCompile(physicalShader,{});
 out.opticsPhysicalFS=defs+'#define PHYSICAL\n'+fp+expand(physicalShader.fragmentShader);
+// Compile the exact ice sheet and matching cut rim, including all three texture channels.
+const ice=require('./ice-fixture.cjs').iceFixture(),iceDefs=defs+'#define USE_ROUGHNESSMAP\n';
+for(const [name,material] of [['iceSheet',ice.sheet.material],['iceRim',ice.rim.material]]){
+ const sh=ice.shader(material);out[name+'VS']=iceDefs+vp+expand(sh.vertexShader);out[name+'FS']=iceDefs+fp+expand(sh.fragmentShader);
+}
 process.stdout.write(JSON.stringify(out));

@@ -1,4 +1,4 @@
-/*APPV:20261031221101*/
+/*APPV:20261031221102*/
 /* Account assistance follows the authenticated Google identity, never a saved flag. */
 function createAccountAssist(){
   let enabled=false;
@@ -5021,7 +5021,17 @@ const col=rep(tl.load('snow_Diffuse.jpg'),90); col.encoding=T.sRGBEncoding;
 const mat=new T.MeshStandardMaterial({map:col,normalMap:rep(tl.load('snow_nor_gl.jpg'),90),roughnessMap:rep(tl.load('snow_Rough.jpg'),90),roughness:.82,metalness:0,color:0xffffff,envMapIntensity:1.6,normalScale:new T.Vector2(.45,.45)});
 // 真實結冰湖面：風吹乾淨的地方是深色透明冰（ambientCG Ice003，CC0，裂紋網），其他地方是積雪；用大範圍雜訊自然混合
 const iceC=rep(tl.load('ice_Color.jpg'),60); iceC.encoding=T.sRGBEncoding; const iceN=rep(tl.load('ice_nor.jpg'),60);
-mat.onBeforeCompile=sh=>{ sh.uniforms.iceMap={value:iceC}; sh.uniforms.iceNor={value:iceN};
+// 湖面與洞緣從同一個世界座標取樣；移動／轉頭不會讓裂紋在洞口斷開。
+const cutHole={value:new T.Vector3(0,0,0)};
+function iceSurfaceShader(sh,cut){
+  sh.uniforms.iceMap={value:iceC}; sh.uniforms.iceNor={value:iceN}; sh.uniforms.iceHole=cutHole;
+  sh.vertexShader='varying vec3 vIceWorld;\n'+sh.vertexShader;
+  sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+  vIceWorld=(modelMatrix*vec4(transformed,1.0)).xyz;
+  vUv=vec2(45.0)+vec2(vIceWorld.x,-vIceWorld.z)*0.075;`);
+  sh.fragmentShader='varying vec3 vIceWorld; uniform vec3 iceHole;\n'+sh.fragmentShader;
+  if(cut) sh.fragmentShader=sh.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
+  if(iceHole.z>0.0 && distance(vIceWorld.xz,iceHole.xy)<iceHole.z) discard;`);
   sh.fragmentShader='uniform sampler2D iceMap; uniform sampler2D iceNor;\nfloat hh_(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }\nfloat vn_(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hh_(i),hh_(i+vec2(1,0)),f.x),mix(hh_(i+vec2(0,1)),hh_(i+vec2(1,1)),f.x),f.y); }\n'+sh.fragmentShader;
   sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
   vec4 t2_=mapTexelToLinear(texture2D(map,vUv*0.27+vec2(0.31,0.17)));
@@ -5033,11 +5043,13 @@ mat.onBeforeCompile=sh=>{ sh.uniforms.iceMap={value:iceC}; sh.uniforms.iceNor={v
   diffuseColor.rgb=mix(diffuseColor.rgb,ic_,iceK)+vec3(0.18,0.2,0.22)*edge_*0.6;`);
   sh.fragmentShader=sh.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n  roughnessFactor=mix(roughnessFactor,0.12,iceK);');
   sh.fragmentShader=sh.fragmentShader.replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n  { vec3 n2_=texture2D(iceNor,vUv*1.5).xyz*2.0-1.0; normal=normalize(mix(normal,normalize(normal+vec3(n2_.xy*0.25,0.0)),iceK)); }');
-};
+}
+mat.onBeforeCompile=sh=>iceSurfaceShader(sh,true);
+mat.customProgramCacheKey=()=> 'ice-world-sheet-v2';
 // 夜裡雪地反射月光與星光，呈藍灰色，不會全黑：依環境亮度補一點自發光
 mat.emissive=new T.Color(0x3a4a62); mat.emissiveIntensity=0;
 const g=new T.Group(); g.visible=false; W.scene.add(g);
-const sheet=new T.Mesh(new T.CircleGeometry(600,96).rotateX(-Math.PI/2),mat); sheet.position.y=.01; g.add(sheet);
+const sheet=new T.Mesh(new T.CircleGeometry(600,96).rotateX(-Math.PI/2),mat); sheet.position.y=.01; sheet.receiveShadow=true; g.add(sheet);
 // 冰洞：看得到約 35 公分厚的冰層斷面（上白下藍綠、半透明），水面在冰層下，浮著冰沙；洞口一圈是冰鑽帶上來的雪屑
 const hole=new T.Group(); hole.visible=false; g.add(hole);
 let drilled=false, prog=0, lastKey='';
@@ -5050,18 +5062,23 @@ const wall=new T.Mesh(new T.CylinderGeometry(.17,.16,.36,40,1,true),wallM); wall
 const water=new T.Mesh(new T.CircleGeometry(.165,40).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x07202a,roughness:.05,metalness:.1,envMapIntensity:1.6,emissive:0x12283a,emissiveIntensity:0})); water.position.y=-.06; hole.add(water);
 const slushM=new T.MeshStandardMaterial({color:0xdcecf2,roughness:.4,transparent:true,opacity:.85,emissive:0x4a5a72,emissiveIntensity:0});
 const slush=[]; for(let i=0;i<9;i++){ const sz=.012+Math.random()*.03, m=new T.Mesh(new T.CircleGeometry(sz,6).rotateX(-Math.PI/2),slushM); const a=Math.random()*6.28, r=Math.random()*.12; m.position.set(Math.cos(a)*r,-.055,Math.sin(a)*r); hole.add(m); slush.push({m,a,r,ph:Math.random()*6}); }
-// 雪屑堆：用雪地同一個材質，做成高低不平的一圈
-const rimM=new T.MeshStandardMaterial({map:col,color:0xffffff,roughness:.9,emissive:0x4a5a72,emissiveIntensity:0});
-{ const rg=new T.RingGeometry(.17,.5,64,8).rotateX(-Math.PI/2), pp=rg.attributes.position;
+// 洞緣沿用完整的裂冰／積雪／法線混合，不再用一整塊白色圓盤蓋住湖面。
+const rimM=mat.clone();
+rimM.onBeforeCompile=sh=>{ iceSurfaceShader(sh,false);
+  sh.fragmentShader=sh.fragmentShader.replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
+  float wetCut=1.0-smoothstep(0.175,0.225,distance(vIceWorld.xz,iceHole.xy));
+  roughnessFactor=mix(roughnessFactor,0.16,wetCut*0.8);`);
+};
+rimM.customProgramCacheKey=()=> 'ice-world-rim-v2';
+{ const rg=new T.RingGeometry(.17,.285,64,8).rotateX(-Math.PI/2), pp=rg.attributes.position;
   for(let i=0;i<pp.count;i++){ const x=pp.getX(i), z=pp.getZ(i), r=Math.hypot(x,z), a=Math.atan2(z,x);
-    const bump=Math.sin(a*3+1.2)*.6+Math.sin(a*9+.4)*.35+Math.sin(a*17+2)*.2+(Math.random()-.5)*.9, k=Math.pow(Math.max(0,Math.sin(Math.min(1,Math.max(0,(r-.17)/.33))*Math.PI)),.7);
-    pp.setY(i,Math.max(0,k*(.03+.035*bump))*(a>-.6&&a<1.4?1.7:1)); }
-  rg.computeVertexNormals(); const rim=new T.Mesh(rg,rimM); rim.position.y=.012; hole.add(rim);
-  const lip=new T.Mesh(new T.TorusGeometry(.175,.022,8,40).rotateX(Math.PI/2),rimM); lip.position.y=.02; hole.add(lip);
-  // 冰鑽帶上來的壓實雪塊，散在洞口
-  for(let i=0;i<11;i++){ const a=Math.random()*6.28, r=.24+Math.random()*.32, s=.018+Math.random()*.035, cl=new T.Mesh(new T.IcosahedronGeometry(s,1),rimM);
+    const k=Math.max(0,1-(r-.17)/.115), chipped=.65+.2*Math.sin(a*9+.4)+.15*Math.sin(a*17+2);
+    pp.setY(i,.0015+.014*Math.sin((1-k)*Math.PI)*k*chipped); }
+  rg.computeVertexNormals(); const rim=new T.Mesh(rg,rimM); rim.position.y=.01; rim.receiveShadow=true; hole.add(rim);
+  // 小塊鑽出的冰屑，分散放置，保留可見的原冰面。
+  for(let i=0;i<11;i++){ const a=i/11*Math.PI*2+Math.random()*.25, r=.21+Math.random()*.15, s=.009+Math.random()*.016, cl=new T.Mesh(new T.IcosahedronGeometry(s,1),rimM);
     const ps=cl.geometry.attributes.position; for(let j=0;j<ps.count;j++) ps.setXYZ(j,ps.getX(j)*(1+(Math.random()-.5)*.5),ps.getY(j)*(.5+Math.random()*.3),ps.getZ(j)*(1+(Math.random()-.5)*.5)); cl.geometry.computeVertexNormals();
-    cl.position.set(Math.cos(a)*r,.015+s*.25,Math.sin(a)*r); cl.rotation.y=Math.random()*6; hole.add(cl); } }
+    cl.position.set(Math.cos(a)*r,.015+s*.25,Math.sin(a)*r); cl.rotation.y=Math.random()*6; cl.castShadow=cl.receiveShadow=true; hole.add(cl); } }
 const holePos=new T.Vector3();
 // 手搖冰鑽：鑿冰時邊轉邊往下鑽，完成後拔出來
 const auger=new T.Group(); auger.visible=false; g.add(auger);
@@ -5098,12 +5115,12 @@ function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visib
   if(liftT>0){ liftT-=dt; auger.position.y+=dt*.6; auger.rotation.y+=dt*3; if(liftT<=0) auger.visible=false; }
   else if(!drilled&&on&&prog>0&&!(c.held&&c.held())) auger.visible=prog>0;
   if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
-      W.addRipple(holePos.x,holePos.z,.15+.2*T2); if(T2>.6){ c.chips&&0; if(c.splash) c.splash(holePos,T2); } } } if(!on){ drilled=false; prog=0; return; }
+      W.addRipple(holePos.x,holePos.z,.15+.2*T2); if(T2>.6){ c.chips&&0; if(c.splash) c.splash(holePos,T2); } } } if(!on){ drilled=false; prog=0; cutHole.value.z=0; return; }
   const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; auger.visible=false; liftT=0; }
   holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); hole.position.copy(holePos); hole.visible=drilled;
-  sheet.position.x=b.x; sheet.position.z=b.z; col.offset.set(b.x/600*90/2,-b.z/600*90/2); }
+  sheet.position.x=b.x; sheet.position.z=b.z; cutHole.value.set(holePos.x,holePos.z,drilled?.17:0); }
 /* 鑿冰洞：按住約 2 秒，冰屑四濺，完成後冰洞出現 */
-function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); auger.visible=true; auger.position.set(holePos.x,.02-prog*.42,holePos.z); auger.rotation.y+=dt*9; if(c.grind&&Math.random()<dt*10) c.grind(); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; liftT=1.2; if(c.done) c.done(holePos); } return prog; }
+function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); auger.visible=true; auger.position.set(holePos.x,.02-prog*.42,holePos.z); auger.rotation.y+=dt*9; if(c.grind&&Math.random()<dt*10) c.grind(); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; cutHole.value.set(holePos.x,holePos.z,.17); liftT=1.2; if(c.done) c.done(holePos); } return prog; }
 const gripTmp=new T.Vector3();
 function grip(side,out){ auger.updateMatrixWorld(true); if(side==='R'){ gripTmp.set(.38,.06,0); crankRef.localToWorld(gripTmp); } else { gripTmp.set(0,1.29,0); auger.localToWorld(gripTmp); } out.copy(gripTmp); return out; }
 function drilling(){ return auger.visible&&!drilled&&prog>0&&prog<1; }
@@ -6490,7 +6507,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261031221101'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261031221102'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
