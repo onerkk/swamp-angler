@@ -20,7 +20,7 @@ function createWaterOptics(U,{surface=0,bounds=null,flat=false,strength=1}={}){
      float optWave=0.0;if(uOptFlat<.5&&uOptDetail>.5)optWave=waterSample(vOptWorld.xz,uOptTime,uOptWind,uOptSea).y;
      float optDepth=uOptSurface+optWave-vOptWorld.y;
      float optWet=(1.0-smoothstep(-.03,.15,-optDepth))*optInside;
-     roughnessFactor=mix(roughnessFactor,max(.16,roughnessFactor*.55),optWet);
+     roughnessFactor=mix(roughnessFactor,min(roughnessFactor,max(.08,roughnessFactor*.55)),optWet);
      diffuseColor.rgb*=mix(1.0,.82,optWet);`);
    s.fragmentShader=s.fragmentShader.replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
      vec3 optRay=refract(-normalize(uOptDir),vec3(0.0,1.0,0.0),1.0/1.333);
@@ -28,7 +28,7 @@ function createWaterOptics(U,{surface=0,bounds=null,flat=false,strength=1}={}){
      float optC=sin(optQ.x*3.7+sin(optQ.y*2.3)+uOptTime*.8)+sin(optQ.y*4.1-uOptTime*.65);
      float optCaustic=pow(max(0.0,1.0-abs(optC)*.65),14.0);
      float optWater=step(0.0,optDepth)*optInside*exp(-max(0.0,optDepth)*.35);
-     reflectedLight.indirectDiffuse+=uOptLight*optCaustic*optWater*.24*max(.12,vOptNormal.y)*uOptStrength*uOptDetail;`);
+     reflectedLight.indirectDiffuse+=diffuseColor.rgb*uOptLight*optCaustic*optWater*.24*max(.12,vOptNormal.y)*uOptStrength*uOptDetail;`);
   };mat.customProgramCacheKey=()=>key()+'|water-optics-v1';mat.needsUpdate=true;
  }
  function add(root){root.traverse(m=>{if(!m.isMesh)return;m.castShadow=m.receiveShadow=true;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))patch(mat);});}
