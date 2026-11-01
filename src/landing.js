@@ -20,3 +20,6 @@ function fishingLandingTarget(physics,base,fish,length){
  return physics.resolve(FishingPhysics.world(reachable[0],hull),Math.max(.12,length*.22));
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={fishingLanding,fishingLandingTarget};
+
+function retrieveTravelBudget(path,node,position,elapsed,seconds){let distance=0,from=position;for(let i=node;i<path.length;i++){const to=path[i];distance+=Math.hypot(to.x-from.x,to.y-from.y,to.z-from.z);from=to;}return distance*Math.min(1,Math.max(0,seconds)/Math.max(.001,2.8-elapsed));}
+if(typeof module!=='undefined'&&module.exports)module.exports.retrieveTravelBudget=retrieveTravelBudget;

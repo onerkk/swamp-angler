@@ -25,19 +25,19 @@ function createWaterOptics(U,{surface=0,bounds=null,flat=false,strength=1}={}){
      roughnessFactor=mix(roughnessFactor,min(roughnessFactor,max(.08,roughnessFactor*.55)),optWet);
      diffuseColor.rgb*=mix(1.0,.82,optWet);`);
    s.fragmentShader=s.fragmentShader.replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
-     vec3 optRay=refract(-normalize(uOptDir),vec3(0.0,1.0,0.0),1.0/1.333);
+     if(uOptDetail>.5){vec3 optRay=refract(-normalize(uOptDir),vec3(0.0,1.0,0.0),1.0/1.333);
      vec2 optQ=vOptWorld.xz-optRay.xz*max(0.0,optDepth)/max(.2,-optRay.y);
      float optC=sin(optQ.x*3.7+sin(optQ.y*2.3)+uOptTime*.8)+sin(optQ.y*4.1-uOptTime*.65);
      float optCaustic=pow(max(0.0,1.0-abs(optC)*.65),14.0);
      float optWater=step(0.0,optDepth)*optInside*exp(-max(0.0,optDepth)*.35);
-     reflectedLight.indirectDiffuse+=diffuseColor.rgb*uOptLight*optCaustic*optWater*.24*max(.12,vOptNormal.y)*uOptStrength*uOptDetail;`);
+     reflectedLight.indirectDiffuse+=diffuseColor.rgb*uOptLight*optCaustic*optWater*.24*max(.12,vOptNormal.y)*uOptStrength*uOptDetail;}`);
   };mat.customProgramCacheKey=()=>key()+'|water-optics-v2';mat.needsUpdate=true;
  }
  function add(root){const used=new Set();root.traverse(m=>{if(!m.isMesh)return;m.castShadow=m.receiveShadow=true;
   const scoped=material=>{if(!material)return material;let mat=material;const existing=WATER_OPTICS_STATE.get(mat);if(existing&&existing.owner!==owner){mat=scopedMaterials.get(material);if(!mat){mat=material.clone();mat.onBeforeCompile=material.onBeforeCompile;mat.customProgramCacheKey=material.customProgramCacheKey.bind(material);scopedMaterials.set(material,mat);}}patch(mat);if(mat)used.add(mat);return mat;};
   m.material=Array.isArray(m.material)?m.material.map(scoped):scoped(m.material);
  });const before=rootMaterials.get(root)||new Set();for(const m of before)if(!used.has(m)){const n=(references.get(m)||1)-1;references.set(m,n);if(!n)materials.delete(m);}for(const m of used){if(!before.has(m))references.set(m,(references.get(m)||0)+1);if(WATER_OPTICS_STATE.has(m))materials.add(m);}rootMaterials.set(root,used);}
- function update(){detail.value=typeof window!=='undefined'&&window.__GFX==='low'?.45:1;const day=U.uDay?U.uDay.value:1;for(const m of materials)if(WATER_OPTICS_STATE.get(m).owner===owner)m.envMapIntensity=m.userData.opticsEnv*(.22+.78*day);}
+ function update(){detail.value=typeof window!=='undefined'&&(window.__effectBudget?.caustics===false||window.__GFX==='low')?0:1;const day=U.uDay?U.uDay.value:1;for(const m of materials)if(WATER_OPTICS_STATE.get(m).owner===owner)m.envMapIntensity=m.userData.opticsEnv*(.22+.78*day);}
  function remove(root){const used=rootMaterials.get(root);if(!used)return;for(const m of used){const n=(references.get(m)||1)-1;references.set(m,n);if(!n)materials.delete(m);}rootMaterials.delete(root);}
  return{add,remove,patch,update,uniforms};
 }

@@ -143,7 +143,7 @@ const viewM=new T.MeshBasicMaterial({map:winTex.day,side:T.BackSide,fog:false});
 const rainGlass=(()=>{ const cv=document.createElement('canvas'); cv.width=256; cv.height=192; const g=cv.getContext('2d'), tex=new T.CanvasTexture(cv), drops=[];
   for(let i=0;i<70;i++) drops.push({x:Math.random()*256,y:Math.random()*192,r:1+Math.random()*2.6,v:0});
   const m=new T.Mesh(new T.PlaneGeometry(WIN.w,WIN.h),new T.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,opacity:0})); m.rotation.y=Math.PI/2; m.position.set(-ROOM.x+.03,WIN.y,WIN.z); scene.add(m);
-  return {m,tick(dt,k){ m.material.opacity=k; if(k<.02) return; g.clearRect(0,0,256,192); g.fillStyle='rgba(120,130,140,'+(.25*k)+')'; g.fillRect(0,0,256,192);   // 雨天窗外霧濛濛
+  return {m,tick(dt,k){m.visible=k>=.02;m.material.opacity=k; if(k<.02) return; g.clearRect(0,0,256,192); g.fillStyle='rgba(120,130,140,'+(.25*k)+')'; g.fillRect(0,0,256,192);   // 雨天窗外霧濛濛
     drops.forEach(d=>{ if(d.r>2.4&&Math.random()<dt*.6*k) d.v=40+Math.random()*60; d.y+=d.v*dt; if(d.v){ g.strokeStyle='rgba(220,230,240,.35)'; g.lineWidth=d.r*.8; g.beginPath(); g.moveTo(d.x,d.y-14); g.lineTo(d.x,d.y); g.stroke(); d.v*=.985; if(d.v<5) d.v=0; }   // 大水珠會滑下來
       if(d.y>196||Math.random()<dt*.05){ d.x=Math.random()*256; d.y=Math.random()*150; d.r=1+Math.random()*2.6; d.v=0; }
       const gr=g.createRadialGradient(d.x-d.r*.3,d.y-d.r*.3,0,d.x,d.y,d.r); gr.addColorStop(0,'rgba(255,255,255,.75)'); gr.addColorStop(.6,'rgba(200,210,220,.35)'); gr.addColorStop(1,'rgba(60,70,80,.25)'); g.fillStyle=gr; g.beginPath(); g.arc(d.x,d.y,d.r,0,6.3); g.fill(); });
@@ -854,7 +854,7 @@ function exit(){ on=false;resetGraphics();releaseSceneGPU(scene);W.radiance.rele
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
 const reflectionAnchor=new T.Vector3(0,1.6,0);let lastHomeShadow=-Infinity;
-function render(dt){t+=dt;W.interiorReflection.update(scene,reflectionAnchor,W.scene.environment,t); yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
+function render(dt){t+=dt;if(W.prepareScene)W.prepareScene(scene);if(window.__effectBudget?.environment===false)scene.environment=null;else W.interiorReflection.update(scene,reflectionAnchor,W.scene.environment,t); yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
   vb+=((mode!=='room'&&mode!=='act'?1:0)-vb)*Math.min(1,dt*4); dYaw+=(dYawT-dYaw)*Math.min(1,dt*6); dPitch+=(dPitchT-dPitch)*Math.min(1,dt*6);
   // 在房間裡用搖桿走動：前進／後退、左右轉；不能走進水族箱、壁爐和牆
   if(mode==='room'&&c.joy){ const j=c.joy(); if(Math.abs(j.thr)>.05||Math.abs(j.turn)>.05){ yawT-=j.turn*dt*1.7; const sp=1.3*j.thr*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw); let nx=pRoom.x+fx*sp, nz=pRoom.z+fz*sp;
@@ -886,7 +886,7 @@ function render(dt){t+=dt;W.interiorReflection.update(scene,reflectionAnchor,W.s
   updAct(dt); swingLamp(dt);
   furnTick-=dt; if(furnTick<=0){ furnTick=3; updFurnTags(); syncTime(); }
   updGrill(dt);   // 爐火劈啪聲，隨機間隔
-  { const rk=c.rain?Math.min(1,c.rain()*1.6):0; rainGlass.tick(dt,rk); viewM.color.setScalar((.35+.65*daylight())*(1-.35*rk)); }   // 下雨：窗上有水珠、水痕往下滑，外面變暗變霧
+  { const rk=c.rain?Math.min(1,c.rain()*1.6):0; rainGlass.tick(dt,window.__effectBudget?.rainOverlay===false?0:rk); viewM.color.setScalar((.35+.65*daylight())*(1-.35*rk)); }   // 下雨：窗上有水珠、水痕往下滑，外面變暗變霧
   sparkles.forEach(q=>{ const k=Math.max(0,Math.sin(t*1.7+q.ph)); q.sp.material.opacity=Math.pow(k,8); q.sp.scale.setScalar(.03+.05*Math.pow(k,4)); if(k<.02&&Math.random()<.02) q.sp.position.set((Math.random()-.5)*1.5,(Math.random()-.5)*1.2,.0); });   // 水晶閃光
   updTanks(dt);for(const k of ['fresh','sea'])if(tanks[k]&&tanks[k].optics)tanks[k].optics.update();
   const shadowSize=window.__gfxStatus&&window.__gfxStatus.shadow==='ultra'?4096:window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}

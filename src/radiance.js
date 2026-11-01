@@ -1,6 +1,6 @@
 /* Screen-space ray marching, not hardware RT. Water keeps its separate planar reflection/refraction. */
 function radianceReflector(m){return !!(m&&(m.isMeshStandardMaterial||m.isMeshPhysicalMaterial)&&(!m.transparent||m.opacity>.85)&&(m.roughness<.32||m.metalness>.45||m.clearcoat>.6||(m.userData&&m.userData.screenReflection)));}
-function createSceneRadiance(T,R){
+function createSceneRadiance(T,R,prepare=()=>{}){
  let pass=null,failed=false,sizeKey='',sceneKey=null,selected=[];
  const cache=new WeakMap(),normalMaterials=new Set(),size=new T.Vector2();
  const supported=!!(T.SSRPass&&R.extensions&&(R.capabilities.isWebGL2?R.extensions.has('EXT_color_buffer_float'):R.extensions.has('WEBGL_depth_texture')&&R.extensions.has('EXT_color_buffer_half_float')));
@@ -21,10 +21,10 @@ function createSceneRadiance(T,R){
    R.setRenderTarget(target);R.setClearColor(0,0);R.clear();R.render(scene,camera);
   }finally{for(const [o,m,v]of backup){o.material=m;o.visible=v;}scene.overrideMaterial=oldOverride;scene.background=bg;R.shadowMap.autoUpdate=oldShadow;}
  }
- function render(scene,camera){
+ function render(scene,camera){prepare(scene);
   const now=typeof performance!=='undefined'?performance.now():Date.now();if(now>=auditAt&&typeof auditSceneLighting==='function'&&typeof document!=='undefined'&&document.getElementById('gfxLive')){auditAt=now+5000;const report=auditSceneLighting(scene);report.ssrActive=status.active;if(typeof window!=='undefined')window.__materialLightingAudit=report;}
   status.active=false;const high=typeof window!=='undefined'&&window.__gfxStatus&&window.__gfxStatus.level===7;
-  if(!supported||failed||!high){status.reason=!supported?'device unsupported':failed?'render fallback':'below highest quality';R.render(scene,camera);return;}
+  if(!supported||failed||!high||window.__effectBudget?.ssr===false){if(pass)release();status.reason=!supported?'device unsupported':failed?'render fallback':'below highest quality';const env=scene.environment;try{if(window.__effectBudget?.environment===false)scene.environment=null;R.render(scene,camera);}finally{scene.environment=env;}return;}
   const target=R.getRenderTarget(),color=R.getClearColor(new T.Color()).clone(),alpha=R.getClearAlpha(),auto=R.autoClear,viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest();
   try{
    if(!pass){pass=new T.SSRPass({renderer:R,scene,camera,width:64,height:64,selects:[],encoding:R.outputEncoding,bouncing:false,morphTargets:true});pass.renderToScreen=true;pass.opacity=.18;pass.maxDistance=18;pass.thickness=.08;pass.blur=true;pass.distanceAttenuation=true;pass.fresnel=true;pass.metalnessOnMaterial.skinning=pass.metalnessOffMaterial.skinning=true;pass.metalnessOnMaterial.morphTargets=pass.metalnessOffMaterial.morphTargets=true;

@@ -19,6 +19,7 @@ uniform float uDay;
 uniform float uCloud;
 uniform vec3 uEye;
 uniform float uRain;
+uniform float uDetail;
 uniform vec3 uWind;
 uniform vec2 uCloudOff;
 uniform float uCShadow;
@@ -318,11 +319,12 @@ void main(){
   dw+=leafPatch*.018*(1.0-fadeD)*(1.0-uSea);
   vec2 wd = normalize(uWind.xy + vec2(1e-4));
   float gust = smoothstep(0.35, 0.75, noise2(p*0.035 - uCloudOff*9.0)*0.7 + noise2(p*0.11 - uCloudOff*20.0)*0.3);
-  float csh = 1.0 - 0.85*cloudSh(p);
+  float csh = uDetail>.5?1.0-0.85*cloudSh(p):1.0;
   float ruff = mix(0.15, 1.0, smoothstep(0.35, 0.7, noise2(p*0.03 + vec2(uTime*0.015, -uTime*0.01))))*(0.35 + 0.65*uWind.z) + gust*uWind.z*1.4;
   float amp = uWave*ruff*(1.0 - 0.85*dw);
   vec3 waveSample=waterSample(p,uTime,uWind,uSea);
   vec2 g=waveSample.xz;
+  if(uDetail>.5){
   // Wind ripples change the surface normal between geometry vertices.
   g+=wv(p,wd,.42,.0008+.0018*uWind.z,dist);
   g+=wv(p,vec2(wd.y,-wd.x),.23,.0004+.0009*uWind.z,dist);
@@ -365,6 +367,7 @@ void main(){
       float m0 = noise2(pq2), mx = noise2(pq2 + vec2(e, 0.0)), mz = noise2(pq2 + vec2(0.0, e));
       g += (vec2(nx - n0, nz - n0)*0.55 + vec2(mx - m0, mz - m0)*0.45)/e*0.06*pf; }
   }
+  }
   vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
   float NdV = max(dot(N, V), 0.0);
   float F = (0.02 + 0.98*pow(1.0 - NdV, 5.0))*(1.0 - 0.3*uRain*uSea);   // 雨中的海面粗糙，鏡面反光變弱，浪坡不會反出一條條亮線
@@ -390,7 +393,7 @@ void main(){
   body += uScatter*(amb*0.5 + uLightCol*0.3*uSunVis)*smoothstep(-0.2, 0.8, vH)*0.9;
   #endif
   vec3 bodyD = TM(body);
-  if(uSea < .5){
+  if(uSea < .5&&uDetail>.5){
     vec3 underRay=refract(-V,N,.75);
     float bankDepth=mix(1.15,3.8,smoothstep(2.0,22.0,Rs-rp));
     bankDepth=min(bankDepth,1.25+smoothstep(2.0,32.0,-p.y)*2.6);
@@ -401,7 +404,7 @@ void main(){
     gravel=pow(max(gravel,vec3(.001)),vec3(2.2));
     float silt=noise2(bedPoint*.37)*.62+noise2(bedPoint*1.9)*.38;
     gravel=mix(gravel,vec3(.085,.105,.046),smoothstep(.46,.7,silt)*.55);
-    float caustic=causF(bedPoint,uTime)*.28+causF(bedPoint*1.73+4.1,uTime*.79)*.12;
+    float caustic=0.0;if(uDetail>.5)caustic=causF(bedPoint,uTime)*.28+causF(bedPoint*1.73+4.1,uTime*.79)*.12;
     vec3 transmittance=exp(-vec3(.58,.27,.38)*travel);
     vec3 bedLight=gravel*(.38+uLightK*.65+caustic*uSunVis*csh)*(1.0-.65*uRain);
     vec3 transmitted=TM(bedLight*transmittance+body*(1.0-transmittance));
@@ -414,7 +417,7 @@ void main(){
     deepC *= 1.0 - 0.38*uRain - 0.15*(1.0 - uSunVis);
     deepC = mix(deepC, vec3(dot(deepC, vec3(0.3, 0.55, 0.15)))*vec3(0.9, 1.0, 1.02), clamp(0.55*uRain + 0.3*(1.0 - uSunVis), 0.0, 0.7));   // 去掉晴天的飽和藍，偏鉛灰   // 下雨、陰天的海是暗沉的鉛灰藍，不是晴天的亮藍
     bodyD = deepC;
-    if(uReef > 0.01){
+    if(uReef > 0.01&&uDetail>.5){
       vec3 Vr = refract(-V, N, 0.75);
       float iy = 1.0/max(-Vr.y, 0.12);
       vec2 b0 = vW.xz + Vr.xz*4.5*iy;
@@ -422,7 +425,7 @@ void main(){
       float reefK = smoothstep(0.46, 0.56, rf_), grass = smoothstep(0.38, 0.46, rf_)*(1.0 - reefK);
       float Dd = 4.5 - 1.6*reefK, Lp = Dd*iy;
       vec2 bp = vW.xz + Vr.xz*Lp;
-      float cs = (causF(bp, uTime) + 0.6*causF(bp*1.7 + 9.0, uTime*1.2))*mix(0.15, 1.0, uSunVis)*(1.0 - 0.7*uRain);   // 陰天下雨沒有陽光，海底不會有亮晶晶的光紋
+      float cs = 0.0;if(uDetail>.5)cs = (causF(bp, uTime) + 0.6*causF(bp*1.7 + 9.0, uTime*1.2))*mix(0.15, 1.0, uSunVis)*(1.0 - 0.7*uRain);   // 陰天下雨沒有陽光，海底不會有亮晶晶的光紋
       vec3 rk = mix(vec3(0.10, 0.13, 0.11), vec3(0.04, 0.06, 0.06), noise2(bp*0.9));
       vec3 bed = mix(mix(vec3(0.92, 0.88, 0.72), vec3(0.45, 0.50, 0.35), grass*0.6), rk, reefK);
       bed *= lk*(0.6 + 0.75*cs*uLightK*(0.35 + 0.65*uSunVis)*(1.0 - 0.6*reefK)*(1.0 - smoothstep(6.0, 40.0, dist)));
@@ -516,7 +519,7 @@ const head = new T.Group(); head.rotation.x = -0.16; player.add(head); head.add(
 const V = () => new T.Vector3();
 const U = { uTime:{value:0}, uSunDir:{value:new T.Vector3(0,1,0)}, uLightCol:{value:V()}, uSunDisk:{value:new T.Vector3(0,1,0)},
   uSunCol:{value:V()}, uMoonDir:{value:new T.Vector3(0,1,0)}, uMoonCol:{value:V()}, uZenith:{value:V()}, uHorizon:{value:V()},
-  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.012,.075,.13)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
+  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0},uDetail:{value:1}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.012,.075,.13)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
 
 // 天空球（含樹林遠景）
 const skyMat = new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:SH.common+SH.skyFS, side:T.BackSide, depthWrite:false, depthTest:false});
@@ -544,7 +547,10 @@ Object.assign(sunLight.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.
 function setShadows(q){renderer.shadowMap.enabled=q!=='low';const n=q==='ultra'?Math.min(4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='mid'?512:1024;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
 const hemi = new T.HemisphereLight(0xffffff, 0x223322, 0.55); scene.add(hemi);
 
-function qualityTextures(root){const max=Math.min(renderer.capabilities.getMaxAnisotropy(),window.__resourcePolicy?.anisotropy||16);root.traverse(m=>{if(!m.isMesh)return;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))if(mat)for(const key of['map','normalMap','roughnessMap','metalnessMap','bumpMap','emissiveMap'])tuneTextureSampling(T,mat[key],max,!!(mat.userData&&mat.userData.packedAtlas));});}
+const materialQuality=createMaterialQuality();let materialScanTimes=new WeakMap();
+function setEffects(level){materialQuality.set(level);materialQuality.apply(scene);if(window.__HOME_SCENE)materialQuality.apply(window.__HOME_SCENE);U.uDetail.value=effectBudget(level).waterDetail?1:0;if(level<2){radiance.release();reflRT.setSize(4,4);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}if(window.__HOME_SCENE)interiorReflection.release(window.__HOME_SCENE);}materialScanTimes=new WeakMap();}
+function prepareScene(root){const now=performance.now();if(now<(materialScanTimes.get(root)||0))return;materialScanTimes.set(root,now+1000);materialQuality.apply(root);}
+function qualityTextures(root){materialQuality.apply(root);const max=Math.min(renderer.capabilities.getMaxAnisotropy(),window.__resourcePolicy?.anisotropy||16);root.traverse(m=>{if(!m.isMesh)return;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))if(mat)for(const key of['map','normalMap','roughnessMap','metalnessMap','bumpMap','emissiveMap'])tuneTextureSampling(T,mat[key],max,!!(mat.userData&&mat.userData.packedAtlas));});}
 let waterDetail='mid';function setWaterDetail(q){if(q===waterDetail)return;let [rings,segments]=waterDetailSettings(q);if(rings*segments>65535&&!renderer.capabilities.isWebGL2&&!renderer.extensions.get('OES_element_index_uint'))[rings,segments]=waterDetailSettings('high');const old=seaGrid.geometry;seaGrid.geometry=makeWaterGrid(T,150,rings,segments);old.dispose();waterDetail=q;}
 
 // 環境光照貼圖（由同一套天空/樹林產生）
@@ -633,10 +639,10 @@ function addRipple(x, z, amp){ const r = ripS[ripI]; ripI = (ripI+1)%12; r.x=x; 
 function seaH(x,z,t){ return sampleWater(x,z,t,U.uWind.value,true).height; }
 function swell(x,z,t){return sampleWater(x,z,t,U.uWind.value,seaMode).height;}
 
-function updateEnvironment(dt,t){U.uTime.value=t;U.uLightK.value=Math.min(1,Math.max(0,info.light));envJobs.update(window.__frameSeconds||dt);const w=U.uWind.value,k=(.002+.01*w.z)*dt;U.uCloudOff.value.x+=w.x*k;U.uCloudOff.value.y+=w.y*k;}
+function updateEnvironment(dt,t){U.uTime.value=t;U.uLightK.value=Math.min(1,Math.max(0,info.light));if(window.__effectBudget?.probes!==false)envJobs.update(window.__frameSeconds||dt);const w=U.uWind.value,k=(.002+.01*w.z)*dt;U.uCloudOff.value.x+=w.x*k;U.uCloudOff.value.y+=w.y*k;}
 function update(dt, t){
   {const target=new T.Vector3();camera.getWorldPosition(target);target.y=0;sunLight.target.position.copy(target);sunLight.position.copy(target).addScaledVector(U.uSunDir.value,60);sunLight.target.updateMatrixWorld();}
-  envJobs.update(window.__frameSeconds||dt);optics.update();U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
+  if(window.__effectBudget?.probes!==false)envJobs.update(window.__frameSeconds||dt);optics.update();U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
   if(seaGrid.visible) seaGrid.position.set(U.uEye.value.x,0,U.uEye.value.z);
   { const w=U.uWind.value, k=(.002+.01*w.z)*dt; U.uCloudOff.value.x+=w.x*k; U.uCloudOff.value.y+=w.y*k; }
   for(let i=0;i<12;i++){ const r = ripS[i]; r.age += dt; rip[i].set(r.x, r.z, r.age, r.age < 5 ? r.amp : 0); }
@@ -685,11 +691,11 @@ function renderRefl(){
 
 const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
-const radiance=createSceneRadiance(T,renderer),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
-function render(){const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
+const radiance=createSceneRadiance(T,renderer,prepareScene),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
+function render(){prepareScene(scene);const oldEnv=scene.environment;if(window.__effectBudget?.environment===false)scene.environment=null;const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
  try{const now=U.uTime.value,hz=window.__gfxStatus&&window.__gfxStatus.level===7?30:20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz;if(renderer.shadowMap.needsUpdate)lastShadow=now;
   submerged.render();if(reflEnabled){try{renderRefl();}catch(e){reflEnabled=false;WU.uReflOn.value=0;console.warn('refl off',e);}}radiance.render(scene,camera);
- }finally{renderer.shadowMap.autoUpdate=auto;renderer.shadowMap.needsUpdate=request;}
+ }finally{scene.environment=oldEnv;renderer.shadowMap.autoUpdate=auto;renderer.shadowMap.needsUpdate=request;}
 }
 
 function suspendEffects(){releaseSceneGPU(scene);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}lastShadow=-Infinity;reflRT.setSize(4,4);WU.uReflOn.value=0;submerged.target.setSize(4,4);WU.uSubmergedOn.value=0;radiance.release();}
@@ -705,5 +711,5 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { updateEnvironment,resetGraphics,suspendEffects,invalidateEnvironment,interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { setEffects,prepareScene,updateEnvironment,resetGraphics,suspendEffects,invalidateEnvironment,interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }

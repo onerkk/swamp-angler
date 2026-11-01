@@ -40,7 +40,7 @@ def uniform(name,v):
   elif len(v)==3:u3(l,*v)
   else:a=np.array(v,dtype=np.float32);um(l,1,0,a.ctypes.data)
  else:u1(l,v)
-for name,v in {'modelMatrix':cfg['model'],'viewMatrix':cfg['view'],'projectionMatrix':cfg['projection'],'cameraPosition':[0,1.4,0],'uEye':[0,1.4,0],'uPhoto':1,'uExpo':1,'uSunDir':[.5,.7,-.5],'uLightCol':[1.5,1.3,1.05],'uSunVis':1,'uHorizon':[.45,.55,.65],'uZenith':[.15,.25,.5],'uWind':[.95,.31,.25],'uWave':1,'uYaw':.25,'uNightDeep':.05,'uFogCol':[.45,.53,.6],'uFogDen':.001,'uDeep':[.012,.03,.025],'uScatter':[.028,.07,.06],'uSeaCol':[.008,.065,.115]}.items():uniform(name,v)
+for name,v in {'modelMatrix':cfg['model'],'viewMatrix':cfg['view'],'projectionMatrix':cfg['projection'],'cameraPosition':[0,1.4,0],'uEye':[0,1.4,0],'uPhoto':1,'uExpo':1,'uSunDir':[.5,.7,-.5],'uLightCol':[1.5,1.3,1.05],'uSunVis':1,'uHorizon':[.45,.55,.65],'uZenith':[.15,.25,.5],'uWind':[.95,.31,.25],'uWave':1,'uDetail':1,'uYaw':.25,'uNightDeep':.05,'uFogCol':[.45,.53,.6],'uFogDen':.001,'uDeep':[.012,.03,.025],'uScatter':[.028,.07,.06],'uSeaCol':[.008,.065,.115]}.items():uniform(name,v)
 buffer=f('glGenBuffers',None,[C.c_int,C.POINTER(C.c_uint)]);bind=f('glBindBuffer',None,[C.c_uint,C.c_uint]);data=f('glBufferData',None,[C.c_uint,C.c_ssize_t,C.c_void_p,C.c_uint]);va=f('glGetAttribLocation',C.c_int,[C.c_uint,C.c_char_p]);enable=f('glEnableVertexAttribArray',None,[C.c_uint]);attrib=f('glVertexAttribPointer',None,[C.c_uint,C.c_int,C.c_uint,C.c_ubyte,C.c_int,C.c_void_p]);ids=(C.c_uint*2)();buffer(2,ids)
 p=np.array(cfg['position'],np.float32);ix=np.array(cfg['index'],np.uint32);bind(0x8892,ids[0]);data(0x8892,p.nbytes,p.ctypes.data,0x88E4);at=va(program,b'position');enable(at);attrib(at,3,0x1406,0,0,None);bind(0x8893,ids[1]);data(0x8893,ix.nbytes,ix.ctypes.data,0x88E4)
 gentex=f('glGenTextures',None,[C.c_int,C.POINTER(C.c_uint)]);activetex=f('glActiveTexture',None,[C.c_uint]);bindtex=f('glBindTexture',None,[C.c_uint,C.c_uint]);texImage=f('glTexImage2D',None,[C.c_uint,C.c_int,C.c_int,C.c_int,C.c_int,C.c_int,C.c_uint,C.c_uint,C.c_void_p]);param=f('glTexParameteri',None,[C.c_uint,C.c_uint,C.c_int]);tex=(C.c_uint*5)();gentex(5,tex)
@@ -57,10 +57,22 @@ for sea in [False,True]:
   uniform('uTime',t);clearColor(.16,.2,.24,1);clear(0x4000);draw(0x0004,len(ix),0x1405,None);finish();a=np.zeros((384,512,4),np.uint8);read(0,0,512,384,0x1908,0x1401,a.ctypes.data);a=np.flipud(a);frames.append(a);Image.fromarray(a).save(output/('water-'+('sea' if sea else 'lake')+'-'+str(t)+'.png'))
  delta=np.abs(frames[0][220:,:,:3].astype(float)-frames[1][220:,:,:3]).mean();print(('sea' if sea else 'lake'),'animated mean RGB difference',round(float(delta),3));assert delta>1,'surface did not visibly animate'
 
+# Heavy rain must compile/render at both budgets, while moving waves remain visible.
+for detail in [0,1]:
+ uniform('uDetail',detail);uniform('uRain',.85)
+ for sea in [0,1]:
+  uniform('uSea',sea);frames=[]
+  for t in [.6,1.2]:
+   uniform('uTime',t);clear(0x4000);draw(0x0004,len(ix),0x1405,None);finish();a=np.zeros((384,512,4),np.uint8);read(0,0,512,384,0x1908,0x1401,a.ctypes.data);frames.append(a.copy())
+  delta=np.abs(frames[0][:164,:,:3].astype(float)-frames[1][:164,:,:3]).mean();print('rain detail',detail,'sea',sea,'wave difference',round(float(delta),3));assert delta>.5
+uniform('uRain',0);uniform('uDetail',1)
+
 # Regression: fish in the transmission target must affect the actual water pixels.
 mask=Image.new('RGBA',(512,384),(0,0,0,0));pen=ImageDraw.Draw(mask);pen.ellipse((210,270,300,310),fill=(110,75,35,220));pen.polygon([(215,290),(192,270),(192,310)],fill=(100,65,30,210));mask.save(output/'submerged-test-fish.png')
-texture(4,output/'submerged-test-fish.png');uniform('uSea',0);uniform('uSubmergedSize',[512,384]);frames=[]
-for enabled in [0,1]:
- uniform('uSubmergedOn',enabled);clear(0x4000);draw(0x0004,len(ix),0x1405,None);finish();a=np.zeros((384,512,4),np.uint8);read(0,0,512,384,0x1908,0x1401,a.ctypes.data);frames.append(np.flipud(a).copy())
-delta=np.abs(frames[1][270:311,192:301,:3].astype(float)-frames[0][270:311,192:301,:3]).mean();print('transmitted fish mean RGB difference',round(float(delta),3));assert delta>3,'water still covers submerged fish'
-Image.fromarray(frames[1]).save(output/'visible-transmitted-fish.png')
+for detail in [0,1]:
+ uniform('uDetail',detail)
+ texture(4,output/'submerged-test-fish.png');uniform('uSea',0);uniform('uSubmergedSize',[512,384]);frames=[]
+ for enabled in [0,1]:
+  uniform('uSubmergedOn',enabled);clear(0x4000);draw(0x0004,len(ix),0x1405,None);finish();a=np.zeros((384,512,4),np.uint8);read(0,0,512,384,0x1908,0x1401,a.ctypes.data);frames.append(np.flipud(a).copy())
+ delta=np.abs(frames[1][270:311,192:301,:3].astype(float)-frames[0][270:311,192:301,:3]).mean();print('transmitted fish mean RGB difference',round(float(delta),3));assert delta>3,'water still covers submerged fish'
+ Image.fromarray(frames[1]).save(output/'visible-transmitted-fish.png')

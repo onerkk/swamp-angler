@@ -146,7 +146,7 @@ function updQte(dt){ if(!qte) return; qte.t-=dt; if(qte.t<=0){ qte=null; qEl.cla
 
 function update(dt,t){
   const rain=W.U.uRain.value, cw=rU.uC.value; W.camera.getWorldPosition(cw);
-  rU.uRain.value=rain>.03?Math.min(1,rain*1.2):0; rings.visible=drops.visible=rain>.03&&!c.underwater()&&G.loc!=='ice'&&window.__GFX!=='low';
+  rU.uRain.value=rain>.03?Math.min(1,rain*1.2):0; rings.visible=drops.visible=rain>.03&&!c.underwater()&&G.loc!=='ice'&&window.__GFX!=='low'&&window.__effectBudget?.rainRings!==false;
   const L=clamp(W.info.light,.15,1); rU.uCol.value.setRGB(.85*L,.9*L,.95*L);
   dU.uScale.value=window.innerHeight*W.getPR()/(2*Math.tan(W.camera.fov*Math.PI/360));
   updSnatch(dt); updOver(dt); updQte(dt);

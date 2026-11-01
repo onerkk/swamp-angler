@@ -223,10 +223,10 @@ function updateWeather(dt){
   const ic=((W.info.day<.2&&cur.c<.4)?(window.__MOONPH?window.__MOONPH.emo():'🌙'):wxEmo(wxType))+' '+Math.round(windNow*(W.isSea&&W.isSea()?1.6:1))+'m/s'; if(ic!==lastIcon){ lastIcon=ic; const el=wxIcon('wxI'); if(el) el.textContent=ic; }
 }
 function updateRain(dt){
-  if(cur.r<.02||(window.__G&&window.__G.loc==='ice')){ rainL.visible=false; return; }
+  const count=Math.min(NR,window.__effectBudget?.rainLines??NR);rgeo.setDrawRange(0,count*2);if(!count||cur.r<.02||(window.__G&&window.__G.loc==='ice')){ rainL.visible=false; return; }
   rainL.visible=true; W.camera.getWorldPosition(cw); rainL.position.copy(cw);
   const ws=clamp(windNow/12,0,1), wvx=Math.cos(windAng)*ws, wvz=Math.sin(windAng)*ws;
-  for(let i=0;i<NR;i++){ let y=roff[i*3+1]-dt*10; roff[i*3]+=wvx*dt*6; roff[i*3+2]+=wvz*dt*6; if(roff[i*3]>10) roff[i*3]-=20; if(roff[i*3]<-10) roff[i*3]+=20; if(roff[i*3+2]>10) roff[i*3+2]-=20; if(roff[i*3+2]<-10) roff[i*3+2]+=20; if(cw.y+y<-.1) y+=14; roff[i*3+1]=y; const x=roff[i*3], z=roff[i*3+2];
+  for(let i=0;i<count;i++){ let y=roff[i*3+1]-dt*10; roff[i*3]+=wvx*dt*6; roff[i*3+2]+=wvz*dt*6; if(roff[i*3]>10) roff[i*3]-=20; if(roff[i*3]<-10) roff[i*3]+=20; if(roff[i*3+2]>10) roff[i*3+2]-=20; if(roff[i*3+2]<-10) roff[i*3+2]+=20; if(cw.y+y<-.1) y+=14; roff[i*3+1]=y; const x=roff[i*3], z=roff[i*3+2];
     rpos[i*6]=x; rpos[i*6+1]=y; rpos[i*6+2]=z; rpos[i*6+3]=x-wvx*.35+.01; rpos[i*6+4]=y+.38; rpos[i*6+5]=z-wvz*.35; }
   rgeo.attributes.position.needsUpdate=true; rmat.opacity=.45*cur.r; rmat.color.setScalar(.75*clamp(W.info.light,.2,1));
 }

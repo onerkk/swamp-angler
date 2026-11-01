@@ -201,7 +201,7 @@ function update(dt,t){
   // 環境音
   Snd.setAmb({wind:wd.s, lap:ctx.spot()===0?.7:.35, cic:(per==='day'&&wx.r<.2&&wx.c<.7)?1:0, crk:(per==='night'||per==='dusk')&&wx.r<.3?1:0});
   // 螢幕雨滴
-  const rk=(uw||(window.__G&&window.__G.loc==='ice'))?0:W.U.uRain.value;
+  const rk=(window.__effectBudget?.rainOverlay===false||uw||(window.__G&&window.__G.loc==='ice'))?0:W.U.uRain.value;
   if(rk>.05){ if(!dOn){ dOn=true; dc.style.opacity='1'; }
     if(Math.random()<dt*rk*7&&drops.length<42) drops.push({x:Math.random()*dW,y:Math.random()*dH*.9,r:rand(3,9)*dW/600,v:0,life:rand(4,10),sl:Math.random()<.35});
     dx.clearRect(0,0,dW,dH);
@@ -214,7 +214,7 @@ function update(dt,t){
   } else if(dOn){ dOn=false; dc.style.opacity='0'; setTimeout(()=>{ if(!dOn){ drops=[]; dx.clearRect(0,0,dW,dH); } },700); }
   // 太陽眩光
   let op=0;
-  if(!uw){ tv.copy(cw).addScaledVector(W.U.uSunDisk.value,500).project(W.camera);
+  if(!uw&&window.__effectBudget?.lensFlare!==false){ tv.copy(cw).addScaledVector(W.U.uSunDisk.value,500).project(W.camera);
     if(tv.z<1&&Math.abs(tv.x)<1.3&&Math.abs(tv.y)<1.3){ const s=W.U.uSunCol.value, k=clamp((s.x+s.y+s.z)/3/2.2,0,1)*W.U.uSunVis.value;
       op=k*(1-sstep(.85,1.3,Math.max(Math.abs(tv.x),Math.abs(tv.y))));
       if(op>.01){ const X=(tv.x*.5+.5)*innerWidth, Y=(-tv.y*.5+.5)*innerHeight, cx=innerWidth/2, cy=innerHeight/2;

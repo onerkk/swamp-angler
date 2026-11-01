@@ -264,7 +264,7 @@ function updDistMark(){ const st=G.state; let p=null;
   if(!p||document.body.classList.contains('sheetOn')||UW.active()){ DMK.style.display='none'; return; }   // 水下鏡頭時不顯示水面距離
   const d=Math.hypot(p.x-(G.angler||G.base).x,p.z-(G.angler||G.base).z); DMV.set(p.x,(p.y||0)+.05,p.z).project(W.camera); if(DMV.z>1){ DMK.style.display='none'; return; }
   DMK.style.display='block'; DMK.style.left=((DMV.x+1)/2*innerWidth)+'px'; DMK.style.top=((1-DMV.y)/2*innerHeight)+'px'; DMKt.textContent=d.toFixed(d<10?1:0)+' 米'; }
-function startRetrieve(msg,cls){ G.retrievePath=PH.route(rod.tipW,bob.position,.085).slice().reverse().map(p=>new T.Vector3(p.x,p.y,p.z)); G.retrieveNode=1; exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
+function startRetrieve(msg,cls){ G.retrievePath=PH.route(rod.tipW,bob.position,.085).slice().reverse().map(p=>new T.Vector3(p.x,p.y,p.z)); G.retrieveNode=1;G.retrieveClock=0; exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
 function nibble(){ const big=Math.random()<.25; G.dip=big?.75:.28; G.dipMax=G.dip; G.dipAmp=big?.14:.035; W.addRipple(G.to.x,G.to.z,big?.5:.18); if(big){ P.splash(G.to.x,0,G.to.z,5,.35); Snd.bite(); vib([40,30,60]); } else { Snd.nibble(); vib(12); } G.approach=Math.max(G.approach,.01); }
 // 體型等級：u 是這條魚在該魚種體型範圍內的位置（0 最小、1 最大，巨物可再超出）
 const GRADES=[[.2,'幼魚'],[.7,'成魚'],[.93,'大物'],[9,'巨物']];
@@ -659,7 +659,7 @@ const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* Adaptive profiles change resolution, reflection, shadow and effect budgets together. */
 window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;return Math.max(.35,Math.min(3.25,Math.max(2,window.devicePixelRatio||1),Math.sqrt(12000000/(w*h)),limit/w,limit/h));};
 const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,initialLevel:window.__resourcePolicy?.mobile?1:4,profile:(p,scope,cap)=>{if(window.__resourcePolicy?.recovery&&p.mode==='auto'){const safe={...p,...graphicsProfiles(cap)[Math.min(p.level,2)],maxLevel:2,reason:'前次中斷後的保護模式'};return{...safe,pr:Math.min(safe.pr,.8)};}return aquariumGraphicsProfile(p,scope,cap);},apply:s=>{
-  window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;
+  window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;window.__effectBudget=effectBudget(s.level);if(W.setEffects)W.setEffects(s.level);
   if(W.setWaterDetail)W.setWaterDetail(s.geometry);if(W.setShadows)W.setShadows(s.shadow);if(W.setRefl)W.setRefl(s.reflection>0,s.reflection);W.setPR(s.pr);
   document.body.dataset.gfx=s.effect;document.body.dataset.gfxMode=s.mode;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);
 },onSample:s=>{window.__FPS=s.fps;window.__gfxStatus=s;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);}});
@@ -980,7 +980,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       trem=(.012+.05*f.T)*(f.run?1.6:1); } }
   else if(st==='retrieve'){
     const path=G.retrievePath||[bob.position.clone(),rod.tipW.clone()];
-    let budget=dt*1.5*META.gear().reel.spd;
+    const retrieveSeconds=Math.max(0,window.__frameSeconds||dt);let budget=retrieveTravelBudget(path,G.retrieveNode,bob.position,G.retrieveClock||0,retrieveSeconds);G.retrieveClock=(G.retrieveClock||0)+retrieveSeconds;
     while(budget>0&&G.retrieveNode<path.length){
       const target=path[G.retrieveNode], old=bob.position.clone(), distance=old.distanceTo(target), step=Math.min(distance,budget);
       const want=old.clone().lerp(target,distance>.0001?step/distance:1), q=PH.move(old,want,.065);
