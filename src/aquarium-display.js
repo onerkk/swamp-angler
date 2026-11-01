@@ -34,3 +34,9 @@ function aquariumCameraPosition(T,tk,fromWorld,toWorld){
  return from.add(offset);
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={aquariumGraphicsProfile,createAquariumPlantBatch,aquariumCameraPosition};
+/* Cabin auto quality varies pixels, without recompiling every resident's materials. */
+function stableCabinGraphicsProfile(profile,scope,mobile){
+ if(!mobile||profile.mode!=='auto'||!String(scope).startsWith('home'))return profile;
+ return{...profile,effectLevel:1,effect:'low',shadow:'low',reflection:0,geometry:'low'};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports.stableCabinGraphicsProfile=stableCabinGraphicsProfile;

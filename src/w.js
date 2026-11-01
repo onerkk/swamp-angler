@@ -114,6 +114,7 @@ function createHomeScene(W,c){
 'use strict';
 const T=THREE, R=W.renderer, scene=new T.Scene(), cam=new T.PerspectiveCamera(62,1,.05,60), TL=new T.TextureLoader();
 window.__HOME_SCENE=scene;
+const homeWork=createHomeWorkQueue({canRun:()=>on&&!document.hidden&&!document.querySelector('[data-photo-preview]'),report:error=>console.error('home work',error),onSlow:(label,ms)=>window.__DIAG?.event('home-work',{label,ms})});
 let on=false, yaw=0, pitch=-.08, yawT=0, pitchT=-.08, drag=null, t=0;
 const EYE=1.6, ROOM={x:4.4,zb:-4.2,zf:2.8,h:2.9}   /* 房間加寬（6.4→8.8 公尺），兩個水族箱升到最大也能並排、一樣大 */;
 // 站在房間中段：轉頭時左邊窗戶、右邊壁爐都在畫面中央
@@ -246,7 +247,7 @@ const sparkTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.hei
 const sparks=[]; for(let i=0;i<30;i++){ const s=new T.Sprite(new T.SpriteMaterial({map:sparkTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending})); s.scale.set(.025,.025,1); s.visible=false; scene.add(s); sparks.push({s,v:new T.Vector3(),t:0,life:1}); }
 const fireL=new T.PointLight(0xff8a40,2.2,9,1.3); fireL.position.set(ROOM.x-1.1,.6,FP.z); scene.add(fireL);
 // 家具：Poly Haven 真實模型（CC0），回家時才載入。位置以房間中央偏後的客廳區為主
-const GL=createHomeModelQueue(new T.GLTFLoader(),error=>console.error('home model callback',error)), mcache={}, glowM=[];
+const GL=createHomeModelQueue(new T.GLTFLoader(),error=>console.error('home model callback',error),(fn,label)=>homeWork.add(fn,label)), mcache={}, glowM=[];
 const ART={hanging_picture_frame_01:'mer_paint.jpg',hanging_picture_frame_02:'mer_paint.jpg'};   /* 小屋牆上的美人魚畫像：月光下坐在礁石上的全身畫 */
 function put(name,x,y,z,ry,sc,fn,failed){ const place=g=>{ const o=g.scene.clone(true); o.position.set(x,y,z); o.rotation.y=ry||0; o.scale.setScalar(sc||1);
     o.traverse(m=>{ if(!m.isMesh) return; m.frustumCulled=false; m.castShadow=true; m.receiveShadow=true; m.material=Array.isArray(m.material)?m.material.map(k=>k.clone()):m.material.clone(); const mats=Array.isArray(m.material)?m.material:[m.material];
@@ -255,7 +256,7 @@ function put(name,x,y,z,ry,sc,fn,failed){ const place=g=>{ const o=g.scene.clone
         if(/_glass$/.test(mm.name)){ m.castShadow=false; const nm=new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.12,roughness:.05,metalness:0,depthWrite:false}); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_lamp$/.test(mm.name)){ const nm=mm.clone(); nm.emissive=new T.Color(0xffd080); nm.emissiveIntensity=1.2; if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; glowM.push(nm); } }); });
     if(W.qualityTextures)W.qualityTextures(o);scene.add(o); addObs(o); if(fn) fn(o); };
-  if(mcache[name]) place(mcache[name]); else GL.load('models/home/'+name+'.glb',g=>{ mcache[name]=g; place(g); },undefined,()=>{console.warn('home model',name);if(failed)failed();}); }
+  if(mcache[name]) homeWork.add(()=>place(mcache[name]),'furniture '+name); else GL.load('models/home/'+name+'.glb',g=>{ mcache[name]=g; place(g); },undefined,()=>{console.warn('home model',name);if(failed)failed();}); }
 const LV={x:-.9,z:-.45};   /* 客廳區往前移：魚缸前留 1.4 公尺走道，可以走到玻璃前面看 */
 // 碰撞：落地的家具用實際模型的外框當障礙（升級換模型也自動跟著變），走路時不能穿過去
 const OBS=[];
@@ -393,7 +394,7 @@ const brassM=new T.MeshStandardMaterial({color:0xb08a4a,roughness:.3,metalness:.
 // tanks 依水質存放每個缸：群組、尺寸、位置、魚、水草、氣泡
 const tankLightTime=W.U.uTime;
 const tankModels=new Map();
-function loadTankModel(file,fn){let item=tankModels.get(file);if(item){if(item.model)fn(item.model);else item.wait.push(fn);return;}item={wait:[fn]};tankModels.set(file,item);GL.load(file,model=>{if(W.qualityTextures)W.qualityTextures(model.scene);item.model=model;for(const f of item.wait.splice(0)){try{f(model);}catch(error){console.error('tank model callback',error);}}},undefined,()=>tankModels.delete(file));}
+function loadTankModel(file,fn){let item=tankModels.get(file);if(item){if(item.model)homeWork.add(()=>fn(item.model),'tank '+file);else item.wait.push(fn);return;}item={wait:[fn]};tankModels.set(file,item);GL.load(file,model=>{if(W.qualityTextures)W.qualityTextures(model.scene);item.model=model;for(const f of item.wait.splice(0))homeWork.add(()=>f(model),'tank '+file);},undefined,()=>tankModels.delete(file));}
 const tanks={}, causList=[], shaftList=[], tv2=new T.Vector3(), tv3=new T.Vector3();
 // 造景缸的木製底櫃：檯面板、門框、內嵌門片、黃銅把手、踢腳
 function standCabinet(g,W,Hs,D){ const add=(geo,m,px,py,pz)=>{ const o=new T.Mesh(geo,m); o.position.set(px,py,pz); g.add(o); return o; };
@@ -514,19 +515,22 @@ function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.s
   if(tanks._tier!==tierSig){ buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?-ROOM.x*.48:0);   /* 有海水缸時兩缸左右對稱並排 */ if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,ROOM.x*.48); } else if(tanks.sea){destroyTank(tanks.sea);delete tanks.sea;}tanks._tier=tierSig;}
   for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=(Array.isArray(want[w])?want[w]:[]).filter(r=>r&&typeof r.id==='string'&&Number.isFinite(r.L)&&r.L>0), sig=list.map(r=>r.id+r.d+':'+r.L+(c.isReal(r.id)?'r':'')).join('|')+':'+!!(window.__TIDE&&window.__TIDE.makeModel);
     const rebuild=sig!==tk.sig;if(!rebuild&&!(tk.pending&&tk.pending.length))continue;tk.sig=sig;
-    if(rebuild){tk.fish.forEach(f=>disposeAquariumResident(f.o,tk.optics));tk.fish=[];tk.motion.bodies.length=0;tk.fitScale=aquariumFitScale(tk.spec,list);}
-    const retry=rebuild?list:tk.pending;tk.pending=[];let added=false;
-    retry.forEach(rec=>{let created=null;try{ c.want(rec.id);const model=fishObj(rec);if(!model){tk.pending.push(rec);return;}
+    const layout=list.map(r=>r.id+r.d+':'+r.L).join('|'),layoutChanged=tk.layoutSig!==layout;tk.layoutSig=layout;
+    const sourceSig=rec=>(c.isReal(rec.id)?'real':'fallback')+(BENTHIC[rec.id]?':'+!!(window.__TIDE&&window.__TIDE.makeModel):'');
+    if(layoutChanged){tk.residentEpoch={};tk.loading=new Set();tk.fish.forEach(f=>disposeAquariumResident(f.o,tk.optics));tk.fish=[];tk.motion.bodies.length=0;tk.fitScale=aquariumFitScale(tk.spec,list);}
+    else if(rebuild){tk.fish=tk.fish.filter(f=>{if(f.sourceSig===sourceSig(f.rec))return true;disposeAquariumResident(f.o,tk.optics);const i=tk.motion.bodies.indexOf(f);if(i>=0)tk.motion.bodies.splice(i,1);return false;});}
+    const retry=rebuild?list.filter(rec=>!tk.fish.some(f=>f.rec===rec||f.rec.id===rec.id&&f.rec.d===rec.d&&f.rec.L===rec.L)):tk.pending;tk.pending=[];tk.loading=tk.loading||new Set();const epoch=tk.residentEpoch,loading=tk.loading;
+    retry.forEach(rec=>{const source=sourceSig(rec),key=rec.id+':'+rec.d+':'+rec.L+':'+source;if(loading.has(key))return;loading.add(key);homeWork.add(()=>{loading.delete(key);if(tanks[w]!==tk||tk.residentEpoch!==epoch)return;if(sourceSig(rec)!==source){tk.pending.push(rec);return;}let created=null;try{ c.want(rec.id);const model=fishObj(rec);if(!model){tk.pending.push(rec);return;}
       model.scale.setScalar(1);const bottom=!!BENTHIC[rec.id],procedural=!!model.userData.aquariumProcedural;
       const o=aquariumCenterModel(T,model,procedural);created=o;if(!o){tk.pending.push(rec);return;}
       const modelBox=aquariumModelBounds(T,o,procedural),modelSize=modelBox.getSize(new T.Vector3());
       const length=aquariumResidentLength(tk.spec,rec,tk.fitScale,bottom,list.length);
       o.scale.setScalar(length/Math.max(modelSize.x,modelSize.y,modelSize.z,.001));o.userData.rec=rec;
       const body=aquariumBodyBounds(aquariumModelBounds(T,o,procedural),length,bottom);
-      const f={o,rec,body,bottom,yaw:Math.random()<.5?0:Math.PI,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni};
+      const f={o,rec,body,bottom,sourceSig:sourceSig(rec),yaw:Math.random()<.5?0:Math.PI,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni};
       o.rotation.y=f.yaw; const b=bounds(tk,rec.L);o.position.set(0,(b.y0+b.y1)/2,tk.spec.d*.2);
-      if(W.qualityTextures)W.qualityTextures(o);tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.motion.add(f);pickTarget(f,tk);tk.fish.push(f);added=true;
-      }catch(err){if(created){for(let i=tk.motion.bodies.length-1;i>=0;i--)if(tk.motion.bodies[i].o===created)tk.motion.bodies.splice(i,1);disposeAquariumResident(created,tk.optics);}tk.pending.push(rec);if(tk.lastError!==String(err)){tk.lastError=String(err);console.error('tank fish',rec&&rec.id,err);}}});if(added||rebuild)tk.motion.pack(); } }
+      if(W.qualityTextures)W.qualityTextures(o);tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.motion.add(f);pickTarget(f,tk);tk.fish.push(f);tk.motion.pack();
+      }catch(err){if(created){for(let i=tk.motion.bodies.length-1;i>=0;i--)if(tk.motion.bodies[i].o===created)tk.motion.bodies.splice(i,1);disposeAquariumResident(created,tk.optics);}tk.pending.push(rec);if(tk.lastError!==String(err)){tk.lastError=String(err);console.error('tank fish',rec&&rec.id,err);}}},'aquarium resident '+rec.id);}); } }
 // 標本牆：右牆、壁爐後方，兩排各四個；大魚統一縮到木板放得下的長度
 const MSLOT=[]; for(const y of [1.8,2.45]) for(const z of [-3.95,-3.25,-2.55,-1.85]) MSLOT.push({y,z});   // 先掛視線高度那一排
 const mountG=new T.Group(); mountG.rotation.y=-Math.PI/2;mountG.position.z=ROOM.zf-ROOM.x;scene.add(mountG); let mountSig='';
@@ -593,7 +597,7 @@ const sun=new T.DirectionalLight(0xfff4e0,.8); sun.position.set(-4.05,2.2,.5); s
 sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-6,right:6,top:5,bottom:-5,near:.1,far:18});sun.shadow.bias=-.0003;sun.shadow.normalBias=.025;sun.shadow.radius=3; scene.add(sun,sun.target);
 function daylight(){ const h=((c.hour()%24)+24)%24; return Math.max(0,Math.min(1,Math.min(h-5.5,19-h)/2)); }
 function syncTime(){ const dl=daylight(), h=((c.hour()%24)+24)%24;
-  viewM.map=dl>.6?winTex.day:dl>.05?winTex.dawn:winTex.night; viewM.needsUpdate=true; viewM.color.setScalar(.35+.65*dl);
+  const map=dl>.6?winTex.day:dl>.05?winTex.dawn:winTex.night;if(viewM.map!==map){viewM.map=map;viewM.needsUpdate=true;} viewM.color.setScalar(.35+.65*dl);
   const lk=lightsOff()?0:1;
   hemi.intensity=(.3+.14*dl)*(lk?1:.45+.55*dl); sun.intensity=.9*dl; ceilL.intensity=(1.8-.7*dl)*lk; wallLs.forEach(w=>w.intensity=(2.6-1.3*dl)*lk); lampL.intensity=(1.6-.8*dl)*lk; glowM.forEach(m=>m.emissiveIntensity=(1.6-1.2*dl)*lk); }
 // 吊燈：點它開關燈（關燈時只剩爐火和窗外的光）
@@ -848,9 +852,9 @@ function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
     if(D.s.position.y<.3){ D.s.visible=false; flare.visible=true; flare.position.set(D.s.position.x+.05,.36,D.s.position.z); sparkM.opacity=.95; fireL.intensity*=1.5; c.sizzle&&c.sizzle(.3+Math.random()*.35); } });
   if(flare.visible){ sparkM.opacity-=dt*2.2; flare.scale.setScalar(.35+(.9-sparkM.opacity)*.3); if(sparkM.opacity<=0) flare.visible=false; }
   spin.position.y=Math.sin(GR.t*1.3)*.003; }
-function enter(){if(on)return;try{merArtSync();yaw=yawT=0;pitch=pitchT=-.08;vb=0;pRoom.set(0,EYE,.9);resize();syncTime();syncFish();exitView();syncFurn();updFurnTags();closeFurn();on=true;}catch(err){on=false;throw err;}try{if(c.onEnter)c.onEnter();}catch(err){console.error('home welcome',err);}}
+function enter(){if(on)return;homeWork.setActive(true);try{merArtSync();yaw=yawT=0;pitch=pitchT=-.08;vb=0;pRoom.set(0,EYE,.9);resize();syncTime();syncFish();exitView();syncFurn();updFurnTags();closeFurn();on=true;}catch(err){on=false;homeWork.setActive(false);throw err;}try{if(c.onEnter)c.onEnter();}catch(err){console.error('home welcome',err);}}
 function resetGraphics(){if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}lastHomeShadow=-Infinity;W.interiorReflection.release(scene);}
-function exit(){ on=false;resetGraphics();releaseSceneGPU(scene);W.radiance.release(); drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
+function exit(){ on=false;homeWork.setActive(false);resetGraphics();releaseSceneGPU(scene);W.radiance.release(); drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
 const reflectionAnchor=new T.Vector3(0,1.6,0);let lastHomeShadow=-Infinity;

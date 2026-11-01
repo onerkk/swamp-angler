@@ -1,4 +1,4 @@
-/*APPV:20261101093913*/
+/*APPV:20261101151318*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -81,6 +81,12 @@ function aquariumCameraPosition(T,tk,fromWorld,toWorld){
  return from.add(offset);
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={aquariumGraphicsProfile,createAquariumPlantBatch,aquariumCameraPosition};
+/* Cabin auto quality varies pixels, without recompiling every resident's materials. */
+function stableCabinGraphicsProfile(profile,scope,mobile){
+ if(!mobile||profile.mode!=='auto'||!String(scope).startsWith('home'))return profile;
+ return{...profile,effectLevel:1,effect:'low',shadow:'low',reflection:0,geometry:'low'};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports.stableCabinGraphicsProfile=stableCabinGraphicsProfile;
 /* Aquarium collision uses complete, rotated model bounds, with room for the tail stroke.
    Steering anticipates contact; the swept pose check is the final non-penetration guard. */
 function aquariumSpecs(){return [{w:2,h:1,d:.95,st:.7},{w:2.7,h:1.25,d:1.2,st:.65},{w:3.3,h:1.45,d:1.45,st:.6},{w:3.9,h:1.65,d:1.65,st:.55}];}
@@ -250,11 +256,11 @@ function homeFurnitureSlots(room){return {
 function homeFitFurniture(T,root,slot){const bounds=homeVisibleBounds(T,root);if(bounds.isEmpty())return;const size=bounds.getSize(new T.Vector3()),scale=Math.min(1,slot.w/Math.max(.001,size.x),slot.h/Math.max(.001,size.y),slot.d/Math.max(.001,size.z));root.scale.multiplyScalar(scale);root.updateMatrixWorld(true);const b=homeVisibleBounds(T,root),center=b.getCenter(new T.Vector3());root.position.add(new T.Vector3(slot.x-center.x,(slot.y||0)-b.min.y,slot.z-center.z));root.updateMatrixWorld(true);return homeVisibleBounds(T,root);}
 if(typeof module!=='undefined'&&module.exports)Object.assign(module.exports,{homeFurnitureSlots,homeFitFurniture});
 /* Bound model parsing/decode concurrency and reuse requests across home components. */
-function createHomeModelQueue(loader,report=()=>{}){
+function createHomeModelQueue(loader,report=()=>{},schedule=fn=>fn()){
  const cache=new Map(),pending=new Map(),queue=[];let running=false;
- function deliver(callback,value){try{if(callback)callback(value);}catch(error){report(error);}}
+ function deliver(callback,value){if(callback)schedule(()=>{try{callback(value);}catch(error){report(error);}},'model callback');}
  function next(){if(running||!queue.length)return;running=true;const job=queue.shift();
-  const finish=(value,error)=>{running=false;pending.delete(job.file);if(!error)cache.set(job.file,value);for(const w of job.wait)deliver(error?w.error:w.ready,error||value);next();};
+  const finish=(value,error)=>{running=false;pending.delete(job.file);if(!error)cache.set(job.file,value);for(const w of job.wait)deliver(error?w.error:w.ready,error||value);schedule(next,'next model');};
   try{loader.load(job.file,value=>finish(value,null),undefined,error=>finish(null,error||new Error('Home model load failed')));}catch(error){finish(null,error);}
  }
  return{load(file,ready,progress,error){if(cache.has(file)){deliver(ready,cache.get(file));return;}let job=pending.get(file);if(job){job.wait.push({ready,error});return;}job={file,wait:[{ready,error}]};pending.set(file,job);queue.push(job);next();}};
@@ -280,6 +286,15 @@ if(typeof module!=='undefined'&&module.exports)Object.assign(module.exports,{rel
 
 function createSceneLifetime(){return{alive:true,cancel(){this.alive=false;},wrap(fn){return(...args)=>{if(this.alive)return fn(...args);};}};}
 if(typeof module!=='undefined'&&module.exports)module.exports.createSceneLifetime=createSceneLifetime;
+
+/* One scene-building task per animation frame; parked when the cabin is inactive. */
+function createHomeWorkQueue({schedule=fn=>typeof requestAnimationFrame==='function'?requestAnimationFrame(fn):setTimeout(fn,16),now=()=>performance.now(),report=()=>{},onSlow=()=>{},canRun=()=>true}={}){
+ const jobs=[];let queued=false,active=true;
+ function request(){if(!queued&&active&&jobs.length){queued=true;schedule(drain);}}
+ function drain(){queued=false;if(!active)return;if(!canRun()){request();return;}const job=jobs.shift();if(!job)return;const start=now();try{job.fn();}catch(error){report(error);}finally{const ms=now()-start;if(ms>30)onSlow(job.label,Math.round(ms));request();}}
+ return{add(fn,label='scene build'){jobs.push({fn,label});request();},setActive(on){active=!!on;request();},pending:()=>jobs.length};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports.createHomeWorkQueue=createHomeWorkQueue;
 /* Copy one rendered framebuffer and bounded visible UI. No DOM clone or second WebGL render. */
 function captureDimensions(width,height,dpr=1,sourceWidth=Infinity,sourceHeight=Infinity){const scale=Math.min(1.5,Math.max(.1,dpr),1280/Math.max(width,height),sourceWidth/width,sourceHeight/height,Math.sqrt(1200000/(width*height)));return{width:Math.max(1,Math.round(width*scale)),height:Math.max(1,Math.round(height*scale)),scale};}
 function screenshotIgnores(element,canvas,style=getComputedStyle){if(element===canvas||element.hasAttribute?.('data-screenshot-ignore'))return true;if(['STYLE','LINK','SCRIPT','HEAD','CANVAS','VIDEO'].includes(element.tagName))return true;const s=style(element);return s.display==='none'||s.visibility==='hidden'||Number(s.opacity)===0;}
@@ -392,7 +407,7 @@ function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null,initialL
  }
  return{configure,sample,pause,status,refresh:()=>apply(status())};
 }
-function graphicsStatusText(s){const a=typeof window!=='undefined'?window.__materialLightingAudit:null;return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS・上限 120`+(a?`・受光材質 ${a.lit}／法線 ${a.normalMapped}／凹凸 ${a.bumpMapped}`:'');}
+function graphicsStatusText(s){const a=typeof window!=='undefined'?window.__materialLightingAudit:null;return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS・上限 120`+(s.effectLevel!==undefined?'・木屋材質固定流暢':'')+(a?`・受光材質 ${a.lit}／法線 ${a.normalMapped}／凹凸 ${a.bumpMapped}`:'');}
 if(typeof module!=='undefined'&&module.exports)module.exports={recoverMobileGraphics,graphicsProfiles,createAdaptiveGraphics,graphicsStatusText};
 
 function waterDetailSettings(quality){return{low:[24,48],mid:[112,192],high:[160,256],ultra:[224,320]}[quality]||[112,192];}
@@ -5870,6 +5885,7 @@ function createHomeScene(W,c){
 'use strict';
 const T=THREE, R=W.renderer, scene=new T.Scene(), cam=new T.PerspectiveCamera(62,1,.05,60), TL=new T.TextureLoader();
 window.__HOME_SCENE=scene;
+const homeWork=createHomeWorkQueue({canRun:()=>on&&!document.hidden&&!document.querySelector('[data-photo-preview]'),report:error=>console.error('home work',error),onSlow:(label,ms)=>window.__DIAG?.event('home-work',{label,ms})});
 let on=false, yaw=0, pitch=-.08, yawT=0, pitchT=-.08, drag=null, t=0;
 const EYE=1.6, ROOM={x:4.4,zb:-4.2,zf:2.8,h:2.9}   /* 房間加寬（6.4→8.8 公尺），兩個水族箱升到最大也能並排、一樣大 */;
 // 站在房間中段：轉頭時左邊窗戶、右邊壁爐都在畫面中央
@@ -6002,7 +6018,7 @@ const sparkTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.hei
 const sparks=[]; for(let i=0;i<30;i++){ const s=new T.Sprite(new T.SpriteMaterial({map:sparkTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending})); s.scale.set(.025,.025,1); s.visible=false; scene.add(s); sparks.push({s,v:new T.Vector3(),t:0,life:1}); }
 const fireL=new T.PointLight(0xff8a40,2.2,9,1.3); fireL.position.set(ROOM.x-1.1,.6,FP.z); scene.add(fireL);
 // 家具：Poly Haven 真實模型（CC0），回家時才載入。位置以房間中央偏後的客廳區為主
-const GL=createHomeModelQueue(new T.GLTFLoader(),error=>console.error('home model callback',error)), mcache={}, glowM=[];
+const GL=createHomeModelQueue(new T.GLTFLoader(),error=>console.error('home model callback',error),(fn,label)=>homeWork.add(fn,label)), mcache={}, glowM=[];
 const ART={hanging_picture_frame_01:'mer_paint.jpg',hanging_picture_frame_02:'mer_paint.jpg'};   /* 小屋牆上的美人魚畫像：月光下坐在礁石上的全身畫 */
 function put(name,x,y,z,ry,sc,fn,failed){ const place=g=>{ const o=g.scene.clone(true); o.position.set(x,y,z); o.rotation.y=ry||0; o.scale.setScalar(sc||1);
     o.traverse(m=>{ if(!m.isMesh) return; m.frustumCulled=false; m.castShadow=true; m.receiveShadow=true; m.material=Array.isArray(m.material)?m.material.map(k=>k.clone()):m.material.clone(); const mats=Array.isArray(m.material)?m.material:[m.material];
@@ -6011,7 +6027,7 @@ function put(name,x,y,z,ry,sc,fn,failed){ const place=g=>{ const o=g.scene.clone
         if(/_glass$/.test(mm.name)){ m.castShadow=false; const nm=new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.12,roughness:.05,metalness:0,depthWrite:false}); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_lamp$/.test(mm.name)){ const nm=mm.clone(); nm.emissive=new T.Color(0xffd080); nm.emissiveIntensity=1.2; if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; glowM.push(nm); } }); });
     if(W.qualityTextures)W.qualityTextures(o);scene.add(o); addObs(o); if(fn) fn(o); };
-  if(mcache[name]) place(mcache[name]); else GL.load('models/home/'+name+'.glb',g=>{ mcache[name]=g; place(g); },undefined,()=>{console.warn('home model',name);if(failed)failed();}); }
+  if(mcache[name]) homeWork.add(()=>place(mcache[name]),'furniture '+name); else GL.load('models/home/'+name+'.glb',g=>{ mcache[name]=g; place(g); },undefined,()=>{console.warn('home model',name);if(failed)failed();}); }
 const LV={x:-.9,z:-.45};   /* 客廳區往前移：魚缸前留 1.4 公尺走道，可以走到玻璃前面看 */
 // 碰撞：落地的家具用實際模型的外框當障礙（升級換模型也自動跟著變），走路時不能穿過去
 const OBS=[];
@@ -6149,7 +6165,7 @@ const brassM=new T.MeshStandardMaterial({color:0xb08a4a,roughness:.3,metalness:.
 // tanks 依水質存放每個缸：群組、尺寸、位置、魚、水草、氣泡
 const tankLightTime=W.U.uTime;
 const tankModels=new Map();
-function loadTankModel(file,fn){let item=tankModels.get(file);if(item){if(item.model)fn(item.model);else item.wait.push(fn);return;}item={wait:[fn]};tankModels.set(file,item);GL.load(file,model=>{if(W.qualityTextures)W.qualityTextures(model.scene);item.model=model;for(const f of item.wait.splice(0)){try{f(model);}catch(error){console.error('tank model callback',error);}}},undefined,()=>tankModels.delete(file));}
+function loadTankModel(file,fn){let item=tankModels.get(file);if(item){if(item.model)homeWork.add(()=>fn(item.model),'tank '+file);else item.wait.push(fn);return;}item={wait:[fn]};tankModels.set(file,item);GL.load(file,model=>{if(W.qualityTextures)W.qualityTextures(model.scene);item.model=model;for(const f of item.wait.splice(0))homeWork.add(()=>f(model),'tank '+file);},undefined,()=>tankModels.delete(file));}
 const tanks={}, causList=[], shaftList=[], tv2=new T.Vector3(), tv3=new T.Vector3();
 // 造景缸的木製底櫃：檯面板、門框、內嵌門片、黃銅把手、踢腳
 function standCabinet(g,W,Hs,D){ const add=(geo,m,px,py,pz)=>{ const o=new T.Mesh(geo,m); o.position.set(px,py,pz); g.add(o); return o; };
@@ -6270,19 +6286,22 @@ function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.s
   if(tanks._tier!==tierSig){ buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?-ROOM.x*.48:0);   /* 有海水缸時兩缸左右對稱並排 */ if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,ROOM.x*.48); } else if(tanks.sea){destroyTank(tanks.sea);delete tanks.sea;}tanks._tier=tierSig;}
   for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=(Array.isArray(want[w])?want[w]:[]).filter(r=>r&&typeof r.id==='string'&&Number.isFinite(r.L)&&r.L>0), sig=list.map(r=>r.id+r.d+':'+r.L+(c.isReal(r.id)?'r':'')).join('|')+':'+!!(window.__TIDE&&window.__TIDE.makeModel);
     const rebuild=sig!==tk.sig;if(!rebuild&&!(tk.pending&&tk.pending.length))continue;tk.sig=sig;
-    if(rebuild){tk.fish.forEach(f=>disposeAquariumResident(f.o,tk.optics));tk.fish=[];tk.motion.bodies.length=0;tk.fitScale=aquariumFitScale(tk.spec,list);}
-    const retry=rebuild?list:tk.pending;tk.pending=[];let added=false;
-    retry.forEach(rec=>{let created=null;try{ c.want(rec.id);const model=fishObj(rec);if(!model){tk.pending.push(rec);return;}
+    const layout=list.map(r=>r.id+r.d+':'+r.L).join('|'),layoutChanged=tk.layoutSig!==layout;tk.layoutSig=layout;
+    const sourceSig=rec=>(c.isReal(rec.id)?'real':'fallback')+(BENTHIC[rec.id]?':'+!!(window.__TIDE&&window.__TIDE.makeModel):'');
+    if(layoutChanged){tk.residentEpoch={};tk.loading=new Set();tk.fish.forEach(f=>disposeAquariumResident(f.o,tk.optics));tk.fish=[];tk.motion.bodies.length=0;tk.fitScale=aquariumFitScale(tk.spec,list);}
+    else if(rebuild){tk.fish=tk.fish.filter(f=>{if(f.sourceSig===sourceSig(f.rec))return true;disposeAquariumResident(f.o,tk.optics);const i=tk.motion.bodies.indexOf(f);if(i>=0)tk.motion.bodies.splice(i,1);return false;});}
+    const retry=rebuild?list.filter(rec=>!tk.fish.some(f=>f.rec===rec||f.rec.id===rec.id&&f.rec.d===rec.d&&f.rec.L===rec.L)):tk.pending;tk.pending=[];tk.loading=tk.loading||new Set();const epoch=tk.residentEpoch,loading=tk.loading;
+    retry.forEach(rec=>{const source=sourceSig(rec),key=rec.id+':'+rec.d+':'+rec.L+':'+source;if(loading.has(key))return;loading.add(key);homeWork.add(()=>{loading.delete(key);if(tanks[w]!==tk||tk.residentEpoch!==epoch)return;if(sourceSig(rec)!==source){tk.pending.push(rec);return;}let created=null;try{ c.want(rec.id);const model=fishObj(rec);if(!model){tk.pending.push(rec);return;}
       model.scale.setScalar(1);const bottom=!!BENTHIC[rec.id],procedural=!!model.userData.aquariumProcedural;
       const o=aquariumCenterModel(T,model,procedural);created=o;if(!o){tk.pending.push(rec);return;}
       const modelBox=aquariumModelBounds(T,o,procedural),modelSize=modelBox.getSize(new T.Vector3());
       const length=aquariumResidentLength(tk.spec,rec,tk.fitScale,bottom,list.length);
       o.scale.setScalar(length/Math.max(modelSize.x,modelSize.y,modelSize.z,.001));o.userData.rec=rec;
       const body=aquariumBodyBounds(aquariumModelBounds(T,o,procedural),length,bottom);
-      const f={o,rec,body,bottom,yaw:Math.random()<.5?0:Math.PI,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni};
+      const f={o,rec,body,bottom,sourceSig:sourceSig(rec),yaw:Math.random()<.5?0:Math.PI,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni};
       o.rotation.y=f.yaw; const b=bounds(tk,rec.L);o.position.set(0,(b.y0+b.y1)/2,tk.spec.d*.2);
-      if(W.qualityTextures)W.qualityTextures(o);tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.motion.add(f);pickTarget(f,tk);tk.fish.push(f);added=true;
-      }catch(err){if(created){for(let i=tk.motion.bodies.length-1;i>=0;i--)if(tk.motion.bodies[i].o===created)tk.motion.bodies.splice(i,1);disposeAquariumResident(created,tk.optics);}tk.pending.push(rec);if(tk.lastError!==String(err)){tk.lastError=String(err);console.error('tank fish',rec&&rec.id,err);}}});if(added||rebuild)tk.motion.pack(); } }
+      if(W.qualityTextures)W.qualityTextures(o);tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.motion.add(f);pickTarget(f,tk);tk.fish.push(f);tk.motion.pack();
+      }catch(err){if(created){for(let i=tk.motion.bodies.length-1;i>=0;i--)if(tk.motion.bodies[i].o===created)tk.motion.bodies.splice(i,1);disposeAquariumResident(created,tk.optics);}tk.pending.push(rec);if(tk.lastError!==String(err)){tk.lastError=String(err);console.error('tank fish',rec&&rec.id,err);}}},'aquarium resident '+rec.id);}); } }
 // 標本牆：右牆、壁爐後方，兩排各四個；大魚統一縮到木板放得下的長度
 const MSLOT=[]; for(const y of [1.8,2.45]) for(const z of [-3.95,-3.25,-2.55,-1.85]) MSLOT.push({y,z});   // 先掛視線高度那一排
 const mountG=new T.Group(); mountG.rotation.y=-Math.PI/2;mountG.position.z=ROOM.zf-ROOM.x;scene.add(mountG); let mountSig='';
@@ -6349,7 +6368,7 @@ const sun=new T.DirectionalLight(0xfff4e0,.8); sun.position.set(-4.05,2.2,.5); s
 sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-6,right:6,top:5,bottom:-5,near:.1,far:18});sun.shadow.bias=-.0003;sun.shadow.normalBias=.025;sun.shadow.radius=3; scene.add(sun,sun.target);
 function daylight(){ const h=((c.hour()%24)+24)%24; return Math.max(0,Math.min(1,Math.min(h-5.5,19-h)/2)); }
 function syncTime(){ const dl=daylight(), h=((c.hour()%24)+24)%24;
-  viewM.map=dl>.6?winTex.day:dl>.05?winTex.dawn:winTex.night; viewM.needsUpdate=true; viewM.color.setScalar(.35+.65*dl);
+  const map=dl>.6?winTex.day:dl>.05?winTex.dawn:winTex.night;if(viewM.map!==map){viewM.map=map;viewM.needsUpdate=true;} viewM.color.setScalar(.35+.65*dl);
   const lk=lightsOff()?0:1;
   hemi.intensity=(.3+.14*dl)*(lk?1:.45+.55*dl); sun.intensity=.9*dl; ceilL.intensity=(1.8-.7*dl)*lk; wallLs.forEach(w=>w.intensity=(2.6-1.3*dl)*lk); lampL.intensity=(1.6-.8*dl)*lk; glowM.forEach(m=>m.emissiveIntensity=(1.6-1.2*dl)*lk); }
 // 吊燈：點它開關燈（關燈時只剩爐火和窗外的光）
@@ -6604,9 +6623,9 @@ function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
     if(D.s.position.y<.3){ D.s.visible=false; flare.visible=true; flare.position.set(D.s.position.x+.05,.36,D.s.position.z); sparkM.opacity=.95; fireL.intensity*=1.5; c.sizzle&&c.sizzle(.3+Math.random()*.35); } });
   if(flare.visible){ sparkM.opacity-=dt*2.2; flare.scale.setScalar(.35+(.9-sparkM.opacity)*.3); if(sparkM.opacity<=0) flare.visible=false; }
   spin.position.y=Math.sin(GR.t*1.3)*.003; }
-function enter(){if(on)return;try{merArtSync();yaw=yawT=0;pitch=pitchT=-.08;vb=0;pRoom.set(0,EYE,.9);resize();syncTime();syncFish();exitView();syncFurn();updFurnTags();closeFurn();on=true;}catch(err){on=false;throw err;}try{if(c.onEnter)c.onEnter();}catch(err){console.error('home welcome',err);}}
+function enter(){if(on)return;homeWork.setActive(true);try{merArtSync();yaw=yawT=0;pitch=pitchT=-.08;vb=0;pRoom.set(0,EYE,.9);resize();syncTime();syncFish();exitView();syncFurn();updFurnTags();closeFurn();on=true;}catch(err){on=false;homeWork.setActive(false);throw err;}try{if(c.onEnter)c.onEnter();}catch(err){console.error('home welcome',err);}}
 function resetGraphics(){if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}lastHomeShadow=-Infinity;W.interiorReflection.release(scene);}
-function exit(){ on=false;resetGraphics();releaseSceneGPU(scene);W.radiance.release(); drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
+function exit(){ on=false;homeWork.setActive(false);resetGraphics();releaseSceneGPU(scene);W.radiance.release(); drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
 const reflectionAnchor=new T.Vector3(0,1.6,0);let lastHomeShadow=-Infinity;
@@ -6971,7 +6990,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101093913'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101151318'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8472,69 +8491,71 @@ function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }c
 
 /* ---------- 音效（全程序合成） ---------- */
 const Snd=(()=>{
-  let ctx=null,out=null,nb=null,rainG=null,AMB=null,on=save.sound!==false; const SMP={}; let reelSrc=null, reelG=null;
+  let ctx=null,out=null,outdoor=null,soundBus=null,indoor=false,nb=null,rainG=null,AMB=null,on=save.sound!==false; const SMP={}; let reelSrc=null, reelG=null;
   // 捲線器循環：rate 決定轉速（收線慢轉、魚拉走線時高速尖叫），vol 0 就淡出
-  function reelLoop(vol,rate){ if(!ctx||!SMP.reel) return false; if(!reelSrc&&vol>.01){ reelSrc=ctx.createBufferSource(); reelSrc.buffer=SMP.reel; reelSrc.loop=true; reelG=ctx.createGain(); reelG.gain.value=0; reelSrc.connect(reelG); reelG.connect(out); reelSrc.start(); }
+  function reelLoop(vol,rate){ if(!ctx||!SMP.reel) return false; if(!reelSrc&&vol>.01){ reelSrc=ctx.createBufferSource(); reelSrc.buffer=SMP.reel; reelSrc.loop=true; reelG=ctx.createGain(); reelG.gain.value=0; reelSrc.connect(reelG); reelG.connect(outdoor); reelSrc.start(); }
     if(reelSrc){ reelG.gain.setTargetAtTime(vol,ctx.currentTime,.06); reelSrc.playbackRate.setTargetAtTime(rate,ctx.currentTime,.08); if(vol<=.01){ const s=reelSrc; reelSrc=null; setTimeout(()=>{ try{ s.stop(); }catch(e){} },400); } } return true; }
-  function sample(k,vol,rate){ if(!ctx||!SMP[k]) return false; const s=ctx.createBufferSource(); s.buffer=SMP[k]; s.playbackRate.value=rate||1; const g=ctx.createGain(); g.gain.value=vol; s.connect(g); g.connect(out); s.start(); return true; }
+  function sample(k,vol,rate){ if(!ctx||!SMP[k]) return false; const s=ctx.createBufferSource(); s.buffer=SMP[k]; s.playbackRate.value=rate||1; const g=ctx.createGain(); g.gain.value=vol; s.connect(g); g.connect(soundBus||out); s.start(); return true; }
   function init(){
     if(ctx){ if(ctx.state==='suspended') ctx.resume(); return; }
     const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
     try{ ctx=new AC(); }catch(e){ return; }
-    out=ctx.createGain(); out.gain.value=on?.8:0; out.connect(ctx.destination);
+    out=ctx.createGain(); out.gain.value=on?.8:0; out.connect(ctx.destination);outdoor=ctx.createGain();outdoor.gain.value=indoor?0:1;outdoor.connect(out);
     // 真實錄音音效（OpenGameArt「Fisheefects」，CC0）：捲線器、水花；載入失敗就沿用合成音
     ['reel','splash'].forEach(k=>fetch('sfx_'+k+'.mp3').then(r=>r.arrayBuffer()).then(b=>ctx.decodeAudioData(b)).then(buf=>{ SMP[k]=buf; }).catch(()=>{}));
     nb=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate); const d=nb.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
     const amb=(rate,type,f,q,g0,lf,lg)=>{ const s=ctx.createBufferSource(); s.buffer=nb; s.loop=true; s.playbackRate.value=rate;
       const fl=ctx.createBiquadFilter(); fl.type=type; fl.frequency.value=f; fl.Q.value=q; const g=ctx.createGain(); g.gain.value=g0;
       const o=ctx.createOscillator(); o.frequency.value=lf; const og=ctx.createGain(); og.gain.value=lg; o.connect(og); og.connect(g.gain);
-      s.connect(fl); fl.connect(g); g.connect(out); s.start(); o.start(); };
+      s.connect(fl); fl.connect(g); g.connect(outdoor); s.start(); o.start(); };
     amb(1,'lowpass',320,.4,.06,.17,.035);
     amb(.7,'bandpass',2600,.6,.012,.06,.01);
-    rainG=ctx.createGain(); rainG.gain.value=0; { const rs=ctx.createBufferSource(); rs.buffer=nb; rs.loop=true; const rf=ctx.createBiquadFilter(); rf.type='highpass'; rf.frequency.value=1800; rs.connect(rf); rf.connect(rainG); rainG.connect(out); rs.start(); }
+    rainG=ctx.createGain(); rainG.gain.value=0; { const rs=ctx.createBufferSource(); rs.buffer=nb; rs.loop=true; const rf=ctx.createBiquadFilter(); rf.type='highpass'; rf.frequency.value=1800; rs.connect(rf); rf.connect(rainG); rainG.connect(outdoor); rs.start(); }
     const bed=(type,f,q,rate,amHz)=>{ const s=ctx.createBufferSource(); s.buffer=nb; s.loop=true; s.playbackRate.value=rate; const fl=ctx.createBiquadFilter(); fl.type=type; fl.frequency.value=f; fl.Q.value=q;
       const am=ctx.createGain(); am.gain.value=amHz?.5:1; if(amHz){ const o=ctx.createOscillator(); o.frequency.value=amHz; const og=ctx.createGain(); og.gain.value=.5; o.connect(og); og.connect(am.gain); o.start(); }
-      const g=ctx.createGain(); g.gain.value=0; s.connect(fl); fl.connect(am); am.connect(g); g.connect(out); s.start(); return {g,fl}; };
+      const g=ctx.createGain(); g.gain.value=0; s.connect(fl); fl.connect(am); am.connect(g); g.connect(outdoor); s.start(); return {g,fl}; };
     AMB={wind:bed('bandpass',420,.7,.8,0),lap:bed('lowpass',240,.6,.6,.45),cic:bed('bandpass',4800,8,1,31),crk:bed('bandpass',4300,14,1,3.2)};
   }
   function nz(dur,type,f,q,gain,f2){ if(!ctx) return; const t=ctx.currentTime, s=ctx.createBufferSource(); s.buffer=nb;
     const fl=ctx.createBiquadFilter(); fl.type=type; fl.frequency.setValueAtTime(f,t); if(f2) fl.frequency.exponentialRampToValueAtTime(f2,t+dur); fl.Q.value=q;
     const g=ctx.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+.008); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
-    s.connect(fl); fl.connect(g); g.connect(out); s.start(t,Math.random()*1.2,dur+.05); }
+    s.connect(fl); fl.connect(g); g.connect(soundBus||out); s.start(t,Math.random()*1.2,dur+.05); }
   function tn(f,dur,type,gain,delay,f2){ if(!ctx) return; const t=ctx.currentTime+(delay||0), o=ctx.createOscillator(); o.type=type;
     o.frequency.setValueAtTime(f,t); if(f2) o.frequency.exponentialRampToValueAtTime(f2,t+dur);
     const g=ctx.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+.01); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
-    o.connect(g); g.connect(out); o.start(t); o.stop(t+dur+.05); }
+    o.connect(g); g.connect(soundBus||out); o.start(t); o.stop(t+dur+.05); }
   document.addEventListener('visibilitychange',()=>{ if(!ctx) return; if(document.hidden) ctx.suspend(); else ctx.resume(); });
-  return { init, isOn:()=>on, set(v){ on=v; if(out) out.gain.value=v?.8:0; },
-    whoosh(){ nz(.4,'bandpass',2400,.9,.18,500); },
-    splash(s){ s=s||1; if(sample('splash',Math.min(1,.25+.45*s),.85+Math.random()*.3+(s<.5?.25:0))) return; nz(.18+.3*s,'bandpass',1100,.7,.22*s,400); nz(.35+.4*s,'lowpass',700,.5,.16*s); tn(140,.12,'sine',.12*s,0,60); },
-    plop(){ tn(320,.09,'sine',.14,0,120); nz(.06,'bandpass',1800,2,.05); },
+  function outdoors(fn){return(...args)=>{if(indoor)return;const previous=soundBus;soundBus=outdoor;try{return fn(...args);}finally{soundBus=previous;}};}
+  function setIndoor(on){indoor=!!on;if(outdoor)outdoor.gain.setTargetAtTime(indoor?0:1,ctx.currentTime,.12);if(indoor)reelLoop(0,1);}
+  return { init,setIndoor, isOn:()=>on, set(v){ on=v; if(out) out.gain.value=v?.8:0; },
+    whoosh:outdoors(function(){ nz(.4,'bandpass',2400,.9,.18,500); }),
+    splash:outdoors(function(s){ s=s||1; if(sample('splash',Math.min(1,.25+.45*s),.85+Math.random()*.3+(s<.5?.25:0))) return; nz(.18+.3*s,'bandpass',1100,.7,.22*s,400); nz(.35+.4*s,'lowpass',700,.5,.16*s); tn(140,.12,'sine',.12*s,0,60); }),
+    plop:outdoors(function(){ tn(320,.09,'sine',.14,0,120); nz(.06,'bandpass',1800,2,.05); }),
     reelLoop,
-    nibble(){ tn(260,.06,'sine',.07,0,140); },
-    creak(k){ k=k||1; tn(70+Math.random()*50,.16,'sawtooth',.035*k,0,40); nz(.08,'bandpass',900+Math.random()*500,3,.02*k); },   // 竿身承受重量的吱嘎聲
-    bite(){ tn(180,.22,'sine',.28,0,55); nz(.25,'lowpass',900,.6,.12); },
+    nibble:outdoors(function(){ tn(260,.06,'sine',.07,0,140); }),
+    creak:outdoors(function(k){ k=k||1; tn(70+Math.random()*50,.16,'sawtooth',.035*k,0,40); nz(.08,'bandpass',900+Math.random()*500,3,.02*k); }),   // 竿身承受重量的吱嘎聲
+    bite:outdoors(function(){ tn(180,.22,'sine',.28,0,55); nz(.25,'lowpass',900,.6,.12); }),
     click(p){ nz(.014,'highpass',p||3200,.8,.09); },
-    snap(){ nz(.05,'highpass',3000,.6,.5); tn(110,.3,'triangle',.25,0,40); },
+    snap:outdoors(function(){ nz(.05,'highpass',3000,.6,.5); tn(110,.3,'triangle',.25,0,40); }),
     fanfare(r){ const b=[523.25,659.25,783.99,1046.5,1318.5]; for(let i=0;i<3+r;i++) tn(b[i%5]*(i>=5?2:1),.35,'triangle',.11,i*.09); if(r>=3) tn(261.6,.9,'sine',.12,0); },
     coin(){ tn(1318,.08,'square',.04); tn(1760,.14,'square',.04,.07); },
     rain(k){ if(rainG) rainG.gain.setTargetAtTime(k*.16,ctx.currentTime,.5); },
-    thunder(){ nz(2.6,'lowpass',160,.7,.5,60); nz(.5,'lowpass',900,.5,.22); },
-    eagle(){ for(let i=0;i<3;i++) tn(2900-i*120,.12,'sine',.05,i*.13,2300); tn(2400,.5,'sine',.04,.45,1700); },
-    frog(){ const n=2+Math.floor(Math.random()*2); for(let i=0;i<n;i++) tn(140+Math.random()*40,.09,'square',.025,i*.14,110); },
-    bird(){ const b=2600+Math.random()*1200; for(let i=0;i<3;i++) tn(b+i*200,.07,'sine',.03,i*.09,b+600); },
-    gator(){ nz(1.2,'lowpass',90,.8,.35); tn(55,1,'sawtooth',.05,0,40); },
-    paddle(){ nz(.35,'bandpass',700,.8,.14,300); },
-    drip(){ tn(1200,.08,'sine',.05,0,300); },
-    rumble(){ nz(1.2,'lowpass',140,.6,.18,90); tn(48,1.0,'sine',.12,0,38); },
+    thunder:outdoors(function(){ nz(2.6,'lowpass',160,.7,.5,60); nz(.5,'lowpass',900,.5,.22); }),
+    eagle:outdoors(function(){ for(let i=0;i<3;i++) tn(2900-i*120,.12,'sine',.05,i*.13,2300); tn(2400,.5,'sine',.04,.45,1700); }),
+    frog:outdoors(function(){ const n=2+Math.floor(Math.random()*2); for(let i=0;i<n;i++) tn(140+Math.random()*40,.09,'square',.025,i*.14,110); }),
+    bird:outdoors(function(){ const b=2600+Math.random()*1200; for(let i=0;i<3;i++) tn(b+i*200,.07,'sine',.03,i*.09,b+600); }),
+    gator:outdoors(function(){ nz(1.2,'lowpass',90,.8,.35); tn(55,1,'sawtooth',.05,0,40); }),
+    paddle:outdoors(function(){ nz(.35,'bandpass',700,.8,.14,300); }),
+    drip:outdoors(function(){ tn(1200,.08,'sine',.05,0,300); }),
+    rumble:outdoors(function(){ nz(1.2,'lowpass',140,.6,.18,90); tn(48,1.0,'sine',.12,0,38); }),
     sizzle(k){ nz(.5+.6*(k||.5),'highpass',3800,.5,.12*(k||.5),6000); },
-    scream(){ if(!ctx) return; const t=ctx.currentTime, o=ctx.createOscillator(), o2=ctx.createOscillator(), g=ctx.createGain(), lfo=ctx.createOscillator(), lg=ctx.createGain();
+    scream:outdoors(function(){ if(!ctx) return; const t=ctx.currentTime, o=ctx.createOscillator(), o2=ctx.createOscillator(), g=ctx.createGain(), lfo=ctx.createOscillator(), lg=ctx.createGain();
       o.type='sawtooth'; o2.type='square'; o.frequency.setValueAtTime(850,t); o.frequency.exponentialRampToValueAtTime(1500,t+.35); o.frequency.exponentialRampToValueAtTime(1100,t+1.1);
       o2.frequency.setValueAtTime(1710,t); o2.frequency.exponentialRampToValueAtTime(2900,t+.4); lfo.frequency.value=28; lg.gain.value=60; lfo.connect(lg); lg.connect(o.frequency);
       g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.45,t+.04); g.gain.setValueAtTime(.45,t+.8); g.gain.exponentialRampToValueAtTime(.001,t+1.25);
-      o.connect(g); o2.connect(g); g.connect(ctx.destination); o.start(t); o2.start(t); lfo.start(t); o.stop(t+1.3); o2.stop(t+1.3); lfo.stop(t+1.3); nz(.5,'highpass',2500,.6,.25,4000); },
-    grind(){ nz(.06,'bandpass',1200+Math.random()*900,1.2,.05,500); },
-    crackle(){ nz(.03+Math.random()*.05,'highpass',1800+Math.random()*2600,.8,.04+Math.random()*.06,900); },
+      o.connect(g); o2.connect(g); g.connect(soundBus||out); o.start(t); o2.start(t); lfo.start(t); o.stop(t+1.3); o2.stop(t+1.3); lfo.stop(t+1.3); nz(.5,'highpass',2500,.6,.25,4000); }),
+    grind:outdoors(function(){ nz(.06,'bandpass',1200+Math.random()*900,1.2,.05,500); }),
+    crackle(){ nz(.03+Math.random()*.05,'highpass',1800+Math.random()*2600,.8,(indoor?.014:.04)+Math.random()*(indoor?.012:.06),900); },
     plip(){ tn(900,.05,'sine',.03,0,500); nz(.08,'bandpass',2500,1.5,.03); },
     setAmb(o){ if(!AMB) return; const t=ctx.currentTime;
       AMB.wind.g.gain.setTargetAtTime(.02+o.wind*.32,t,.6); AMB.wind.fl.frequency.setTargetAtTime(300+o.wind*700,t,.6);
@@ -8886,11 +8907,11 @@ function homeEnter(){ const hd=HOME.data();
   const pool=BAITS.filter(b=>['corn','shrimp','live'].includes(b.id)&&save.lv>=b.lv), bt=pool[Math.floor(Math.random()*pool.length)]; if(!bt) return;
   const n=Math.min(8,1+Math.floor(kinds/2)); hd.visit=day; save.baits[bt.id]=(save.baits[bt.id]||0)+n; persist();
   setTimeout(()=>toast('釣友來參觀你的 '+kinds+' 種收藏，留下了 '+bt.icon+bt.name+' ×'+n,'good',2600),1200); }
-function recoverHome(err){if(window.__DIAG)window.__DIAG.action('home','error',err.message);console.error('home recovery',err);try{HOME3D.exit();}catch(_){}G.state='idle';document.body.classList.remove('athome','tankview','tankdive','grilling');fadeEl.classList.remove('on');toast('小屋載入暫時失敗，已返回釣點，遊戲進度保留','warn',4200);}
+function recoverHome(err){Snd.setIndoor?.(false);if(window.__DIAG)window.__DIAG.action('home','error',err.message);console.error('home recovery',err);try{HOME3D.exit();}catch(_){}G.state='idle';document.body.classList.remove('athome','tankview','tankdive','grilling');fadeEl.classList.remove('on');toast('小屋載入暫時失敗，已返回釣點，遊戲進度保留','warn',4200);}
 function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收線再回家','warn');return;}if(!HOME.unlocked()){toast('完成主線第一章後才能整理小屋','warn');return;}persist();if(window.__DIAG)window.__DIAG.action('home','begin');G.state='travel';fadeEl.classList.add('on');Snd.paddle();
- setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;HOME3D.enter();G.state='home';document.body.classList.add('athome');fadeEl.classList.remove('on');toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
+ setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeEl.classList.remove('on');toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
-  setTimeout(()=>{ HOME3D.exit(); document.body.classList.remove('athome'); G.state='idle'; fadeEl.classList.remove('on'); if(then) then(); else if(G.spot!==0) goSpot(0); },650); }
+  setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; fadeEl.classList.remove('on'); if(then) then(); else if(G.spot!==0) goSpot(0); },650); }
 window.__goHome=goHome; window.__HOMEOK=()=>HOME.unlocked();
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
@@ -9108,8 +9129,8 @@ window.__STORY=createStory({save,persist,toast,Snd,vib,goSpot:i=>goSpot(i),curSp
 const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* Adaptive profiles change resolution, reflection, shadow and effect budgets together. */
 window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;return Math.max(.35,Math.min(3.25,Math.max(2,window.devicePixelRatio||1),Math.sqrt(12000000/(w*h)),limit/w,limit/h));};
-const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,initialLevel:window.__resourcePolicy?.mobile?1:4,profile:(p,scope,cap)=>{if(window.__resourcePolicy?.recovery&&p.mode==='auto'){const safe={...p,...graphicsProfiles(cap)[Math.min(p.level,2)],maxLevel:2,reason:'前次中斷後的保護模式'};return{...safe,pr:Math.min(safe.pr,.8)};}return aquariumGraphicsProfile(p,scope,cap);},apply:s=>{
-  window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;window.__effectBudget=effectBudget(s.level);if(W.setEffects)W.setEffects(s.level);
+const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,initialLevel:window.__resourcePolicy?.mobile?1:4,profile:(p,scope,cap)=>{if(window.__resourcePolicy?.recovery&&p.mode==='auto'){const safe={...p,...graphicsProfiles(cap)[Math.min(p.level,2)],maxLevel:2,reason:'前次中斷後的保護模式'};return{...safe,pr:Math.min(safe.pr,.8)};}return stableCabinGraphicsProfile(aquariumGraphicsProfile(p,scope,cap),scope,window.__resourcePolicy?.mobile);},apply:s=>{
+  window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;window.__effectBudget=effectBudget(s.effectLevel??s.level);if(W.setEffects)W.setEffects(s.effectLevel??s.level);
   if(W.setWaterDetail)W.setWaterDetail(s.geometry);if(W.setShadows)W.setShadows(s.shadow);if(W.setRefl)W.setRefl(s.reflection>0,s.reflection);W.setPR(s.pr);
   document.body.dataset.gfx=s.effect;document.body.dataset.gfxMode=s.mode;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);
 },onSample:s=>{window.__FPS=s.fps;window.__gfxStatus=s;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);}});

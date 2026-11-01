@@ -1,9 +1,9 @@
 /* Bound model parsing/decode concurrency and reuse requests across home components. */
-function createHomeModelQueue(loader,report=()=>{}){
+function createHomeModelQueue(loader,report=()=>{},schedule=fn=>fn()){
  const cache=new Map(),pending=new Map(),queue=[];let running=false;
- function deliver(callback,value){try{if(callback)callback(value);}catch(error){report(error);}}
+ function deliver(callback,value){if(callback)schedule(()=>{try{callback(value);}catch(error){report(error);}},'model callback');}
  function next(){if(running||!queue.length)return;running=true;const job=queue.shift();
-  const finish=(value,error)=>{running=false;pending.delete(job.file);if(!error)cache.set(job.file,value);for(const w of job.wait)deliver(error?w.error:w.ready,error||value);next();};
+  const finish=(value,error)=>{running=false;pending.delete(job.file);if(!error)cache.set(job.file,value);for(const w of job.wait)deliver(error?w.error:w.ready,error||value);schedule(next,'next model');};
   try{loader.load(job.file,value=>finish(value,null),undefined,error=>finish(null,error||new Error('Home model load failed')));}catch(error){finish(null,error);}
  }
  return{load(file,ready,progress,error){if(cache.has(file)){deliver(ready,cache.get(file));return;}let job=pending.get(file);if(job){job.wait.push({ready,error});return;}job={file,wait:[{ready,error}]};pending.set(file,job);queue.push(job);next();}};
@@ -29,3 +29,12 @@ if(typeof module!=='undefined'&&module.exports)Object.assign(module.exports,{rel
 
 function createSceneLifetime(){return{alive:true,cancel(){this.alive=false;},wrap(fn){return(...args)=>{if(this.alive)return fn(...args);};}};}
 if(typeof module!=='undefined'&&module.exports)module.exports.createSceneLifetime=createSceneLifetime;
+
+/* One scene-building task per animation frame; parked when the cabin is inactive. */
+function createHomeWorkQueue({schedule=fn=>typeof requestAnimationFrame==='function'?requestAnimationFrame(fn):setTimeout(fn,16),now=()=>performance.now(),report=()=>{},onSlow=()=>{},canRun=()=>true}={}){
+ const jobs=[];let queued=false,active=true;
+ function request(){if(!queued&&active&&jobs.length){queued=true;schedule(drain);}}
+ function drain(){queued=false;if(!active)return;if(!canRun()){request();return;}const job=jobs.shift();if(!job)return;const start=now();try{job.fn();}catch(error){report(error);}finally{const ms=now()-start;if(ms>30)onSlow(job.label,Math.round(ms));request();}}
+ return{add(fn,label='scene build'){jobs.push({fn,label});request();},setActive(on){active=!!on;request();},pending:()=>jobs.length};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports.createHomeWorkQueue=createHomeWorkQueue;
