@@ -1,4 +1,4 @@
-/*APPV:20261101000507*/
+/*APPV:20261101001731*/
 /* The aquarium is a close-up exhibit: keep texture detail and reduce repeated draw calls. */
 function aquariumGraphicsProfile(profile,scope,cap){
  if(scope!=='home-aquarium'||profile.mode!=='auto')return profile;
@@ -269,7 +269,7 @@ function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null}){
  }
  return{configure,sample,pause,status,refresh:()=>apply(status())};
 }
-function graphicsStatusText(s){return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS`;}
+function graphicsStatusText(s){const a=typeof window!=='undefined'?window.__materialLightingAudit:null;return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS`+(a?`・受光材質 ${a.lit}／法線 ${a.normalMapped}／凹凸 ${a.bumpMapped}`:'');}
 if(typeof module!=='undefined'&&module.exports)module.exports={graphicsProfiles,createAdaptiveGraphics,graphicsStatusText};
 
 function waterDetailSettings(quality){return{low:[64,128],mid:[112,192],high:[160,256],ultra:[224,320]}[quality]||[112,192];}
@@ -596,13 +596,13 @@ function applyTackleFinish(T,materials,id,color,gold,assets){
   const role=m.userData.tackleRole;
   if(role==='blank'){
    m.color.set(f.color).convertSRGBToLinear();m.map=f.carbon?assets.carbon:null;
-   m.bumpMap=f.carbon?assets.weave:assets.brushed;m.bumpScale=f.carbon?.000035:.000018;
+   m.normalMap=assets.normals?(f.carbon?assets.normals.weave:assets.normals.brushed):null;if(m.normalMap){m.normalScale.setScalar(f.carbon?.18:.12);m.bumpMap=null;}else{m.bumpMap=f.carbon?assets.weave:assets.brushed;m.bumpScale=f.carbon?.000035:.000018;}
    m.roughnessMap=null;m.metalness=f.metalness;m.roughness=f.roughness;m.clearcoat=f.clearcoat;m.clearcoatRoughness=f.coatRoughness;m.envMapIntensity=1;
-   m.userData.finish=id;
+   m.userData.finish=id;m.name='Tackle blank: '+f.name;
   }else if(role==='trim'){
-   m.color.set(f.gold?'#dfb85f':'#c6cdd2').convertSRGBToLinear();m.metalness=1;m.roughness=f.gold?.22:.19;m.envMapIntensity=1;
+   m.name=f.gold?'Gold plated tackle trim':'Polished stainless tackle trim';if(assets.normals){m.normalMap=assets.normals.brushed;m.normalScale.setScalar(.08);m.bumpMap=null;}m.color.set(f.gold?'#dfb85f':'#c6cdd2').convertSRGBToLinear();m.metalness=1;m.roughness=f.gold?.22:.19;m.envMapIntensity=1;
   }else if(role==='frame'){
-   m.color.set(id==='black'?'#25282b':'#30363c').convertSRGBToLinear();m.metalness=.8;m.roughness=.3;
+   if(assets.normals){m.normalMap=assets.normals.brushed;m.normalScale.setScalar(.14);}m.color.set(id==='black'?'#25282b':'#30363c').convertSRGBToLinear();m.metalness=.8;m.roughness=.3;
   }
   m.needsUpdate=true;
  }
@@ -625,6 +625,38 @@ function createTacklePreview(W,build){
  };
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={TACKLE_FINISHES,tackleFinish,applyTackleFinish};
+/* Tangent-space normals describe surface detail; they do not replace lighting or IBL. */
+function createDetailNormals(T){
+ const n=256,out={};
+ const height={brushed:(x,y)=>.007*Math.sin(y*Math.PI/2)+.004*Math.sin(y*Math.PI*7/16),weave:(x,y)=>.035*Math.sin((x+y)*Math.PI/8)*Math.sin((x-y)*Math.PI/8),grip:(x,y)=>.03*Math.sin(x*Math.PI/4)*Math.sin(y*Math.PI/4)};
+ for(const [kind,h]of Object.entries(height)){const data=new Uint8Array(n*n*4);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const v=new T.Vector3(-(h(x+1,y)-h(x-1,y))*8,-(h(x,y+1)-h(x,y-1))*8,1).normalize(),i=(y*n+x)*4;data[i]=Math.round((v.x*.5+.5)*255);data[i+1]=Math.round((v.y*.5+.5)*255);data[i+2]=Math.round((v.z*.5+.5)*255);data[i+3]=255;}
+  const t=new T.DataTexture(data,n,n,T.RGBAFormat);t.name='Surface normal: '+kind;t.wrapS=t.wrapT=T.RepeatWrapping;t.generateMipmaps=true;t.minFilter=T.LinearMipmapLinearFilter;t.magFilter=T.LinearFilter;t.encoding=T.LinearEncoding;t.needsUpdate=true;out[kind]=t;
+ }out.weave.repeat.set(3,4);out.brushed.repeat.set(1,3);out.grip.repeat.set(2,6);return out;
+}
+function auditSceneLighting(scene){
+ const result={meshes:0,lit:0,normalMapped:0,bumpMapped:0,smooth:0,customShader:0,unlit:0,metal:0,metalWithoutEnvironment:0,normalMissingUV:0,examples:{smooth:[],unlit:[],custom:[]}},seen=new Set();
+ scene.traverseVisible(o=>{if(!o.isMesh)return;result.meshes++;for(const m of(Array.isArray(o.material)?o.material:[o.material])){if(!m||seen.has(m))continue;seen.add(m);const name=m.name||o.name||m.type;
+  if(m.isShaderMaterial||m.isRawShaderMaterial){result.customShader++;if(result.examples.custom.length<8)result.examples.custom.push(name);continue;}
+  if(m.isMeshBasicMaterial){result.unlit++;if(result.examples.unlit.length<8)result.examples.unlit.push(name);continue;}
+  result.lit++;if(m.normalMap){result.normalMapped++;if(!o.geometry.attributes.uv)result.normalMissingUV++;}else if(m.bumpMap)result.bumpMapped++;else{result.smooth++;if(result.examples.smooth.length<8)result.examples.smooth.push(name);}
+  if(m.metalness>.5){result.metal++;if(!(m.envMap||scene.environment))result.metalWithoutEnvironment++;}
+ }});result.materials=seen.size;return result;
+}
+/* A local cabin probe captures actual walls/furniture/lights, not a studio-light overlay. */
+function createInteriorReflection(T,R){
+ const pmrem=new T.PMREMGenerator(R),cube=new T.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter,type:R.capabilities.isWebGL2&&R.extensions.has('EXT_color_buffer_float')?T.HalfFloatType:T.UnsignedByteType}),camera=new T.CubeCamera(.08,40,cube),records=new WeakMap();let failed=false;
+ function update(scene,position,outdoor,time){
+  const level=typeof window!=='undefined'&&window.__gfxStatus?window.__gfxStatus.level:4;let rec=records.get(scene);
+  if(failed||level<3){scene.environment=outdoor;return;}
+  if(rec&&time-rec.time<10){scene.environment=rec.rt.texture;return;}
+  const target=R.getRenderTarget(),viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest(),shadow=R.shadowMap.autoUpdate,oldEnv=scene.environment;
+  try{scene.environment=outdoor;R.shadowMap.autoUpdate=false;R.setScissorTest(false);camera.position.copy(position);camera.updateMatrixWorld(true);camera.update(R,scene);const rt=pmrem.fromCubemap(cube.texture);records.set(scene,{rt,time});scene.environment=rt.texture;if(rec)rec.rt.dispose();}
+  catch(e){failed=true;scene.environment=outdoor||oldEnv;console.warn('Interior reflection probe unavailable',e);}
+  finally{R.shadowMap.autoUpdate=shadow;R.setRenderTarget(target);R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);}
+ }
+ return{update};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={createDetailNormals,auditSceneLighting,createInteriorReflection};
 /* Material assignments follow the yacht asset's named parts, not average pixel color. */
 const MARINE_PARTS={
  material_3:'teak',material_5:'navy',material_40:'navy',material_1:'gelcoat',material_33:'gelcoat',material_42:'steel',material_7:'steel',material_2:'steel',material_4:'steel',material_35:'steel',material_17:'fabric',material_8:'leather'
@@ -697,6 +729,7 @@ function createSceneRadiance(T,R){
  let pass=null,failed=false,sizeKey='',sceneKey=null,selected=[];
  const cache=new WeakMap(),normalMaterials=new Set(),size=new T.Vector2();
  const supported=!!(T.SSRPass&&R.extensions&&(R.capabilities.isWebGL2?R.extensions.has('EXT_color_buffer_float'):R.extensions.has('WEBGL_depth_texture')&&R.extensions.has('EXT_color_buffer_half_float')));
+ let auditAt=0;
  const status={supported,active:false,technique:'screen-space ray marching',reason:''};
  function auxiliary(scene,camera,target,mask){
   const backup=[],oldOverride=scene.overrideMaterial,bg=scene.background,oldShadow=R.shadowMap.autoUpdate,chosen=new Set(selected);
@@ -714,6 +747,7 @@ function createSceneRadiance(T,R){
   }finally{for(const [o,m,v]of backup){o.material=m;o.visible=v;}scene.overrideMaterial=oldOverride;scene.background=bg;R.shadowMap.autoUpdate=oldShadow;}
  }
  function render(scene,camera){
+  const now=typeof performance!=='undefined'?performance.now():Date.now();if(now>=auditAt&&typeof auditSceneLighting==='function'){auditAt=now+2000;const report=auditSceneLighting(scene);report.ssrActive=status.active;if(typeof window!=='undefined')window.__materialLightingAudit=report;}
   status.active=false;const high=typeof window!=='undefined'&&window.__gfxStatus&&window.__gfxStatus.level===7;
   if(!supported||failed||!high){status.reason=!supported?'device unsupported':failed?'render fallback':'below highest quality';R.render(scene,camera);return;}
   const target=R.getRenderTarget(),color=R.getClearColor(new T.Color()).clone(),alpha=R.getClearAlpha(),auto=R.autoClear,viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest();
@@ -1357,9 +1391,9 @@ function setTime(hour, force){
   if(photoHook){ const o=photoHook(h,wx); if(o){
     U.uSunDir.value.copy(o.dir); U.uSunDisk.value.copy(o.dir); U.uLightCol.value.set(o.lc[0],o.lc[1],o.lc[2]); U.uSunVis.value=1-wx.cloud*.85;
     renderer.toneMappingExposure=o.exp; U.uExpo.value=o.exp; sunLight.color.setRGB(o.lc[0],o.lc[1],o.lc[2]); sunLight.intensity=.7*(1-wx.cloud*.5);
-    sunLight.position.copy(o.dir).multiplyScalar(60);hemi.color.setRGB(.18+.35*U.uDay.value,.23+.35*U.uDay.value,.32+.35*U.uDay.value);hemi.groundColor.setRGB(.035,.045,.055);hemi.intensity=.45*(1-wx.cloud*.3);info.light=o.light;return info; } }
+    sunLight.position.copy(o.dir).multiplyScalar(60);hemi.color.setRGB(.18+.35*U.uDay.value,.23+.35*U.uDay.value,.32+.35*U.uDay.value);hemi.groundColor.setRGB(.035,.045,.055);hemi.intensity=.45*(1-wx.cloud*.3);info.light=o.light; } }
   let dh = Math.abs(h - envHour); if(dh > 12) dh = 24 - dh;
-  if(force || dh > 0.35 || wxDirty){ wxDirty = false; envHour = h; regenEnv(); }
+  if(force || envHour<0 || dh > 0.35 || wxDirty){ wxDirty = false; envHour = h; regenEnv(); }
   return info;
 }
 
@@ -1418,20 +1452,20 @@ function renderRefl(){
 
 const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
-const radiance=createSceneRadiance(T,renderer);
+const radiance=createSceneRadiance(T,renderer),interiorReflection=createInteriorReflection(T,renderer);
 function render(){ submerged.render(); if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } radiance.render(scene, camera); }
 
 function setIce(on){water.visible=!on;seaGrid.visible=!on;}
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=water.visible; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
 let photoHook=null;
-function setPhotoHook(f){ photoHook=f; }
-function setPhotoActive(){ U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; seaMat.toneMapped=false; seaMat.needsUpdate=true; }
+function setPhotoHook(f){ photoHook=f;wxDirty=true; }
+function setPhotoActive(){ wxDirty=true;envHour=-99;U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; seaMat.toneMapped=false; seaMat.needsUpdate=true; }
 function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 // 水色：每個水域的水本身顏色不同（浮萍灣藻綠、倒木區單寧茶色、深水中央墨綠藍…），換釣點時慢慢轉過去
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
 /* ===== 美人魚的骨架與表情（依新設定圖生成的模型，載入後在執行時自動加骨架）=====
    骨架：臀→腰→胸→頸→頭；左右肩→上臂→前臂→手；尾巴 6 節＋尾鰭；頭髮 3 節
@@ -1709,11 +1743,11 @@ const carbonTex=texC(256,256,(g,w,h)=>{ g.fillStyle='#d0d1d3'; g.fillRect(0,0,w,
 carbonTex.encoding=T.sRGBEncoding;carbonTex.anisotropy=8;
 const weaveTex=texC(128,128,(g,w,h)=>{for(let y=0;y<h;y++)for(let x=0;x<w;x++){const n=128+26*Math.sin((x+y)*Math.PI/4)*Math.sin((x-y)*Math.PI/4);g.fillStyle=`rgb(${n},${n},${n})`;g.fillRect(x,y,1,1);}},3,4);
 const brushedTex=texC(128,128,(g,w,h)=>{for(let y=0;y<h;y++){const n=128+12*Math.sin(y*2.91)+5*Math.sin(y*9.3);g.fillStyle=`rgb(${n},${n},${n})`;g.fillRect(0,y,w,1);}},1,3);
-const finishAssets={carbon:carbonTex,weave:weaveTex,brushed:brushedTex};
+const finishAssets={carbon:carbonTex,weave:weaveTex,brushed:brushedTex,normals:createDetailNormals(T)};
 const evaTex=texC(64,64,(g,w,h)=>{ g.fillStyle='#202124'; g.fillRect(0,0,w,h); for(let i=0;i<500;i++){ g.fillStyle=Math.random()<.5?'rgba(0,0,0,.55)':'rgba(70,72,78,.35)'; g.beginPath(); g.arc(Math.random()*w,Math.random()*h,Math.random()*1.3+.3,0,7); g.fill(); } },2,6);
 evaTex.encoding=T.sRGBEncoding;
 const blankMat=new T.MeshPhysicalMaterial({color:0xffffff,map:carbonTex,metalness:.25,roughness:.38,clearcoat:1,clearcoatRoughness:.05});
-const gripMat=new T.MeshStandardMaterial({color:0xffffff,map:evaTex,bumpMap:evaTex,bumpScale:.002,roughness:.92});
+const gripMat=new T.MeshStandardMaterial({color:0xffffff,map:evaTex,normalMap:finishAssets.normals.grip,normalScale:new T.Vector2(.35,.35),roughness:.92});
 const chromeMat=new T.MeshStandardMaterial({color:0xdde2e6, metalness:1, roughness:.16});
 const darkMetal=new T.MeshStandardMaterial({color:0x2a2e35, metalness:.75, roughness:.3});
 const goldMat=new T.MeshStandardMaterial({color:0xd9b25a, metalness:1, roughness:.2});
@@ -3979,7 +4013,7 @@ const rbMat=new T.ShaderMaterial({uniforms:{uA:{value:0}},transparent:true,depth
   vertexShader:'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
   fragmentShader:'uniform float uA; varying vec2 vP; vec3 sp(float t){ return clamp(vec3(abs(t*6.0-3.0)-1.0, 2.0-abs(t*6.0-2.0), 2.0-abs(t*6.0-4.0)),0.0,1.0); } void main(){ float r=length(vP); float t=clamp((r-700.0)/60.0,0.0,1.0); float e=smoothstep(0.0,0.15,t)*(1.0-smoothstep(0.85,1.0,t)); gl_FragColor=vec4(sp(1.0-t)*e*uA, e*uA); }'});
 const rainbow=new T.Mesh(new T.RingGeometry(700,760,160,1,0,Math.PI),rbMat); rainbow.visible=false; rainbow.frustumCulled=false; rainbow.renderOrder=4; S.add(rainbow);
-const birdMat=new T.MeshBasicMaterial({color:0x1a1a1a,side:T.DoubleSide});
+const birdMat=new T.MeshStandardMaterial({color:0x35322d,roughness:.9,side:T.DoubleSide});
 const birdG=new T.BufferGeometry(); birdG.setAttribute('position',new T.Float32BufferAttribute([0,0,0,-.5,.08,-.15,-.05,0,-.05, 0,0,0,.5,.08,-.15,.05,0,-.05],3));
 const flock=[]; for(let i=0;i<18;i++){ const m=new T.Mesh(birdG,birdMat); m.visible=false; m.scale.setScalar(1.6); S.add(m); flock.push(m); }
 if(window.__MDL) flock.forEach(m=>window.__MDL.attach(m,'gull',{len:.42,target:'+z'}));
@@ -6393,7 +6427,7 @@ function enter(){ on=true; merArtSync(); yaw=yawT=0; pitch=pitchT=-.08; vb=0; pR
 function exit(){ on=false; drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
-function render(dt){scene.environment=W.scene.environment;t+=dt; yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
+function render(dt){t+=dt;W.interiorReflection.update(scene,new T.Vector3(0,1.6,0),W.scene.environment,t); yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
   vb+=((mode!=='room'&&mode!=='act'?1:0)-vb)*Math.min(1,dt*4); dYaw+=(dYawT-dYaw)*Math.min(1,dt*6); dPitch+=(dPitchT-dPitch)*Math.min(1,dt*6);
   // 在房間裡用搖桿走動：前進／後退、左右轉；不能走進水族箱、壁爐和牆
   if(mode==='room'&&c.joy){ const j=c.joy(); if(Math.abs(j.thr)>.05||Math.abs(j.turn)>.05){ yawT-=j.turn*dt*1.7; const sp=1.3*j.thr*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw); let nx=pRoom.x+fx*sp, nz=pRoom.z+fz*sp;
@@ -6753,7 +6787,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101000507'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101001731'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

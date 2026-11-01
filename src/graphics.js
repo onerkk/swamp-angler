@@ -29,7 +29,7 @@ function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null}){
  }
  return{configure,sample,pause,status,refresh:()=>apply(status())};
 }
-function graphicsStatusText(s){return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS`;}
+function graphicsStatusText(s){const a=typeof window!=='undefined'?window.__materialLightingAudit:null;return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS`+(a?`・受光材質 ${a.lit}／法線 ${a.normalMapped}／凹凸 ${a.bumpMapped}`:'');}
 if(typeof module!=='undefined'&&module.exports)module.exports={graphicsProfiles,createAdaptiveGraphics,graphicsStatusText};
 
 function waterDetailSettings(quality){return{low:[64,128],mid:[112,192],high:[160,256],ultra:[224,320]}[quality]||[112,192];}

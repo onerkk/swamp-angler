@@ -17,13 +17,13 @@ function applyTackleFinish(T,materials,id,color,gold,assets){
   const role=m.userData.tackleRole;
   if(role==='blank'){
    m.color.set(f.color).convertSRGBToLinear();m.map=f.carbon?assets.carbon:null;
-   m.bumpMap=f.carbon?assets.weave:assets.brushed;m.bumpScale=f.carbon?.000035:.000018;
+   m.normalMap=assets.normals?(f.carbon?assets.normals.weave:assets.normals.brushed):null;if(m.normalMap){m.normalScale.setScalar(f.carbon?.18:.12);m.bumpMap=null;}else{m.bumpMap=f.carbon?assets.weave:assets.brushed;m.bumpScale=f.carbon?.000035:.000018;}
    m.roughnessMap=null;m.metalness=f.metalness;m.roughness=f.roughness;m.clearcoat=f.clearcoat;m.clearcoatRoughness=f.coatRoughness;m.envMapIntensity=1;
-   m.userData.finish=id;
+   m.userData.finish=id;m.name='Tackle blank: '+f.name;
   }else if(role==='trim'){
-   m.color.set(f.gold?'#dfb85f':'#c6cdd2').convertSRGBToLinear();m.metalness=1;m.roughness=f.gold?.22:.19;m.envMapIntensity=1;
+   m.name=f.gold?'Gold plated tackle trim':'Polished stainless tackle trim';if(assets.normals){m.normalMap=assets.normals.brushed;m.normalScale.setScalar(.08);m.bumpMap=null;}m.color.set(f.gold?'#dfb85f':'#c6cdd2').convertSRGBToLinear();m.metalness=1;m.roughness=f.gold?.22:.19;m.envMapIntensity=1;
   }else if(role==='frame'){
-   m.color.set(id==='black'?'#25282b':'#30363c').convertSRGBToLinear();m.metalness=.8;m.roughness=.3;
+   if(assets.normals){m.normalMap=assets.normals.brushed;m.normalScale.setScalar(.14);}m.color.set(id==='black'?'#25282b':'#30363c').convertSRGBToLinear();m.metalness=.8;m.roughness=.3;
   }
   m.needsUpdate=true;
  }

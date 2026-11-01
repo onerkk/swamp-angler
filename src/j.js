@@ -141,7 +141,7 @@ const rbMat=new T.ShaderMaterial({uniforms:{uA:{value:0}},transparent:true,depth
   vertexShader:'varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
   fragmentShader:'uniform float uA; varying vec2 vP; vec3 sp(float t){ return clamp(vec3(abs(t*6.0-3.0)-1.0, 2.0-abs(t*6.0-2.0), 2.0-abs(t*6.0-4.0)),0.0,1.0); } void main(){ float r=length(vP); float t=clamp((r-700.0)/60.0,0.0,1.0); float e=smoothstep(0.0,0.15,t)*(1.0-smoothstep(0.85,1.0,t)); gl_FragColor=vec4(sp(1.0-t)*e*uA, e*uA); }'});
 const rainbow=new T.Mesh(new T.RingGeometry(700,760,160,1,0,Math.PI),rbMat); rainbow.visible=false; rainbow.frustumCulled=false; rainbow.renderOrder=4; S.add(rainbow);
-const birdMat=new T.MeshBasicMaterial({color:0x1a1a1a,side:T.DoubleSide});
+const birdMat=new T.MeshStandardMaterial({color:0x35322d,roughness:.9,side:T.DoubleSide});
 const birdG=new T.BufferGeometry(); birdG.setAttribute('position',new T.Float32BufferAttribute([0,0,0,-.5,.08,-.15,-.05,0,-.05, 0,0,0,.5,.08,-.15,.05,0,-.05],3));
 const flock=[]; for(let i=0;i<18;i++){ const m=new T.Mesh(birdG,birdMat); m.visible=false; m.scale.setScalar(1.6); S.add(m); flock.push(m); }
 if(window.__MDL) flock.forEach(m=>window.__MDL.attach(m,'gull',{len:.42,target:'+z'}));

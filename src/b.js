@@ -622,9 +622,9 @@ function setTime(hour, force){
   if(photoHook){ const o=photoHook(h,wx); if(o){
     U.uSunDir.value.copy(o.dir); U.uSunDisk.value.copy(o.dir); U.uLightCol.value.set(o.lc[0],o.lc[1],o.lc[2]); U.uSunVis.value=1-wx.cloud*.85;
     renderer.toneMappingExposure=o.exp; U.uExpo.value=o.exp; sunLight.color.setRGB(o.lc[0],o.lc[1],o.lc[2]); sunLight.intensity=.7*(1-wx.cloud*.5);
-    sunLight.position.copy(o.dir).multiplyScalar(60);hemi.color.setRGB(.18+.35*U.uDay.value,.23+.35*U.uDay.value,.32+.35*U.uDay.value);hemi.groundColor.setRGB(.035,.045,.055);hemi.intensity=.45*(1-wx.cloud*.3);info.light=o.light;return info; } }
+    sunLight.position.copy(o.dir).multiplyScalar(60);hemi.color.setRGB(.18+.35*U.uDay.value,.23+.35*U.uDay.value,.32+.35*U.uDay.value);hemi.groundColor.setRGB(.035,.045,.055);hemi.intensity=.45*(1-wx.cloud*.3);info.light=o.light; } }
   let dh = Math.abs(h - envHour); if(dh > 12) dh = 24 - dh;
-  if(force || dh > 0.35 || wxDirty){ wxDirty = false; envHour = h; regenEnv(); }
+  if(force || envHour<0 || dh > 0.35 || wxDirty){ wxDirty = false; envHour = h; regenEnv(); }
   return info;
 }
 
@@ -683,18 +683,18 @@ function renderRefl(){
 
 const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
-const radiance=createSceneRadiance(T,renderer);
+const radiance=createSceneRadiance(T,renderer),interiorReflection=createInteriorReflection(T,renderer);
 function render(){ submerged.render(); if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } radiance.render(scene, camera); }
 
 function setIce(on){water.visible=!on;seaGrid.visible=!on;}
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=water.visible; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
 let photoHook=null;
-function setPhotoHook(f){ photoHook=f; }
-function setPhotoActive(){ U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; seaMat.toneMapped=false; seaMat.needsUpdate=true; }
+function setPhotoHook(f){ photoHook=f;wxDirty=true; }
+function setPhotoActive(){ wxDirty=true;envHour=-99;U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; seaMat.toneMapped=false; seaMat.needsUpdate=true; }
 function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 // 水色：每個水域的水本身顏色不同（浮萍灣藻綠、倒木區單寧茶色、深水中央墨綠藍…），換釣點時慢慢轉過去
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }

@@ -22,3 +22,15 @@ Validation:
 - Native Draco yacht geometry checks verify the standing decks, outward clear sightline and net reach. These automated checks do not replace visual/performance testing on the player's phone.
 
 Vendored SSR/Pass/CopyShader sources are from Three.js r128, MIT licensed in `vendor/three-addons.LICENSE.txt`. SSRShader has local bounded-ray, viewport clipping and transparent-output initialization changes.
+
+## Material lighting correction (2026-11-01)
+
+The photo-sky branch in `setTime` returned before environment regeneration. This meant photographed lighting could leave PBR metals using an absent or stale environment, even though their metalness was set. The photo hook now continues through bounded IBL regeneration, including first use and weather changes; switching the photo sky marks the probe dirty. This correction applies at every graphics level and does not depend on SSR.
+
+The cabin gets a local 128-pixel cube probe of its actual room, prefiltered with PMREM, refreshed at most once per ten seconds at levels 3–7. Lower profiles use the shared outdoor IBL. The old local probe is disposed after replacement, and render target/scissor/shadow state is restored. This is an approximation to room reflections, not full dynamic GI.
+
+Tackle carbon, brushed gold/steel and grips now have actual linear tangent-space normal textures, shared by equipped gear and shop previews. Original normal maps on imported models remain intact. This is not a claim that every imported material has a normal texture: smooth materials may use geometry normals, some assets use bump maps, and UI/effects deliberately use unlit/custom shaders.
+
+`window.__materialLightingAudit` distinguishes the active scene's visible meshes, unique lit materials, normal-mapped, bump-mapped and smooth materials, custom shaders/unlit surfaces, and metals missing an environment. The graphics status displays actual mapped-material counts. These are runtime scene counts, not a fabricated all-assets percentage.
+
+Additional validation: `python tests/check-metal-gpu.py` renders the actual Three r128 metallic BRDF against black/bright CubeUV environments. Gold must darken without illumination, reflect the bright environment, and preserve gold spectral coloration. Regression tests exercise the actual photo-sky `setTime` function and local room probe lifecycle.

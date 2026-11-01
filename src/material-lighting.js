@@ -1,0 +1,32 @@
+/* Tangent-space normals describe surface detail; they do not replace lighting or IBL. */
+function createDetailNormals(T){
+ const n=256,out={};
+ const height={brushed:(x,y)=>.007*Math.sin(y*Math.PI/2)+.004*Math.sin(y*Math.PI*7/16),weave:(x,y)=>.035*Math.sin((x+y)*Math.PI/8)*Math.sin((x-y)*Math.PI/8),grip:(x,y)=>.03*Math.sin(x*Math.PI/4)*Math.sin(y*Math.PI/4)};
+ for(const [kind,h]of Object.entries(height)){const data=new Uint8Array(n*n*4);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const v=new T.Vector3(-(h(x+1,y)-h(x-1,y))*8,-(h(x,y+1)-h(x,y-1))*8,1).normalize(),i=(y*n+x)*4;data[i]=Math.round((v.x*.5+.5)*255);data[i+1]=Math.round((v.y*.5+.5)*255);data[i+2]=Math.round((v.z*.5+.5)*255);data[i+3]=255;}
+  const t=new T.DataTexture(data,n,n,T.RGBAFormat);t.name='Surface normal: '+kind;t.wrapS=t.wrapT=T.RepeatWrapping;t.generateMipmaps=true;t.minFilter=T.LinearMipmapLinearFilter;t.magFilter=T.LinearFilter;t.encoding=T.LinearEncoding;t.needsUpdate=true;out[kind]=t;
+ }out.weave.repeat.set(3,4);out.brushed.repeat.set(1,3);out.grip.repeat.set(2,6);return out;
+}
+function auditSceneLighting(scene){
+ const result={meshes:0,lit:0,normalMapped:0,bumpMapped:0,smooth:0,customShader:0,unlit:0,metal:0,metalWithoutEnvironment:0,normalMissingUV:0,examples:{smooth:[],unlit:[],custom:[]}},seen=new Set();
+ scene.traverseVisible(o=>{if(!o.isMesh)return;result.meshes++;for(const m of(Array.isArray(o.material)?o.material:[o.material])){if(!m||seen.has(m))continue;seen.add(m);const name=m.name||o.name||m.type;
+  if(m.isShaderMaterial||m.isRawShaderMaterial){result.customShader++;if(result.examples.custom.length<8)result.examples.custom.push(name);continue;}
+  if(m.isMeshBasicMaterial){result.unlit++;if(result.examples.unlit.length<8)result.examples.unlit.push(name);continue;}
+  result.lit++;if(m.normalMap){result.normalMapped++;if(!o.geometry.attributes.uv)result.normalMissingUV++;}else if(m.bumpMap)result.bumpMapped++;else{result.smooth++;if(result.examples.smooth.length<8)result.examples.smooth.push(name);}
+  if(m.metalness>.5){result.metal++;if(!(m.envMap||scene.environment))result.metalWithoutEnvironment++;}
+ }});result.materials=seen.size;return result;
+}
+/* A local cabin probe captures actual walls/furniture/lights, not a studio-light overlay. */
+function createInteriorReflection(T,R){
+ const pmrem=new T.PMREMGenerator(R),cube=new T.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter,type:R.capabilities.isWebGL2&&R.extensions.has('EXT_color_buffer_float')?T.HalfFloatType:T.UnsignedByteType}),camera=new T.CubeCamera(.08,40,cube),records=new WeakMap();let failed=false;
+ function update(scene,position,outdoor,time){
+  const level=typeof window!=='undefined'&&window.__gfxStatus?window.__gfxStatus.level:4;let rec=records.get(scene);
+  if(failed||level<3){scene.environment=outdoor;return;}
+  if(rec&&time-rec.time<10){scene.environment=rec.rt.texture;return;}
+  const target=R.getRenderTarget(),viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest(),shadow=R.shadowMap.autoUpdate,oldEnv=scene.environment;
+  try{scene.environment=outdoor;R.shadowMap.autoUpdate=false;R.setScissorTest(false);camera.position.copy(position);camera.updateMatrixWorld(true);camera.update(R,scene);const rt=pmrem.fromCubemap(cube.texture);records.set(scene,{rt,time});scene.environment=rt.texture;if(rec)rec.rt.dispose();}
+  catch(e){failed=true;scene.environment=outdoor||oldEnv;console.warn('Interior reflection probe unavailable',e);}
+  finally{R.shadowMap.autoUpdate=shadow;R.setRenderTarget(target);R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);}
+ }
+ return{update};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={createDetailNormals,auditSceneLighting,createInteriorReflection};

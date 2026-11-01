@@ -104,11 +104,11 @@ const carbonTex=texC(256,256,(g,w,h)=>{ g.fillStyle='#d0d1d3'; g.fillRect(0,0,w,
 carbonTex.encoding=T.sRGBEncoding;carbonTex.anisotropy=8;
 const weaveTex=texC(128,128,(g,w,h)=>{for(let y=0;y<h;y++)for(let x=0;x<w;x++){const n=128+26*Math.sin((x+y)*Math.PI/4)*Math.sin((x-y)*Math.PI/4);g.fillStyle=`rgb(${n},${n},${n})`;g.fillRect(x,y,1,1);}},3,4);
 const brushedTex=texC(128,128,(g,w,h)=>{for(let y=0;y<h;y++){const n=128+12*Math.sin(y*2.91)+5*Math.sin(y*9.3);g.fillStyle=`rgb(${n},${n},${n})`;g.fillRect(0,y,w,1);}},1,3);
-const finishAssets={carbon:carbonTex,weave:weaveTex,brushed:brushedTex};
+const finishAssets={carbon:carbonTex,weave:weaveTex,brushed:brushedTex,normals:createDetailNormals(T)};
 const evaTex=texC(64,64,(g,w,h)=>{ g.fillStyle='#202124'; g.fillRect(0,0,w,h); for(let i=0;i<500;i++){ g.fillStyle=Math.random()<.5?'rgba(0,0,0,.55)':'rgba(70,72,78,.35)'; g.beginPath(); g.arc(Math.random()*w,Math.random()*h,Math.random()*1.3+.3,0,7); g.fill(); } },2,6);
 evaTex.encoding=T.sRGBEncoding;
 const blankMat=new T.MeshPhysicalMaterial({color:0xffffff,map:carbonTex,metalness:.25,roughness:.38,clearcoat:1,clearcoatRoughness:.05});
-const gripMat=new T.MeshStandardMaterial({color:0xffffff,map:evaTex,bumpMap:evaTex,bumpScale:.002,roughness:.92});
+const gripMat=new T.MeshStandardMaterial({color:0xffffff,map:evaTex,normalMap:finishAssets.normals.grip,normalScale:new T.Vector2(.35,.35),roughness:.92});
 const chromeMat=new T.MeshStandardMaterial({color:0xdde2e6, metalness:1, roughness:.16});
 const darkMetal=new T.MeshStandardMaterial({color:0x2a2e35, metalness:.75, roughness:.3});
 const goldMat=new T.MeshStandardMaterial({color:0xd9b25a, metalness:1, roughness:.2});
