@@ -1,4 +1,4 @@
-/*APPV:20261101002244*/
+/*APPV:20261101002549*/
 /* The aquarium is a close-up exhibit: keep texture detail and reduce repeated draw calls. */
 function aquariumGraphicsProfile(profile,scope,cap){
  if(scope!=='home-aquarium'||profile.mode!=='auto')return profile;
@@ -2675,7 +2675,7 @@ function update(dt){
   for(const r of rays){ r.rotation.set(0,Math.atan2(cam.position.x-r.position.x,cam.position.z-r.position.z),.18); r.material.opacity=.09*L*(.6+.4*Math.sin(tt*.5+r.userData.ph)); r.material.color.setRGB(.8,1,.75); }
 }
 function resize(w,h){ cam.aspect=w/h; cam.fov=w<h?54:46; cam.updateProjectionMatrix(); }
-return { scene,cam,start, end, update, resize, active:()=>on, setProgress:a=>{ prog=clamp(a,0,1); }, bite:()=>{ if(on&&biteT<0) biteT=0; }, render:()=>W.radiance.render(scene,cam) };
+return { scene,cam,start, end, update, resize, active:()=>on, setProgress:a=>{ prog=clamp(a,0,1); }, bite:()=>{ if(on&&biteT<0) biteT=0; }, render:()=>{scene.environment=W.scene.environment;W.radiance.render(scene,cam);} };
 }
 
 /* ---------- 釣具與魚餌資料 ---------- */
@@ -6797,7 +6797,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101002244'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101002549'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

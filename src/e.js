@@ -241,7 +241,7 @@ function update(dt){
   for(const r of rays){ r.rotation.set(0,Math.atan2(cam.position.x-r.position.x,cam.position.z-r.position.z),.18); r.material.opacity=.09*L*(.6+.4*Math.sin(tt*.5+r.userData.ph)); r.material.color.setRGB(.8,1,.75); }
 }
 function resize(w,h){ cam.aspect=w/h; cam.fov=w<h?54:46; cam.updateProjectionMatrix(); }
-return { scene,cam,start, end, update, resize, active:()=>on, setProgress:a=>{ prog=clamp(a,0,1); }, bite:()=>{ if(on&&biteT<0) biteT=0; }, render:()=>W.radiance.render(scene,cam) };
+return { scene,cam,start, end, update, resize, active:()=>on, setProgress:a=>{ prog=clamp(a,0,1); }, bite:()=>{ if(on&&biteT<0) biteT=0; }, render:()=>{scene.environment=W.scene.environment;W.radiance.render(scene,cam);} };
 }
 
 /* ---------- 釣具與魚餌資料 ---------- */
