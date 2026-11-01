@@ -438,7 +438,7 @@ function homeEnter(){ const hd=HOME.data();
   setTimeout(()=>toast('釣友來參觀你的 '+kinds+' 種收藏，留下了 '+bt.icon+bt.name+' ×'+n,'good',2600),1200); }
 function recoverHome(err){console.error('home recovery',err);try{HOME3D.exit();}catch(_){}G.state='idle';document.body.classList.remove('athome','tankview','tankdive','grilling');fadeEl.classList.remove('on');toast('小屋載入暫時失敗，已返回釣點，遊戲進度保留','warn',4200);}
 function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收線再回家','warn');return;}if(!HOME.unlocked()){toast('完成主線第一章後才能整理小屋','warn');return;}persist();G.state='travel';fadeEl.classList.add('on');Snd.paddle();
- setTimeout(()=>{try{if(W.suspendEffects)W.suspendEffects();HOME3D.enter();G.state='home';document.body.classList.add('athome');fadeEl.classList.remove('on');toast('回到老漁人的小屋','good',1400);}catch(err){recoverHome(err);}},650);}
+ setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;HOME3D.enter();G.state='home';document.body.classList.add('athome');fadeEl.classList.remove('on');toast('回到老漁人的小屋','good',1400);}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit(); document.body.classList.remove('athome'); G.state='idle'; fadeEl.classList.remove('on'); if(then) then(); else if(G.spot!==0) goSpot(0); },650); }
 window.__goHome=goHome; window.__HOMEOK=()=>HOME.unlocked();
@@ -629,12 +629,12 @@ function tideDone(bag0,forced){ const handled=bag0.filter(b=>b.done).length; let
   const fin=keep=>{ let earn=0; save.cooler=save.cooler||[]; bag.forEach(b=>{ if(keep&&grill.includes(b.id)&&!b.broken&&save.cooler.length<5) save.cooler.push({id:b.id,L:b.L,w:+(b.L*b.L*b.L*600).toFixed(3),d:Date.now()}); else earn+=b.v; });
     save.coins+=earn; setCoins(); persist(); Snd.coin&&Snd.coin(); el.remove(); toast(earn?'賣了 🪙'+earn.toLocaleString():'放進保冷箱了，回小屋就能烤','good',2200); };
   el.querySelector('#tdSell').onclick=()=>fin(false); const k=el.querySelector('#tdKeep'); if(k) k.onclick=()=>fin(true); }
-const HOME3D=createHomeScene(W,{openShop:()=>openShop(),save,home:()=>HOME,grillHeat:()=>HOME.grillHeat(),coin:()=>{ Snd.coin&&Snd.coin(); },toast:(...a)=>toastHome(...a),persist:()=>persist(),onGrilled,buy:(id,p)=>{ if(save.coins<p){ toast('金幣不夠','warn',1400); return false; } save.coins-=p; setCoins(); persist(); return true; },sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
+const HOME3D=createLazyHomeScene(()=>createHomeScene(W,{openShop:()=>openShop(),save,home:()=>HOME,grillHeat:()=>HOME.grillHeat(),coin:()=>{ Snd.coin&&Snd.coin(); },toast:(...a)=>toastHome(...a),persist:()=>persist(),onGrilled,buy:(id,p)=>{ if(save.coins<p){ toast('金幣不夠','warn',1400); return false; } save.coins-=p; setCoins(); persist(); return true; },sizzle:k=>{ Snd.sizzle&&Snd.sizzle(k); },joy:()=>({thr:KY.thr,turn:KY.turn}),hour:()=>G.hour,data:()=>HOME.data(),species:id=>SPECIES.find(s=>s.id===id),getFish:sp=>P.getFish(sp),
   isReal:id=>!!(window.__MDL&&window.__MDL.fishReady(id)),want:id=>{ if(window.__MDL&&window.__MDL.want) window.__MDL.want(id); },
   crackle:()=>Snd.crackle(), onEnter:()=>homeEnter(), rain:()=>{ if(window.__rainTest!=null) return window.__rainTest; const wx=WL.wx?WL.wx():{}; return wx.r||0; },
   showFish:(rec,card)=>{ const sp=SPECIES.find(s=>s.id===rec.id)||{name:rec.id,rar:0}, r=RAR[sp.rar]; card.style.setProperty('--rc',r.col);
     card.innerHTML=`<b>${sp.name}</b><small>${r.name}${rec.g?'｜'+rec.g:''}</small><div class="fg"><span>長度</span><div>${(rec.L*100).toFixed(1)} 公分</div><span>重量</span><div>${rec.w<1?Math.round(rec.w*1000)+' 公克':rec.w.toFixed(2)+' 公斤'}</div><span>釣到地點</span><div>${rec.at||'—'}</div><span>釣到日期</span><div>${new Date(rec.d).toLocaleDateString('zh-TW')}</div></div>`;
-    card.classList.remove('hidden'); }});
+    card.classList.remove('hidden'); }}));
 window.__HOME=createHome({save,persist:()=>persist(),toast:(...a)=>toastHome(...a),setCoins:()=>setCoins(),addXP:x=>META.addXP(x),syncHUD:()=>META.syncHUD(),hour:()=>G.hour,setHour:h=>{ G.hour=h; W.setTime(h,true); },fxChanged:()=>{ if(window.__ECO&&window.__ECO.render) window.__ECO.render(); }}); const HOME=window.__HOME;
 const META=createMeta({W,save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS,goSpot,curSpot:()=>G.spot,setHour:h=>{ G.hour=h; W.setTime(h,true); }});
 const UW=createUnderwater(W,P);
@@ -884,7 +884,7 @@ function updateFight(dt){
 }
 
 function update(dt){
-  PH.refresh();
+  if(G.state!=='home')PH.refresh();
   if(document.body.dataset.fishingState!==G.state) document.body.dataset.fishingState=G.state;
   if(easy()){
     if(G.state==='wait'){ G.snag=false; G.noBait=false; G.nib=0; G.timer=Math.min(G.timer,.6); }
@@ -897,7 +897,7 @@ function update(dt){
   if(G.state==='fight'&&G.prevSt!=='fight') G.aimYaw=G.aimYawCast!=null?G.aimYawCast:G.yawT; G.prevSt=G.state;
   G.t+=dt; G.hour+=dt/(G.state==='tide'?240:40);   // 在泥灘上時間放慢 6 倍，退潮有足夠的時間慢慢找、慢慢挖
   G.hSave=(G.hSave||0)+dt; if(G.hSave>10){ G.hSave=0; save.hour=((G.hour%24)+24)%24; persist(); }
-  const info=W.setTime(G.hour); W.update(dt,G.t); updateKayak(dt);
+  const info=W.setTime(G.hour);if(G.state==='home'){W.updateEnvironment(dt,G.t);updateKayak(dt);return;}W.update(dt,G.t); updateKayak(dt);
   if(keys.ArrowLeft||keys.ArrowRight){ const k=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0); if(G.state==='fight') G.rodSideT=k; else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(G.yawT-k*dt*1.2,-.95,.95); }
   G.rodSide+=(G.rodSideT-G.rodSide)*Math.min(1,dt*8); rod.side=G.rodSide;
   if(G.state!=='fight'){ rod.end=null; rod.bendT=.03; } bob.visible=!G.snapped&&!((G.drillK||0)>.5)&&!(G.bottom&&(G.state==='wait'||G.state==='bite'||G.state==='fight'))&&!(G.state==='fight'&&G.f&&G.f.jumpT>0); bob.rotation.set(0,0,0);
@@ -1095,11 +1095,13 @@ W.setTime(G.hour,true);
 dockCameraButton($('bCam'),$('cameraSlot'),$('top'));
 const screenCapture=createScreenCapture({canvas:W.renderer.domElement,button:$('bCam'),report:(m,k)=>toast(m,k,2200),onCaptured:scene=>SEA.recordPhoto(scene),scene:()=>TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':END.on()?'ending':G.loc||'lake'});
 const frameLimiter=createFrameLimiter(GAME_FPS_LIMIT,performance.now());window.__frameLimit=GAME_FPS_LIMIT;
+const gpuStatus=document.createElement('div');gpuStatus.style.cssText='display:none;position:fixed;inset:0;z-index:200;background:rgba(6,16,20,.92);color:white;align-items:center;justify-content:center;text-align:center;padding:28px;font:18px sans-serif';document.body.appendChild(gpuStatus);
+const graphicsRecovery=createGraphicsRecovery(W.renderer.domElement,{save:persist,report:(kind,msg)=>{if(window.__DIAG)window.__DIAG.add(kind,msg);},lost:()=>{releaseAll();if(window.__DIAG)window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','context-lost');gpuStatus.textContent='畫面正在恢復，遊戲進度已保存。';gpuStatus.style.display='flex';setTimeout(()=>{if(graphicsRecovery.paused()){gpuStatus.innerHTML='<div>畫面尚未恢復，遊戲進度已保存。<br><button style="margin-top:20px;padding:12px 24px">重新載入</button></div>';gpuStatus.querySelector('button').onclick=()=>{persist();location.reload();};}},8000);},restored:()=>{W.resetGraphics();HOME3D.resetGraphics();frameLimiter.reset(performance.now());gfxAuto.pause();gpuStatus.style.display='none';}});
 function frame(now){
   const frameSeconds=frameLimiter.step(now);if(frameSeconds===null){requestAnimationFrame(frame);return;}
-  const dt=Math.min(.05,frameSeconds);window.__frameSeconds=frameSeconds;
-  try{ window.__UWON=UW.active(); update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
-  screenCapture.afterFrame();if(window.__DIAG)window.__DIAG.frame(frameSeconds);
+  if(graphicsRecovery.paused()){requestAnimationFrame(frame);return;}const dt=Math.min(.05,frameSeconds);window.__frameSeconds=frameSeconds;
+  try{ window.__UWON=UW.active(); update(dt);if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);} if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
+  screenCapture.afterFrame();if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
   gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?HOME3D.qualityScope():UW.active()?'underwater':G.loc||'lake'});
   requestAnimationFrame(frame);
 }

@@ -8,6 +8,6 @@ function createFrameLimiter(limit=GAME_FPS_LIMIT,start=0){
   if(budget+.5<interval)return null;budget=gap>interval*2?0:budget-interval;if(budget>=interval)budget%=interval;
   const seconds=(now-renderedAt)/1000;renderedAt=now;return seconds;
  }
- return{step,limit:1000/interval};
+ return{step,reset(now){tickAt=renderedAt=now;budget=0;},limit:1000/interval};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={GAME_FPS_LIMIT,createFrameLimiter};

@@ -21,7 +21,7 @@ function createProgressiveEnvironment(T,R,scene,onReady){
    return true;
   }catch(e){failed=true;face=-1;pending=false;console.warn('Environment capture paused after a rendering failure',e);return false;}finally{if(R.xr)R.xr.enabled=xr;R.shadowMap.autoUpdate=auto;R.shadowMap.needsUpdate=request;R.setRenderTarget(target);R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);}
  }
- return{request(){pending=true;},update};
+ return{request(){pending=true;},reset(){failed=false;ready=false;face=-1;pending=true;cube.dispose();},update};
 }
 /* Tangent-space normals describe surface detail; they do not replace lighting or IBL. */
 function createDetailNormals(T){
@@ -58,6 +58,6 @@ function createInteriorReflection(T,R){
   catch(e){failed=true;scene.environment=outdoor||oldEnv;console.warn('Interior reflection probe unavailable',e);}
   finally{if(R.xr)R.xr.enabled=xr;R.shadowMap.needsUpdate=request;R.shadowMap.autoUpdate=shadow;R.setRenderTarget(target);R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);}
  }
- return{update};
+ return{update,release(scene){const rec=records.get(scene);if(rec){if(scene.environment===rec.rt.texture)scene.environment=null;rec.rt.dispose();records.delete(scene);}if(work&&work.scene===scene)work=null;cube.dispose();failed=false;}};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={createProgressiveEnvironment,photoProbeFragment,createDetailNormals,auditSceneLighting,createInteriorReflection};
