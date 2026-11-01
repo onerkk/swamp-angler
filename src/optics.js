@@ -37,7 +37,7 @@ function createWaterOptics(U,{surface=0,bounds=null,flat=false,strength=1}={}){
   const scoped=material=>{if(!material)return material;let mat=material;const existing=WATER_OPTICS_STATE.get(mat);if(existing&&existing.owner!==owner){mat=scopedMaterials.get(material);if(!mat){mat=material.clone();mat.onBeforeCompile=material.onBeforeCompile;mat.customProgramCacheKey=material.customProgramCacheKey.bind(material);scopedMaterials.set(material,mat);}}patch(mat);if(mat)used.add(mat);return mat;};
   m.material=Array.isArray(m.material)?m.material.map(scoped):scoped(m.material);
  });const before=rootMaterials.get(root)||new Set();for(const m of before)if(!used.has(m)){const n=(references.get(m)||1)-1;references.set(m,n);if(!n)materials.delete(m);}for(const m of used){if(!before.has(m))references.set(m,(references.get(m)||0)+1);if(WATER_OPTICS_STATE.has(m))materials.add(m);}rootMaterials.set(root,used);}
- function update(){detail.value=typeof window!=='undefined'&&(window.__effectBudget?.caustics===false||window.__GFX==='low')?0:1;const day=U.uDay?U.uDay.value:1;for(const m of materials)if(WATER_OPTICS_STATE.get(m).owner===owner)m.envMapIntensity=m.userData.opticsEnv*(.22+.78*day);}
+ function update(){detail.value=typeof window!=='undefined'&&window.__effectBudget?.caustics===false?0:1;const day=U.uDay?U.uDay.value:1;for(const m of materials)if(WATER_OPTICS_STATE.get(m).owner===owner)m.envMapIntensity=m.userData.opticsEnv*(.22+.78*day);}
  function remove(root){const used=rootMaterials.get(root);if(!used)return;for(const m of used){const n=(references.get(m)||1)-1;references.set(m,n);if(!n)materials.delete(m);}rootMaterials.delete(root);}
  return{add,remove,patch,update,uniforms};
 }

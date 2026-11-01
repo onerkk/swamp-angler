@@ -43,7 +43,7 @@ function updShafts(dt){ const sun=W.U.uSunDir.value, vis=(W.U.uSunVis?W.U.uSunVi
   const K=Math.min(1,k*1.6)*vis*(sun.y>-.02?1:0); hs.set(sun.x,0,sun.z); const hl=hs.length(); if(hl<1e-3||K<.01){ shafts.forEach(s=>s.m.visible=false); return; } hs.divideScalar(hl);
   const el=Math.max(.42,Math.atan2(sun.y,hl)); sd.set(hs.x*Math.cos(el),Math.sin(el),hs.z*Math.cos(el));   // 太低時抬高光束角度，避免躺平
   W.camera.getWorldDirection(vd); const face=Math.max(0,vd.x*hs.x+vd.z*hs.z), tt=performance.now()*.001;
-  occClock-=dt; if(occClock<=0){ occClock=1.5; rt.set(-hs.z,0,hs.x); updOcc(sd,rt); }
+  occClock-=dt; if(occClock<=0){ occClock=window.__GFX==='high'?1.5:window.__GFX==='mid'?3:5; rt.set(-hs.z,0,hs.x); updOcc(sd,rt); }
   for(const s of shafts){ const a=Math.atan2(hs.x,hs.z)+s.off; base.set(cam.x+Math.sin(a)*s.dist,0,cam.z+Math.cos(a)*s.dist); s.base=(s.base||new T.Vector3()).copy(base); s.occ+=(s.occT-s.occ)*Math.min(1,dt*1.5);
     ctr.copy(base).addScaledVector(sd,s.len*.5); vd.subVectors(cam,ctr).normalize();
     rt.crossVectors(sd,vd).normalize(); nm.crossVectors(rt,sd).normalize();
@@ -55,8 +55,8 @@ function update(dt){ W.camera.getWorldPosition(cam); const wx=c.wx?c.wx():{r:0};
   const target=mistK()*(.75+.5*wet)*(c.sea()?.5:1)*(c.underwater()?0:1);
   k+=(target-k)*Math.min(1,dt*.5); U.uK.value=k;
   const wd=c.wind?c.wind():null; if(wd) U.uWind.value.set(wd.x||1,wd.z||0);
-  const q=window.__GFX||'high';
-  for(const m of layers){ m.visible=k>.01&&q!=='low'; m.position.x=cam.x; m.position.z=cam.z; }
-  if(q==='high') updShafts(dt); else shafts.forEach(s2=>s2.m.visible=false); }
+  for(const m of layers){ m.visible=k>.01; m.position.x=cam.x; m.position.z=cam.z; }
+  // 霧層與光束在每種畫質都保留；光束最貴的是遮擋射線檢查，中、低畫質把它放慢（光束跟著鏡頭的位置仍每幀更新，不會抖）
+  updShafts(dt); }
 return {update,level:()=>k};
 }

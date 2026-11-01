@@ -2,7 +2,7 @@
 function recoverMobileGraphics(save,touch,dpr){if(!touch||dpr<2.5||save.gfx!=='high'||save.gfxRecoveryVersion)return false;save.gfx='auto';save.gfxRecoveryVersion=1;return true;}
 /* Raw RAF timing, independent of the simulation's capped timestep. */
 function graphicsProfiles(cap){
- const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
+ const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[.16,.2,.24,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
  return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:i<2?Math.min(cap,i===0?.65:.85):Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
 }
 function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null,initialLevel=4}){
@@ -33,7 +33,7 @@ function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null,initialL
  }
  return{configure,sample,pause,status,refresh:()=>apply(status())};
 }
-function graphicsStatusText(s){const a=typeof window!=='undefined'?window.__materialLightingAudit:null;return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS・上限 120`+(s.effectLevel!==undefined?'・木屋材質固定流暢':'')+(a?`・受光材質 ${a.lit}／法線 ${a.normalMapped}／凹凸 ${a.bumpMapped}`:'');}
+function graphicsStatusText(s){const a=typeof window!=='undefined'?window.__materialLightingAudit:null;return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}${typeof window!=='undefined'&&window.__effectTier?'・材質'+({high:'高',mid:'中',low:'低'})[window.__effectTier]:''}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS・上限 120`+(s.effectLevel!==undefined?'・木屋材質固定流暢':'')+(a?`・受光材質 ${a.lit}／法線 ${a.normalMapped}／凹凸 ${a.bumpMapped}`:'');}
 if(typeof module!=='undefined'&&module.exports)module.exports={recoverMobileGraphics,graphicsProfiles,createAdaptiveGraphics,graphicsStatusText};
 
 function waterDetailSettings(quality){return{low:[24,48],mid:[112,192],high:[160,256],ultra:[224,320]}[quality]||[112,192];}

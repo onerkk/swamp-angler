@@ -1,7 +1,14 @@
 /* Effect costs are controlled independently from framebuffer resolution. */
-function effectBudget(level){return{normalMaps:false,surfaceMaps:level>=2,physicalCoat:level>=4,environment:level>=2,probes:level>=3,caustics:level>=3,waterDetail:level>=3,rainLines:level<2?0:level<4?180:level<6?500:1400,rainOverlay:level>=4,lensFlare:level>=3,rainRings:level>=3,ssr:false,transmissionHz:level<2?15:level<4?30:120};}
+/* 畫質分兩層：tier（高／中／低）決定材質用哪些貼圖與光澤，整段遊戲固定不變，避免著色器重新編譯造成卡頓；
+   level（0～7）只調數量、更新頻率與解析度，所有特效在每一級都保留，只是用較省的版本。 */
+function effectTier(mode,mobile){return mode==='high'||mode==='mid'||mode==='low'?mode:mobile?'mid':'high';}
+function effectBudget(level,tier){level=Math.max(0,Math.min(7,Math.round(Number(level)||0)));tier=tier||(typeof window!=='undefined'&&window.__effectTier)||'high';
+ const pick=a=>a[level];
+ return{tier,cullStatic:level<2,normalMaps:false,surfaceMaps:true,physicalCoat:tier!=='low',environment:true,probes:true,probeHz:pick([1,1,2,2,4,6,10,15]),caustics:true,waterDetail:true,
+  rainLines:pick([160,220,320,420,600,800,1100,1400]),rainOverlay:true,lensFlare:true,rainRings:true,ssr:false,
+  transmissionHz:pick([12,15,20,30,45,60,120,120]),reflectionHz:pick([15,15,20,24,30,40,60,60]),shadowHz:pick([8,10,12,15,20,20,24,30]),particleScale:pick([.4,.5,.6,.7,.85,1,1,1])};}
 function createMaterialQuality(){
- const states=new WeakMap(),objects=new WeakMap(),sources=new Map(),keys=['envMap','normalMap','bumpMap','roughnessMap','metalnessMap','aoMap','clearcoatMap','clearcoatNormalMap','clearcoatRoughnessMap'];let budget=effectBudget(7);
+ const states=new WeakMap(),objects=new WeakMap(),sources=new Map(),keys=['envMap','normalMap','bumpMap','roughnessMap','metalnessMap','aoMap','clearcoatMap','clearcoatNormalMap','clearcoatRoughnessMap'];let budget=effectBudget(7,'high');
  const remember=t=>{if(t?.uuid)sources.set(t.uuid,typeof WeakRef==='function'?new WeakRef(t):{deref:()=>t});};
  function material(m){
   if(!m||(!m.isMeshStandardMaterial&&!m.isMeshPhysicalMaterial))return;let s=states.get(m);
@@ -26,7 +33,7 @@ function createMaterialQuality(){
   if(m.isMeshPhysicalMaterial){const on=budget.physicalCoat,has=Object.prototype.hasOwnProperty.call(m.defines||{},'PHYSICAL');if(on!==has){m.defines={...s.defines};if(!on)delete m.defines.PHYSICAL;changed=true;}}
   if(changed)m.needsUpdate=true;
  }
- function apply(root){if(root)root.traverse(o=>{const mats=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];if(o.isMesh&&!o.isSkinnedMesh&&!o.isInstancedMesh&&!o.morphTargetInfluences?.length&&mats.some(m=>m?.isMeshStandardMaterial)){if(!objects.has(o))objects.set(o,o.frustumCulled);o.frustumCulled=budget.surfaceMaps?objects.get(o):true;}for(const m of mats)material(m);});}
- return{set(level){budget=effectBudget(level);return budget;},apply,material};
+ function apply(root){if(root)root.traverse(o=>{const mats=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];if(o.isMesh&&!o.isSkinnedMesh&&!o.isInstancedMesh&&!o.morphTargetInfluences?.length&&mats.some(m=>m?.isMeshStandardMaterial)){if(!objects.has(o))objects.set(o,o.frustumCulled);o.frustumCulled=budget.cullStatic?true:objects.get(o);}for(const m of mats)material(m);});}
+ return{set(level,tier){budget=effectBudget(level,tier);return budget;},apply,material};
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={effectBudget,createMaterialQuality};
+if(typeof module!=='undefined'&&module.exports)module.exports={effectTier,effectBudget,createMaterialQuality};

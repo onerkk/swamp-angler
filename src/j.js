@@ -270,7 +270,7 @@ function update(dt,t){
   if(wx.r>.4) lastRain=60; else lastRain=Math.max(0,lastRain-dt);
   updEv(dt,t,wx,day); updChase(dt);
   if((marineWakeT-=dt)<=0){marineWakeT=.45;for(const root of [whale,sfin,...dolphins.map(o=>o.g)]){if(!root.visible)continue;const water=W.swell(root.position.x,root.position.z,t),b=marineBodyBounds(T,root).applyMatrix4(root.matrixWorld);if(b.min.y<water&&b.max.y>water){W.addRipple(root.position.x,root.position.z,root===whale?1.2:.35);foam(root.position.x,root.position.z,root===whale?1.8:.3,root===whale?3.5:.9,1.5);}}}
-  lakeT-=dt; if(lakeT<=0){ lakeT=.25; const sea=(G.loc||loc)!=='lake'; S.children.forEach(o=>{ if(o.userData&&o.userData.lake){ const want=!sea&&!(o.userData.veg&&window.__GFX==='low'); if(o.visible!==want) o.visible=want; } }); }
+  lakeT-=dt; if(lakeT<=0){ lakeT=.25; const sea=(G.loc||loc)!=='lake'; S.children.forEach(o=>{ if(o.userData&&o.userData.lake){ const want=!sea; if(o.visible!==want) o.visible=want; } }); }
   if(yacht.visible){ const b=base(); const h0=W.swell(b.x,b.z,t), fx=-Math.sin(G.head), fz=-Math.cos(G.head);
     const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);
     yacht.position.set(b.x,h0*.9-.05,b.z); yacht.rotation.set((hf-h0)/3*.7,G.head,(hs-h0)/1.5*-.5,'YXZ');

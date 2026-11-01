@@ -544,11 +544,13 @@ const seaGrid = new T.Mesh(makeWaterGrid(T), seaMat); seaGrid.visible=true; seaG
 const sunLight = new T.DirectionalLight(0xffffff, 0.9); scene.add(sunLight); scene.add(sunLight.target);
 renderer.shadowMap.type=T.PCFSoftShadowMap;sunLight.castShadow=true;sunLight.shadow.bias=-.00018;sunLight.shadow.normalBias=.012;sunLight.shadow.radius=2;
 Object.assign(sunLight.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.2,far:130});sunLight.shadow.camera.updateProjectionMatrix();
-function setShadows(q){renderer.shadowMap.enabled=q!=='low';const n=q==='ultra'?Math.min(4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='mid'?512:1024;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
+// 陰影一律開著：關掉再打開會讓全場材質重新編譯而卡一下；低畫質改用小張陰影圖、較低更新頻率
+function setShadows(q){renderer.shadowMap.enabled=true;const n=q==='ultra'?Math.min(4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='auto'?1024:q==='mid'?1024:512;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
 const hemi = new T.HemisphereLight(0xffffff, 0x223322, 0.55); scene.add(hemi);
 
 const materialQuality=createMaterialQuality();let materialScanTimes=new WeakMap();
-function setEffects(level){materialQuality.set(level);materialQuality.apply(scene);if(window.__HOME_SCENE)materialQuality.apply(window.__HOME_SCENE);U.uDetail.value=effectBudget(level).waterDetail?1:0;if(level<2){radiance.release();reflRT.setSize(4,4);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}if(window.__HOME_SCENE)interiorReflection.release(window.__HOME_SCENE);}materialScanTimes=new WeakMap();}
+// 換畫質等級只調數量與頻率；材質種類由固定的 tier 決定，所以這裡不會讓著色器重新編譯，也不再釋放再重建反射與陰影（以前低畫質來回切換會一直重建而卡頓）
+function setEffects(level,tier){const prev=materialQuality.tier;materialQuality.set(level,tier);materialQuality.tier=tier;U.uDetail.value=1;if(prev!==tier){materialQuality.apply(scene);if(window.__HOME_SCENE)materialQuality.apply(window.__HOME_SCENE);materialScanTimes=new WeakMap();}}
 function prepareScene(root){const now=performance.now();if(now<(materialScanTimes.get(root)||0))return;materialScanTimes.set(root,now+1000);materialQuality.apply(root);}
 function qualityTextures(root){materialQuality.apply(root);const max=Math.min(renderer.capabilities.getMaxAnisotropy(),window.__resourcePolicy?.anisotropy||16);root.traverse(m=>{if(!m.isMesh)return;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))if(mat)for(const key of['map','normalMap','roughnessMap','metalnessMap','bumpMap','emissiveMap'])tuneTextureSampling(T,mat[key],max,!!(mat.userData&&mat.userData.packedAtlas));});}
 let waterDetail='mid';function setWaterDetail(q){if(q===waterDetail)return;let [rings,segments]=waterDetailSettings(q);if(rings*segments>65535&&!renderer.capabilities.isWebGL2&&!renderer.extensions.get('OES_element_index_uint'))[rings,segments]=waterDetailSettings('high');const old=seaGrid.geometry;seaGrid.geometry=makeWaterGrid(T,150,rings,segments);old.dispose();waterDetail=q;}
@@ -639,10 +641,12 @@ function addRipple(x, z, amp){ const r = ripS[ripI]; ripI = (ripI+1)%12; r.x=x; 
 function seaH(x,z,t){ return sampleWater(x,z,t,U.uWind.value,true).height; }
 function swell(x,z,t){return sampleWater(x,z,t,U.uWind.value,seaMode).height;}
 
-function updateEnvironment(dt,t){U.uTime.value=t;U.uLightK.value=Math.min(1,Math.max(0,info.light));if(window.__effectBudget?.probes!==false)envJobs.update(window.__frameSeconds||dt);const w=U.uWind.value,k=(.002+.01*w.z)*dt;U.uCloudOff.value.x+=w.x*k;U.uCloudOff.value.y+=w.y*k;}
+// 環境光探針依畫質放慢更新頻率（不關閉），把每秒的工作量壓低
+let envAcc=0;function envTick(dt){envAcc+=dt;const hz=window.__effectBudget?.probeHz||15;if(envAcc<1/hz)return;envAcc=0;envJobs.update(dt);}
+function updateEnvironment(dt,t){U.uTime.value=t;U.uLightK.value=Math.min(1,Math.max(0,info.light));envTick(window.__frameSeconds||dt);const w=U.uWind.value,k=(.002+.01*w.z)*dt;U.uCloudOff.value.x+=w.x*k;U.uCloudOff.value.y+=w.y*k;}
 function update(dt, t){
   {const target=new T.Vector3();camera.getWorldPosition(target);target.y=0;sunLight.target.position.copy(target);sunLight.position.copy(target).addScaledVector(U.uSunDir.value,60);sunLight.target.updateMatrixWorld();}
-  if(window.__effectBudget?.probes!==false)envJobs.update(window.__frameSeconds||dt);optics.update();U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
+  envTick(window.__frameSeconds||dt);optics.update();U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
   if(seaGrid.visible) seaGrid.position.set(U.uEye.value.x,0,U.uEye.value.z);
   { const w=U.uWind.value, k=(.002+.01*w.z)*dt; U.uCloudOff.value.x+=w.x*k; U.uCloudOff.value.y+=w.y*k; }
   for(let i=0;i<12;i++){ const r = ripS[i]; r.age += dt; rip[i].set(r.x, r.z, r.age, r.age < 5 ? r.amp : 0); }
@@ -658,9 +662,13 @@ WU.uRefl={value:reflRT.texture}; WU.uReflMat={value:reflTM}; WU.uReflOn={value:0
 const _rp=new T.Vector3(), _cp=new T.Vector3(), _rm=new T.Matrix4(), _la=new T.Vector3(), _tg=new T.Vector3(), _n=new T.Vector3(0,1,0), _vw=new T.Vector3();
 const _pl=new T.Plane(), _cpl=new T.Vector4(), _q=new T.Vector4(), _sz=new T.Vector2(); let reflScale=.35, reflEnabled=true, reflHide=[];
 function setRefl(on,scale){ reflEnabled=on; if(scale) reflScale=scale; WU.uReflOn.value=0; }
+let lastRefl=-Infinity, reflCamKey='';
 function renderRefl(){
   camera.updateMatrixWorld(); _cp.setFromMatrixPosition(camera.matrixWorld);
-  if(_cp.y<.05){ WU.uReflOn.value=0; return; }
+  if(_cp.y<.05){ WU.uReflOn.value=0; lastRefl=-Infinity; return; }
+  // 倒影依畫質用較低頻率更新：水面本來就有波紋，20～30 次／秒肉眼看不出差別，卻省下整整一次全場景繪製；鏡頭大幅移動時立刻補畫
+  { const e=camera.matrixWorld.elements, key=[e[8],e[9],e[10],e[12],e[13],e[14]].map(v=>Math.round(v*8)).join(','), hz=window.__effectBudget?.reflectionHz||60, now=U.uTime.value;
+    if(reflCamKey===key&&now-lastRefl<1/hz&&now>=lastRefl&&WU.uReflOn.value===1) return; reflCamKey=key; lastRefl=now; }
   renderer.getDrawingBufferSize(_sz); const cap=window.__gfxStatus&&window.__gfxStatus.level===7?1536:window.__GFX==='high'?1024:640,k=Math.min(reflScale,cap/Math.max(_sz.x,_sz.y)),w=Math.max(64,Math.round(_sz.x*k)), h=Math.max(64,Math.round(_sz.y*k));
   if(reflRT.width!==w||reflRT.height!==h) reflRT.setSize(w,h);
   _rp.set(_cp.x,0,_cp.z); _vw.subVectors(_rp,_cp).reflect(_n).negate().add(_rp);
@@ -693,7 +701,7 @@ const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
 const radiance=createSceneRadiance(T,renderer,prepareScene),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
 function render(){prepareScene(scene);const oldEnv=scene.environment;if(window.__effectBudget?.environment===false)scene.environment=null;const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
- try{const now=U.uTime.value,hz=window.__gfxStatus&&window.__gfxStatus.level===7?30:20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz;if(renderer.shadowMap.needsUpdate)lastShadow=now;
+ try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz||20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz;if(renderer.shadowMap.needsUpdate)lastShadow=now;
   submerged.render();if(reflEnabled){try{renderRefl();}catch(e){reflEnabled=false;WU.uReflOn.value=0;console.warn('refl off',e);}}radiance.render(scene,camera);
  }finally{scene.environment=oldEnv;renderer.shadowMap.autoUpdate=auto;renderer.shadowMap.needsUpdate=request;}
 }

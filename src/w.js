@@ -896,7 +896,7 @@ function render(dt){t+=dt;if(W.prepareScene)W.prepareScene(scene);if(window.__ef
   const shadowSize=window.__gfxStatus&&window.__gfxStatus.shadow==='ultra'?4096:window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
   const exposure=R.toneMappingExposure,shadows=R.shadowMap.enabled,shadowType=R.shadowMap.type,shadowAuto=R.shadowMap.autoUpdate,shadowRequest=R.shadowMap.needsUpdate;
   try{
-    R.shadowMap.autoUpdate=false;R.shadowMap.needsUpdate=t-lastHomeShadow>=.05||!sun.shadow.map;if(R.shadowMap.needsUpdate)lastHomeShadow=t;R.toneMappingExposure=.88;R.shadowMap.enabled=window.__GFX!=='low';R.shadowMap.type=T.PCFSoftShadowMap;
+    R.shadowMap.autoUpdate=false;R.shadowMap.needsUpdate=t-lastHomeShadow>=1/(window.__effectBudget?.shadowHz||20)||!sun.shadow.map;if(R.shadowMap.needsUpdate)lastHomeShadow=t;R.toneMappingExposure=.88;R.shadowMap.enabled=true;R.shadowMap.type=T.PCFSoftShadowMap;
     R.setRenderTarget(null);W.radiance.render(scene,cam);
   }finally{R.toneMappingExposure=exposure;R.shadowMap.enabled=shadows;R.shadowMap.type=shadowType;R.shadowMap.autoUpdate=shadowAuto;R.shadowMap.needsUpdate=shadowRequest;}
 }

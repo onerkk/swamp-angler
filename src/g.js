@@ -140,6 +140,11 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid_v2.glb',gl=>{ const o=g
   fluke.children.forEach(ch=>{ ch.visible=false; }); fluke.add(w); });
 let tease=null, teaseT=rand(60,140), teaseN=0;
 let riseT=rand(3,8), t0=0;
+// 螢幕水珠的外觀圖：一顆帶高光的透明水珠，第一次需要時畫一次
+let dropSpr=null;
+function dropSprite(){ if(dropSpr) return dropSpr; const doc=(typeof document!=='undefined'&&document)||null, cv=doc?doc.createElement('canvas'):{width:0,height:0,getContext:()=>null}; cv.width=cv.height=64; const x=cv.getContext&&cv.getContext('2d');
+  if(x){ const g=x.createRadialGradient(32-9.6,32-11.2,3.2,32,32,32); g.addColorStop(0,'rgba(255,255,255,.3)'); g.addColorStop(.55,'rgba(200,215,220,.07)'); g.addColorStop(1,'rgba(0,0,0,.24)'); x.fillStyle=g; x.beginPath(); x.arc(32,32,32,0,6.283); x.fill(); }
+  dropSpr=cv; return cv; }
 function update(dt,t){
   const uw=ctx.underwater(), day=W.info.day, light=W.info.light, wd=WL.wind(), wx=WL.wx(), b=base(), per=ctx.period();
   W.camera.getWorldPosition(cw);
@@ -203,13 +208,14 @@ function update(dt,t){
   // 螢幕雨滴
   const rk=(window.__effectBudget?.rainOverlay===false||uw||(window.__G&&window.__G.loc==='ice'))?0:W.U.uRain.value;
   if(rk>.05){ if(!dOn){ dOn=true; dc.style.opacity='1'; }
-    if(Math.random()<dt*rk*7&&drops.length<42) drops.push({x:Math.random()*dW,y:Math.random()*dH*.9,r:rand(3,9)*dW/600,v:0,life:rand(4,10),sl:Math.random()<.35});
+    const maxDrops=Math.round(42*(window.__effectBudget?.particleScale??1));
+    if(Math.random()<dt*rk*7&&drops.length<maxDrops) drops.push({x:Math.random()*dW,y:Math.random()*dH*.9,r:rand(3,9)*dW/600,v:0,life:rand(4,10),sl:Math.random()<.35});
     dx.clearRect(0,0,dW,dH);
     for(const d of drops){ d.life-=dt; if(d.sl){ d.v+=dt*rand(0,40); d.y+=d.v*dt; }
       dx.globalAlpha=clamp(d.life,0,1);
       if(d.sl&&d.v>4){ dx.strokeStyle='rgba(220,230,235,.12)'; dx.lineWidth=d.r*.5; dx.beginPath(); dx.moveTo(d.x,d.y-d.r); dx.lineTo(d.x,d.y-d.r-Math.min(60,d.v*.8)); dx.stroke(); }
-      const g=dx.createRadialGradient(d.x-d.r*.3,d.y-d.r*.35,d.r*.1,d.x,d.y,d.r); g.addColorStop(0,'rgba(255,255,255,.3)'); g.addColorStop(.55,'rgba(200,215,220,.07)'); g.addColorStop(1,'rgba(0,0,0,.24)');
-      dx.fillStyle=g; dx.beginPath(); dx.ellipse(d.x,d.y,d.r,d.r*(d.sl?1.25:1),0,0,6.283); dx.fill(); }
+      // 水珠外觀預先畫成一張小圖重複貼上，不再每顆每幀重建漸層（手機上這是雨天掉幀的主因）
+      const ry=d.r*(d.sl?1.25:1); dx.drawImage(dropSprite(),d.x-d.r,d.y-ry,d.r*2,ry*2); }
     dx.globalAlpha=1; drops=drops.filter(d=>d.life>0&&d.y<dH+20);
   } else if(dOn){ dOn=false; dc.style.opacity='0'; setTimeout(()=>{ if(!dOn){ drops=[]; dx.clearRect(0,0,dW,dH); } },700); }
   // 太陽眩光

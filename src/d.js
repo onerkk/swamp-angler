@@ -662,7 +662,7 @@ const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* Adaptive profiles change resolution, reflection, shadow and effect budgets together. */
 window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;return Math.max(.35,Math.min(3.25,Math.max(2,window.devicePixelRatio||1),Math.sqrt(12000000/(w*h)),limit/w,limit/h));};
 const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,initialLevel:window.__resourcePolicy?.mobile?1:4,profile:(p,scope,cap)=>{if(window.__resourcePolicy?.recovery&&p.mode==='auto'){const safe={...p,...graphicsProfiles(cap)[Math.min(p.level,2)],maxLevel:2,reason:'前次中斷後的保護模式'};return{...safe,pr:Math.min(safe.pr,.8)};}return stableCabinGraphicsProfile(aquariumGraphicsProfile(p,scope,cap),scope,window.__resourcePolicy?.mobile);},apply:s=>{
-  window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;window.__effectBudget=effectBudget(s.effectLevel??s.level);if(W.setEffects)W.setEffects(s.effectLevel??s.level);
+  window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;const tier=effectTier(s.mode,!!window.__resourcePolicy?.mobile);window.__effectTier=tier;window.__effectBudget=effectBudget(s.effectLevel??s.level,tier);if(W.setEffects)W.setEffects(s.effectLevel??s.level,tier);
   if(W.setWaterDetail)W.setWaterDetail(s.geometry);if(W.setShadows)W.setShadows(s.shadow);if(W.setRefl)W.setRefl(s.reflection>0,s.reflection);W.setPR(s.pr);
   document.body.dataset.gfx=s.effect;document.body.dataset.gfxMode=s.mode;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);
 },onSample:s=>{window.__FPS=s.fps;window.__gfxStatus=s;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);}});
@@ -1137,7 +1137,9 @@ requestAnimationFrame(frame);
     const slow=setInterval(()=>{ if(lbox&&lbox.classList.contains('done')){ clearInterval(slow); return; } if(performance.now()-lastT>15000&&ltip) ltip.textContent='網路比較慢，仍在下載中，請不要關閉畫面…（也可以先按「開始釣魚」，畫面會在下載完後自動變成真實場景）\n目前：'+(window.__LASTURL||'')+'（'+(window.__LOADN||'')+'）'; },3000);
     try{ window.__REAL=createReal(W,P,(p,done,err)=>{ if(!ln) return; if(p!==lastP){ lastP=p; lastT=performance.now(); }
       if(lbar) lbar.style.width=Math.max(3,Math.round((done?1:p)*100))+'%';
-      if(done||Math.round(p*100)>=100){ window.__REALDONE=true; ln.textContent='✅ 真實場景已載入'; if(lbox) lbox.classList.add('done'); try{ localStorage.setItem('swampAngler.loaded','1'); }catch(e){} if(sb&&sb.dataset.t){ sb.textContent=sb.dataset.t; sb.style.opacity=''; } }
+      if(done||Math.round(p*100)>=100){ if(!window.__REALDONE){ try{ W.renderer.compile(W.scene,W.camera); }catch(_){} }
+      // 上一行：場景載完時趁還在載入畫面，一次把全場材質的著色器編譯好，避免開始玩後第一次看到某個東西才編譯而卡一下
+      window.__REALDONE=true; ln.textContent='✅ 真實場景已載入'; if(lbox) lbox.classList.add('done'); try{ localStorage.setItem('swampAngler.loaded','1'); }catch(e){} if(sb&&sb.dataset.t){ sb.textContent=sb.dataset.t; sb.style.opacity=''; } }
       else if(err&&p===0) ln.textContent='部分場景檔案載入失敗，暫用簡化畫面（'+err+'）';
       else ln.textContent='正在載入真實場景… '+Math.round(p*100)+'%'; }); }catch(e){ console.warn(e); }
     startGame(W,P); }
