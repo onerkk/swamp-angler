@@ -245,7 +245,7 @@ const sparkTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.hei
 const sparks=[]; for(let i=0;i<30;i++){ const s=new T.Sprite(new T.SpriteMaterial({map:sparkTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending})); s.scale.set(.025,.025,1); s.visible=false; scene.add(s); sparks.push({s,v:new T.Vector3(),t:0,life:1}); }
 const fireL=new T.PointLight(0xff8a40,2.2,9,1.3); fireL.position.set(ROOM.x-1.1,.6,FP.z); scene.add(fireL);
 // 家具：Poly Haven 真實模型（CC0），回家時才載入。位置以房間中央偏後的客廳區為主
-const GL=new T.GLTFLoader(), mcache={}, glowM=[];
+const GL=createHomeModelQueue(new T.GLTFLoader(),error=>console.error('home model callback',error)), mcache={}, glowM=[];
 const ART={hanging_picture_frame_01:'mer_paint.jpg',hanging_picture_frame_02:'mer_paint.jpg'};   /* 小屋牆上的美人魚畫像：月光下坐在礁石上的全身畫 */
 function put(name,x,y,z,ry,sc,fn){ const place=g=>{ const o=g.scene.clone(true); o.position.set(x,y,z); o.rotation.y=ry||0; o.scale.setScalar(sc||1);
     o.traverse(m=>{ if(!m.isMesh) return; m.frustumCulled=false; m.castShadow=true; m.receiveShadow=true; m.material=Array.isArray(m.material)?m.material.map(k=>k.clone()):m.material.clone(); const mats=Array.isArray(m.material)?m.material:[m.material];
@@ -340,7 +340,7 @@ function syncFurn(){ const H=c.home&&c.home(); if(!H) return;
     if(want&&!it.obj&&!it.loading){ it.loading=true; const [x,y,z,ry,sc]=it.p;
       put(it.m,x,y,z,ry,sc,o=>{ it.loading=false; o.userData.furn=it.f; if(it.slot){dropObs(o);homeFitFurniture(T,o,{...FSLOT[it.slot],...(it.decor?{y:it.p[1],h:.2,w:.4,d:.4}:{})});addObs(o);} if(it.herbs) plantHerbs(o,it.herbs);
         // 新木色太亮的家具壓暗成老木屋的舊木色
-        if(it.tint) o.traverse(m=>{ if(m.isMesh){ m.material=m.material.clone(); m.material.color.multiply(new T.Color(it.tint)); } });
+        if(it.tint) o.traverse(m=>{ if(m.isMesh){ for(const mt of(Array.isArray(m.material)?m.material:[m.material]))if(mt.color)mt.color.multiply(new T.Color(it.tint)); } });
         if(!(H.furnLv(it.f)>=it.lv[0]&&H.furnLv(it.f)<=it.lv[1])){ scene.remove(o); dropObs(o); return; } it.obj=o;updFurnTags(); }); }
     else if(!want&&it.obj){ scene.remove(it.obj); dropObs(it.obj); it.obj=null; } } }
 let clockObj=null;
@@ -405,7 +405,7 @@ function standCabinet(g,W,Hs,D){ const add=(geo,m,px,py,pz)=>{ const o=new T.Mes
     for(const [w2,h2,ox,oy] of [[dw-.06,.035,0,dh/2-.045],[dw-.06,.035,0,-dh/2+.045],[.035,dh-.06,-(dw-.06)/2+.0175,0],[.035,dh-.06,(dw-.06)/2-.0175,0]]) add(new T.BoxGeometry(w2,h2,.016),body,cx+ox,cy+oy,fz+.017);
     const kb=add(new T.SphereGeometry(.014,12,8),brassM,cx+(i%2?-1:1)*(dw/2-.07),cy+.02,fz+.03); kb.scale.z=.7; } }
 function buildTank(water,spec,x){
-  const old=tanks[water]; if(old){ if(old.plantBatch)old.plantBatch.dispose();dropObs(old.g); scene.remove(old.g); for(let i=causList.length-1;i>=0;i--) if(causList[i].g===old.g) causList.splice(i,1); for(let i=shaftList.length-1;i>=0;i--) if(shaftList[i].g===old.g) shaftList.splice(i,1); }
+  const old=tanks[water]; if(old){for(const f of old.fish)disposeAquariumResident(f.o,old.optics); if(old.plantBatch)old.plantBatch.dispose();dropObs(old.g); scene.remove(old.g); for(let i=causList.length-1;i>=0;i--) if(causList[i].g===old.g) causList.splice(i,1); for(let i=shaftList.length-1;i>=0;i--) if(shaftList[i].g===old.g) shaftList.splice(i,1); }
   const g=new T.Group(), z=ROOM.zb+spec.d/2+.08, y=spec.st||.85, W=spec.w, D=spec.d, Hh=spec.h; g.position.set(x,0,z); scene.add(g);
   const motion=createAquariumMotion(T,{min:new T.Vector3(-W/2+.035,y+.025,-D/2+.035),max:new T.Vector3(W/2-.035,y+Hh-.1,D/2-.035),floor:(px,pz)=>y+hAt(px,pz)+.009});
   const add=(geo,m,px,py,pz)=>{ const o=new T.Mesh(geo,m); o.position.set(px,py,pz); g.add(o); return o; };
@@ -477,13 +477,13 @@ function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null;
   if(BENTHIC[rec.id]){if(!window.__TIDE||!window.__TIDE.makeModel)return null;const m=window.__TIDE.makeModel(rec.id);if(!m)return null;m.group.userData.uni=m.uni;m.group.userData.aquariumProcedural=true;return m.group;}
   const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
   src.traverse(o=>{ o.frustumCulled=false; if(o.isMesh&&o.material){ const mats=Array.isArray(o.material)?o.material:[o.material];
-      const nm=mats.map(m=>{ const k=m.clone(); k.onBeforeCompile=()=>{}; k.customProgramCacheKey=()=>'tank'; const see=m.transparent&&m.opacity<.95; k.transparent=see; k.opacity=see?m.opacity:1; k.depthWrite=!see; k.needsUpdate=true; return k; });   // 半透明的幽靈魚保持半透明
+      const nm=mats.map(m=>{ const k=m.clone(); k.onBeforeCompile=()=>{}; k.customProgramCacheKey=()=>'tank';k.userData.aquariumOwned=true; const see=m.transparent&&m.opacity<.95; k.transparent=see; k.opacity=see?m.opacity:1; k.depthWrite=!see; k.needsUpdate=true; return k; });   // 半透明的幽靈魚保持半透明
       o.material=Array.isArray(o.material)?nm:nm[0]; o.renderOrder=1; } });
   const w=new T.Group(); w.add(src); const bones=rigFish(src); w.scale.setScalar(rec.L); w.userData.rec=rec; w.userData.real=c.isReal(rec.id); w.userData.bones=bones; return w; }
 // 執行時綁骨：魚頭朝群組的 +x；在每個網格的本地座標裡找出「往前」與「往上」的方向，沿長軸放 7 節骨頭，依前後位置線性分配權重
 const NB_=7;
 function rigFish(root){ root.updateMatrixWorld(true); const inv=new T.Matrix4(), all=[]; const meshes=[]; root.traverse(o=>{ if(o.isMesh&&o.geometry&&o.geometry.attributes.position) meshes.push(o); });
-  meshes.forEach(o=>{ const g=o.geometry.clone(); const pos=g.attributes.position;
+  meshes.forEach(o=>{ const g=o.geometry.clone();g.userData.aquariumOwned=true; const pos=g.attributes.position;
     inv.copy(o.matrixWorld).invert(); const fw=new T.Vector3(1,0,0).transformDirection(inv).normalize(), up=new T.Vector3(0,1,0).transformDirection(inv).normalize();
     let lo=Infinity, hi=-Infinity; for(let i=0;i<pos.count;i++){ const s=pos.getX(i)*fw.x+pos.getY(i)*fw.y+pos.getZ(i)*fw.z; if(s<lo) lo=s; if(s>hi) hi=s; } const len=Math.max(1e-6,hi-lo);
     const si=new Uint16Array(pos.count*4), sw=new Float32Array(pos.count*4);
@@ -506,21 +506,22 @@ function bounds(tk,L){ L=dispL(tk,L); const s=tk.spec, m=L*.6+.035; return {x0:-
 function pickTarget(f,tk){ const b=bounds(tk,f.rec.L), r=(a,b)=>a+Math.random()*Math.max(0,b-a); const cy=f.o?f.o.position.y:(b.y0+b.y1)/2, dyMax=(b.y1-b.y0)*.3; f.tgt.set(r(b.x0,b.x1),Math.max(b.y0,Math.min(b.y1,cy+(Math.random()-.5)*2*dyMax)),r(Math.min(b.z0,b.z1),Math.max(b.z0,b.z1))); }
 function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.sea:[]};
   const tierSig='t'+hd.tier+(hd.seaTank?'s'+(hd.seaTier||0):'');
-  if(tanks._tier!==tierSig){ tanks._tier=tierSig; buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?-ROOM.x*.48:0);   /* 有海水缸時兩缸左右對稱並排 */ if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,ROOM.x*.48); } else if(tanks.sea){ dropObs(tanks.sea.g); scene.remove(tanks.sea.g); delete tanks.sea; } }
-  for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=want[w]||[], sig=list.map(r=>r.id+r.d+':'+r.L+(c.isReal(r.id)?'r':'')).join('|')+':'+!!(window.__TIDE&&window.__TIDE.makeModel);
-    if(sig===tk.sig) continue; tk.sig=sig; tk.fish.forEach(f=>tk.g.remove(f.o)); tk.fish=[]; tk.motion.bodies.length=0; tk.fitScale=aquariumFitScale(tk.spec,list);let complete=true;
-    list.forEach(rec=>{ try{ c.want(rec.id);const model=fishObj(rec);if(!model){complete=false;return;}
+  if(tanks._tier!==tierSig){ buildTank('fresh',TSPEC[hd.tier]||TSPEC[0],hd.seaTank?-ROOM.x*.48:0);   /* 有海水缸時兩缸左右對稱並排 */ if(hd.seaTank){ const ss=SEA_SPECS[Math.min(3,hd.seaTier||0)]; buildTank('sea',ss,ROOM.x*.48); } else if(tanks.sea){ dropObs(tanks.sea.g); scene.remove(tanks.sea.g); delete tanks.sea;}tanks._tier=tierSig;}
+  for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue; const list=(Array.isArray(want[w])?want[w]:[]).filter(r=>r&&typeof r.id==='string'&&Number.isFinite(r.L)&&r.L>0), sig=list.map(r=>r.id+r.d+':'+r.L+(c.isReal(r.id)?'r':'')).join('|')+':'+!!(window.__TIDE&&window.__TIDE.makeModel);
+    const rebuild=sig!==tk.sig;if(!rebuild&&!(tk.pending&&tk.pending.length))continue;tk.sig=sig;
+    if(rebuild){tk.fish.forEach(f=>disposeAquariumResident(f.o,tk.optics));tk.fish=[];tk.motion.bodies.length=0;tk.fitScale=aquariumFitScale(tk.spec,list);}
+    const retry=rebuild?list:tk.pending;tk.pending=[];let added=false;
+    retry.forEach(rec=>{let created=null;try{ c.want(rec.id);const model=fishObj(rec);if(!model){tk.pending.push(rec);return;}
       model.scale.setScalar(1);const bottom=!!BENTHIC[rec.id],procedural=!!model.userData.aquariumProcedural;
-      const o=aquariumCenterModel(T,model,procedural);if(!o){complete=false;return;}
+      const o=aquariumCenterModel(T,model,procedural);created=o;if(!o){tk.pending.push(rec);return;}
       const modelBox=aquariumModelBounds(T,o,procedural),modelSize=modelBox.getSize(new T.Vector3());
       const length=aquariumResidentLength(tk.spec,rec,tk.fitScale,bottom,list.length);
       o.scale.setScalar(length/Math.max(modelSize.x,modelSize.y,modelSize.z,.001));o.userData.rec=rec;
       const body=aquariumBodyBounds(aquariumModelBounds(T,o,procedural),length,bottom);
       const f={o,rec,body,bottom,yaw:Math.random()<.5?0:Math.PI,tgt:new T.Vector3(),sp:.09+Math.random()*.08,ph:Math.random()*6,uni:o.userData.uni};
       o.rotation.y=f.yaw; const b=bounds(tk,rec.L);o.position.set(0,(b.y0+b.y1)/2,tk.spec.d*.2);
-      if(W.qualityTextures)W.qualityTextures(o);tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.fish.push(f);tk.motion.add(f);
-      pickTarget(f,tk);
-      }catch(err){ complete=false;console.error('tank fish',rec&&rec.id,err); } }); if(!complete)tk.sig='';tk.motion.pack(); } }
+      if(W.qualityTextures)W.qualityTextures(o);tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.motion.add(f);pickTarget(f,tk);tk.fish.push(f);added=true;
+      }catch(err){if(created){for(let i=tk.motion.bodies.length-1;i>=0;i--)if(tk.motion.bodies[i].o===created)tk.motion.bodies.splice(i,1);disposeAquariumResident(created,tk.optics);}tk.pending.push(rec);if(tk.lastError!==String(err)){tk.lastError=String(err);console.error('tank fish',rec&&rec.id,err);}}});if(added||rebuild)tk.motion.pack(); } }
 // 標本牆：右牆、壁爐後方，兩排各四個；大魚統一縮到木板放得下的長度
 const MSLOT=[]; for(const y of [1.8,2.45]) for(const z of [-3.95,-3.25,-2.55,-1.85]) MSLOT.push({y,z});   // 先掛視線高度那一排
 const mountG=new T.Group(); mountG.rotation.y=-Math.PI/2;mountG.position.z=ROOM.zf-ROOM.x;scene.add(mountG); let mountSig='';
@@ -742,11 +743,7 @@ function updFurnTags(){ const H=c.home&&c.home(); if(!H) return; const mounts=(c
   for(const tag of tags.filter(t=>t.k==='shop'||t.k==='grill')){const b=homeVisibleBounds(T,tag.k==='grill'?fpParts:shopParts,scene);if(b.isEmpty())continue;const p=b.getCenter(new T.Vector3()),dir=new T.Vector3(-p.x,0,(ROOM.zb+ROOM.zf)/2-p.z).normalize();tag.y=tag.k==='grill'?Math.min(ROOM.h-.16,p.y+.2):Math.min(ROOM.h-.16,b.max.y+.16);tag.s.position.set(p.x+dir.x*.18,tag.y,p.z+dir.z*.18);}
 }
 let furnTick=0;
-// 開遊戲時就把目前等級的家具載好；其他等級的模型等一下在背景預先載入，升級時立刻換好，不用等
-setTimeout(()=>{ try{ syncFurn(); }catch(e){ console.warn('furn init',e); } },1500);
-setTimeout(()=>{ const names=[...new Set(FITEMS.map(it=>it.m).concat(['nettle_plant']))].filter(n=>!mcache[n]);
-  const next=()=>{ const n=names.shift(); if(!n) return; if(mcache[n]){ next(); return; } GL.load('models/home/'+n+'.glb',g=>{ mcache[n]=g; setTimeout(next,400); },undefined,()=>setTimeout(next,400)); };
-  next(); },25000);
+// 家具只載入目前使用的等級，避免整批預解碼佔用記憶體。
 window.__HOMEFURN=()=>{ syncFurn(); syncTime(); updFurnTags(); };
 window.__HOMETAP=id=>{ if(on) tapFurn(id); };
 /* ===== 壁爐烤魚：魚串在鐵叉上，靠火的那面會熟；魚皮依熟度從生色→金黃→焦黑，出現烤痕；冒煙、油滴竄火、滋滋聲 ===== */
@@ -846,7 +843,7 @@ function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
     if(D.s.position.y<.3){ D.s.visible=false; flare.visible=true; flare.position.set(D.s.position.x+.05,.36,D.s.position.z); sparkM.opacity=.95; fireL.intensity*=1.5; c.sizzle&&c.sizzle(.3+Math.random()*.35); } });
   if(flare.visible){ sparkM.opacity-=dt*2.2; flare.scale.setScalar(.35+(.9-sparkM.opacity)*.3); if(sparkM.opacity<=0) flare.visible=false; }
   spin.position.y=Math.sin(GR.t*1.3)*.003; }
-function enter(){ on=true; merArtSync(); yaw=yawT=0; pitch=pitchT=-.08; vb=0; pRoom.set(0,EYE,.9); resize(); for(const f of [syncTime,syncFish,syncMounts,exitView,syncFurn,updFurnTags,closeFurn]){ try{ f(); }catch(err){ console.error('home enter',err); } } try{ if(c.onEnter) c.onEnter(); }catch(err){ console.error(err); } }
+function enter(){if(on)return;try{merArtSync();yaw=yawT=0;pitch=pitchT=-.08;vb=0;pRoom.set(0,EYE,.9);resize();syncTime();syncFish();exitView();syncFurn();updFurnTags();closeFurn();on=true;}catch(err){on=false;throw err;}try{if(c.onEnter)c.onEnter();}catch(err){console.error('home welcome',err);}}
 function exit(){ on=false; drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;

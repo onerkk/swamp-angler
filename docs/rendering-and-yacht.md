@@ -58,3 +58,13 @@ Diagnostics now identify the app version, session start, actual framebuffer dime
 The main game loop uses a phase-preserving 120 FPS limiter. A 120 Hz RAF source is not halved by small timestamp jitter; faster 144/240 Hz callbacks skip surplus updates, while 30/60 Hz callbacks remain at their actual available rate. Simulation and adaptive graphics use elapsed time between rendered game updates. Long pauses do not trigger catch-up rendering bursts. This cap does not force the browser/display to refresh at 120 Hz or guarantee that a heavy scene can sustain 120 FPS.
 
 Diagnostics now sample the actual main game update loop rather than running a separate uncapped RAF sampler. The report/settings show the 120 FPS ceiling separately from measured FPS. `tests/frame-timing.test.js` exercises high-refresh rates, jitter, slower callbacks and long pauses.
+
+## Return-home reliability (2026-11-01)
+
+Returning home is transactional: game progress is saved before transition, critical cabin initialization must succeed before home becomes active, and failure rolls back the camera/UI state to fishing. A render failure while home is active also exits the failed scene instead of logging the same exception every frame. Optional welcome/story errors are logged separately.
+
+Pending aquarium residents now retry individually. Previously one missing native model caused every successful fish to be removed/recreated on each one-second sync, while old owned geometry/material/skeleton resources were retained. Successful residents remain stable while a missing model loads. Full record/native-model changes release only aquarium-owned resources, keeping shared model geometry and source textures intact. Optical material registration is reference-counted so removing one resident does not stop lighting updates on another sharing its scoped material. Tank tier signatures commit only after construction succeeds.
+
+Home model loads are serialized, deduplicated in flight and cached after parse. The bulk preloader for all unused furniture upgrade tiers is removed. Outdoor-only shadow, planar reflection, underwater transmission and SSR buffers are released/shrunk before cabin initialization, then recreated on demand when fishing resumes. Multi-material furniture tinting supports material arrays.
+
+These fixes address reproduced JS lifecycle defects and avoidable resource growth; the supplied social-media screenshot contains no device error trace, so it does not establish a specific browser/OS crash cause or prove that all device-specific exits are resolved.

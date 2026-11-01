@@ -38,6 +38,7 @@ function createSceneRadiance(T,R){
   }catch(e){failed=true;status.reason='render fallback';console.warn('SSR unavailable; retaining PBR lighting and planar water',e);R.setRenderTarget(target);R.setClearColor(color,alpha);R.autoClear=auto;R.render(scene,camera);
   }finally{R.setRenderTarget(target);R.setClearColor(color,alpha);R.autoClear=auto;R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);if(typeof window!=='undefined')window.__rayTracingState=status;}
  }
- return{render,status,dispose(){if(pass)pass.dispose();for(const m of normalMaterials)m.dispose();}};
+ function release(){if(pass)pass.dispose();pass=null;sizeKey='';sceneKey=null;selected=[];}
+ return{render,status,release,dispose(){if(pass)pass.dispose();for(const m of normalMaterials)m.dispose();}};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={createSceneRadiance,radianceReflector};
