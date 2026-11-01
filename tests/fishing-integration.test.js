@@ -53,3 +53,8 @@ test('rock between rod and boat-side fish still prevents landing',()=>{const c=y
 test('moving away from the rail clears stale net presses',()=>{const c=yachtFight();c.G.f.netOn=true;c.G.f.netGo=true;c.G.f.pos.z=-15;c.updateFight(.02);assert.equal(c.G.f.netOn,false);assert.equal(c.G.f.netGo,false);assert.equal(c.G.state,'fight');});
 test('cannot net a fish from the far stern through the length of the yacht',()=>{const c=yachtFight();c.G.f.pos.set(0,-.35,21.8);c.G.f.az0=Math.PI;c.updateFight(.02);assert.equal(c.G.f.netOn,false);assert.equal(c.G.state,'fight');});
 test('assisted boat catch follows clear water to the rail then automatically nets',()=>{for(const yaw of [0,.7]){const c=yachtFight(yaw),assist=createAccountAssist();assist.authenticate({email:'crazyice5240@gmail.com',emailVerified:true,providerData:[{providerId:'google.com'}]});c.window.__ASSIST=assist;for(let i=0;i<30&&c.G.state==='fight';i++){c.updateFight(.05);assert(c.PH.clear(c.G.f.pos,.109));}assert.equal(c.G.state,'land');assert.equal(c.G.f.netted,true);assert(c.G.f.d>4.5);}});
+test('actual fight update retrieves and nets beside the aft angler instead of pulling to boat centre',()=>{
+ const c=yachtFight();c.G.angler=new T.Vector3(1.4,3.65,15);c.G.fishingYaw=-Math.PI/2;c.G.f.az0=-Math.PI/2;c.G.f.pos.set(7,-.35,15);c.G.f.d=5.6;c.rod.tipW.set(2.6,3.3,15);
+ for(let i=0;i<500&&!c.G.f.netOn;i++){c.updateFight(.02);assert(c.PH.clear(c.G.f.pos,.109));}
+ assert(c.G.f.netOn);assert(c.G.f.pos.x>2);assert(Math.abs(c.G.f.pos.z-15)<2);c.G.f.netGo=true;c.updateFight(.02);assert.equal(c.G.state,'land');
+});

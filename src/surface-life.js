@@ -13,9 +13,10 @@ function createSurfaceResidents(W,P,MDL){
   function update(dt,G){
     group.visible=['idle','charge','cast','wait','bite','lure','fight','retrieve','land','catch','post'].includes(G.state)&&G.loc!=='ice';if(!group.visible)return;
     if(loc!==(G.loc||'lake')){clear();loc=G.loc||'lake';initialized=false;retry=0;}
-    if(!initialized||anchor.distanceTo(G.base)>18){anchor.copy(G.base);initialized=true;fish.forEach(f=>f.last=null);}
+    const origin=G.angler||G.base;
+    if(!initialized||anchor.distanceTo(origin)>18){anchor.copy(origin);initialized=true;fish.forEach(f=>f.last=null);}
     retry-=dt;if(retry<=0){populate(G);retry=1;}
-    const heading=G.head,forward=new T.Vector3(-Math.sin(heading),0,-Math.cos(heading)),right=new T.Vector3(Math.cos(heading),0,-Math.sin(heading));
+    const heading=G.head+(G.fishingYaw||0),forward=new T.Vector3(-Math.sin(heading),0,-Math.cos(heading)),right=new T.Vector3(Math.cos(heading),0,-Math.sin(heading));
     for(const f of fish){
       const phase=G.t*.24+f.phase,range=(loc==='sea'?11:5.5)+(1+Math.sin(phase*.43+f.phase))*1.5,side=Math.cos(phase)*2.1;
       const target=anchor.clone().addScaledVector(forward,range).addScaledVector(right,side);target.y=W.swell(target.x,target.z,G.t)-f.depth;

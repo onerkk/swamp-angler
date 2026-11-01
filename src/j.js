@@ -11,7 +11,7 @@ function gradTex(top,bot,mid){ const d=new Uint8Array(4*64); for(let i=0;i<64;i+
   const t=new T.DataTexture(d,1,64,T.RGBAFormat); t.encoding=T.sRGBEncoding; t.magFilter=T.LinearFilter; t.needsUpdate=true; return t; }
 
 /* ---------- 遊艇（船頭甲板、柚木地板、不鏽鋼欄杆） ---------- */
-const yacht=new T.Group(); yacht.visible=false; S.add(yacht);
+const yacht=new T.Group(); yacht.visible=false; S.add(yacht); yacht.userData.stations={fishing:{x:1.08,z:.5,deck:1.69,yaw:-Math.PI/2},helm:{x:0,z:.5,deck:1.69,yaw:0}};
 { const out=[[-1.6,2],[-1.6,-2],[-1.15,-4.5],[0,-6.3],[1.15,-4.5],[1.6,-2],[1.6,2]];
   const shp=new T.Shape(); out.forEach((p,i)=>i?shp.lineTo(p[0],-p[1]):shp.moveTo(p[0],-p[1]));
   const white=new T.MeshPhysicalMaterial({color:0xf4f4f0,roughness:.25,clearcoat:.9,clearcoatRoughness:.1});
@@ -53,7 +53,7 @@ if(T.GLTFLoader) new T.GLTFLoader().load('rock_moss_set_01.glb',gl=>{
   }
 });
 const hullCollider=W.fishingPhysics.addBox({x:-HX,y:-.8,z:HZ0},{x:HX,y:1.7,z:HZ1},()=>yacht.visible,'船體');
-hullCollider.update=()=>{const b=hullCollider.boxes[0];b.min={x:-HX,y:-.8,z:HZ0};b.max={x:HX,y:1.7,z:HZ1};b.frame={x:G.base.x,z:G.base.z,head:G.head};
+hullCollider.update=()=>{const b=hullCollider.boxes[0];b.min={x:-HX,y:-.8,z:HZ0};b.max={x:HX,y:yacht.userData.stations.fishing.deck,z:HZ1};b.frame={x:G.base.x,z:G.base.z,head:G.head};
 };
 /* ---------- 海豚 ---------- */
 const dTex=gradTex([62,74,90],[214,220,226],.42);
@@ -263,7 +263,9 @@ function update(dt,t){
   lakeT-=dt; if(lakeT<=0){ lakeT=.25; const sea=(G.loc||loc)!=='lake'; S.children.forEach(o=>{ if(o.userData&&o.userData.lake){ const want=!sea&&!(o.userData.veg&&window.__GFX==='low'); if(o.visible!==want) o.visible=want; } }); }
   if(yacht.visible){ const b=base(); const h0=W.swell(b.x,b.z,t), fx=-Math.sin(G.head), fz=-Math.cos(G.head);
     const hf=W.swell(b.x+fx*3,b.z+fz*3,t), hs=W.swell(b.x-fz*1.5,b.z+fx*1.5,t);
-    yacht.position.set(b.x,h0*.9-.05,b.z); yacht.rotation.set((hf-h0)/3*.7,G.head,(hs-h0)/1.5*-.5,'YXZ'); }
+    yacht.position.set(b.x,h0*.9-.05,b.z); yacht.rotation.set((hf-h0)/3*.7,G.head,(hs-h0)/1.5*-.5,'YXZ');
+    const station=yacht.userData.stations[G.boatStation==='helm'?'helm':'fishing'],pose=yachtAnglerPose(T,yacht,station);G.angler=G.angler||new T.Vector3();G.angler.copy(pose.position);G.fishingYaw=pose.yaw;W.player.position.copy(pose.position);
+  }else{G.angler=null;G.fishingYaw=0;}
 }
 return {recordPhoto,hullClear,hullOut,hullDims:()=>({HX,HZ0,HZ1}),setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
 }

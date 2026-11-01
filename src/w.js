@@ -889,7 +889,7 @@ function render(dt){scene.environment=W.scene.environment;t+=dt; yaw+=(yawT-yaw)
   const exposure=R.toneMappingExposure,shadows=R.shadowMap.enabled,shadowType=R.shadowMap.type;
   try{
     R.toneMappingExposure=.88;R.shadowMap.enabled=window.__GFX!=='low';R.shadowMap.type=T.PCFSoftShadowMap;
-    R.setRenderTarget(null);R.render(scene,cam);
+    R.setRenderTarget(null);W.radiance.render(scene,cam);
   }finally{R.toneMappingExposure=exposure;R.shadowMap.enabled=shadows;R.shadowMap.type=shadowType;}
 }
 window.addEventListener('resize',()=>{ if(on) resize(); });

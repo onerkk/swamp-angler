@@ -151,13 +151,12 @@ function attach(host,key,o){ const h={host,loaded:false,actions:{},mixer:null,pl
   return h; }
 const cl0=a=>a.getClip().duration||1;
 
-/* 遊艇：船頭在前方 4.5m，鏡頭站在前甲板，甲板高度用射線量出來 */
+/* 遊艇：分開實際柚木釣位與駕駛甲板，不把艙頂當釣位。 */
 function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene.clone(), wrap=new T.Group(); wrap.add(obj);
   const L=26; let b=new T.Box3().setFromObject(wrap), sz=b.getSize(new T.Vector3()); obj.scale.setScalar(L/sz.z); wrap.updateMatrixWorld(true);
   b=new T.Box3().setFromObject(wrap); const c=b.getCenter(new T.Vector3()), H=b.max.y-b.min.y;
   obj.position.x-=c.x; obj.position.z+=-4.5-b.min.z; obj.position.y+=-(b.min.y+H*.1); wrap.updateMatrixWorld(true);
-  const rc=new T.Raycaster(new T.Vector3(0,100,0),new T.Vector3(0,-1,0)); const hit=rc.intersectObject(wrap,true)[0];
-  const deck=hit?hit.point.y:1.6;
+  host.userData.stations=yachtStations(T,wrap);const deck=host.userData.stations.fishing.deck;
   obj.traverse(m=>{ m.frustumCulled=false; if(m.isMesh) m.castShadow=false; });
   const marine=createMarineMaterials(T);dressYacht(T,obj,marine);addMarineHardware(T,wrap,deck,marine);
 

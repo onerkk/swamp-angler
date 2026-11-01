@@ -335,6 +335,10 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:lo
   fail(u){ if(this.on&&u&&u.indexOf(this.base)===0){ this.on=false; try{ localStorage.setItem('swampAngler.cdn','off'); }catch(e){} console.warn('CDN 下載失敗，改用本站',u); } }};
 </script>
 <script defer src="vendor/three.min.js"></script>
+<script defer src="vendor/Pass.js"></script>
+<script defer src="vendor/CopyShader.js"></script>
+<script defer src="vendor/SSRShader.js"></script>
+<script defer src="vendor/SSRPass.js"></script>
 <script defer src="vendor/GLTFLoader.js"></script>
 <script defer src="vendor/DRACOLoader.js"></script>
 <script defer src="vendor/SkeletonUtils.js"></script>

@@ -5,9 +5,9 @@ const MARINE_PARTS={
 function marinePart(name){return MARINE_PARTS[name]||'original';}
 function createMarineMaterials(T){
  const tl=new T.TextureLoader(),texture=(f,color)=>{const t=tl.load(f);t.wrapS=t.wrapT=T.RepeatWrapping;t.anisotropy=8;if(color)t.encoding=T.sRGBEncoding;return t;};
- const microCanvas=document.createElement('canvas');microCanvas.width=microCanvas.height=128;const g=microCanvas.getContext('2d');
- for(let y=0;y<128;y++)for(let x=0;x<128;x++){const v=128+9*Math.sin(x*1.71+y*2.13)+5*Math.cos(x*4.13-y*3.79);g.fillStyle=`rgb(${v},${v},${v})`;g.fillRect(x,y,1,1);}
- const micro=new T.CanvasTexture(microCanvas);micro.wrapS=micro.wrapT=T.RepeatWrapping;micro.repeat.set(9,9);
+ const n=128,data=new Uint8Array(n*n*4),height=(x,y)=>.045*Math.sin(x*1.71+y*2.13)+.025*Math.cos(x*4.13-y*3.79);
+ for(let y=0;y<n;y++)for(let x=0;x<n;x++){const dx=(height((x+1)%n,y)-height((x+n-1)%n,y))*.5,dy=(height(x,(y+1)%n)-height(x,(y+n-1)%n))*.5,v=new T.Vector3(-dx,-dy,1).normalize(),i=(y*n+x)*4;data[i]=Math.round((v.x*.5+.5)*255);data[i+1]=Math.round((v.y*.5+.5)*255);data[i+2]=Math.round((v.z*.5+.5)*255);data[i+3]=255;}
+ const micro=new T.DataTexture(data,n,n,T.RGBAFormat);micro.wrapS=micro.wrapT=T.RepeatWrapping;micro.repeat.set(9,9);micro.generateMipmaps=true;micro.minFilter=T.LinearMipmapLinearFilter;micro.magFilter=T.LinearFilter;micro.needsUpdate=true;
  const teak=new T.MeshStandardMaterial({color:new T.Color('#bda47d').convertSRGBToLinear(),map:texture('dock_diff.jpg',true),normalMap:texture('dock_nor.jpg'),roughnessMap:texture('dock_rough.jpg'),normalScale:new T.Vector2(.55,.55),roughness:.87,envMapIntensity:.5});teak.name='Marine teak with caulk';
  teak.onBeforeCompile=s=>{s.fragmentShader=s.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
    float boardU=fract(vUv.x/.13);
@@ -15,11 +15,11 @@ function createMarineMaterials(T){
    float endJoint=1.0-smoothstep(.001,.003,min(fract((vUv.y+floor(vUv.x/.13)*.47)/2.1),1.0-fract((vUv.y+floor(vUv.x/.13)*.47)/2.1))*2.1);
    diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.012,.015,.014),max(caulk,endJoint)*.86);`);};teak.customProgramCacheKey=()=> 'marine-teak-caulk-v1';
  const color=h=>new T.Color(h).convertSRGBToLinear();
- const gelcoat=new T.MeshPhysicalMaterial({color:color('#e7e6df'),roughness:.28,metalness:0,clearcoat:1,clearcoatRoughness:.15,bumpMap:micro,bumpScale:.0004});gelcoat.name='Marine fiberglass gelcoat';
- const navy=new T.MeshPhysicalMaterial({color:color('#203d50'),roughness:.25,metalness:0,clearcoat:1,clearcoatRoughness:.12,bumpMap:micro,bumpScale:.00035});navy.name='Marine navy enamel';
- const steel=new T.MeshStandardMaterial({color:color('#bfc7ca'),metalness:1,roughness:.23,bumpMap:micro,bumpScale:.00006});steel.name='Marine brushed stainless steel';
- const fabric=new T.MeshStandardMaterial({color:color('#bdb9ae'),roughness:.92,bumpMap:micro,bumpScale:.0012});
- const leather=new T.MeshStandardMaterial({color:color('#4e3224'),roughness:.64,bumpMap:micro,bumpScale:.0006});
+ const gelcoat=new T.MeshPhysicalMaterial({color:color('#e7e6df'),roughness:.28,metalness:0,clearcoat:1,clearcoatRoughness:.15,normalMap:micro,normalScale:new T.Vector2(.12,.12)});gelcoat.name='Marine fiberglass gelcoat';
+ const navy=new T.MeshPhysicalMaterial({color:color('#203d50'),roughness:.25,metalness:0,clearcoat:1,clearcoatRoughness:.12,normalMap:micro,normalScale:new T.Vector2(.1,.1)});navy.name='Marine navy enamel';
+ const steel=new T.MeshStandardMaterial({color:color('#bfc7ca'),metalness:1,roughness:.23,normalMap:micro,normalScale:new T.Vector2(.04,.04)});steel.name='Marine brushed stainless steel';
+ const fabric=new T.MeshStandardMaterial({color:color('#bdb9ae'),roughness:.92,normalMap:micro,normalScale:new T.Vector2(.7,.7)});
+ const leather=new T.MeshStandardMaterial({color:color('#4e3224'),roughness:.64,normalMap:micro,normalScale:new T.Vector2(.35,.35)});
  return{teak,gelcoat,navy,steel,fabric,leather};
 }
 function dressYacht(T,object,materials){

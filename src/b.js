@@ -683,7 +683,8 @@ function renderRefl(){
 
 const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
-function render(){ submerged.render(); if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } renderer.render(scene, camera); }
+const radiance=createSceneRadiance(T,renderer);
+function render(){ submerged.render(); if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } radiance.render(scene, camera); }
 
 function setIce(on){water.visible=!on;seaGrid.visible=!on;}
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=water.visible; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
@@ -695,5 +696,5 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
