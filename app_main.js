@@ -1,4 +1,4 @@
-/*APPV:20261101012817*/
+/*APPV:20261101013104*/
 /* The aquarium is a close-up exhibit: keep texture detail and reduce repeated draw calls. */
 function aquariumGraphicsProfile(profile,scope,cap){
  if(scope!=='home-aquarium'||profile.mode!=='auto')return profile;
@@ -6134,7 +6134,7 @@ function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null;
 // 執行時綁骨：魚頭朝群組的 +x；在每個網格的本地座標裡找出「往前」與「往上」的方向，沿長軸放 7 節骨頭，依前後位置線性分配權重
 const NB_=7;
 function rigFish(root){ root.updateMatrixWorld(true); const inv=new T.Matrix4(), all=[]; const meshes=[]; root.traverse(o=>{ if(o.isMesh&&o.geometry&&o.geometry.attributes.position) meshes.push(o); });
-  meshes.forEach(o=>{ const g=o.geometry.clone();g.userData.aquariumOwned=true; const pos=g.attributes.position;
+  meshes.forEach(o=>{ const g=o.geometry.clone();g.userData={...g.userData,aquariumOwned:true}; const pos=g.attributes.position;
     inv.copy(o.matrixWorld).invert(); const fw=new T.Vector3(1,0,0).transformDirection(inv).normalize(), up=new T.Vector3(0,1,0).transformDirection(inv).normalize();
     let lo=Infinity, hi=-Infinity; for(let i=0;i<pos.count;i++){ const s=pos.getX(i)*fw.x+pos.getY(i)*fw.y+pos.getZ(i)*fw.z; if(s<lo) lo=s; if(s>hi) hi=s; } const len=Math.max(1e-6,hi-lo);
     const si=new Uint16Array(pos.count*4), sw=new Float32Array(pos.count*4);
@@ -6859,7 +6859,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101012817'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101013104'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

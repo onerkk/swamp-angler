@@ -483,7 +483,7 @@ function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null;
 // 執行時綁骨：魚頭朝群組的 +x；在每個網格的本地座標裡找出「往前」與「往上」的方向，沿長軸放 7 節骨頭，依前後位置線性分配權重
 const NB_=7;
 function rigFish(root){ root.updateMatrixWorld(true); const inv=new T.Matrix4(), all=[]; const meshes=[]; root.traverse(o=>{ if(o.isMesh&&o.geometry&&o.geometry.attributes.position) meshes.push(o); });
-  meshes.forEach(o=>{ const g=o.geometry.clone();g.userData.aquariumOwned=true; const pos=g.attributes.position;
+  meshes.forEach(o=>{ const g=o.geometry.clone();g.userData={...g.userData,aquariumOwned:true}; const pos=g.attributes.position;
     inv.copy(o.matrixWorld).invert(); const fw=new T.Vector3(1,0,0).transformDirection(inv).normalize(), up=new T.Vector3(0,1,0).transformDirection(inv).normalize();
     let lo=Infinity, hi=-Infinity; for(let i=0;i<pos.count;i++){ const s=pos.getX(i)*fw.x+pos.getY(i)*fw.y+pos.getZ(i)*fw.z; if(s<lo) lo=s; if(s>hi) hi=s; } const len=Math.max(1e-6,hi-lo);
     const si=new Uint16Array(pos.count*4), sw=new Float32Array(pos.count*4);
