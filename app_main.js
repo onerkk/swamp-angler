@@ -1,4 +1,4 @@
-/*APPV:20261101151318*/
+/*APPV:20261101151504*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -6746,6 +6746,7 @@ function croak(on){ const a=actx(); if(!a) return; if(rattle){ rattle.stop=true;
 function croakVol(v){ try{ if(rattle&&AC) rattle.g.gain.setTargetAtTime(Math.min(1,v*1.6),AC.currentTime,.2); }catch(e){} }
 function crack(){ const a=actx(); if(!a) return; const b=a.createBuffer(1,a.sampleRate*.06,a.sampleRate), d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,6);
   const s=a.createBufferSource(), f=a.createBiquadFilter(), g=a.createGain(); f.type='highpass'; f.frequency.value=1800; g.gain.value=.9; s.buffer=b; s.connect(f); f.connect(g); g.connect(a.destination); s.start(); }
+function stopAudio(){croak(false);croakOld(false);for(const a of Object.values(SFX))try{a.pause();a.currentTime=0;}catch(_){} }
 function muteAll(on){ try{ if(c.mute) c.mute(on); }catch(e){} }
 const MODES=['glide','peek','behind','jump','grab','creep','bow','stalk']; let testIdx=0;
 function pickMode(){ if(TEST){ if(TEST_MODE) return TEST_MODE; const m=MODES[testIdx%MODES.length]; testIdx++; return m; }
@@ -6885,7 +6886,7 @@ function update2(dt){ tt+=dt; fxTick(dt); updLamp(dt,tt); if(fin){ updFinale(dt)
   if(!TEST&&c.storyDone&&c.storyDone('lantern')){ updCalm(dt); return; }
   if(!ev&&finaleReady()&&!aliveLoading){ startFinale(); return; }
   update(dt); }
-return {dbg:()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t.toFixed(1)},pos:model&&model.visible?[+model.position.x.toFixed(2),+model.position.y.toFixed(2),+model.position.z.toFixed(2)]:null,base:[+c.base().x.toFixed(2),+c.base().z.toFixed(2)],head:+c.head().toFixed(2),yaw:+(c.yaw?c.yaw():0).toFixed(2)}),update:update2,trigger,onPhoto,photoTarget,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};
+return {dbg:()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t.toFixed(1)},pos:model&&model.visible?[+model.position.x.toFixed(2),+model.position.y.toFixed(2),+model.position.z.toFixed(2)]:null,base:[+c.base().x.toFixed(2),+c.base().z.toFixed(2)],head:+c.head().toFixed(2),yaw:+(c.yaw?c.yaw():0).toFixed(2)}),update:update2,stopAudio,trigger,onPhoto,photoTarget,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};
 }
 /* ===== 雲端存檔：Google 帳號登入（Firebase），本機進度永遠不會被洗掉 ===== */
 function createCloud(c){
@@ -6990,7 +6991,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101151318'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101151504'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8909,7 +8910,7 @@ function homeEnter(){ const hd=HOME.data();
   setTimeout(()=>toast('釣友來參觀你的 '+kinds+' 種收藏，留下了 '+bt.icon+bt.name+' ×'+n,'good',2600),1200); }
 function recoverHome(err){Snd.setIndoor?.(false);if(window.__DIAG)window.__DIAG.action('home','error',err.message);console.error('home recovery',err);try{HOME3D.exit();}catch(_){}G.state='idle';document.body.classList.remove('athome','tankview','tankdive','grilling');fadeEl.classList.remove('on');toast('小屋載入暫時失敗，已返回釣點，遊戲進度保留','warn',4200);}
 function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收線再回家','warn');return;}if(!HOME.unlocked()){toast('完成主線第一章後才能整理小屋','warn');return;}persist();if(window.__DIAG)window.__DIAG.action('home','begin');G.state='travel';fadeEl.classList.add('on');Snd.paddle();
- setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeEl.classList.remove('on');toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
+ setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeEl.classList.remove('on');toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; fadeEl.classList.remove('on'); if(then) then(); else if(G.spot!==0) goSpot(0); },650); }
 window.__goHome=goHome; window.__HOMEOK=()=>HOME.unlocked();

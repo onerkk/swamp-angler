@@ -70,6 +70,7 @@ function croak(on){ const a=actx(); if(!a) return; if(rattle){ rattle.stop=true;
 function croakVol(v){ try{ if(rattle&&AC) rattle.g.gain.setTargetAtTime(Math.min(1,v*1.6),AC.currentTime,.2); }catch(e){} }
 function crack(){ const a=actx(); if(!a) return; const b=a.createBuffer(1,a.sampleRate*.06,a.sampleRate), d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,6);
   const s=a.createBufferSource(), f=a.createBiquadFilter(), g=a.createGain(); f.type='highpass'; f.frequency.value=1800; g.gain.value=.9; s.buffer=b; s.connect(f); f.connect(g); g.connect(a.destination); s.start(); }
+function stopAudio(){croak(false);croakOld(false);for(const a of Object.values(SFX))try{a.pause();a.currentTime=0;}catch(_){} }
 function muteAll(on){ try{ if(c.mute) c.mute(on); }catch(e){} }
 const MODES=['glide','peek','behind','jump','grab','creep','bow','stalk']; let testIdx=0;
 function pickMode(){ if(TEST){ if(TEST_MODE) return TEST_MODE; const m=MODES[testIdx%MODES.length]; testIdx++; return m; }
@@ -209,5 +210,5 @@ function update2(dt){ tt+=dt; fxTick(dt); updLamp(dt,tt); if(fin){ updFinale(dt)
   if(!TEST&&c.storyDone&&c.storyDone('lantern')){ updCalm(dt); return; }
   if(!ev&&finaleReady()&&!aliveLoading){ startFinale(); return; }
   update(dt); }
-return {dbg:()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t.toFixed(1)},pos:model&&model.visible?[+model.position.x.toFixed(2),+model.position.y.toFixed(2),+model.position.z.toFixed(2)]:null,base:[+c.base().x.toFixed(2),+c.base().z.toFixed(2)],head:+c.head().toFixed(2),yaw:+(c.yaw?c.yaw():0).toFixed(2)}),update:update2,trigger,onPhoto,photoTarget,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};
+return {dbg:()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t.toFixed(1)},pos:model&&model.visible?[+model.position.x.toFixed(2),+model.position.y.toFixed(2),+model.position.z.toFixed(2)]:null,base:[+c.base().x.toFixed(2),+c.base().z.toFixed(2)],head:+c.head().toFixed(2),yaw:+(c.yaw?c.yaw():0).toFixed(2)}),update:update2,stopAudio,trigger,onPhoto,photoTarget,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};
 }
