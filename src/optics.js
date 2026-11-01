@@ -1,14 +1,16 @@
 /* Shared water lighting: wet surfaces, Snell-projected moving caustics and depth loss. */
+const WATER_OPTICS_STATE=new WeakMap();
 function createWaterOptics(U,{surface=0,bounds=null,flat=false,strength=1}={}){
- const T=THREE,patched=new WeakSet(),materials=new Set(),detail={value:1};
+ const owner={},T=THREE,patched=new WeakSet(),scopedMaterials=new WeakMap(),materials=new Set(),detail={value:1};
  const uniforms={uOptTime:U.uTime,uOptWind:U.uWind,uOptSea:U.uSea,uOptLight:U.uLightCol,uOptDir:U.uSunDir,uOptSurface:{value:surface},uOptFlat:{value:flat?1:0},uOptStrength:{value:strength},uOptDetail:detail,uOptMin:{value:bounds?bounds.min:new T.Vector3(-1e6,-1e6,-1e6)},uOptMax:{value:bounds?bounds.max:new T.Vector3(1e6,1e6,1e6)}};
  function patch(mat){
   if(!mat||patched.has(mat)||!(mat.isMeshStandardMaterial||mat.isMeshPhysicalMaterial))return;patched.add(mat);materials.add(mat);
-  const previous=mat.onBeforeCompile,key=mat.customProgramCacheKey.bind(mat),baseEnv=mat.envMapIntensity??1;
-  mat.userData.opticsEnv=baseEnv;
+  const previous=mat.onBeforeCompile,key=mat.customProgramCacheKey.bind(mat),baseEnv=mat.userData.opticsEnv??mat.envMapIntensity??1;
+  mat.userData.opticsEnv=baseEnv;WATER_OPTICS_STATE.set(mat,{owner});
   mat.onBeforeCompile=(s,r)=>{
    if(previous)previous(s,r);Object.assign(s.uniforms,uniforms);
-   s.vertexShader='varying vec3 vOptWorld,vOptNormal;\n'+s.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
+   if(s.vertexShader.includes('#define SWAMP_WATER_OPTICS'))return;
+   s.vertexShader='#define SWAMP_WATER_OPTICS\nvarying vec3 vOptWorld,vOptNormal;\n'+s.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
      vec4 optP=vec4(transformed,1.0);vec3 optN=objectNormal;
      #ifdef USE_INSTANCING
      optP=instanceMatrix*optP;optN=mat3(instanceMatrix)*optN;
@@ -29,10 +31,13 @@ function createWaterOptics(U,{surface=0,bounds=null,flat=false,strength=1}={}){
      float optCaustic=pow(max(0.0,1.0-abs(optC)*.65),14.0);
      float optWater=step(0.0,optDepth)*optInside*exp(-max(0.0,optDepth)*.35);
      reflectedLight.indirectDiffuse+=diffuseColor.rgb*uOptLight*optCaustic*optWater*.24*max(.12,vOptNormal.y)*uOptStrength*uOptDetail;`);
-  };mat.customProgramCacheKey=()=>key()+'|water-optics-v1';mat.needsUpdate=true;
+  };mat.customProgramCacheKey=()=>key()+'|water-optics-v2';mat.needsUpdate=true;
  }
- function add(root){root.traverse(m=>{if(!m.isMesh)return;m.castShadow=m.receiveShadow=true;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))patch(mat);});}
- function update(){detail.value=typeof window!=='undefined'&&window.__GFX==='low'?.45:1;const day=U.uDay?U.uDay.value:1;for(const m of materials)m.envMapIntensity=m.userData.opticsEnv*(.22+.78*day);}
+ function add(root){root.traverse(m=>{if(!m.isMesh)return;m.castShadow=m.receiveShadow=true;
+  const scoped=material=>{if(!material)return material;let mat=material;const existing=WATER_OPTICS_STATE.get(mat);if(existing&&existing.owner!==owner){mat=scopedMaterials.get(material);if(!mat){mat=material.clone();mat.onBeforeCompile=material.onBeforeCompile;mat.customProgramCacheKey=material.customProgramCacheKey.bind(material);scopedMaterials.set(material,mat);}}patch(mat);return mat;};
+  m.material=Array.isArray(m.material)?m.material.map(scoped):scoped(m.material);
+ });}
+ function update(){detail.value=typeof window!=='undefined'&&window.__GFX==='low'?.45:1;const day=U.uDay?U.uDay.value:1;for(const m of materials)if(WATER_OPTICS_STATE.get(m).owner===owner)m.envMapIntensity=m.userData.opticsEnv*(.22+.78*day);}
  return{add,patch,update,uniforms};
 }
 function marineBodyBounds(T,root){

@@ -44,3 +44,11 @@ Water reflection and underwater transmission targets have independent long-edge 
 SSR reflector discovery is cached for 500 ms; diagnostic material scans run only with the graphics settings present, at most once per five seconds. Normal and mask passes retain their required per-frame work. There is no reuse of a stale full-screen screenshot during camera motion.
 
 Adaptive graphics remembers levels per scene for the current session. Sustained <22 FPS is handled during warmup after at least eight slow frames and 0.8 seconds; a few isolated stalls do not trigger that path. The aquarium's resolution floor relaxes at low levels so that severe lag can actually reduce its pixel load. Stable frame rates can still recover to the highest tier, and manual modes remain fixed.
+
+## Diagnostic-driven shader correction (2026-11-01)
+
+A shared PBR material could pass through two independent water-optics instances. Their `onBeforeCompile` chain injected the same varying and local declarations twice (`vOptWorld`, `vOptNormal`, `optP`, `optN`). Optics injection is now idempotent, and materials shared across different water volumes are cloned and cached per volume. Animation/immersion hooks and texture references remain intact; objects in one volume still share the same scoped material so plant batching is preserved. GPU fixtures now exercise nested optics hooks on standard, physical, skinned and instanced shader variants.
+
+Legacy fixed-high settings migrate to auto once on coarse-pointer devices with DPR >= 2.5. An explicit graphics selection in the new UI marks that preference and prevents further migration. This modifies graphics preference only, not gameplay progress, coins or account entitlements.
+
+Diagnostics now identify the app version, session start, actual framebuffer dimensions and active graphics level. Current-run errors are separated from the preserved prior-run history. Ten-second average FPS uses frame count divided by total elapsed frame duration rather than averaging instantaneous reciprocal durations. It is not valid to assume that all historical log entries occurred in the current build.

@@ -1,4 +1,4 @@
-/*APPV:20261101004316*/
+/*APPV:20261101005610*/
 /* The aquarium is a close-up exhibit: keep texture detail and reduce repeated draw calls. */
 function aquariumGraphicsProfile(profile,scope,cap){
  if(scope!=='home-aquarium'||profile.mode!=='auto')return profile;
@@ -238,6 +238,8 @@ function dockCameraButton(button,slot,top){let queued=false;const obstacles=['ma
  window.addEventListener('resize',schedule);if(typeof ResizeObserver!=='undefined'){const ro=new ResizeObserver(schedule);for(const el of[slot,top,...obstacles])ro.observe(el);}if(typeof MutationObserver!=='undefined')new MutationObserver(schedule).observe(document.body,{attributes:true,attributeFilter:['class','data-fishing-state']});schedule();return update;
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={createScreenCapture,captureDimensions,screenshotIgnores,cameraButtonPosition};
+/* Recover a legacy fixed-high setting once on high-DPR touch devices. */
+function recoverMobileGraphics(save,touch,dpr){if(!touch||dpr<2.5||save.gfx!=='high'||save.gfxRecoveryVersion)return false;save.gfx='auto';save.gfxRecoveryVersion=1;return true;}
 /* Raw RAF timing, independent of the simulation's capped timestep. */
 function graphicsProfiles(cap){
  const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
@@ -272,7 +274,7 @@ function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null}){
  return{configure,sample,pause,status,refresh:()=>apply(status())};
 }
 function graphicsStatusText(s){const a=typeof window!=='undefined'?window.__materialLightingAudit:null;return `${s.mode==='auto'?'自動':'固定'}畫質：${s.name}（${s.level+1}/${s.maxLevel+1}）・${s.pr.toFixed(2)} 倍解析度・${Math.round(s.fps||0)} FPS`+(a?`・受光材質 ${a.lit}／法線 ${a.normalMapped}／凹凸 ${a.bumpMapped}`:'');}
-if(typeof module!=='undefined'&&module.exports)module.exports={graphicsProfiles,createAdaptiveGraphics,graphicsStatusText};
+if(typeof module!=='undefined'&&module.exports)module.exports={recoverMobileGraphics,graphicsProfiles,createAdaptiveGraphics,graphicsStatusText};
 
 function waterDetailSettings(quality){return{low:[64,128],mid:[112,192],high:[160,256],ultra:[224,320]}[quality]||[112,192];}
 function tuneTextureSampling(T,texture,maxAnisotropy,atlas=false){
@@ -448,16 +450,18 @@ function makeWaterGrid(T,radius=150,rings=112,segments=192){
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={WATER_WAVES,sampleWater,waterWaveGLSL,makeWaterGrid};
 /* Shared water lighting: wet surfaces, Snell-projected moving caustics and depth loss. */
+const WATER_OPTICS_STATE=new WeakMap();
 function createWaterOptics(U,{surface=0,bounds=null,flat=false,strength=1}={}){
- const T=THREE,patched=new WeakSet(),materials=new Set(),detail={value:1};
+ const owner={},T=THREE,patched=new WeakSet(),scopedMaterials=new WeakMap(),materials=new Set(),detail={value:1};
  const uniforms={uOptTime:U.uTime,uOptWind:U.uWind,uOptSea:U.uSea,uOptLight:U.uLightCol,uOptDir:U.uSunDir,uOptSurface:{value:surface},uOptFlat:{value:flat?1:0},uOptStrength:{value:strength},uOptDetail:detail,uOptMin:{value:bounds?bounds.min:new T.Vector3(-1e6,-1e6,-1e6)},uOptMax:{value:bounds?bounds.max:new T.Vector3(1e6,1e6,1e6)}};
  function patch(mat){
   if(!mat||patched.has(mat)||!(mat.isMeshStandardMaterial||mat.isMeshPhysicalMaterial))return;patched.add(mat);materials.add(mat);
-  const previous=mat.onBeforeCompile,key=mat.customProgramCacheKey.bind(mat),baseEnv=mat.envMapIntensity??1;
-  mat.userData.opticsEnv=baseEnv;
+  const previous=mat.onBeforeCompile,key=mat.customProgramCacheKey.bind(mat),baseEnv=mat.userData.opticsEnv??mat.envMapIntensity??1;
+  mat.userData.opticsEnv=baseEnv;WATER_OPTICS_STATE.set(mat,{owner});
   mat.onBeforeCompile=(s,r)=>{
    if(previous)previous(s,r);Object.assign(s.uniforms,uniforms);
-   s.vertexShader='varying vec3 vOptWorld,vOptNormal;\n'+s.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
+   if(s.vertexShader.includes('#define SWAMP_WATER_OPTICS'))return;
+   s.vertexShader='#define SWAMP_WATER_OPTICS\nvarying vec3 vOptWorld,vOptNormal;\n'+s.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
      vec4 optP=vec4(transformed,1.0);vec3 optN=objectNormal;
      #ifdef USE_INSTANCING
      optP=instanceMatrix*optP;optN=mat3(instanceMatrix)*optN;
@@ -478,10 +482,13 @@ function createWaterOptics(U,{surface=0,bounds=null,flat=false,strength=1}={}){
      float optCaustic=pow(max(0.0,1.0-abs(optC)*.65),14.0);
      float optWater=step(0.0,optDepth)*optInside*exp(-max(0.0,optDepth)*.35);
      reflectedLight.indirectDiffuse+=diffuseColor.rgb*uOptLight*optCaustic*optWater*.24*max(.12,vOptNormal.y)*uOptStrength*uOptDetail;`);
-  };mat.customProgramCacheKey=()=>key()+'|water-optics-v1';mat.needsUpdate=true;
+  };mat.customProgramCacheKey=()=>key()+'|water-optics-v2';mat.needsUpdate=true;
  }
- function add(root){root.traverse(m=>{if(!m.isMesh)return;m.castShadow=m.receiveShadow=true;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))patch(mat);});}
- function update(){detail.value=typeof window!=='undefined'&&window.__GFX==='low'?.45:1;const day=U.uDay?U.uDay.value:1;for(const m of materials)m.envMapIntensity=m.userData.opticsEnv*(.22+.78*day);}
+ function add(root){root.traverse(m=>{if(!m.isMesh)return;m.castShadow=m.receiveShadow=true;
+  const scoped=material=>{if(!material)return material;let mat=material;const existing=WATER_OPTICS_STATE.get(mat);if(existing&&existing.owner!==owner){mat=scopedMaterials.get(material);if(!mat){mat=material.clone();mat.onBeforeCompile=material.onBeforeCompile;mat.customProgramCacheKey=material.customProgramCacheKey.bind(material);scopedMaterials.set(material,mat);}}patch(mat);return mat;};
+  m.material=Array.isArray(m.material)?m.material.map(scoped):scoped(m.material);
+ });}
+ function update(){detail.value=typeof window!=='undefined'&&window.__GFX==='low'?.45:1;const day=U.uDay?U.uDay.value:1;for(const m of materials)if(WATER_OPTICS_STATE.get(m).owner===owner)m.envMapIntensity=m.userData.opticsEnv*(.22+.78*day);}
  return{add,patch,update,uniforms};
 }
 function marineBodyBounds(T,root){
@@ -2860,7 +2867,7 @@ function render(){
     shT.textContent='設定';
     h+='<div class="note">切換時段</div><div class="tabs">'+PRESETS.map((p,i)=>`<button class="tab" data-a="time" data-v="${i}">${p[1]}</button>`).join('')+'</div>';
     { const gq=save.gfx||'auto'; h+='<div class="note">畫質</div><div class="tabs">'+[['auto','自動'],['high','高'],['mid','中'],['low','低']].map(([k,n])=>`<button class="tab${gq===k?' on':''}" data-a="gfx" data-v="${k}">${n}</button>`).join('')+'</div><div class="note" style="font-size:12px">自動（建議）：掉幀時降低解析度、倒影、陰影與特效；穩定達 60 FPS 時逐級升到最高。高／中／低：固定畫質。</div>'+`<div id="gfxLive" class="note" style="font-size:12px">${window.__gfxStatus?graphicsStatusText(window.__gfxStatus):'畫質初始化中'}</div>`; }
-    { const n=window.__DIAG?window.__DIAG.count():0; h+=`<div class="note">問題回報（目前記錄 ${n} 筆錯誤）</div><div class="tabs"><button class="tab" data-a="diag" data-v="copy">📋 複製診斷資訊</button><button class="tab" data-a="diag" data-v="clear">清除記錄</button></div><div class="note" style="font-size:12px">遇到怪問題時，按「複製診斷資訊」再貼給開發者，就能看到你手機上實際發生的錯誤和幀率。</div>`; }
+    { const n=window.__DIAG?window.__DIAG.count():0; h+=`<div class="note">問題回報（本次執行記錄 ${n} 筆錯誤）</div><div class="tabs"><button class="tab" data-a="diag" data-v="copy">📋 複製診斷資訊</button><button class="tab" data-a="diag" data-v="clear">清除記錄</button></div><div class="note" style="font-size:12px">遇到怪問題時，按「複製診斷資訊」再貼給開發者，就能看到你手機上實際發生的錯誤和幀率。</div>`; }
     h+='<div class="note">天氣</div><div class="tabs">'+[['auto','自動'],['clear','晴'],['breezy','有風'],['cloudy','陰'],['drizzle','毛毛雨'],['rain','雨'],['storm','雷雨'],['fog','霧']].map(w=>`<button class="tab${(save.wxMode||'auto')===w[0]?' on':''}" data-a="wx" data-v="${w[0]}">${w[1]}</button>`).join('')+'</div>';
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
     h+='<div class="note">魚訊放大視窗（自動：休閒、標準開，硬派、專家關）</div><div class="tabs">'+[['auto','自動'],['on','開'],['off','關']].map(m=>`<button class="tab${(save.mag||'auto')===m[0]?' on':''}" data-a="mag" data-v="${m[0]}">${m[1]}</button>`).join('')+'</div>';
@@ -3014,7 +3021,7 @@ $('shX').addEventListener('click',close);
 sheet.addEventListener('click',e=>{ if(e.target===sheet) close(); });
 shB.addEventListener('click',e=>{
   const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(a==='diag'&&window.__DIAG){ if(v==='copy') window.__DIAG.copy().then(ok=>toast(ok?'已複製診斷資訊，可以直接貼上':'複製失敗，請截圖設定頁','good',2200)); else { window.__DIAG.clear(); toast('已清除錯誤記錄','good',1200); } render(); return; }
-  if(a==='gfx'){ save.gfx=v; persist(); if(window.__applyGfx) window.__applyGfx(v); toast('畫質：'+({auto:'自動',high:'高',mid:'中',low:'低'})[v],'good',1200); render(); return; } if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
+  if(a==='gfx'){ save.gfx=v;save.gfxRecoveryVersion=1; persist(); if(window.__applyGfx) window.__applyGfx(v); toast('畫質：'+({auto:'自動',high:'高',mid:'中',low:'低'})[v],'good',1200); render(); return; } if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
   if(a==='tab') shopTab=v;
   else if(a==='buy'){ const it=GEAR[shopTab][+v]; if(save.coins<it.price){ toast('金幣不夠','bad'); return; }
     save.coins-=it.price; save.gear[shopTab].push(+v); save.eq[shopTab]=+v; persist(); setCoins(); Snd.coin(); toast('已購買並裝備：'+it.name,'good'); applyRod(); }
@@ -5429,27 +5436,28 @@ return {update,holePos:()=>holePos,drilled:()=>drilled,drill,progress:()=>prog,g
 /* ===== 診斷：錯誤記錄、效能取樣、一鍵複製給開發者 ===== */
 function createDiag(W,c){
 'use strict';
-const KEY='swampAngler.log'; let log=[]; try{ log=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ log=[]; }
-function add(kind,msg){ const t=new Date(); log.push(`${t.getMonth()+1}/${t.getDate()} ${t.toTimeString().slice(0,8)} [${kind}] ${String(msg).slice(0,300)}`); if(log.length>30) log=log.slice(-30); try{ localStorage.setItem(KEY,JSON.stringify(log)); }catch(e){} }
+const KEY='swampAngler.log',startedAt=new Date();let current=[];let log=[]; try{ log=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ log=[]; }
+let history=log.slice();
+function add(kind,msg){ const t=new Date(); const entry=`${t.getMonth()+1}/${t.getDate()} ${t.toTimeString().slice(0,8)} [${kind}] ${String(msg).slice(0,600)}`;current.push(entry);if(current.length>30)current.shift();log.push(entry); if(log.length>30) log=log.slice(-30); try{ localStorage.setItem(KEY,JSON.stringify(log)); }catch(e){} }
 window.addEventListener('error',e=>{ if(e.target&&e.target!==window&&(e.target.src||e.target.href)) add('load',e.target.src||e.target.href); else add('error',(e.message||'')+' @'+(e.filename||'').split('/').pop()+':'+(e.lineno||'')); },true);
 window.addEventListener('unhandledrejection',e=>add('promise',e.reason&&(e.reason.message||e.reason)));
 const ce=console.error.bind(console); console.error=function(){ try{ add('console',[...arguments].map(a=>a&&a.message?a.message:String(a)).join(' ')); }catch(e){} ce(...arguments); };
 /* 效能：最近 10 秒的平均與最低幀率 */
 const fr=[]; let last=performance.now();
-function tick(){ const n=performance.now(), dt=n-last; last=n; if(dt>0&&dt<2000){ fr.push([n,1000/dt]); } while(fr.length&&n-fr[0][0]>10000) fr.shift(); requestAnimationFrame(tick); }
+function tick(){ const n=performance.now(), dt=n-last; last=n; if(dt>0&&dt<2000){ fr.push([n,dt]); } while(fr.length&&n-fr[0][0]>10000) fr.shift(); requestAnimationFrame(tick); }
 requestAnimationFrame(tick);
-function fps(){ if(!fr.length) return {avg:0,min:0}; let s=0,mn=999; for(const f of fr){ s+=f[1]; if(f[1]<mn) mn=f[1]; } return {avg:Math.round(s/fr.length),min:Math.round(mn)}; }
+function fps(){if(!fr.length)return{avg:0,min:0,worst:0};let total=0,worst=0;for(const f of fr){total+=f[1];worst=Math.max(worst,f[1]);}return{avg:Math.round(1000*fr.length/total),min:Math.round(1000/worst),worst:Math.round(worst)};}
 function gpu(){ try{ const gl=W.renderer.getContext(), ext=gl.getExtension('WEBGL_debug_renderer_info'); return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER); }catch(e){ return '?'; } }
 function report(){ const f=fps(), G=c.G, S=c.save;
-  return ['【濕地垂釣 診斷資訊】','時間：'+new Date().toLocaleString('zh-TW'),'裝置：'+navigator.userAgent,'螢幕：'+screen.width+'×'+screen.height+' DPR '+(window.devicePixelRatio||1)+'，畫布解析度 '+(W.getPR?W.getPR():'?'),
-    '顯示晶片：'+gpu(),'畫質設定：'+(S.gfx||'high'),'幀率（近 10 秒）：平均 '+f.avg+'，最低 '+f.min,
+  return ['【濕地垂釣 診斷資訊】','程式版本：'+(window.__APP_VER||'未知'),'本次啟動：'+startedAt.toLocaleString('zh-TW'),'時間：'+new Date().toLocaleString('zh-TW'),'裝置：'+navigator.userAgent,'螢幕：'+screen.width+'×'+screen.height+' DPR '+(window.devicePixelRatio||1)+'，畫布解析度 '+(W.getPR?W.getPR():'?'),
+    '畫布實際像素：'+(W.renderer.domElement?W.renderer.domElement.width+'×'+W.renderer.domElement.height:'?'),'顯示晶片：'+gpu(),'畫質設定：'+(S.gfx||'auto')+'／實際等級 '+(window.__gfxStatus?window.__gfxStatus.level:'?'),'幀率（近 10 秒）：平均 '+f.avg+'，最低 '+f.min+'，最長幀耗時 '+f.worst+' ms',
     '位置：'+(G.loc||'?')+'／釣點 '+(G.spot)+'／狀態 '+G.state+'／時間 '+(((G.hour%24)+24)%24).toFixed(1)+'／Lv '+S.lv,
-    '錯誤記錄（最近 '+log.length+' 筆）：',...(log.length?log:['（沒有錯誤）'])].join('\n'); }
+    '本次執行錯誤（最近 '+current.length+' 筆）：',...(current.length?current:['（本次沒有記錄到錯誤）']),'歷史錯誤（本次啟動前留存 '+history.length+' 筆）：',...(history.length?history:['（沒有歷史錯誤）'])].join('\n'); }
 async function copy(){ const txt=report();
   try{ await navigator.clipboard.writeText(txt); return true; }
   catch(e){ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); let ok=false; try{ ok=document.execCommand('copy'); }catch(e2){} ta.remove(); return ok; } }
-function clear(){ log=[]; try{ localStorage.removeItem(KEY); }catch(e){} }
-return {report,copy,clear,add,count:()=>log.length};
+function clear(){ current=[];history=[];log=[]; try{ localStorage.removeItem(KEY); }catch(e){} }
+return {report,copy,clear,add,count:()=>current.length};
 }
 /* ===== 主線故事「老漁人的手記」：章節、任務、地圖開放、手記面板 ===== */
 function createStory(c){
@@ -6825,7 +6833,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101004316'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101005610'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8983,6 +8991,7 @@ const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,profile:aquariumGraphi
 window.__applyGfx=q=>{gfxAuto.configure(q);if(window.__toastGfx)window.__toastGfx(q);};
 window.addEventListener('resize',()=>gfxAuto.refresh());document.addEventListener('visibilitychange',()=>gfxAuto.pause());
 if(W.qualityTextures)W.qualityTextures(W.scene);
+if(recoverMobileGraphics(save,window.matchMedia('(pointer:coarse)').matches,window.devicePixelRatio||1)){persist();setTimeout(()=>toast('已改用自動畫質，掉幀時會自動降低負載；仍可在設定手動選擇','',3800),1800);}
 window.__applyGfx(save.gfx||'auto');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,held:()=>G.held,grind:()=>Snd.grind&&Snd.grind(),splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
 function iceDrop(){ G.noBait=false; const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=1.6; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;

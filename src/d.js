@@ -666,6 +666,7 @@ const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,profile:aquariumGraphi
 window.__applyGfx=q=>{gfxAuto.configure(q);if(window.__toastGfx)window.__toastGfx(q);};
 window.addEventListener('resize',()=>gfxAuto.refresh());document.addEventListener('visibilitychange',()=>gfxAuto.pause());
 if(W.qualityTextures)W.qualityTextures(W.scene);
+if(recoverMobileGraphics(save,window.matchMedia('(pointer:coarse)').matches,window.devicePixelRatio||1)){persist();setTimeout(()=>toast('已改用自動畫質，掉幀時會自動降低負載；仍可在設定手動選擇','',3800),1800);}
 window.__applyGfx(save.gfx||'auto');
 const ICE=createIce(W,{loc:()=>G.loc,base:()=>G.base,head:()=>G.head,state:()=>G.state,tens:()=>G.f?G.f.T:0,held:()=>G.held,grind:()=>Snd.grind&&Snd.grind(),splash:(p,k)=>{ P.splash(p.x,.02,p.z,Math.round(4+10*k),.25+.35*k); if(k>.85) vib(15); },chips:p=>{ P.splash(p.x+(Math.random()-.5)*.3,.05,p.z+(Math.random()-.5)*.3,3,.25); if(Math.random()<.5) Snd.click(); vib(8); },done:p=>{ P.splash(p.x,.05,p.z,24,.6); W.addRipple(p.x,p.z,.3); Snd.plop(); vib([20,30,40]); toast('冰洞鑿開了！點擊放線','good',1800); }});
 function iceDrop(){ G.noBait=false; const bt=META.useBait(); G.baitUsed=bt&&bt.lure?Object.assign({},bt,{lure:null,wait:(bt.wait||1)*.85}):bt; LURE.bobberVis(true); G.to.copy(ICE.holePos()); G.castDist=1.6; bob.position.set(G.to.x,.6,G.to.z); Snd.plop(); landBobber(); } window.__ICE=ICE;
