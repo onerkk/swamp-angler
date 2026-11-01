@@ -53,3 +53,8 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
    （固定到提交 SHA，jsDelivr 一定拿到新版；用 @main 會有分支快取延遲，載入器會退回本站、變慢）
 3. 換過模型／貼圖時，對換過的檔案呼叫 `https://purge.jsdelivr.net/gh/onerkk/swamp-angler@main/<檔案路徑>`
 4. 上線前一定要跑完整啟動測試（載入到「✅ 真實場景已載入」且 G.state 為 idle、沒有錯誤）
+
+## 效能與畫質（2026-11-02）
+- 畫質分兩層：材質等級 tier（高／中／低，effect-budget.js effectTier）整段遊戲固定，決定貼圖與光澤，不隨自動調整切換（避免著色器重新編譯卡頓）；等級 level 0～7 只調解析度、數量、更新頻率（effectBudget 的 rainLines、reflectionHz、shadowHz、probeHz、particleScale）
+- 規則：任何畫質都不得關閉特效，只能改用較省的版本；陰影 shadowMap.enabled 一律 true
+- 遠近細節 lod.js：models/lod/*_lod1.glb 是倒木、樹樁、岸邊岩石的簡化幾何（無貼圖、Draco），由 GLTFLoader 掛鉤自動配對，遠處換幾何、材質不變；新增大型岸邊模型時用 /tmp 的 gltf-transform 腳本（simplify ratio 0.12、prune keepAttributes、draco）產生並加入 LOD_MODELS

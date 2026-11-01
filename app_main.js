@@ -1,4 +1,4 @@
-/*APPV:20261101223638*/
+/*APPV:20261101230735*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -13,6 +13,48 @@ function createImageBudget(policy,makeCanvas=()=>document.createElement('canvas'
 function installImageBudget(T,budget){for(const name of['ImageLoader','ImageBitmapLoader']){if(!T[name])continue;const original=T[name].prototype.load;T[name].prototype.load=function(url,loaded,progress,failed){return original.call(this,url,image=>{const result=budget.resize(image);try{result.__assetURL=String(url).split('/').pop().slice(0,160);}catch(_){}try{if(loaded)loaded(result);}finally{if(result!==image&&typeof image.close==='function')image.close();}},progress,failed);};}}
 function createTextureVariants(T,loader){const textures=new Map(),sources=new Map();return function(file,rx=1,ry=1,rotation=0){const key=[file,rx,ry,rotation].join('|');if(textures.has(key))return textures.get(key);let source=sources.get(file);if(!source){source={variants:[],ready:false};sources.set(file,source);source.texture=loader.load(file,loaded=>{source.ready=true;source.texture=loaded;for(const t of source.variants){t.image=loaded.image;t.needsUpdate=true;}});}const t=source.texture.clone();source.variants.push(t);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(rx,ry);t.rotation=rotation;t.anisotropy=4;textures.set(key,t);return t;};}
 if(typeof module!=='undefined'&&module.exports)module.exports={deviceResourcePolicy,budgetImageSize,createImageBudget,installImageBudget,createTextureVariants};
+/* 遠近細節（LOD）：倒木、樹樁、岸邊岩石原檔一個就有 4～8 萬面，湖區同時有十幾個，主畫面、倒影、陰影各畫一次。
+   遠處改用預先簡化的幾何（約 12% 面數，models/lod/），材質、貼圖完全不變，切換時不會重新編譯著色器；近處仍是原檔。
+   切換距離依材質等級：高 18 公尺、中 11 公尺、低 7 公尺，並留 15% 緩衝避免在邊界來回閃。 */
+const LOD_MODELS=['dead_tree_trunk_02.glb','tree_stump_01.glb','tree_stump_02.glb','rock_moss_set_01.glb'];
+function lodFileFor(url){const name=String(url).split('?')[0].split('/').pop();return LOD_MODELS.includes(name)?'models/lod/'+name.replace(/\.glb$/,'_lod1.glb'):null;}
+function lodDistance(tier){return tier==='high'?18:tier==='mid'?11:7;}
+function pairLODMeshes(full,lod,lodOf,fullOf){
+ const a=[],b=[],byName=new Map();full.traverse(o=>{if(o.isMesh)a.push(o);});lod.traverse(o=>{if(o.isMesh)b.push(o);});
+ for(const m of b){if(!byName.has(m.name))byName.set(m.name,[]);byName.get(m.name).push(m);}
+ let paired=0;
+ a.forEach((m,i)=>{const list=byName.get(m.name),cand=list&&list.length?list.shift():b[i];if(!cand||!cand.geometry||m.isSkinnedMesh)return;const g=cand.geometry;
+  // 屬性必須一致（例如都有 uv），否則同一個材質程式讀不到資料
+  for(const k of Object.keys(m.geometry.attributes))if(!g.attributes[k])return;
+  g.computeBoundingSphere();g.computeBoundingBox();lodOf.set(m.geometry,g);fullOf.set(g,m.geometry);paired++;});
+ return paired;
+}
+function createGeometryLOD(){
+ const lodOf=new WeakMap(),fullOf=new WeakMap(),stats={paired:0,near:0,far:0};let list=[],scanT=0,cam=null,pos=null;
+ function install(T){
+  if(!T||!T.GLTFLoader||T.GLTFLoader.prototype.__geometryLOD)return;const load=T.GLTFLoader.prototype.load;T.GLTFLoader.prototype.__geometryLOD=true;
+  T.GLTFLoader.prototype.load=function(url,onLoad,onProgress,onError){
+   const lodURL=lodFileFor(url);if(!lodURL||typeof onLoad!=='function')return load.call(this,url,onLoad,onProgress,onError);
+   const loader=this;let full=null,lod=null,left=2;
+   // 簡化檔載入失敗也照常交出原檔，只是沒有遠景簡化
+   const done=()=>{if(--left>0)return;if(lod)try{stats.paired+=pairLODMeshes(full.scene,lod.scene,lodOf,fullOf);}catch(e){console.warn('lod pair',e);}onLoad(full);};
+   load.call(loader,lodURL,g=>{lod=g;done();},undefined,()=>done());
+   return load.call(loader,url,g=>{full=g;done();},onProgress,onError);
+  };
+ }
+ function update(scene,camera,dt,tier){
+  if(!scene||!camera)return;if(!cam){cam=new camera.position.constructor();pos=new camera.position.constructor();}
+  const now=typeof performance!=='undefined'?performance.now()/1000:scanT+dt;if(now>=scanT){scanT=now+2;list=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&lodOf.has(fullOf.get(o.geometry)||o.geometry))list.push(o);});}
+  camera.getWorldPosition(cam);const d=lodDistance(tier),near2=d*d,far2=(d*1.15)*(d*1.15);let n=0,f=0;
+  for(const m of list){const full=fullOf.get(m.geometry)||m.geometry,lod=lodOf.get(full);if(!lod)continue;
+   if(!full.boundingSphere)full.computeBoundingSphere();pos.setFromMatrixPosition(m.matrixWorld);const r=full.boundingSphere?full.boundingSphere.radius*Math.max(m.matrixWorld.getMaxScaleOnAxis(),1e-3):0,dd=Math.max(0,pos.distanceTo(cam)-r),d2=dd*dd;
+   if(m.geometry===full){if(d2>far2)m.geometry=lod;}else if(d2<near2)m.geometry=full;
+   if(m.geometry===full)n++;else f++;}
+  stats.near=n;stats.far=f;
+ }
+ return{install,update,stats};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={LOD_MODELS,lodFileFor,lodDistance,pairLODMeshes,createGeometryLOD};
 /* Effect costs are controlled independently from framebuffer resolution. */
 /* 畫質分兩層：tier（高／中／低）決定材質用哪些貼圖與光澤，整段遊戲固定不變，避免著色器重新編譯造成卡頓；
    level（0～7）只調數量、更新頻率與解析度，所有特效在每一級都保留，只是用較省的版本。 */
@@ -7012,7 +7054,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101223638'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101230735'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9597,7 +9639,7 @@ function frame(now){
   if(graphicsRecovery.paused()||document.hidden||screenCapture.paused()){frameLimiter.reset(now);requestAnimationFrame(frame);return;}const dt=Math.min(.05,frameSeconds);window.__frameSeconds=frameSeconds;
   // Resolution changes clear the drawing buffer: apply them BEFORE drawing this frame.
   gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?HOME3D.qualityScope():UW.active()?'underwater':G.loc||'lake'});
-  if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
+  if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { if(window.__GEOLOD) window.__GEOLOD.update(W.scene,W.camera,dt,window.__effectTier); W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
   if(HOME3D.active()){if(!homeWarmAt)homeWarmAt=now;if(homeWarmAt>0&&now-homeWarmAt>5000){homeWarmAt=-1;if(window.__DIAG)window.__DIAG.action('home','done','5 seconds rendered');}}else homeWarmAt=0;if(window.__DIAG)window.__DIAG.stage('render');screenCapture.afterFrame();fpsDisplay.frame(frameSeconds);if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
 
   requestAnimationFrame(frame);
@@ -9615,7 +9657,7 @@ requestAnimationFrame(frame);
     // 所有模型都經過 Draco 幾何壓縮（體積約剩 1/4）：每個 GLTF 載入器自動接上同一個 Draco 解壓器
     let resourceSave={};try{resourceSave=JSON.parse(localStorage.getItem('swampAngler.v1')||'{}');}catch(_){}const previous=readDiagnosticJournal();const recovery=!!(previous&&!previous.clean&&Date.now()-previous.at<600000&&((previous.started&&previous.visible!==false)||previous.recovery));window.__resourcePolicy=deviceResourcePolicy(navigator.userAgent,resourceSave.gfx||'auto',recovery);window.__imageBudget=createImageBudget(window.__resourcePolicy);installImageBudget(THREE,window.__imageBudget);
     if(THREE.DRACOLoader&&THREE.GLTFLoader){ const dl=new THREE.DRACOLoader();dl.setWorkerLimit(1); dl.setDecoderPath('vendor/draco/'); dl.preload();
-      for(const k of ['load','parse']){ const o=THREE.GLTFLoader.prototype[k]; THREE.GLTFLoader.prototype[k]=function(...a){ if(!this.dracoLoader) this.setDRACOLoader(dl); return o.apply(this,a); }; } } if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); }catch(e){ console.warn('cdn',e); }
+      for(const k of ['load','parse']){ const o=THREE.GLTFLoader.prototype[k]; THREE.GLTFLoader.prototype[k]=function(...a){ if(!this.dracoLoader) this.setDRACOLoader(dl); return o.apply(this,a); }; } } if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); window.__GEOLOD=createGeometryLOD(); window.__GEOLOD.install(THREE); }catch(e){ console.warn('cdn',e); }
   try{
     const W=createWorld({canvas:document.getElementById('c')});W.renderer.info.autoReset=false; window.__DIAG=createDiag(W,{get G(){ return window.__G||{}; },get save(){ return (window.__G&&window.__G.saveRef)||{}; },persist:()=>{if(window.__G?.saveRef)localStorage.setItem(window.__SAVE_KEY||'swampAngler.v1',JSON.stringify(window.__G.saveRef));}}); const P=createProps(W);
     // 主畫面的載入提示：進度條、第一次進入的說明、網路慢時的提醒（避免玩家以為當機）
