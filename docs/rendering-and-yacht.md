@@ -52,3 +52,9 @@ A shared PBR material could pass through two independent water-optics instances.
 Legacy fixed-high settings migrate to auto once on coarse-pointer devices with DPR >= 2.5. An explicit graphics selection in the new UI marks that preference and prevents further migration. This modifies graphics preference only, not gameplay progress, coins or account entitlements.
 
 Diagnostics now identify the app version, session start, actual framebuffer dimensions and active graphics level. Current-run errors are separated from the preserved prior-run history. Ten-second average FPS uses frame count divided by total elapsed frame duration rather than averaging instantaneous reciprocal durations. It is not valid to assume that all historical log entries occurred in the current build.
+
+## 120 FPS update ceiling (2026-11-01)
+
+The main game loop uses a phase-preserving 120 FPS limiter. A 120 Hz RAF source is not halved by small timestamp jitter; faster 144/240 Hz callbacks skip surplus updates, while 30/60 Hz callbacks remain at their actual available rate. Simulation and adaptive graphics use elapsed time between rendered game updates. Long pauses do not trigger catch-up rendering bursts. This cap does not force the browser/display to refresh at 120 Hz or guarantee that a heavy scene can sustain 120 FPS.
+
+Diagnostics now sample the actual main game update loop rather than running a separate uncapped RAF sampler. The report/settings show the 120 FPS ceiling separately from measured FPS. `tests/frame-timing.test.js` exercises high-refresh rates, jitter, slower callbacks and long pauses.

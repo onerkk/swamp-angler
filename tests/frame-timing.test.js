@@ -1,0 +1,6 @@
+const{test}=require('node:test'),assert=require('node:assert/strict'),{GAME_FPS_LIMIT,createFrameLimiter}=require('../src/frame-timing.js');
+function simulate(hz,seconds,jitter=false){const limiter=createFrameLimiter(120,0),samples=[];for(let i=1;i<=hz*seconds;i++){const now=i*1000/hz+(jitter?(i%2?.2:-.2):0),dt=limiter.step(now);if(dt!==null)samples.push(dt);}return samples;}
+test('120 Hz reaches 120 updates without accidentally halving to 60, including timestamp jitter',()=>{assert.equal(GAME_FPS_LIMIT,120);for(const jitter of[false,true])assert.equal(simulate(120,10,jitter).length,1200);});
+test('144 and 240 Hz callbacks are capped at 120 actual updates',()=>{for(const hz of[144,240]){const s=simulate(hz,10);assert.equal(s.length,1200);assert(Math.abs(s.reduce((a,b)=>a+b,0)-10)<.01);}});
+test('30 and 60 Hz devices keep their available frame rate and real elapsed animation time',()=>{for(const hz of[30,60]){const s=simulate(hz,10);assert.equal(s.length,hz*10);assert(Math.abs(s.reduce((a,b)=>a+b,0)-10)<1e-8);}});
+test('a long pause cannot cause a burst of catch-up renders',()=>{const c=createFrameLimiter();assert.equal(c.step(4000),4);assert.equal(c.step(4001),null);assert.equal(c.step(4002),null);assert(c.step(4009)>0);});
