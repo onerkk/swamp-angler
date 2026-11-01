@@ -1,8 +1,8 @@
-/*APPV:20261101002549*/
+/*APPV:20261101004316*/
 /* The aquarium is a close-up exhibit: keep texture detail and reduce repeated draw calls. */
 function aquariumGraphicsProfile(profile,scope,cap){
  if(scope!=='home-aquarium'||profile.mode!=='auto')return profile;
- return{...profile,pr:Math.min(cap,Math.max(1.15,profile.pr))};
+ return{...profile,pr:Math.min(cap,Math.max(Math.min(1.15,.65+profile.level*.12),profile.pr))};
 }
 function createAquariumPlantBatch(T,parent,plants){
  const batches=[],matrix=new T.Matrix4();let entries=[],disposed=false;
@@ -244,16 +244,18 @@ function graphicsProfiles(cap){
  return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
 }
 function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null}){
+ const sceneLevels=new Map();let emergencyTime=0,emergencyFrames=0;
  let mode='auto',level=4,scope='',elapsed=0,frames=0,slow=0,warm=3,cool=0,fast=0,bad=0,clock=0,blocked=-1,blockedUntil=0,probe=null,fps=0,reason='初始化';
  const reset=()=>{elapsed=0;frames=0;slow=0;fast=0;bad=0;};
  function status(){const s={mode,level,maxLevel:7,fps,reason,...graphicsProfiles(cap())[level]};return profile?profile(s,scope,cap()):s;}
- function commit(next,why){level=Math.max(0,Math.min(7,next));reason=why;apply(status());reset();cool=4;}
- function configure(next){mode=['auto','high','mid','low'].includes(next)?next:'auto';probe=null;blocked=-1;warm=3;reset();level=mode==='auto'?4:mode==='high'?7:mode==='mid'?3:0;commit(level,mode==='auto'?'開始自動調整':'固定畫質');}
- function pause(){reset();warm=3;probe=null;}
+ function commit(next,why){level=Math.max(0,Math.min(7,next));if(scope)sceneLevels.set(scope,level);emergencyTime=emergencyFrames=0;reason=why;apply(status());reset();cool=4;}
+ function configure(next){sceneLevels.clear();emergencyTime=emergencyFrames=0;mode=['auto','high','mid','low'].includes(next)?next:'auto';probe=null;blocked=-1;warm=3;reset();level=mode==='auto'?4:mode==='high'?7:mode==='mid'?3:0;commit(level,mode==='auto'?'開始自動調整':'固定畫質');}
+ function pause(){reset();warm=3;probe=null;emergencyTime=emergencyFrames=0;}
  function sample(seconds,{ready=true,scene='',enabled=true}={}){
   if(!ready||!enabled||!Number.isFinite(seconds)||seconds<=0){pause();return;}
-  if(scene!==scope){scope=scene;pause();blocked=-1;if(profile){if(mode==='auto')level=scope==='home-aquarium'?6:4;apply(status());}}
+  if(scene!==scope){const previousLevel=level;if(scope)sceneLevels.set(scope,level);scope=scene;pause();blocked=-1;if(mode==='auto')level=sceneLevels.has(scope)?sceneLevels.get(scope):(scope==='home-aquarium'?6:4);if(profile||previousLevel!==level)apply(status());}
   clock+=seconds;cool=Math.max(0,cool-seconds);
+  if(mode==='auto'){if(seconds>1/30){emergencyTime+=seconds;emergencyFrames++;}else{emergencyTime=emergencyFrames=0;}if(emergencyTime>=.8&&emergencyFrames>=8){const severe=emergencyFrames/emergencyTime<22;emergencyTime=emergencyFrames=0;if(severe&&level>0){commit(level-2,'嚴重掉幀，快速降低負載');warm=.5;return;}}}
   if(warm>0){warm-=seconds;return;}
   elapsed+=seconds;frames++;if(seconds>1/45)slow++;
   if(elapsed<2)return;
@@ -494,7 +496,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={createWaterOptics
 function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
   const T=THREE,roots=new Set(),patched=new WeakSet(),pass={value:0};
   const rt=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true});
-  const cam=new T.PerspectiveCamera(),size=new T.Vector2();cam.layers.set(1);cam.matrixAutoUpdate=false;
+  let lightScanAt=-Infinity;const cam=new T.PerspectiveCamera(),size=new T.Vector2();cam.layers.set(1);cam.matrixAutoUpdate=false;
   WU.uSubmerged={value:rt.texture};WU.uSubmergedSize={value:new T.Vector2(1,1)};WU.uSubmergedOn={value:0};
   function patch(mat){
     if(patched.has(mat))return;patched.add(mat);
@@ -532,15 +534,15 @@ function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
   function render(){
     WU.uSubmergedOn.value=0;if(!roots.size)return;
     camera.updateWorldMatrix(true,false);camera.matrixWorldInverse.copy(camera.matrixWorld).invert();cam.matrix.copy(camera.matrixWorld);cam.matrixWorld.copy(camera.matrixWorld);cam.matrixWorldInverse.copy(camera.matrixWorldInverse);cam.projectionMatrix.copy(camera.projectionMatrix);cam.projectionMatrixInverse.copy(camera.projectionMatrixInverse);cam.near=camera.near;cam.far=camera.far;
-    R.getDrawingBufferSize(size);const scale=window.__waterQuality??(window.__GFX==='low'?.5:.85),w=Math.max(64,Math.round(size.x*scale)),h=Math.max(64,Math.round(size.y*scale));
+    R.getDrawingBufferSize(size);const cap=window.__gfxStatus&&window.__gfxStatus.level===7?1536:window.__GFX==='low'?768:1024,scale=Math.min(window.__waterQuality??(window.__GFX==='low'?.5:.85),cap/Math.max(size.x,size.y)),w=Math.max(64,Math.round(size.x*scale)),h=Math.max(64,Math.round(size.y*scale));
     if(rt.width!==w||rt.height!==h)rt.setSize(w,h);WU.uSubmergedSize.value.copy(size);
-    scene.traverse(o=>{if(o.isLight)o.layers.enable(1);});
-    const target=R.getRenderTarget(),color=R.getClearColor(new T.Color()),alpha=R.getClearAlpha(),background=scene.background,tone=R.toneMapping,encoding=R.outputEncoding,shadows=R.shadowMap.autoUpdate;
+    if(U.uTime.value>=lightScanAt){scene.traverse(o=>{if(o.isLight)o.layers.enable(1);});lightScanAt=U.uTime.value+1;}
+    const target=R.getRenderTarget(),color=R.getClearColor(new T.Color()),alpha=R.getClearAlpha(),background=scene.background,tone=R.toneMapping,encoding=R.outputEncoding,shadows=R.shadowMap.autoUpdate,shadowRequest=R.shadowMap.needsUpdate;
     try{
-      pass.value=1;scene.background=null;R.toneMapping=T.NoToneMapping;R.outputEncoding=T.LinearEncoding;R.shadowMap.autoUpdate=false;
+      R.shadowMap.needsUpdate=false;pass.value=1;scene.background=null;R.toneMapping=T.NoToneMapping;R.outputEncoding=T.LinearEncoding;R.shadowMap.autoUpdate=false;
       R.setRenderTarget(rt);R.setClearColor(0,0);R.clear();R.render(scene,cam);WU.uSubmergedOn.value=1;
     }finally{
-      pass.value=0;R.setRenderTarget(target);R.setClearColor(color,alpha);scene.background=background;R.toneMapping=tone;R.outputEncoding=encoding;R.shadowMap.autoUpdate=shadows;
+      pass.value=0;R.setRenderTarget(target);R.setClearColor(color,alpha);scene.background=background;R.toneMapping=tone;R.outputEncoding=encoding;R.shadowMap.autoUpdate=shadows;R.shadowMap.needsUpdate=shadowRequest;
     }
   }
   return{add,remove,render,pass,target:rt};
@@ -635,6 +637,21 @@ vec3 probeHDR(sampler2D image,vec3 d){vec2 uv=vec2(fract(atan(d.x,-d.z)*0.159154
  col=hdr*clamp(col/max(rawPhoto,vec3(0.004)),vec3(0.0),vec3(2.0));
  }
  gl_FragColor=vec4(col,1.0);`);}
+/* One capture face per frame, with convolution deferred to its own frame. */
+function createProgressiveEnvironment(T,R,scene,onReady){
+ const pmrem=new T.PMREMGenerator(R),cube=new T.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter,type:R.capabilities.isWebGL2&&R.extensions.has('EXT_color_buffer_float')?T.HalfFloatType:T.UnsignedByteType}),camera=new T.CubeCamera(.1,100,cube);let pending=false,face=-1,ready=false,failed=false;
+ function update(frameSeconds){
+  if(failed||face<0&&!pending)return false;if(ready&&frameSeconds>1/20)return false;
+  if(face<0){face=0;pending=false;camera.updateMatrixWorld(true);}
+  const target=R.getRenderTarget(),viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest(),auto=R.shadowMap.autoUpdate,request=R.shadowMap.needsUpdate,xr=R.xr&&R.xr.enabled;
+  try{R.shadowMap.autoUpdate=false;R.shadowMap.needsUpdate=false;R.setScissorTest(false);if(R.xr)R.xr.enabled=false;
+   if(face<6){cube.texture.generateMipmaps=face===5;R.setRenderTarget(cube,face);R.render(scene,camera.children[face]);face++;}
+   else{const rt=pmrem.fromCubemap(cube.texture);onReady(rt);ready=true;face=-1;}
+   return true;
+  }catch(e){failed=true;face=-1;pending=false;console.warn('Environment capture paused after a rendering failure',e);return false;}finally{if(R.xr)R.xr.enabled=xr;R.shadowMap.autoUpdate=auto;R.shadowMap.needsUpdate=request;R.setRenderTarget(target);R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);}
+ }
+ return{request(){pending=true;},update};
+}
 /* Tangent-space normals describe surface detail; they do not replace lighting or IBL. */
 function createDetailNormals(T){
  const n=256,out={};
@@ -654,19 +671,25 @@ function auditSceneLighting(scene){
 }
 /* A local cabin probe captures actual walls/furniture/lights, not a studio-light overlay. */
 function createInteriorReflection(T,R){
- const pmrem=new T.PMREMGenerator(R),cube=new T.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter,type:R.capabilities.isWebGL2&&R.extensions.has('EXT_color_buffer_float')?T.HalfFloatType:T.UnsignedByteType}),camera=new T.CubeCamera(.08,40,cube),records=new WeakMap();let failed=false;
+ const pmrem=new T.PMREMGenerator(R),cube=new T.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter,type:R.capabilities.isWebGL2&&R.extensions.has('EXT_color_buffer_float')?T.HalfFloatType:T.UnsignedByteType}),camera=new T.CubeCamera(.08,40,cube),records=new WeakMap();let failed=false,work=null;
  function update(scene,position,outdoor,time){
   const level=typeof window!=='undefined'&&window.__gfxStatus?window.__gfxStatus.level:4;let rec=records.get(scene);
   if(failed||level<3){scene.environment=outdoor;return;}
-  if(rec&&time-rec.time<10){scene.environment=rec.rt.texture;return;}
-  const target=R.getRenderTarget(),viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest(),shadow=R.shadowMap.autoUpdate,oldEnv=scene.environment;
-  try{scene.environment=outdoor;R.shadowMap.autoUpdate=false;R.setScissorTest(false);camera.position.copy(position);camera.updateMatrixWorld(true);camera.update(R,scene);const rt=pmrem.fromCubemap(cube.texture);records.set(scene,{rt,time});scene.environment=rt.texture;if(rec)rec.rt.dispose();}
+  scene.environment=rec?rec.rt.texture:outdoor;
+  if(rec&&time-rec.time<30)return;
+  if(typeof window!=='undefined'&&window.__frameSeconds>1/30)return;
+  if(!work||work.scene!==scene){work={scene,face:0};camera.position.copy(position);camera.updateMatrixWorld(true);}
+  const target=R.getRenderTarget(),viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest(),shadow=R.shadowMap.autoUpdate,request=R.shadowMap.needsUpdate,oldEnv=scene.environment,xr=R.xr&&R.xr.enabled;
+  try{scene.environment=outdoor;R.shadowMap.autoUpdate=false;R.shadowMap.needsUpdate=false;R.setScissorTest(false);if(R.xr)R.xr.enabled=false;
+   if(work.face<6){const face=work.face++;cube.texture.generateMipmaps=face===5;R.setRenderTarget(cube,face);R.render(scene,camera.children[face]);scene.environment=rec?rec.rt.texture:outdoor;}
+   else{const rt=pmrem.fromCubemap(cube.texture);records.set(scene,{rt,time});scene.environment=rt.texture;if(rec)rec.rt.dispose();work=null;}
+  }
   catch(e){failed=true;scene.environment=outdoor||oldEnv;console.warn('Interior reflection probe unavailable',e);}
-  finally{R.shadowMap.autoUpdate=shadow;R.setRenderTarget(target);R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);}
+  finally{if(R.xr)R.xr.enabled=xr;R.shadowMap.needsUpdate=request;R.shadowMap.autoUpdate=shadow;R.setRenderTarget(target);R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);}
  }
  return{update};
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={photoProbeFragment,createDetailNormals,auditSceneLighting,createInteriorReflection};
+if(typeof module!=='undefined'&&module.exports)module.exports={createProgressiveEnvironment,photoProbeFragment,createDetailNormals,auditSceneLighting,createInteriorReflection};
 /* Material assignments follow the yacht asset's named parts, not average pixel color. */
 const MARINE_PARTS={
  material_3:'teak',material_5:'navy',material_40:'navy',material_1:'gelcoat',material_33:'gelcoat',material_42:'steel',material_7:'steel',material_2:'steel',material_4:'steel',material_35:'steel',material_17:'fabric',material_8:'leather'
@@ -739,13 +762,13 @@ function createSceneRadiance(T,R){
  let pass=null,failed=false,sizeKey='',sceneKey=null,selected=[];
  const cache=new WeakMap(),normalMaterials=new Set(),size=new T.Vector2();
  const supported=!!(T.SSRPass&&R.extensions&&(R.capabilities.isWebGL2?R.extensions.has('EXT_color_buffer_float'):R.extensions.has('WEBGL_depth_texture')&&R.extensions.has('EXT_color_buffer_half_float')));
- let auditAt=0;
+ let auditAt=0,selectAt=0;
  const status={supported,active:false,technique:'screen-space ray marching',reason:''};
  function auxiliary(scene,camera,target,mask){
   const backup=[],oldOverride=scene.overrideMaterial,bg=scene.background,oldShadow=R.shadowMap.autoUpdate,chosen=new Set(selected);
   try{
    scene.overrideMaterial=null;scene.background=null;R.shadowMap.autoUpdate=false;
-   scene.traverse(o=>{if(!o.visible||!o.material)return;const original=o.material,mats=Array.isArray(original)?original:[original];
+   scene.traverseVisible(o=>{if(!o.material)return;const original=o.material,mats=Array.isArray(original)?original:[original];
     backup.push([o,original,o.visible]);
     if(!o.isMesh||mats.some(m=>!m||(m.isShaderMaterial||m.isRawShaderMaterial)||m.alphaTest>0||(m.transparent&&(m.opacity<.85||!m.depthWrite)))){o.visible=false;return;}
     o.material=mask?(chosen.has(o)?pass.metalnessOnMaterial:pass.metalnessOffMaterial):mats.map(m=>{
@@ -757,7 +780,7 @@ function createSceneRadiance(T,R){
   }finally{for(const [o,m,v]of backup){o.material=m;o.visible=v;}scene.overrideMaterial=oldOverride;scene.background=bg;R.shadowMap.autoUpdate=oldShadow;}
  }
  function render(scene,camera){
-  const now=typeof performance!=='undefined'?performance.now():Date.now();if(now>=auditAt&&typeof auditSceneLighting==='function'){auditAt=now+2000;const report=auditSceneLighting(scene);report.ssrActive=status.active;if(typeof window!=='undefined')window.__materialLightingAudit=report;}
+  const now=typeof performance!=='undefined'?performance.now():Date.now();if(now>=auditAt&&typeof auditSceneLighting==='function'&&typeof document!=='undefined'&&document.getElementById('gfxLive')){auditAt=now+5000;const report=auditSceneLighting(scene);report.ssrActive=status.active;if(typeof window!=='undefined')window.__materialLightingAudit=report;}
   status.active=false;const high=typeof window!=='undefined'&&window.__gfxStatus&&window.__gfxStatus.level===7;
   if(!supported||failed||!high){status.reason=!supported?'device unsupported':failed?'render fallback':'below highest quality';R.render(scene,camera);return;}
   const target=R.getRenderTarget(),color=R.getClearColor(new T.Color()).clone(),alpha=R.getClearAlpha(),auto=R.autoClear,viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest();
@@ -767,8 +790,7 @@ function createSceneRadiance(T,R){
    }
    pass.scene=scene;pass.camera=camera;R.getDrawingBufferSize(size);const key=size.x+'x'+size.y,scale=Math.min(.5,768/Math.max(size.x,size.y));
    if(key!==sizeKey){pass.setSize(Math.max(2,Math.round(size.x*scale)),Math.max(2,Math.round(size.y*scale)));pass.beautyRenderTarget.setSize(size.x,size.y);pass.ssrMaterial.defines.MAX_STEP=64;pass.ssrMaterial.needsUpdate=true;sizeKey=key;}
-   const next=[];scene.traverseVisible(o=>{if(o.isMesh&&(Array.isArray(o.material)?o.material:[o.material]).some(radianceReflector))next.push(o);});
-   if(sceneKey!==scene||next.length!==selected.length||next.some((o,i)=>o!==selected[i])){selected=next;pass.selects=selected;sceneKey=scene;}
+   if(sceneKey!==scene||now>=selectAt){const next=[];scene.traverseVisible(o=>{if(o.isMesh&&(Array.isArray(o.material)?o.material:[o.material]).some(radianceReflector))next.push(o);});if(sceneKey!==scene||next.length!==selected.length||next.some((o,i)=>o!==selected[i])){selected=next;pass.selects=selected;}sceneKey=scene;selectAt=now+500;}
    const u=pass.ssrMaterial.uniforms;u.cameraNear.value=camera.near;u.cameraFar.value=camera.far;u.cameraProjectionMatrix.value.copy(camera.projectionMatrix);u.cameraInverseProjectionMatrix.value.copy(camera.projectionMatrixInverse);
    R.setScissorTest(false);pass.render(R,null);status.active=true;status.reason='highest quality';
   }catch(e){failed=true;status.reason='render fallback';console.warn('SSR unavailable; retaining PBR lighting and planar water',e);R.setRenderTarget(target);R.setClearColor(color,alpha);R.autoClear=auto;R.render(scene,camera);
@@ -1327,11 +1349,11 @@ function qualityTextures(root){const max=renderer.capabilities.getMaxAnisotropy(
 let waterDetail='mid';function setWaterDetail(q){if(q===waterDetail)return;let [rings,segments]=waterDetailSettings(q);if(rings*segments>65535&&!renderer.capabilities.isWebGL2&&!renderer.extensions.get('OES_element_index_uint'))[rings,segments]=waterDetailSettings('high');const old=seaGrid.geometry;seaGrid.geometry=makeWaterGrid(T,150,rings,segments);old.dispose();waterDetail=q;}
 
 // 環境光照貼圖（由同一套天空/樹林產生）
-const pmrem = new T.PMREMGenerator(renderer);
 const envScene = new T.Scene();Object.assign(U,{uRadianceA:{value:null},uRadianceB:{value:null},uRadianceReady:{value:0}});
 envScene.add(new T.Mesh(new T.SphereGeometry(40,32,16), new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:photoProbeFragment(SH), side:T.BackSide, depthWrite:false, depthTest:false})));
 let envRT = null, envHour = -99;
-function regenEnv(){ const rt = pmrem.fromScene(envScene, 0, 0.1, 100); if(envRT) envRT.dispose(); envRT = rt; scene.environment = rt.texture; }
+const envJobs=createProgressiveEnvironment(T,renderer,envScene,rt=>{const old=envRT;envRT=rt;scene.environment=rt.texture;if(old)old.dispose();});
+function regenEnv(){envJobs.request();}
 
 const lin = hex => { const c = new T.Color(hex).convertSRGBToLinear(); return new T.Vector3(c.r,c.g,c.b); };
 const KEYS = [
@@ -1414,7 +1436,7 @@ function swell(x,z,t){return sampleWater(x,z,t,U.uWind.value,seaMode).height;}
 
 function update(dt, t){
   {const target=new T.Vector3();camera.getWorldPosition(target);target.y=0;sunLight.target.position.copy(target);sunLight.position.copy(target).addScaledVector(U.uSunDir.value,60);sunLight.target.updateMatrixWorld();}
-  optics.update();U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
+  envJobs.update(window.__frameSeconds||dt);optics.update();U.uTime.value = t; camera.getWorldPosition(U.uEye.value); U.uLightK.value = Math.min(1, Math.max(0, info.light));
   if(seaGrid.visible) seaGrid.position.set(U.uEye.value.x,0,U.uEye.value.z);
   { const w=U.uWind.value, k=(.002+.01*w.z)*dt; U.uCloudOff.value.x+=w.x*k; U.uCloudOff.value.y+=w.y*k; }
   for(let i=0;i<12;i++){ const r = ripS[i]; r.age += dt; rip[i].set(r.x, r.z, r.age, r.age < 5 ? r.amp : 0); }
@@ -1433,7 +1455,7 @@ function setRefl(on,scale){ reflEnabled=on; if(scale) reflScale=scale; WU.uReflO
 function renderRefl(){
   camera.updateMatrixWorld(); _cp.setFromMatrixPosition(camera.matrixWorld);
   if(_cp.y<.05){ WU.uReflOn.value=0; return; }
-  renderer.getDrawingBufferSize(_sz); const w=Math.max(64,Math.round(_sz.x*reflScale)), h=Math.max(64,Math.round(_sz.y*reflScale));
+  renderer.getDrawingBufferSize(_sz); const cap=window.__gfxStatus&&window.__gfxStatus.level===7?1536:window.__GFX==='high'?1024:640,k=Math.min(reflScale,cap/Math.max(_sz.x,_sz.y)),w=Math.max(64,Math.round(_sz.x*k)), h=Math.max(64,Math.round(_sz.y*k));
   if(reflRT.width!==w||reflRT.height!==h) reflRT.setSize(w,h);
   _rp.set(_cp.x,0,_cp.z); _vw.subVectors(_rp,_cp).reflect(_n).negate().add(_rp);
   _rm.extractRotation(camera.matrixWorld); _la.set(0,0,-1).applyMatrix4(_rm).add(_cp);
@@ -1447,6 +1469,7 @@ function renderRefl(){
   _q.x=(Math.sign(_cpl.x)+pm.elements[8])/pm.elements[0]; _q.y=(Math.sign(_cpl.y)+pm.elements[9])/pm.elements[5]; _q.z=-1; _q.w=(1+pm.elements[10])/pm.elements[14];
   _cpl.multiplyScalar(2/_cpl.dot(_q)); pm.elements[2]=_cpl.x; pm.elements[6]=_cpl.y; pm.elements[10]=_cpl.z+1-.003; pm.elements[14]=_cpl.w;
   const hid=[water,seaGrid,sky,...reflHide].filter(o=>o&&o.visible); hid.forEach(o=>o.visible=false);
+  const requestedShadow=renderer.shadowMap.needsUpdate;renderer.shadowMap.needsUpdate=false;
   const oc=renderer.getClearColor(new T.Color()), oa=renderer.getClearAlpha(), ort=renderer.getRenderTarget(), bg=scene.background, sh=renderer.shadowMap.autoUpdate, tone=renderer.toneMapping, encoding=renderer.outputEncoding;
   scene.background=null; renderer.shadowMap.autoUpdate=false;
   try{
@@ -1456,14 +1479,18 @@ function renderRefl(){
     WU.uReflOn.value=1;
   }finally{
     renderer.setRenderTarget(ort);renderer.setClearColor(oc,oa);scene.background=bg;renderer.shadowMap.autoUpdate=sh;
-    renderer.toneMapping=tone;renderer.outputEncoding=encoding;hid.forEach(o=>o.visible=true);
+    renderer.shadowMap.needsUpdate=requestedShadow;renderer.toneMapping=tone;renderer.outputEncoding=encoding;hid.forEach(o=>o.visible=true);
   }
 }
 
 const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
-const radiance=createSceneRadiance(T,renderer),interiorReflection=createInteriorReflection(T,renderer);
-function render(){ submerged.render(); if(reflEnabled){ try{ renderRefl(); }catch(e){ reflEnabled=false; WU.uReflOn.value=0; console.warn('refl off',e); } } radiance.render(scene, camera); }
+const radiance=createSceneRadiance(T,renderer),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
+function render(){const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
+ try{const now=U.uTime.value,hz=window.__gfxStatus&&window.__gfxStatus.level===7?30:20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz;if(renderer.shadowMap.needsUpdate)lastShadow=now;
+  submerged.render();if(reflEnabled){try{renderRefl();}catch(e){reflEnabled=false;WU.uReflOn.value=0;console.warn('refl off',e);}}radiance.render(scene,camera);
+ }finally{renderer.shadowMap.autoUpdate=auto;renderer.shadowMap.needsUpdate=request;}
+}
 
 function setIce(on){water.visible=!on;seaGrid.visible=!on;}
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=water.visible; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
@@ -6437,7 +6464,8 @@ function enter(){ on=true; merArtSync(); yaw=yawT=0; pitch=pitchT=-.08; vb=0; pR
 function exit(){ on=false; drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
-function render(dt){t+=dt;W.interiorReflection.update(scene,new T.Vector3(0,1.6,0),W.scene.environment,t); yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
+const reflectionAnchor=new T.Vector3(0,1.6,0);let lastHomeShadow=-Infinity;
+function render(dt){t+=dt;W.interiorReflection.update(scene,reflectionAnchor,W.scene.environment,t); yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
   vb+=((mode!=='room'&&mode!=='act'?1:0)-vb)*Math.min(1,dt*4); dYaw+=(dYawT-dYaw)*Math.min(1,dt*6); dPitch+=(dPitchT-dPitch)*Math.min(1,dt*6);
   // 在房間裡用搖桿走動：前進／後退、左右轉；不能走進水族箱、壁爐和牆
   if(mode==='room'&&c.joy){ const j=c.joy(); if(Math.abs(j.thr)>.05||Math.abs(j.turn)>.05){ yawT-=j.turn*dt*1.7; const sp=1.3*j.thr*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw); let nx=pRoom.x+fx*sp, nz=pRoom.z+fz*sp;
@@ -6473,11 +6501,11 @@ function render(dt){t+=dt;W.interiorReflection.update(scene,new T.Vector3(0,1.6,
   sparkles.forEach(q=>{ const k=Math.max(0,Math.sin(t*1.7+q.ph)); q.sp.material.opacity=Math.pow(k,8); q.sp.scale.setScalar(.03+.05*Math.pow(k,4)); if(k<.02&&Math.random()<.02) q.sp.position.set((Math.random()-.5)*1.5,(Math.random()-.5)*1.2,.0); });   // 水晶閃光
   updTanks(dt);for(const k of ['fresh','sea'])if(tanks[k]&&tanks[k].optics)tanks[k].optics.update();
   const shadowSize=window.__gfxStatus&&window.__gfxStatus.shadow==='ultra'?4096:window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
-  const exposure=R.toneMappingExposure,shadows=R.shadowMap.enabled,shadowType=R.shadowMap.type;
+  const exposure=R.toneMappingExposure,shadows=R.shadowMap.enabled,shadowType=R.shadowMap.type,shadowAuto=R.shadowMap.autoUpdate,shadowRequest=R.shadowMap.needsUpdate;
   try{
-    R.toneMappingExposure=.88;R.shadowMap.enabled=window.__GFX!=='low';R.shadowMap.type=T.PCFSoftShadowMap;
+    R.shadowMap.autoUpdate=false;R.shadowMap.needsUpdate=t-lastHomeShadow>=.05||!sun.shadow.map;if(R.shadowMap.needsUpdate)lastHomeShadow=t;R.toneMappingExposure=.88;R.shadowMap.enabled=window.__GFX!=='low';R.shadowMap.type=T.PCFSoftShadowMap;
     R.setRenderTarget(null);W.radiance.render(scene,cam);
-  }finally{R.toneMappingExposure=exposure;R.shadowMap.enabled=shadows;R.shadowMap.type=shadowType;}
+  }finally{R.toneMappingExposure=exposure;R.shadowMap.enabled=shadows;R.shadowMap.type=shadowType;R.shadowMap.autoUpdate=shadowAuto;R.shadowMap.needsUpdate=shadowRequest;}
 }
 window.addEventListener('resize',()=>{ if(on) resize(); });
 return {enter,exit,render,active:()=>on,qualityScope:()=>mode==='view'||mode==='dive'?'home-aquarium':'home',scene,cam,grill:()=>pickFish(),grillSet:(a,b,f)=>{ if(!GR.on) return; GR.a=a; GR.b=b; if(f!=null){ GR.face=f; spin.rotation.z=f*Math.PI; } }};
@@ -6797,7 +6825,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101002549'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101004316'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9384,7 +9412,7 @@ dockCameraButton($('bCam'),$('cameraSlot'),$('top'));
 const screenCapture=createScreenCapture({canvas:W.renderer.domElement,button:$('bCam'),report:(m,k)=>toast(m,k,2200),onCaptured:scene=>SEA.recordPhoto(scene),scene:()=>TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':END.on()?'ending':G.loc||'lake'});
 let last=performance.now();
 function frame(now){
-  const frameSeconds=Math.max(0,(now-last)/1000),dt=Math.min(.05,frameSeconds);last=now;
+  const frameSeconds=Math.max(0,(now-last)/1000),dt=Math.min(.05,frameSeconds);last=now;window.__frameSeconds=frameSeconds;
   try{ window.__UWON=UW.active(); update(dt); merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){ console.error(e); }
   screenCapture.afterFrame();
   gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?HOME3D.qualityScope():UW.active()?'underwater':G.loc||'lake'});

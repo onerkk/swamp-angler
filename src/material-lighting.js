@@ -8,6 +8,21 @@ vec3 probeHDR(sampler2D image,vec3 d){vec2 uv=vec2(fract(atan(d.x,-d.z)*0.159154
  col=hdr*clamp(col/max(rawPhoto,vec3(0.004)),vec3(0.0),vec3(2.0));
  }
  gl_FragColor=vec4(col,1.0);`);}
+/* One capture face per frame, with convolution deferred to its own frame. */
+function createProgressiveEnvironment(T,R,scene,onReady){
+ const pmrem=new T.PMREMGenerator(R),cube=new T.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter,type:R.capabilities.isWebGL2&&R.extensions.has('EXT_color_buffer_float')?T.HalfFloatType:T.UnsignedByteType}),camera=new T.CubeCamera(.1,100,cube);let pending=false,face=-1,ready=false,failed=false;
+ function update(frameSeconds){
+  if(failed||face<0&&!pending)return false;if(ready&&frameSeconds>1/20)return false;
+  if(face<0){face=0;pending=false;camera.updateMatrixWorld(true);}
+  const target=R.getRenderTarget(),viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest(),auto=R.shadowMap.autoUpdate,request=R.shadowMap.needsUpdate,xr=R.xr&&R.xr.enabled;
+  try{R.shadowMap.autoUpdate=false;R.shadowMap.needsUpdate=false;R.setScissorTest(false);if(R.xr)R.xr.enabled=false;
+   if(face<6){cube.texture.generateMipmaps=face===5;R.setRenderTarget(cube,face);R.render(scene,camera.children[face]);face++;}
+   else{const rt=pmrem.fromCubemap(cube.texture);onReady(rt);ready=true;face=-1;}
+   return true;
+  }catch(e){failed=true;face=-1;pending=false;console.warn('Environment capture paused after a rendering failure',e);return false;}finally{if(R.xr)R.xr.enabled=xr;R.shadowMap.autoUpdate=auto;R.shadowMap.needsUpdate=request;R.setRenderTarget(target);R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);}
+ }
+ return{request(){pending=true;},update};
+}
 /* Tangent-space normals describe surface detail; they do not replace lighting or IBL. */
 function createDetailNormals(T){
  const n=256,out={};
@@ -27,16 +42,22 @@ function auditSceneLighting(scene){
 }
 /* A local cabin probe captures actual walls/furniture/lights, not a studio-light overlay. */
 function createInteriorReflection(T,R){
- const pmrem=new T.PMREMGenerator(R),cube=new T.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter,type:R.capabilities.isWebGL2&&R.extensions.has('EXT_color_buffer_float')?T.HalfFloatType:T.UnsignedByteType}),camera=new T.CubeCamera(.08,40,cube),records=new WeakMap();let failed=false;
+ const pmrem=new T.PMREMGenerator(R),cube=new T.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter,type:R.capabilities.isWebGL2&&R.extensions.has('EXT_color_buffer_float')?T.HalfFloatType:T.UnsignedByteType}),camera=new T.CubeCamera(.08,40,cube),records=new WeakMap();let failed=false,work=null;
  function update(scene,position,outdoor,time){
   const level=typeof window!=='undefined'&&window.__gfxStatus?window.__gfxStatus.level:4;let rec=records.get(scene);
   if(failed||level<3){scene.environment=outdoor;return;}
-  if(rec&&time-rec.time<10){scene.environment=rec.rt.texture;return;}
-  const target=R.getRenderTarget(),viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest(),shadow=R.shadowMap.autoUpdate,oldEnv=scene.environment;
-  try{scene.environment=outdoor;R.shadowMap.autoUpdate=false;R.setScissorTest(false);camera.position.copy(position);camera.updateMatrixWorld(true);camera.update(R,scene);const rt=pmrem.fromCubemap(cube.texture);records.set(scene,{rt,time});scene.environment=rt.texture;if(rec)rec.rt.dispose();}
+  scene.environment=rec?rec.rt.texture:outdoor;
+  if(rec&&time-rec.time<30)return;
+  if(typeof window!=='undefined'&&window.__frameSeconds>1/30)return;
+  if(!work||work.scene!==scene){work={scene,face:0};camera.position.copy(position);camera.updateMatrixWorld(true);}
+  const target=R.getRenderTarget(),viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest(),shadow=R.shadowMap.autoUpdate,request=R.shadowMap.needsUpdate,oldEnv=scene.environment,xr=R.xr&&R.xr.enabled;
+  try{scene.environment=outdoor;R.shadowMap.autoUpdate=false;R.shadowMap.needsUpdate=false;R.setScissorTest(false);if(R.xr)R.xr.enabled=false;
+   if(work.face<6){const face=work.face++;cube.texture.generateMipmaps=face===5;R.setRenderTarget(cube,face);R.render(scene,camera.children[face]);scene.environment=rec?rec.rt.texture:outdoor;}
+   else{const rt=pmrem.fromCubemap(cube.texture);records.set(scene,{rt,time});scene.environment=rt.texture;if(rec)rec.rt.dispose();work=null;}
+  }
   catch(e){failed=true;scene.environment=outdoor||oldEnv;console.warn('Interior reflection probe unavailable',e);}
-  finally{R.shadowMap.autoUpdate=shadow;R.setRenderTarget(target);R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);}
+  finally{if(R.xr)R.xr.enabled=xr;R.shadowMap.needsUpdate=request;R.shadowMap.autoUpdate=shadow;R.setRenderTarget(target);R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);}
  }
  return{update};
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={photoProbeFragment,createDetailNormals,auditSceneLighting,createInteriorReflection};
+if(typeof module!=='undefined'&&module.exports)module.exports={createProgressiveEnvironment,photoProbeFragment,createDetailNormals,auditSceneLighting,createInteriorReflection};

@@ -4,7 +4,7 @@ test('aquarium resolution recovers on entry and still adapts to actual FPS',()=>
  const applied=[],controller=createAdaptiveGraphics({cap:()=>2.75,apply:s=>applied.push(s),profile:aquariumGraphicsProfile});controller.configure('auto');
  const run=(fps,seconds,scene)=>{for(let i=0;i<fps*seconds;i++)controller.sample(1/fps,{scene});};
  run(10,25,'lake');assert(controller.status().pr<1);controller.sample(1/60,{scene:'home-aquarium'});assert.equal(controller.status().pr,2.75);
- run(15,25,'home-aquarium');assert.equal(controller.status().level,0);assert(controller.status().pr>=1.15);run(90,140,'home-aquarium');assert.equal(controller.status().level,7);
+ run(15,25,'home-aquarium');assert.equal(controller.status().level,0);assert(controller.status().pr<1,'severe aquarium lag must be allowed below one pixel per CSS pixel');run(90,140,'home-aquarium');assert.equal(controller.status().level,7);
  controller.configure('low');assert(controller.status().pr<1,'manual low must remain available');
 });
 test('plant instancing reduces repeated draw objects while preserving geometry and wind poses',()=>{

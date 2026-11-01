@@ -40,3 +40,6 @@ test('actual crocodile model dimensions are aligned to the waterline rather than
  const f=fs.readFileSync(require.resolve('../src/f.js'),'utf8'),start=f.indexOf('function placeGator('),end=f.indexOf('\nfunction ',start+1);vm.runInContext(f.slice(start,end),ctx);ctx.placeGator({x:2,z:-6},.4);host.updateMatrixWorld(true);
  const box=new T.Box3().setFromObject(host);assert(Math.abs(box.max.y-(.12+.035))<1e-5);assert(box.min.y<-.3);assert.equal(ctx.mixers.length,0);
 });
+test('underwater effects cap offscreen pixels on high-DPR phones and preserve a main shadow refresh request',()=>{
+ const {W,R}=fixture();window.__gfxStatus={level:7};window.__waterQuality=1;R.getDrawingBufferSize=v=>v.set(2304,4992);R.shadowMap.needsUpdate=true;const mesh=new T.Mesh(new T.BoxGeometry(),new T.MeshStandardMaterial());W.scene.add(mesh);W.submerged.add(mesh);R.render=()=>{assert.equal(R.shadowMap.needsUpdate,false);};W.submerged.render();const rt=W.submerged.target;assert.equal(rt.height,1536);assert(rt.width*rt.height<2304*4992*.1);assert.equal(R.shadowMap.needsUpdate,true);delete window.__gfxStatus;delete window.__waterQuality;
+});

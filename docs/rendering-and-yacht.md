@@ -34,3 +34,13 @@ Tackle carbon, brushed gold/steel and grips now have actual linear tangent-space
 `window.__materialLightingAudit` distinguishes the active scene's visible meshes, unique lit materials, normal-mapped, bump-mapped and smooth materials, custom shaders/unlit surfaces, and metals missing an environment. The graphics status displays actual mapped-material counts. These are runtime scene counts, not a fabricated all-assets percentage.
 
 Additional validation: `python tests/check-metal-gpu.py` renders the actual Three r128 metallic BRDF against black/bright CubeUV environments. Gold must darken without illumination, reflect the bright environment, and preserve gold spectral coloration. Regression tests exercise the actual photo-sky `setTime` function and local room probe lifecycle.
+
+## Frame pacing (2026-11-01)
+
+Sky and room environment captures now draw one cube face per frame, with PMREM filtering on a separate seventh frame. Repeated sky invalidations are coalesced. Room probes reuse their completed map for at least 30 seconds and defer refresh on slow frames; an incomplete capture never replaces the completed reflection. Renderer, XR and shadow-update state are restored after each job.
+
+Water reflection and underwater transmission targets have independent long-edge caps (1536 at highest, smaller at other levels), rather than inheriting the entire high-DPR framebuffer. This reduces offscreen pixel workload; it is not a measured phone-FPS gain. Main framebuffer resolution and source textures are still governed by the normal graphics profiles. Main-world shadows update at 20 Hz (30 Hz at highest), cabin shadows at 20 Hz; auxiliary passes reuse those maps without consuming the main camera's refresh request. Underwater light-layer discovery is throttled to once per second.
+
+SSR reflector discovery is cached for 500 ms; diagnostic material scans run only with the graphics settings present, at most once per five seconds. Normal and mask passes retain their required per-frame work. There is no reuse of a stale full-screen screenshot during camera motion.
+
+Adaptive graphics remembers levels per scene for the current session. Sustained <22 FPS is handled during warmup after at least eight slow frames and 0.8 seconds; a few isolated stalls do not trigger that path. The aquarium's resolution floor relaxes at low levels so that severe lag can actually reduce its pixel load. Stable frame rates can still recover to the highest tier, and manual modes remain fixed.

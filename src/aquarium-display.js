@@ -1,7 +1,7 @@
 /* The aquarium is a close-up exhibit: keep texture detail and reduce repeated draw calls. */
 function aquariumGraphicsProfile(profile,scope,cap){
  if(scope!=='home-aquarium'||profile.mode!=='auto')return profile;
- return{...profile,pr:Math.min(cap,Math.max(1.15,profile.pr))};
+ return{...profile,pr:Math.min(cap,Math.max(Math.min(1.15,.65+profile.level*.12),profile.pr))};
 }
 function createAquariumPlantBatch(T,parent,plants){
  const batches=[],matrix=new T.Matrix4();let entries=[],disposed=false;
