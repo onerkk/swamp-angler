@@ -404,6 +404,7 @@ function render(){
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
     h+='<div class="note">魚訊放大視窗（自動：休閒、標準開，硬派、專家關）</div><div class="tabs">'+[['auto','自動'],['on','開'],['off','關']].map(m=>`<button class="tab${(save.mag||'auto')===m[0]?' on':''}" data-a="mag" data-v="${m[0]}">${m[1]}</button>`).join('')+'</div>';
     const tg=(k,name,sub,onv)=>row(name,sub,`<button class="sbtn${onv?' pri':''}" data-a="tg" data-v="${k}">${onv?'開':'關'}</button>`);
+    h+=tg('fps','顯示 FPS','左下角顯示實際遊戲幀率與最長幀耗時，每半秒更新',save.fps!==false);
     h+=tg('sound','音效','環境聲、捲線器、水花',Snd.isOn());
     h+=tg('vibe','震動','咬餌、拉扯時的手機震動',save.vibe!==false);
     { const st=window.__CLOUD?window.__CLOUD.status():{state:'nocfg'};
@@ -585,7 +586,7 @@ shB.addEventListener('click',e=>{
   else if(a==='tide'){ close(); if(window.__goTide) window.__goTide(); return; }
   else if(a==='home'){ close(); if(window.__goHome) window.__goHome(); return; }
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
-  else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
+  else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else if(v==='fps'){save.fps=save.fps===false;if(window.__setFPSVisible)window.__setFPSVisible(save.fps);} else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
   else if(a==='shop'){ if(window.__SHOP) window.__SHOP(); }
   else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else if(v==='rescue') window.__CLOUD.rescue(); else if(v==='comp') window.__CLOUD.compensate(); else if(v==='copy') window.__CLOUD.copyMain(); else window.__CLOUD.logout(); }

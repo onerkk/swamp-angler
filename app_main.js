@@ -1,4 +1,4 @@
-/*APPV:20261101061534*/
+/*APPV:20261101093913*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -297,11 +297,11 @@ function drawCaptureUI(ctx,root,{width,height,canvas,button,style=getComputedSty
   }ctx.restore();
  }visit(root);return count;
 }
-function createScreenCapture({canvas,button,report=()=>{},onCaptured=()=>{},scene=()=>'',drawUI=drawCaptureUI,diagnostics=()=>window.__DIAG,save=()=>{},now=()=>performance.now(),encodeTimeout=12000}){
+function createScreenCapture({canvas,button,report=()=>{},onCaptured=()=>{},captureState=()=>null,scene=()=>'',drawUI=drawCaptureUI,diagnostics=()=>window.__DIAG,save=()=>{},now=()=>performance.now(),encodeTimeout=12000}){
  let pending=null,busy=false,preview=null,image=null,objectURL=null,cancelled=false;const label=button.textContent||'📷';
  const action=(phase,detail)=>diagnostics()?.action('photo',phase,detail);
  function releasePreview(){if(preview){preview.remove();preview=null;}if(objectURL){URL.revokeObjectURL(objectURL);objectURL=null;}}
- function offer(blob,scope){releasePreview();objectURL=URL.createObjectURL(blob);preview=document.createElement('div');preview.setAttribute('data-screenshot-ignore','');preview.setAttribute('data-photo-preview','');for(const type of['pointerdown','pointerup','click'])preview.addEventListener(type,e=>e.stopPropagation());preview.style.cssText='position:fixed;inset:0;z-index:180;background:rgba(4,13,17,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;color:white';
+ function offer(blob,scope,context){releasePreview();objectURL=URL.createObjectURL(blob);preview=document.createElement('div');preview.setAttribute('data-screenshot-ignore','');preview.setAttribute('data-photo-preview','');for(const type of['pointerdown','pointerup','click'])preview.addEventListener(type,e=>e.stopPropagation());preview.style.cssText='position:fixed;inset:0;z-index:180;background:rgba(4,13,17,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;color:white';
   const photo=document.createElement('img');photo.src=objectURL;photo.alt='剛拍好的遊戲截圖';photo.style.cssText='max-width:100%;max-height:72vh;object-fit:contain';preview.appendChild(photo);
   const message=document.createElement('div');message.textContent='照片已拍好，選擇儲存或分享。';preview.appendChild(message);const controls=document.createElement('div');controls.style.cssText='display:flex;gap:12px';preview.appendChild(controls);
   function control(text,fn){const b=document.createElement('button');b.textContent=text;b.style.cssText='border:0;border-radius:20px;padding:12px 18px;font:600 16px sans-serif;background:#efc04c;color:#102c2b';b.onclick=fn;controls.appendChild(b);return b;}
@@ -309,15 +309,15 @@ function createScreenCapture({canvas,button,report=()=>{},onCaptured=()=>{},scen
     if(file&&navigator.canShare?.({files:[file]})&&navigator.share){action('sharing');await navigator.share({files:[file],title:'濕地垂釣'});action('done','share returned');message.textContent='分享已完成';}
     else{const a=document.createElement('a');a.href=objectURL;a.download='濕地垂釣_'+Date.now()+'.jpg';a.target='_blank';a.rel='noopener';document.body.appendChild(a);action('export','user initiated, separate target');a.click();a.remove();action('done','download requested');message.textContent='已送出，若開啟圖片預覽，請長按圖片儲存。';}
    }catch(error){action('done',error.name||error.message);if(error.name!=='AbortError')message.textContent='請長按照片儲存圖片，或再試一次。';}});
-  control('返回遊戲',()=>{action('done','preview closed');releasePreview();});document.body.appendChild(preview);report('📷 已拍好照片','good');onCaptured(scope);
+  control('返回遊戲',()=>{action('done','preview closed');releasePreview();});document.body.appendChild(preview);report('📷 已拍好照片','good');try{const result=onCaptured(scope,context);if(result?.message)message.textContent=result.message+'。可儲存照片或返回遊戲。';}catch(error){action('record-error',error.message);message.textContent='照片已拍好，但任務記錄失敗，請返回遊戲再試一次。';}
  }
  async function take(){if(busy||preview)return;busy=true;cancelled=false;button.disabled=true;button.textContent='⏳';button.setAttribute('aria-busy','true');const start=now();let timer;
-  try{save();action('begin',{scene:scene(),width:canvas.width,height:canvas.height});const frozen=await new Promise((resolve,reject)=>{pending={resolve,reject};timer=setTimeout(()=>{if(pending){pending=null;reject(Error('畫面尚未準備好，請稍後拍照'));}},2500);});clearTimeout(timer);image=frozen.image;
+  try{const scope=scene(),context=captureState(scope);save();action('begin',{scene:scope,width:canvas.width,height:canvas.height});const frozen=await new Promise((resolve,reject)=>{pending={resolve,reject,scene:scope,context};timer=setTimeout(()=>{if(pending){pending=null;reject(Error('畫面尚未準備好，請稍後拍照'));}},2500);});clearTimeout(timer);image=frozen.image;
    action('encode',{width:image.width,height:image.height,copyMs:Math.round(now()-start)});const blob=await new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(Error('照片編碼逾時，請稍後再試')),encodeTimeout);image.toBlob(b=>{if(b)resolve(b);else reject(Error('照片儲存失敗'));},'image/jpeg',.85);});clearTimeout(timer);
-   if(cancelled)return;action('done',{durationMs:Math.round(now()-start),bytes:blob.size,width:image.width,height:image.height});offer(blob,frozen.scene);
+   if(cancelled)return;action('done',{durationMs:Math.round(now()-start),bytes:blob.size,width:image.width,height:image.height});offer(blob,frozen.scene,frozen.context);
   }catch(error){action('error',error.message);report(error.message||'拍照失敗，請重試','warn');}finally{clearTimeout(timer);if(image){image.width=image.height=1;image=null;}pending=null;busy=false;button.disabled=false;button.textContent=label;button.setAttribute('aria-busy','false');}
  }
- function afterFrame(){if(!pending)return;const job=pending;pending=null;let output;try{const size=captureDimensions(innerWidth,innerHeight,window.devicePixelRatio||1,canvas.width,canvas.height);output=document.createElement('canvas');output.width=size.width;output.height=size.height;const ctx=output.getContext('2d',{alpha:false});if(!ctx)throw Error('照片畫布無法建立');ctx.drawImage(canvas,0,0,size.width,size.height);ctx.save();ctx.scale(size.scale,size.scale);const nodes=drawUI(ctx,document.body,{width:innerWidth,height:innerHeight,canvas,button});ctx.restore();diagnostics()?.event('photo-copy',{pixels:size.width*size.height,nodes});job.resolve({image:output,size,scene:scene()});}catch(error){if(output)output.width=output.height=1;job.reject(error);}}
+ function afterFrame(){if(!pending)return;const job=pending;pending=null;let output;try{const size=captureDimensions(innerWidth,innerHeight,window.devicePixelRatio||1,canvas.width,canvas.height);output=document.createElement('canvas');output.width=size.width;output.height=size.height;const ctx=output.getContext('2d',{alpha:false});if(!ctx)throw Error('照片畫布無法建立');ctx.drawImage(canvas,0,0,size.width,size.height);ctx.save();ctx.scale(size.scale,size.scale);const nodes=drawUI(ctx,document.body,{width:innerWidth,height:innerHeight,canvas,button});ctx.restore();diagnostics()?.event('photo-copy',{pixels:size.width*size.height,nodes});job.resolve({image:output,size,scene:job.scene,context:job.context});}catch(error){if(output)output.width=output.height=1;job.reject(error);}}
  function cancel(){cancelled=true;if(pending){pending.reject(Error('畫面重置，請恢復後再拍照'));pending=null;}releasePreview();}
  button.addEventListener('pointerdown',e=>e.stopPropagation());button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();take();});
  return{take,afterFrame,cancel,isBusy:()=>busy,isPreview:()=>!!preview,paused:()=>!!preview||(busy&&!pending)};
@@ -348,6 +348,15 @@ function createFrameLimiter(limit=GAME_FPS_LIMIT,start=0){
  return{step,reset(now){tickAt=renderedAt=now;budget=0;},limit:1000/interval};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={GAME_FPS_LIMIT,createFrameLimiter};
+
+/* Count completed game frames, update text twice per second, and never intercept input. */
+function createFPSDisplay(doc=document,enabled=true){
+ const el=doc.createElement('div');el.id='fpsDisplay';el.setAttribute('data-screenshot-ignore','');el.setAttribute('aria-label','遊戲 FPS');el.style.cssText='position:fixed;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:155;pointer-events:none;padding:4px 8px;border-radius:8px;background:rgba(0,0,0,.65);color:#b6f5cc;font:600 12px monospace;font-variant-numeric:tabular-nums';el.textContent='FPS —';el.hidden=!enabled;doc.body.appendChild(el);
+ let elapsed=0,frames=0,worst=0,visible=enabled;
+ function reset(){elapsed=frames=worst=0;el.textContent='FPS —';}
+ return{frame(seconds){if(!visible||!Number.isFinite(seconds)||seconds<=0)return;elapsed+=seconds;frames++;worst=Math.max(worst,seconds);if(elapsed>=.5){el.textContent='FPS '+Math.round(frames/elapsed)+' · '+Math.round(worst*1000)+' ms';elapsed=frames=worst=0;}},reset,setEnabled(on){visible=!!on;el.hidden=!visible;reset();}};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports.createFPSDisplay=createFPSDisplay;
 /* Recover a legacy fixed-high setting once on high-DPR touch devices. */
 function recoverMobileGraphics(save,touch,dpr){if(!touch||dpr<2.5||save.gfx!=='high'||save.gfxRecoveryVersion)return false;save.gfx='auto';save.gfxRecoveryVersion=1;return true;}
 /* Raw RAF timing, independent of the simulation's capped timestep. */
@@ -2968,6 +2977,7 @@ function render(){
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
     h+='<div class="note">魚訊放大視窗（自動：休閒、標準開，硬派、專家關）</div><div class="tabs">'+[['auto','自動'],['on','開'],['off','關']].map(m=>`<button class="tab${(save.mag||'auto')===m[0]?' on':''}" data-a="mag" data-v="${m[0]}">${m[1]}</button>`).join('')+'</div>';
     const tg=(k,name,sub,onv)=>row(name,sub,`<button class="sbtn${onv?' pri':''}" data-a="tg" data-v="${k}">${onv?'開':'關'}</button>`);
+    h+=tg('fps','顯示 FPS','左下角顯示實際遊戲幀率與最長幀耗時，每半秒更新',save.fps!==false);
     h+=tg('sound','音效','環境聲、捲線器、水花',Snd.isOn());
     h+=tg('vibe','震動','咬餌、拉扯時的手機震動',save.vibe!==false);
     { const st=window.__CLOUD?window.__CLOUD.status():{state:'nocfg'};
@@ -3149,7 +3159,7 @@ shB.addEventListener('click',e=>{
   else if(a==='tide'){ close(); if(window.__goTide) window.__goTide(); return; }
   else if(a==='home'){ close(); if(window.__goHome) window.__goHome(); return; }
   else if(a==='time'){ setHour(PRESETS[+v][0]); toast(PRESETS[+v][1]); }
-  else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else save[v]=!(save[v]!==false); persist(); }
+  else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else if(v==='fps'){save.fps=save.fps===false;if(window.__setFPSVisible)window.__setFPSVisible(save.fps);} else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
   else if(a==='shop'){ if(window.__SHOP) window.__SHOP(); }
   else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else if(v==='rescue') window.__CLOUD.rescue(); else if(v==='comp') window.__CLOUD.compensate(); else if(v==='copy') window.__CLOUD.copyMain(); else window.__CLOUD.logout(); }
@@ -4259,10 +4269,20 @@ function updChase(dt){ if(!chase) return; if(chase.delay>0){ chase.delay-=dt; if
 function endChase(){ chase=null; if(ev.id!=='shark') sfin.visible=false; }
 
 /* ---------- 拍照收集 ---------- */
-function recordPhoto(scene){if(scene!=='sea'&&scene!=='lake')return;if(window.__GHOST&&window.__GHOST.onPhoto&&window.__GHOST.onPhoto())c.toast('……照片裡好像多了什麼','warn',2400);
-  if(ev.id&&!ev.shot){ ev.shot=true; const sv=c.save; sv.scenes=sv.scenes||{}; const first=!sv.scenes[ev.id]; sv.scenes[ev.id]=(sv.scenes[ev.id]||0)+1; if(window.__STORY) window.__STORY.onScene(ev.id);
-    const rw=first?1000:200; sv.coins+=rw; c.persist(); c.setCoins(); c.Snd.coin(); c.toast((first?'📸 新美景收錄：':'📸 美景照片：')+SCENES[ev.id]+'　🪙'+rw,'good',2400); }
-
+const photoReceipts=new WeakSet();
+function photoTarget(scope){return{scene:scope,event:(scope==='sea'||scope==='lake')&&ev.id?{id:ev.id,state:ev.data}:null,ghost:window.__GHOST?.photoTarget?.()||false};}
+function recordPhoto(scene,target=photoTarget(scene)){
+ if(scene!=='sea'&&scene!=='lake')return null;
+ if(window.__GHOST?.onPhoto?.(target.ghost))c.toast('……照片裡好像多了什麼','warn',2400);
+ const shot=target.event;if(!shot||!SCENES[shot.id])return null;
+ const sv=c.save;sv.scenes=sv.scenes||{};
+ if(photoReceipts.has(shot.state)){if(window.__STORY)window.__STORY.onScene(shot.id);return{message:'已收錄：'+SCENES[shot.id]};}
+ photoReceipts.add(shot.state);const first=!sv.scenes[shot.id];sv.scenes[shot.id]=(sv.scenes[shot.id]||0)+1;
+ const rw=first?1000:200;sv.coins+=rw;c.persist();c.setCoins();
+ if(ev.data===shot.state&&ev.id===shot.id){ev.shot=true;$('bCam').classList.remove('pulse');banner.innerHTML='📸 '+SCENES[shot.id]+'<small>已收錄 ✓</small>';}
+ if(window.__STORY)window.__STORY.onScene(shot.id);
+ c.Snd.coin();c.toast((first?'📸 新美景收錄：':'📸 美景照片：')+SCENES[shot.id]+'　🪙'+rw,'good',2400);
+ return{message:'已收錄：'+SCENES[shot.id]+'　🪙'+rw};
 }
 
 let marineWakeT=0;
@@ -4279,7 +4299,7 @@ function update(dt,t){
     const station=yacht.userData.stations[G.boatStation==='helm'?'helm':'fishing'],pose=yachtAnglerPose(T,yacht,station);G.angler=G.angler||new T.Vector3();G.angler.copy(pose.position);G.fishingYaw=pose.yaw;W.player.position.copy(pose.position);
   }else{G.angler=null;G.fishingYaw=0;}
 }
-return {recordPhoto,hullClear,hullOut,hullDims:()=>({HX,HZ0,HZ1}),setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
+return {recordPhoto,photoTarget,hullClear,hullOut,hullDims:()=>({HX,HZ0,HZ1}),setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
 }
 /* ===== 雨打水面、大白鯊奪魚、閃避 ===== */
 const SH4={};
@@ -5686,7 +5706,7 @@ let cardAt=performance.now()+3000;   // 用真實時間計時，不受每幀時�
 function tryCard(){ if(cinOn||!st.intro) return; const now=performance.now(); if(now<cardAt) return; cardAt=now+2000;
   if(!box.classList.contains('hidden')||!document.getElementById('endBox').classList.contains('hidden')) return;
   if(c.idle&&!c.idle()) return; const ch=active().find(x=>st.seen.indexOf(x.id)<0); if(ch) showCard(ch); }
-let moonClock=0; function tick(dt){ tryCard(); moonClock-=dt; if(moonClock>0) return; moonClock=2; if(S.moon&&S.moon.done) bump(t=>t.t==='moon'?1:0); }
+let moonClock=0; function tick(dt){ tryCard(); moonClock-=dt; if(moonClock>0) return; moonClock=2; if(S.moon&&S.moon.done) bump(t=>t.t==='moon'?1:0);bump(t=>t.t==='scene'&&t.id!=='lantern'&&(S.scenes?.[t.id]||0)>0?1:0); }
 const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>{ if(!st.intro) setTimeout(showIntro,700); });
 /* 手記面板 */
 const btn=document.createElement('button'); btn.className='chip sm'; btn.id='storyBtn'; btn.setAttribute('aria-label','老漁人的手記'); btn.textContent='📜';
@@ -6816,7 +6836,8 @@ function update(dt){ { const tt=performance.now()/1000; if(ghostRig&&!hc) ghostR
     else { m.position.y-=dt*(ev.fast?3:.8); bubbles(m.position,dt,.08); if(m.position.y<-2.1) endEv(); } return; }
 }
 // 拍到她：遠處飄過時按 📷，手記多一頁
-function onPhoto(){ if(!ev||ev.mode!=='glide'||ev.phase==='sink') return false; const g=S.ghost=S.ghost||{}; if(!g.photo){ g.photo=1; c.persist(); if(window.__STORY&&window.__STORY.page) setTimeout(()=>window.__STORY.page('手記・夾頁：拍到了什麼','那晚我在灣裡拍湖面，回家洗出來，水上多了一個人影。<br><br>白衣，長髮，背對著我。放大看，她的腳不在水裡——她是浮著的。<br><br>我沒有刪掉那張照片。'),900); }
+function photoTarget(){return !!(ev&&ev.mode==='glide'&&ev.phase!=='sink');}
+function onPhoto(eligible=photoTarget()){ if(!eligible) return false; const g=S.ghost=S.ghost||{}; if(!g.photo){ g.photo=1; c.persist(); if(window.__STORY&&window.__STORY.page) setTimeout(()=>window.__STORY.page('手記・夾頁：拍到了什麼','那晚我在灣裡拍湖面，回家洗出來，水上多了一個人影。<br><br>白衣，長髮，背對著我。放大看，她的腳不在水裡——她是浮著的。<br><br>我沒有刪掉那張照片。'),900); }
   return true; }
 // 生前模樣的模型（結局與之後的安靜出現）
 function loadAlive(fn){ if(alive) return fn(alive); if(aliveLoading||!GL) return; aliveLoading=true;
@@ -6845,7 +6866,7 @@ function update2(dt){ tt+=dt; fxTick(dt); updLamp(dt,tt); if(fin){ updFinale(dt)
   if(!TEST&&c.storyDone&&c.storyDone('lantern')){ updCalm(dt); return; }
   if(!ev&&finaleReady()&&!aliveLoading){ startFinale(); return; }
   update(dt); }
-return {dbg:()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t.toFixed(1)},pos:model&&model.visible?[+model.position.x.toFixed(2),+model.position.y.toFixed(2),+model.position.z.toFixed(2)]:null,base:[+c.base().x.toFixed(2),+c.base().z.toFixed(2)],head:+c.head().toFixed(2),yaw:+(c.yaw?c.yaw():0).toFixed(2)}),update:update2,trigger,onPhoto,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};
+return {dbg:()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t.toFixed(1)},pos:model&&model.visible?[+model.position.x.toFixed(2),+model.position.y.toFixed(2),+model.position.z.toFixed(2)]:null,base:[+c.base().x.toFixed(2),+c.base().z.toFixed(2)],head:+c.head().toFixed(2),yaw:+(c.yaw?c.yaw():0).toFixed(2)}),update:update2,trigger,onPhoto,photoTarget,finale:()=>{ startFinale(); },active:()=>!!ev||!!fin};
 }
 /* ===== 雲端存檔：Google 帳號登入（Firebase），本機進度永遠不會被洗掉 ===== */
 function createCloud(c){
@@ -6950,7 +6971,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101061534'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101093913'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8622,6 +8643,7 @@ function cast(){
   for(let k=0;k<14;k++){ const r=Math.hypot(x,z), maxR=W.shoreR(Math.atan2(x,-z))-6; if(r<=maxR) break; x=bx+(x-bx)*.9; z=bz+(z-bz)*.9; }
   if(G.spot===0&&z>-4.5) z=-4.5;
   G.to.set(x,0,z); G.castDist=Math.max(3,Math.hypot(x-bx,z-bz)); G.castDur=.55+G.castDist*.028; G.apex=1.2+G.castDist*.12;
+  if(G.castDist<dist*.8)toast('前方岸線限制，落點約 '+Math.round(G.castDist)+' 米；轉向開闊水面可拋得更遠','warn',3200);
   G.castT=0; G.delay=.12; G.state='cast'; rod.pitchT=-.32; Snd.whoosh(); setPower(0);
 }
 function landBobber(){
@@ -9521,7 +9543,8 @@ window.addEventListener('resize',onResize); onResize();
 if(typeof save.hour==='number'&&isFinite(save.hour)) G.hour=save.hour;
 W.setTime(G.hour,true);
 dockCameraButton($('bCam'),$('cameraSlot'),$('top'));
-const screenCapture=createScreenCapture({canvas:W.renderer.domElement,button:$('bCam'),report:(m,k)=>toast(m,k,2200),onCaptured:scene=>SEA.recordPhoto(scene),scene:()=>TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':END.on()?'ending':G.loc||'lake',save:persist});
+const screenCapture=createScreenCapture({canvas:W.renderer.domElement,button:$('bCam'),report:(m,k)=>toast(m,k,2200),captureState:scene=>SEA.photoTarget(scene),onCaptured:(scene,target)=>SEA.recordPhoto(scene,target),scene:()=>TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':END.on()?'ending':G.loc||'lake',save:persist});
+const fpsDisplay=createFPSDisplay(document,save.fps!==false);window.__setFPSVisible=on=>fpsDisplay.setEnabled(on);document.addEventListener('visibilitychange',()=>fpsDisplay.reset());
 const frameLimiter=createFrameLimiter(GAME_FPS_LIMIT,performance.now());window.__frameLimit=GAME_FPS_LIMIT;
 const gpuStatus=document.createElement('div');gpuStatus.style.cssText='display:none;position:fixed;inset:0;z-index:200;background:rgba(6,16,20,.92);color:white;align-items:center;justify-content:center;text-align:center;padding:28px;font:18px sans-serif';document.body.appendChild(gpuStatus);
 const graphicsRecovery=createGraphicsRecovery(W.renderer.domElement,{save:persist,report:(kind,msg)=>{if(window.__DIAG)window.__DIAG.add(kind,msg);},lost:()=>{screenCapture.cancel();releaseAll();if(window.__DIAG)window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','context-lost');gpuStatus.textContent='畫面正在恢復，遊戲進度已保存。';gpuStatus.style.display='flex';setTimeout(()=>{if(graphicsRecovery.paused()){gpuStatus.innerHTML='<div>畫面尚未恢復，遊戲進度已保存。<br><button style="margin-top:20px;padding:12px 24px">重新載入</button></div>';gpuStatus.querySelector('button').onclick=()=>{persist();if(window.__DIAG)window.__DIAG.action('navigation','manual-gpu-recovery');location.reload();};}},8000);},restored:()=>{W.resetGraphics();HOME3D.resetGraphics();frameLimiter.reset(performance.now());gfxAuto.pause();gpuStatus.style.display='none';}});
@@ -9532,7 +9555,7 @@ function frame(now){
   // Resolution changes clear the drawing buffer: apply them BEFORE drawing this frame.
   gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?HOME3D.qualityScope():UW.active()?'underwater':G.loc||'lake'});
   if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
-  if(HOME3D.active()){if(!homeWarmAt)homeWarmAt=now;if(homeWarmAt>0&&now-homeWarmAt>5000){homeWarmAt=-1;if(window.__DIAG)window.__DIAG.action('home','done','5 seconds rendered');}}else homeWarmAt=0;if(window.__DIAG)window.__DIAG.stage('render');screenCapture.afterFrame();if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
+  if(HOME3D.active()){if(!homeWarmAt)homeWarmAt=now;if(homeWarmAt>0&&now-homeWarmAt>5000){homeWarmAt=-1;if(window.__DIAG)window.__DIAG.action('home','done','5 seconds rendered');}}else homeWarmAt=0;if(window.__DIAG)window.__DIAG.stage('render');screenCapture.afterFrame();fpsDisplay.frame(frameSeconds);if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
 
   requestAnimationFrame(frame);
 }

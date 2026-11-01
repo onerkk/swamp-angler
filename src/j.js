@@ -247,10 +247,20 @@ function updChase(dt){ if(!chase) return; if(chase.delay>0){ chase.delay-=dt; if
 function endChase(){ chase=null; if(ev.id!=='shark') sfin.visible=false; }
 
 /* ---------- 拍照收集 ---------- */
-function recordPhoto(scene){if(scene!=='sea'&&scene!=='lake')return;if(window.__GHOST&&window.__GHOST.onPhoto&&window.__GHOST.onPhoto())c.toast('……照片裡好像多了什麼','warn',2400);
-  if(ev.id&&!ev.shot){ ev.shot=true; const sv=c.save; sv.scenes=sv.scenes||{}; const first=!sv.scenes[ev.id]; sv.scenes[ev.id]=(sv.scenes[ev.id]||0)+1; if(window.__STORY) window.__STORY.onScene(ev.id);
-    const rw=first?1000:200; sv.coins+=rw; c.persist(); c.setCoins(); c.Snd.coin(); c.toast((first?'📸 新美景收錄：':'📸 美景照片：')+SCENES[ev.id]+'　🪙'+rw,'good',2400); }
-
+const photoReceipts=new WeakSet();
+function photoTarget(scope){return{scene:scope,event:(scope==='sea'||scope==='lake')&&ev.id?{id:ev.id,state:ev.data}:null,ghost:window.__GHOST?.photoTarget?.()||false};}
+function recordPhoto(scene,target=photoTarget(scene)){
+ if(scene!=='sea'&&scene!=='lake')return null;
+ if(window.__GHOST?.onPhoto?.(target.ghost))c.toast('……照片裡好像多了什麼','warn',2400);
+ const shot=target.event;if(!shot||!SCENES[shot.id])return null;
+ const sv=c.save;sv.scenes=sv.scenes||{};
+ if(photoReceipts.has(shot.state)){if(window.__STORY)window.__STORY.onScene(shot.id);return{message:'已收錄：'+SCENES[shot.id]};}
+ photoReceipts.add(shot.state);const first=!sv.scenes[shot.id];sv.scenes[shot.id]=(sv.scenes[shot.id]||0)+1;
+ const rw=first?1000:200;sv.coins+=rw;c.persist();c.setCoins();
+ if(ev.data===shot.state&&ev.id===shot.id){ev.shot=true;$('bCam').classList.remove('pulse');banner.innerHTML='📸 '+SCENES[shot.id]+'<small>已收錄 ✓</small>';}
+ if(window.__STORY)window.__STORY.onScene(shot.id);
+ c.Snd.coin();c.toast((first?'📸 新美景收錄：':'📸 美景照片：')+SCENES[shot.id]+'　🪙'+rw,'good',2400);
+ return{message:'已收錄：'+SCENES[shot.id]+'　🪙'+rw};
 }
 
 let marineWakeT=0;
@@ -267,5 +277,5 @@ function update(dt,t){
     const station=yacht.userData.stations[G.boatStation==='helm'?'helm':'fishing'],pose=yachtAnglerPose(T,yacht,station);G.angler=G.angler||new T.Vector3();G.angler.copy(pose.position);G.fishingYaw=pose.yaw;W.player.position.copy(pose.position);
   }else{G.angler=null;G.fishingYaw=0;}
 }
-return {recordPhoto,hullClear,hullOut,hullDims:()=>({HX,HZ0,HZ1}),setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
+return {recordPhoto,photoTarget,hullClear,hullOut,hullDims:()=>({HX,HZ0,HZ1}),setLoc,update,onHook,endChase,stolen:()=>{ const v=stolenF; stolenF=false; return v; },loc:()=>loc};
 }
