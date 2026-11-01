@@ -182,16 +182,16 @@ function setLine(end, slack, visible, light, trem){
   lineMesh.visible=!!visible; if(!visible) return;
   let n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(rod.tipW);
   const tip=rod.tipW, dist=tip.distanceTo(end), sag=slack*Math.min(dist,40)*0.12, NC=LN-n;
-  const path=PH.route(tip,end);
+  const chordHit=PH.hit(tip,end,.025),path=chordHit?PH.route(tip,end):[tip,end];
   const ctrl=tmp2.copy(tip).add(end).multiplyScalar(.5); ctrl.y-=sag*2;
   if(trem){ const tq=performance.now()*.001; ctrl.x+=Math.sin(tq*61)*trem; ctrl.y+=Math.sin(tq*47+1.3)*trem*.7; ctrl.z+=Math.cos(tq*53)*trem; }   // 繃緊的釣線細微顫動
   for(let i=1;i<=NC;i++){ const t=i/NC, a=(1-t)*(1-t), b=2*(1-t)*t, c=t*t;
-    if(path.length>2||PH.hit(tip,end,.025)){ const u=t*(path.length-1), j=Math.min(path.length-2,Math.floor(u)), k=u-j; LP[n++].set(lerp(path[j].x,path[j+1].x,k),lerp(path[j].y,path[j+1].y,k),lerp(path[j].z,path[j+1].z,k)); }
+    if(path.length>2||chordHit){ const u=t*(path.length-1), j=Math.min(path.length-2,Math.floor(u)), k=u-j; LP[n++].set(lerp(path[j].x,path[j+1].x,k),lerp(path[j].y,path[j+1].y,k),lerp(path[j].z,path[j+1].z,k)); }
     else LP[n++].set(a*tip.x+b*ctrl.x+c*end.x, a*tip.y+b*ctrl.y+c*end.y, a*tip.z+b*ctrl.z+c*end.z); }
   if(path.length>2){ n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(tip); for(let i=1;i<path.length&&n<LN;i++) LP[n++].copy(path[i]); }
   // A slack curve can touch a low branch even when its straight chord is clear.
   let curveBlocked=false; for(let i=rod.guidesW.length+2;i<n;i++) if(PH.hit(LP[i-1],LP[i],.025)){curveBlocked=true;break;}
-  if(curveBlocked&&path.length===2&&!PH.hit(tip,end,.025)){const first=rod.guidesW.length+2, count=n-first;for(let i=0;i<count;i++)LP[first+i].copy(tip).lerp(end,(i+1)/count);}
+  if(curveBlocked&&path.length===2&&!chordHit){const first=rod.guidesW.length+2, count=n-first;for(let i=0;i<count;i++)LP[first+i].copy(tip).lerp(end,(i+1)/count);}
   camera.getWorldPosition(camW);
   const pix=2*Math.tan(camera.fov*Math.PI/360)/Math.max(300,window.innerHeight);
   for(let i=0;i<n;i++){ const p=LP[i]; const pa=LP[Math.max(0,i-1)], pb=LP[Math.min(n-1,i+1)];

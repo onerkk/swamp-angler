@@ -1,0 +1,12 @@
+const{test}=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),T=require('../vendor/three.min.js');
+test('a quality change that clears the canvas is followed by a render in the same RAF',()=>{
+ const source=fs.readFileSync(require.resolve('../src/d.js'),'utf8'),start=source.indexOf('function frame(now){'),end=source.indexOf('\nrequestAnimationFrame(frame);\n}',start),calls=[];let blank=false;
+ const inactive={active:()=>false},noop=()=>{};
+ const context={frameLimiter:{step:()=>1/60},graphicsRecovery:{paused:()=>false},document:{hidden:false,getElementById:()=>({classList:{contains:()=>true}})},screenCapture:{paused:()=>false,isBusy:()=>false,afterFrame(){assert(!blank);}},window:{__REALDONE:true},gfxAuto:{sample(){calls.push('resize');blank=true;}},TIDE:inactive,HOME3D:inactive,UW:{...inactive,render:noop},G:{loc:'lake',state:'idle'},update:()=>calls.push('update'),merPresent:noop,MERTEST:false,END:{on:()=>false,frame:noop},AFTER:{update:noop},guardUW:noop,MDL:{glowTick:noop},RESIDENTS:{update:noop},GHOST:{update:noop},W:{render(){calls.push('render');blank=false;}},LURE:{renderPiP:noop},requestAnimationFrame:()=>calls.push('raf'),homeWarmAt:0};
+ vm.createContext(context);vm.runInContext(source.slice(start,end),context);context.frame(100);assert.deepEqual(calls,['resize','update','render','raf']);assert(!blank);
+});
+test('actual line builder checks its chord once while still validating every slack segment',()=>{
+ const source=fs.readFileSync(require.resolve('../src/c.js'),'utf8'),start=source.indexOf('function setLine('),end=source.indexOf('\n}',start)+2,LN=64,tip=new T.Vector3(0,2,0),target=new T.Vector3(0,0,-15);let chordChecks=0,segmentChecks=0;
+ const context={lineMesh:{},rod:{spoolW:new T.Vector3(),guidesW:[new T.Vector3(0,1,0)],tipW:tip},LP:Array.from({length:LN},()=>new T.Vector3()),LN,PH:{hit(a,b){if(a===tip&&b===target)chordChecks++;else segmentChecks++;return null;},route(){throw Error('clear chord must not invoke graph search');}},tmp2:new T.Vector3(),camW:new T.Vector3(),lt:new T.Vector3(),lc:new T.Vector3(),ls:new T.Vector3(),camera:{fov:60,getWorldPosition:v=>v.set(0,2,2)},window:{innerHeight:800},lpos:new Float32Array(LN*6),lgeo:{attributes:{position:{}},setDrawRange(){}},lineMat:{color:new T.Color()},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),Math};
+ vm.createContext(context);vm.runInContext(source.slice(start,end),context);context.setLine(target,.35,true,1,0);assert.equal(chordChecks,1);assert(segmentChecks>50);
+});

@@ -1,4 +1,4 @@
-/*APPV:20261101055406*/
+/*APPV:20261101061534*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -14,7 +14,7 @@ function installImageBudget(T,budget){for(const name of['ImageLoader','ImageBitm
 function createTextureVariants(T,loader){const textures=new Map(),sources=new Map();return function(file,rx=1,ry=1,rotation=0){const key=[file,rx,ry,rotation].join('|');if(textures.has(key))return textures.get(key);let source=sources.get(file);if(!source){source={variants:[],ready:false};sources.set(file,source);source.texture=loader.load(file,loaded=>{source.ready=true;source.texture=loaded;for(const t of source.variants){t.image=loaded.image;t.needsUpdate=true;}});}const t=source.texture.clone();source.variants.push(t);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(rx,ry);t.rotation=rotation;t.anisotropy=4;textures.set(key,t);return t;};}
 if(typeof module!=='undefined'&&module.exports)module.exports={deviceResourcePolicy,budgetImageSize,createImageBudget,installImageBudget,createTextureVariants};
 /* Effect costs are controlled independently from framebuffer resolution. */
-function effectBudget(level){return{normalMaps:level>=2,surfaceMaps:level>=2,physicalCoat:level>=4,environment:level>=2,probes:level>=3,caustics:level>=3,waterDetail:level>=3,rainLines:level<2?0:level<4?180:level<6?500:1400,rainOverlay:level>=4,lensFlare:level>=3,rainRings:level>=3,ssr:level===7,transmissionHz:level<2?15:level<4?30:120};}
+function effectBudget(level){return{normalMaps:false,surfaceMaps:level>=2,physicalCoat:level>=4,environment:level>=2,probes:level>=3,caustics:level>=3,waterDetail:level>=3,rainLines:level<2?0:level<4?180:level<6?500:1400,rainOverlay:level>=4,lensFlare:level>=3,rainRings:level>=3,ssr:false,transmissionHz:level<2?15:level<4?30:120};}
 function createMaterialQuality(){
  const states=new WeakMap(),objects=new WeakMap(),sources=new Map(),keys=['envMap','normalMap','bumpMap','roughnessMap','metalnessMap','aoMap','clearcoatMap','clearcoatNormalMap','clearcoatRoughnessMap'];let budget=effectBudget(7);
  const remember=t=>{if(t?.uuid)sources.set(t.uuid,typeof WeakRef==='function'?new WeakRef(t):{deref:()=>t});};
@@ -29,7 +29,7 @@ function createMaterialQuality(){
   let changed=false;
   for(const k of keys){
    if((s.enabled[k]&&m[k]!==s.maps[k])||(!s.enabled[k]&&m[k])){s.maps[k]=m[k];if(m[k]){remember(m[k]);s.ids[k]=m[k].uuid;}else delete s.ids[k];}
-   const on=k==='envMap'?budget.environment:k==='normalMap'||k==='bumpMap'?budget.normalMaps:k.startsWith('clearcoat')?budget.physicalCoat:budget.surfaceMaps,value=on?s.maps[k]:null;
+   const on=k==='envMap'?budget.environment:k==='normalMap'||k==='bumpMap'||k==='clearcoatNormalMap'?budget.normalMaps:k.startsWith('clearcoat')?budget.physicalCoat:budget.surfaceMaps,value=on?s.maps[k]:null;
    if(m[k]!==value){m[k]=value;changed=true;}s.enabled[k]=on;
   }
   for(const k of['clearcoat','transmission','metalness','roughness'])if(typeof s.scalar[k]==='number'){
@@ -41,7 +41,7 @@ function createMaterialQuality(){
   if(m.isMeshPhysicalMaterial){const on=budget.physicalCoat,has=Object.prototype.hasOwnProperty.call(m.defines||{},'PHYSICAL');if(on!==has){m.defines={...s.defines};if(!on)delete m.defines.PHYSICAL;changed=true;}}
   if(changed)m.needsUpdate=true;
  }
- function apply(root){if(root)root.traverse(o=>{const mats=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];if(o.isMesh&&!o.isSkinnedMesh&&!o.isInstancedMesh&&!o.morphTargetInfluences?.length&&mats.some(m=>m?.isMeshStandardMaterial)){if(!objects.has(o))objects.set(o,o.frustumCulled);o.frustumCulled=budget.normalMaps?objects.get(o):true;}for(const m of mats)material(m);});}
+ function apply(root){if(root)root.traverse(o=>{const mats=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];if(o.isMesh&&!o.isSkinnedMesh&&!o.isInstancedMesh&&!o.morphTargetInfluences?.length&&mats.some(m=>m?.isMeshStandardMaterial)){if(!objects.has(o))objects.set(o,o.frustumCulled);o.frustumCulled=budget.surfaceMaps?objects.get(o):true;}for(const m of mats)material(m);});}
  return{set(level){budget=effectBudget(level);return budget;},apply,material};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={effectBudget,createMaterialQuality};
@@ -353,7 +353,7 @@ function recoverMobileGraphics(save,touch,dpr){if(!touch||dpr<2.5||save.gfx!=='h
 /* Raw RAF timing, independent of the simulation's capped timestep. */
 function graphicsProfiles(cap){
  const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
- return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:i===0?Math.min(cap,.65):Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
+ return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:i<2?Math.min(cap,i===0?.65:.85):Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
 }
 function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null,initialLevel=4}){
  const initial=Math.max(0,Math.min(7,Math.round(Number(initialLevel)||0)));const sceneLevels=new Map();let emergencyTime=0,emergencyFrames=0;
@@ -426,13 +426,18 @@ class FishingPhysics {
       if(!b.isEmpty()) item.boxes.push({min:{x:b.min.x,y:b.min.y,z:b.min.z},max:{x:b.max.x,y:b.max.y,z:b.max.z},label:item.label});
     });
   }
-  refresh(){ this.boxes=[]; for(const i of this.items){ if(!i.enabled()) continue; if(i.update) i.update(); else if(i.dynamic) this.measure(i); this.boxes.push(...i.boxes); } }
+  refresh(){ this.boxes.length=0; for(const i of this.items){ if(!i.enabled()) continue; if(i.update) i.update(); else if(i.dynamic) this.measure(i); this.boxes.push(...i.boxes); } }
   static local(p,b){ if(!b.frame)return {...p}; const f=b.frame,c=Math.cos(f.head),s=Math.sin(f.head),x=p.x-f.x,z=p.z-f.z;return{x:x*c-z*s,y:p.y,z:x*s+z*c}; }
   static world(p,b){ if(!b.frame)return {...p};const f=b.frame,c=Math.cos(f.head),s=Math.sin(f.head);return{x:f.x+p.x*c+p.z*s,y:p.y,z:f.z-p.x*s+p.z*c}; }
   static inside(p,b,r=0){ p=FishingPhysics.local(p,b); return ['x','y','z'].every(k=>p[k]>b.min[k]-r&&p[k]<b.max[k]+r); }
   hit(a,b,r=0,accept=null){
     let best=null;
-    for(const box of this.boxes){ if(accept&&!accept(box))continue; const aa=FishingPhysics.local(a,box),bb=FishingPhysics.local(b,box); if(r===.025&&box.label==='睡蓮葉') continue; let lo=0,hi=1,axis=null,sign=0,valid=true;
+    const minX=Math.min(a.x,b.x)-r,maxX=Math.max(a.x,b.x)+r,minY=Math.min(a.y,b.y)-r,maxY=Math.max(a.y,b.y)+r,minZ=Math.min(a.z,b.z)-r,maxZ=Math.max(a.z,b.z)+r;
+    for(const box of this.boxes){
+      if(r===.025&&box.label==='睡蓮葉')continue;
+      // Reject distant static bounds before transforms, allocations and slab tests.
+      if(!box.frame&&(box.min.x>maxX||box.max.x<minX||box.min.y>maxY||box.max.y<minY||box.min.z>maxZ||box.max.z<minZ))continue;
+      if(accept&&!accept(box))continue;const aa=box.frame?FishingPhysics.local(a,box):a,bb=box.frame?FishingPhysics.local(b,box):b; let lo=0,hi=1,axis=null,sign=0,valid=true;
       for(const k of ['x','y','z']){ const d=bb[k]-aa[k], mn=box.min[k]-r,mx=box.max[k]+r;
         if(Math.abs(d)<1e-10){ if(aa[k]<=mn||aa[k]>=mx){valid=false;break;} continue; }
         let t0=(mn-aa[k])/d,t1=(mx-aa[k])/d,sg=-1; if(t0>t1){[t0,t1]=[t1,t0];sg=1;}
@@ -877,48 +882,15 @@ function yachtDeckHeight(T,root,x,z,fallback){
 function yachtStations(T,root){return{fishing:{x:2.12,z:15,deck:yachtDeckHeight(T,root,2.12,15,2.03),yaw:-Math.PI/2},helm:{x:.6,z:10,deck:yachtDeckHeight(T,root,.6,10,3.82),yaw:0}};}
 function yachtAnglerPose(T,boat,station){boat.updateMatrixWorld(true);return{position:boat.localToWorld(new T.Vector3(station.x,station.deck+1.62,station.z)),yaw:station.yaw};}
 if(typeof module!=='undefined'&&module.exports)module.exports={yachtDeckHeight,yachtStations,yachtAnglerPose};
-/* Screen-space ray marching, not hardware RT. Water keeps its separate planar reflection/refraction. */
+/* Single beauty pass. Expensive screen-space ray marching has been removed. */
 function radianceReflector(m){return !!(m&&(m.isMeshStandardMaterial||m.isMeshPhysicalMaterial)&&(!m.transparent||m.opacity>.85)&&(m.roughness<.32||m.metalness>.45||m.clearcoat>.6||(m.userData&&m.userData.screenReflection)));}
 function createSceneRadiance(T,R,prepare=()=>{}){
- let pass=null,failed=false,sizeKey='',sceneKey=null,selected=[];
- const cache=new WeakMap(),normalMaterials=new Set(),size=new T.Vector2();
- const supported=!!(T.SSRPass&&R.extensions&&(R.capabilities.isWebGL2?R.extensions.has('EXT_color_buffer_float'):R.extensions.has('WEBGL_depth_texture')&&R.extensions.has('EXT_color_buffer_half_float')));
- let auditAt=0,selectAt=0;
- const status={supported,active:false,technique:'screen-space ray marching',reason:''};
- function auxiliary(scene,camera,target,mask){
-  const backup=[],oldOverride=scene.overrideMaterial,bg=scene.background,oldShadow=R.shadowMap.autoUpdate,chosen=new Set(selected);
-  try{
-   scene.overrideMaterial=null;scene.background=null;R.shadowMap.autoUpdate=false;
-   scene.traverseVisible(o=>{if(!o.material)return;const original=o.material,mats=Array.isArray(original)?original:[original];
-    backup.push([o,original,o.visible]);
-    if(!o.isMesh||mats.some(m=>!m||(m.isShaderMaterial||m.isRawShaderMaterial)||m.alphaTest>0||(m.transparent&&(m.opacity<.85||!m.depthWrite)))){o.visible=false;return;}
-    o.material=mask?(chosen.has(o)?pass.metalnessOnMaterial:pass.metalnessOffMaterial):mats.map(m=>{
-     let n=cache.get(m);if(!n){n=new T.MeshNormalMaterial({side:m.side,skinning:true,morphTargets:true,morphNormals:true});cache.set(m,n);normalMaterials.add(n);}
-     n.normalMap=m.normalMap;n.bumpMap=m.bumpMap;n.bumpScale=m.bumpScale;if(m.normalScale)n.normalScale.copy(m.normalScale);n.displacementMap=m.displacementMap;n.displacementScale=m.displacementScale;n.displacementBias=m.displacementBias;return n;
-    });if(!Array.isArray(original)&&!mask)o.material=o.material[0];
-   });
-   R.setRenderTarget(target);R.setClearColor(0,0);R.clear();R.render(scene,camera);
-  }finally{for(const [o,m,v]of backup){o.material=m;o.visible=v;}scene.overrideMaterial=oldOverride;scene.background=bg;R.shadowMap.autoUpdate=oldShadow;}
+ const status={supported:false,active:false,technique:'disabled',reason:'removed for frame stability'};
+ function render(scene,camera){prepare(scene);const env=scene.environment;
+  try{if(typeof window!=='undefined'){window.__rayTracingState=status;if(window.__effectBudget?.environment===false)scene.environment=null;}R.render(scene,camera);}
+  finally{scene.environment=env;}
  }
- function render(scene,camera){prepare(scene);
-  const now=typeof performance!=='undefined'?performance.now():Date.now();if(now>=auditAt&&typeof auditSceneLighting==='function'&&typeof document!=='undefined'&&document.getElementById('gfxLive')){auditAt=now+5000;const report=auditSceneLighting(scene);report.ssrActive=status.active;if(typeof window!=='undefined')window.__materialLightingAudit=report;}
-  status.active=false;const high=typeof window!=='undefined'&&window.__gfxStatus&&window.__gfxStatus.level===7;
-  if(!supported||failed||!high||window.__effectBudget?.ssr===false){if(pass)release();status.reason=!supported?'device unsupported':failed?'render fallback':'below highest quality';const env=scene.environment;try{if(window.__effectBudget?.environment===false)scene.environment=null;R.render(scene,camera);}finally{scene.environment=env;}return;}
-  const target=R.getRenderTarget(),color=R.getClearColor(new T.Color()).clone(),alpha=R.getClearAlpha(),auto=R.autoClear,viewport=R.getViewport(new T.Vector4()),scissor=R.getScissor(new T.Vector4()),scissorTest=R.getScissorTest();
-  try{
-   if(!pass){pass=new T.SSRPass({renderer:R,scene,camera,width:64,height:64,selects:[],encoding:R.outputEncoding,bouncing:false,morphTargets:true});pass.renderToScreen=true;pass.opacity=.18;pass.maxDistance=18;pass.thickness=.08;pass.blur=true;pass.distanceAttenuation=true;pass.fresnel=true;pass.metalnessOnMaterial.skinning=pass.metalnessOffMaterial.skinning=true;pass.metalnessOnMaterial.morphTargets=pass.metalnessOffMaterial.morphTargets=true;
-    pass.renderOverride=(_,m,rt)=>auxiliary(pass.scene,pass.camera,rt,false);pass.renderMetalness=(_,m,rt)=>auxiliary(pass.scene,pass.camera,rt,true);
-   }
-   pass.scene=scene;pass.camera=camera;R.getDrawingBufferSize(size);const key=size.x+'x'+size.y,scale=Math.min(.5,768/Math.max(size.x,size.y));
-   if(key!==sizeKey){pass.setSize(Math.max(2,Math.round(size.x*scale)),Math.max(2,Math.round(size.y*scale)));pass.beautyRenderTarget.setSize(size.x,size.y);pass.ssrMaterial.defines.MAX_STEP=64;pass.ssrMaterial.needsUpdate=true;sizeKey=key;}
-   if(sceneKey!==scene||now>=selectAt){const next=[];scene.traverseVisible(o=>{if(o.isMesh&&(Array.isArray(o.material)?o.material:[o.material]).some(radianceReflector))next.push(o);});if(sceneKey!==scene||next.length!==selected.length||next.some((o,i)=>o!==selected[i])){selected=next;pass.selects=selected;}sceneKey=scene;selectAt=now+500;}
-   const u=pass.ssrMaterial.uniforms;u.cameraNear.value=camera.near;u.cameraFar.value=camera.far;u.cameraProjectionMatrix.value.copy(camera.projectionMatrix);u.cameraInverseProjectionMatrix.value.copy(camera.projectionMatrixInverse);
-   R.setScissorTest(false);pass.render(R,null);status.active=true;status.reason='highest quality';
-  }catch(e){failed=true;status.reason='render fallback';console.warn('SSR unavailable; retaining PBR lighting and planar water',e);R.setRenderTarget(target);R.setClearColor(color,alpha);R.autoClear=auto;R.render(scene,camera);
-  }finally{R.setRenderTarget(target);R.setClearColor(color,alpha);R.autoClear=auto;R.setViewport(viewport);R.setScissor(scissor);R.setScissorTest(scissorTest);if(typeof window!=='undefined')window.__rayTracingState=status;}
- }
- function release(){if(pass)pass.dispose();pass=null;sizeKey='';sceneKey=null;selected=[];}
- return{render,status,release,dispose(){if(pass)pass.dispose();for(const m of normalMaterials)m.dispose();}};
+ return{render,status,release(){},dispose(){}};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={createSceneRadiance,radianceReflector};
 /* ===== 第 1 段 · 渲染核心：天空、樹林遠景、水面、光照、時間 ===== */
@@ -1990,16 +1962,16 @@ function setLine(end, slack, visible, light, trem){
   lineMesh.visible=!!visible; if(!visible) return;
   let n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(rod.tipW);
   const tip=rod.tipW, dist=tip.distanceTo(end), sag=slack*Math.min(dist,40)*0.12, NC=LN-n;
-  const path=PH.route(tip,end);
+  const chordHit=PH.hit(tip,end,.025),path=chordHit?PH.route(tip,end):[tip,end];
   const ctrl=tmp2.copy(tip).add(end).multiplyScalar(.5); ctrl.y-=sag*2;
   if(trem){ const tq=performance.now()*.001; ctrl.x+=Math.sin(tq*61)*trem; ctrl.y+=Math.sin(tq*47+1.3)*trem*.7; ctrl.z+=Math.cos(tq*53)*trem; }   // 繃緊的釣線細微顫動
   for(let i=1;i<=NC;i++){ const t=i/NC, a=(1-t)*(1-t), b=2*(1-t)*t, c=t*t;
-    if(path.length>2||PH.hit(tip,end,.025)){ const u=t*(path.length-1), j=Math.min(path.length-2,Math.floor(u)), k=u-j; LP[n++].set(lerp(path[j].x,path[j+1].x,k),lerp(path[j].y,path[j+1].y,k),lerp(path[j].z,path[j+1].z,k)); }
+    if(path.length>2||chordHit){ const u=t*(path.length-1), j=Math.min(path.length-2,Math.floor(u)), k=u-j; LP[n++].set(lerp(path[j].x,path[j+1].x,k),lerp(path[j].y,path[j+1].y,k),lerp(path[j].z,path[j+1].z,k)); }
     else LP[n++].set(a*tip.x+b*ctrl.x+c*end.x, a*tip.y+b*ctrl.y+c*end.y, a*tip.z+b*ctrl.z+c*end.z); }
   if(path.length>2){ n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(tip); for(let i=1;i<path.length&&n<LN;i++) LP[n++].copy(path[i]); }
   // A slack curve can touch a low branch even when its straight chord is clear.
   let curveBlocked=false; for(let i=rod.guidesW.length+2;i<n;i++) if(PH.hit(LP[i-1],LP[i],.025)){curveBlocked=true;break;}
-  if(curveBlocked&&path.length===2&&!PH.hit(tip,end,.025)){const first=rod.guidesW.length+2, count=n-first;for(let i=0;i<count;i++)LP[first+i].copy(tip).lerp(end,(i+1)/count);}
+  if(curveBlocked&&path.length===2&&!chordHit){const first=rod.guidesW.length+2, count=n-first;for(let i=0;i<count;i++)LP[first+i].copy(tip).lerp(end,(i+1)/count);}
   camera.getWorldPosition(camW);
   const pix=2*Math.tan(camera.fov*Math.PI/360)/Math.max(300,window.innerHeight);
   for(let i=0;i<n;i++){ const p=LP[i]; const pa=LP[Math.max(0,i-1)], pb=LP[Math.min(n-1,i+1)];
@@ -5449,13 +5421,13 @@ function createIce(W,c){
 'use strict';
 const T=THREE, tl=new T.TextureLoader(), rep=(t,n)=>{ t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(n,n); t.anisotropy=4; return t; };
 const col=rep(tl.load('snow_Diffuse.jpg'),90); col.encoding=T.sRGBEncoding;
-const mat=new T.MeshStandardMaterial({map:col,normalMap:rep(tl.load('snow_nor_gl.jpg'),90),roughnessMap:rep(tl.load('snow_Rough.jpg'),90),roughness:.82,metalness:0,color:0xffffff,envMapIntensity:1.6,normalScale:new T.Vector2(.45,.45)});mat.userData.screenReflection=true;
+const mat=new T.MeshStandardMaterial({map:col,roughnessMap:rep(tl.load('snow_Rough.jpg'),90),roughness:.82,metalness:0,color:0xffffff,envMapIntensity:1.6,normalScale:new T.Vector2(.45,.45)});mat.userData.screenReflection=true;
 // 真實結冰湖面：風吹乾淨的地方是深色透明冰（ambientCG Ice003，CC0，裂紋網），其他地方是積雪；用大範圍雜訊自然混合
-const iceC=rep(tl.load('ice_Color.jpg'),60); iceC.encoding=T.sRGBEncoding; const iceN=rep(tl.load('ice_nor.jpg'),60);
+const iceC=rep(tl.load('ice_Color.jpg'),60); iceC.encoding=T.sRGBEncoding;
 // 湖面與洞緣從同一個世界座標取樣；移動／轉頭不會讓裂紋在洞口斷開。
 const cutHole={value:new T.Vector3(0,0,0)};
 function iceSurfaceShader(sh,cut){
-  sh.uniforms.iceMap={value:iceC}; sh.uniforms.iceNor={value:iceN}; sh.uniforms.iceHole=cutHole;
+  sh.uniforms.iceMap={value:iceC}; sh.uniforms.iceHole=cutHole;
   sh.vertexShader='varying vec3 vIceWorld;\n'+sh.vertexShader;
   sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
   vIceWorld=(modelMatrix*vec4(transformed,1.0)).xyz;
@@ -5463,7 +5435,7 @@ function iceSurfaceShader(sh,cut){
   sh.fragmentShader='varying vec3 vIceWorld; uniform vec3 iceHole;\n'+sh.fragmentShader;
   if(cut) sh.fragmentShader=sh.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
   if(iceHole.z>0.0 && distance(vIceWorld.xz,iceHole.xy)<iceHole.z) discard;`);
-  sh.fragmentShader='uniform sampler2D iceMap; uniform sampler2D iceNor;\nfloat hh_(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }\nfloat vn_(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hh_(i),hh_(i+vec2(1,0)),f.x),mix(hh_(i+vec2(0,1)),hh_(i+vec2(1,1)),f.x),f.y); }\n'+sh.fragmentShader;
+  sh.fragmentShader='uniform sampler2D iceMap;\nfloat hh_(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }\nfloat vn_(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hh_(i),hh_(i+vec2(1,0)),f.x),mix(hh_(i+vec2(0,1)),hh_(i+vec2(1,1)),f.x),f.y); }\n'+sh.fragmentShader;
   sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
   vec4 t2_=mapTexelToLinear(texture2D(map,vUv*0.27+vec2(0.31,0.17)));
   diffuseColor.rgb=mix(diffuseColor.rgb,t2_.rgb*diffuse,0.45);
@@ -5473,7 +5445,6 @@ function iceSurfaceShader(sh,cut){
   float edge_=smoothstep(0.47,0.53,n_)*(1.0-smoothstep(0.53,0.6,n_));
   diffuseColor.rgb=mix(diffuseColor.rgb,ic_,iceK)+vec3(0.18,0.2,0.22)*edge_*0.6;`);
   sh.fragmentShader=sh.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n  roughnessFactor=mix(roughnessFactor,0.12,iceK);');
-  sh.fragmentShader=sh.fragmentShader.replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n  { vec3 n2_=texture2D(iceNor,vUv*1.5).xyz*2.0-1.0; normal=normalize(mix(normal,normalize(normal+vec3(n2_.xy*0.25,0.0)),iceK)); }');
 }
 mat.onBeforeCompile=sh=>iceSurfaceShader(sh,true);
 mat.customProgramCacheKey=()=> 'ice-world-sheet-v2';
@@ -6979,7 +6950,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101055406'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101061534'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -7685,14 +7656,6 @@ float sandKf(vec2 p){ float e=34.+th(p*vec2(1.7,1.3))*7.+sin(p.x*.21)*2.5; retur
   vec4 texelColor=vec4(mix(pow(mudC,vec3(1.25))*.82*(1.-.25*wet),sandC*(.9-.1*wet),sk),1.);   // 泥比較深、對比高
   texelColor=mapTexelToLinear(texelColor); diffuseColor*=texelColor;
   float macro=th(vWP2.xz*.4)*.5+.5; diffuseColor.rgb*=.85+.2*macro;`)
-  .replace('#include <normal_fragment_maps>',`
-  { vec3 nm=mix(texture2D(normalMap,vWP2.xz*.29).xyz,texture2D(tSandN,vWP2.xz*.3).xyz,clamp(sandKf(vWP2.xz),0.,1.))*2.-1.; nm.xy*=normalScale;
-    #ifdef USE_TANGENT
-    normal=normalize(vTBN*nm);
-    #else
-    normal=perturbNormal2Arb(-vViewPosition,normal,nm,faceDirection);
-    #endif
-  }`)
   .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
   { float skR=clamp(sandKf(vWP2.xz),0.,1.); float wetR=1.-smoothstep(-.12,.02,vWP2.y);
     roughnessFactor=mix(mix(.3,.16,wetR),.88,skR);   // 泥：濕亮（越靠水越像抹了一層水）；沙：乾霧
@@ -9566,9 +9529,11 @@ let homeWarmAt=0;
 function frame(now){
   const frameSeconds=frameLimiter.step(now);if(frameSeconds===null){requestAnimationFrame(frame);return;}
   if(graphicsRecovery.paused()||document.hidden||screenCapture.paused()){frameLimiter.reset(now);requestAnimationFrame(frame);return;}const dt=Math.min(.05,frameSeconds);window.__frameSeconds=frameSeconds;
+  // Resolution changes clear the drawing buffer: apply them BEFORE drawing this frame.
+  gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?HOME3D.qualityScope():UW.active()?'underwater':G.loc||'lake'});
   if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
   if(HOME3D.active()){if(!homeWarmAt)homeWarmAt=now;if(homeWarmAt>0&&now-homeWarmAt>5000){homeWarmAt=-1;if(window.__DIAG)window.__DIAG.action('home','done','5 seconds rendered');}}else homeWarmAt=0;if(window.__DIAG)window.__DIAG.stage('render');screenCapture.afterFrame();if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
-  gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?HOME3D.qualityScope():UW.active()?'underwater':G.loc||'lake'});
+
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

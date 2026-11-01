@@ -15,13 +15,18 @@ class FishingPhysics {
       if(!b.isEmpty()) item.boxes.push({min:{x:b.min.x,y:b.min.y,z:b.min.z},max:{x:b.max.x,y:b.max.y,z:b.max.z},label:item.label});
     });
   }
-  refresh(){ this.boxes=[]; for(const i of this.items){ if(!i.enabled()) continue; if(i.update) i.update(); else if(i.dynamic) this.measure(i); this.boxes.push(...i.boxes); } }
+  refresh(){ this.boxes.length=0; for(const i of this.items){ if(!i.enabled()) continue; if(i.update) i.update(); else if(i.dynamic) this.measure(i); this.boxes.push(...i.boxes); } }
   static local(p,b){ if(!b.frame)return {...p}; const f=b.frame,c=Math.cos(f.head),s=Math.sin(f.head),x=p.x-f.x,z=p.z-f.z;return{x:x*c-z*s,y:p.y,z:x*s+z*c}; }
   static world(p,b){ if(!b.frame)return {...p};const f=b.frame,c=Math.cos(f.head),s=Math.sin(f.head);return{x:f.x+p.x*c+p.z*s,y:p.y,z:f.z-p.x*s+p.z*c}; }
   static inside(p,b,r=0){ p=FishingPhysics.local(p,b); return ['x','y','z'].every(k=>p[k]>b.min[k]-r&&p[k]<b.max[k]+r); }
   hit(a,b,r=0,accept=null){
     let best=null;
-    for(const box of this.boxes){ if(accept&&!accept(box))continue; const aa=FishingPhysics.local(a,box),bb=FishingPhysics.local(b,box); if(r===.025&&box.label==='睡蓮葉') continue; let lo=0,hi=1,axis=null,sign=0,valid=true;
+    const minX=Math.min(a.x,b.x)-r,maxX=Math.max(a.x,b.x)+r,minY=Math.min(a.y,b.y)-r,maxY=Math.max(a.y,b.y)+r,minZ=Math.min(a.z,b.z)-r,maxZ=Math.max(a.z,b.z)+r;
+    for(const box of this.boxes){
+      if(r===.025&&box.label==='睡蓮葉')continue;
+      // Reject distant static bounds before transforms, allocations and slab tests.
+      if(!box.frame&&(box.min.x>maxX||box.max.x<minX||box.min.y>maxY||box.max.y<minY||box.min.z>maxZ||box.max.z<minZ))continue;
+      if(accept&&!accept(box))continue;const aa=box.frame?FishingPhysics.local(a,box):a,bb=box.frame?FishingPhysics.local(b,box):b; let lo=0,hi=1,axis=null,sign=0,valid=true;
       for(const k of ['x','y','z']){ const d=bb[k]-aa[k], mn=box.min[k]-r,mx=box.max[k]+r;
         if(Math.abs(d)<1e-10){ if(aa[k]<=mn||aa[k]>=mx){valid=false;break;} continue; }
         let t0=(mn-aa[k])/d,t1=(mx-aa[k])/d,sg=-1; if(t0>t1){[t0,t1]=[t1,t0];sg=1;}

@@ -4,7 +4,7 @@ test('drilled ice rim shares the sheet textures, world UV mapping and lighting',
  for(const key of ['map','normalMap','roughnessMap'])assert.equal(rim.material[key],sheet.material[key]);
  const ground=shader(sheet.material),edge=shader(rim.material);
  assert.equal(ground.vertexShader,edge.vertexShader);assert(ground.vertexShader.includes('vIceWorld.x,-vIceWorld.z'));
- assert.equal(ground.uniforms.iceMap.value,edge.uniforms.iceMap.value);assert.equal(ground.uniforms.iceNor.value,edge.uniforms.iceNor.value);
+ assert.equal(ground.uniforms.iceMap.value,edge.uniforms.iceMap.value);assert.equal(ground.uniforms.iceNor,undefined);assert.equal(edge.uniforms.iceNor,undefined);assert(!ground.fragmentShader.includes('texture2D(iceNor'));
  base.set(23,0,-41);ice.update(.016);assert.equal(sheet.material.map.offset.length(),0);
  assert(sheet.receiveShadow&&rim.receiveShadow);assert.notEqual(sheet.material.customProgramCacheKey(),rim.material.customProgramCacheKey());
 });

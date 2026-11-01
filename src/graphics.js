@@ -3,7 +3,7 @@ function recoverMobileGraphics(save,touch,dpr){if(!touch||dpr<2.5||save.gfx!=='h
 /* Raw RAF timing, independent of the simulation's capped timestep. */
 function graphicsProfiles(cap){
  const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
- return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:i===0?Math.min(cap,.65):Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
+ return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:i<2?Math.min(cap,i===0?.65:.85):Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
 }
 function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null,initialLevel=4}){
  const initial=Math.max(0,Math.min(7,Math.round(Number(initialLevel)||0)));const sceneLevels=new Map();let emergencyTime=0,emergencyFrames=0;

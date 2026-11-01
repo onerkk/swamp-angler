@@ -3,13 +3,13 @@ function createIce(W,c){
 'use strict';
 const T=THREE, tl=new T.TextureLoader(), rep=(t,n)=>{ t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(n,n); t.anisotropy=4; return t; };
 const col=rep(tl.load('snow_Diffuse.jpg'),90); col.encoding=T.sRGBEncoding;
-const mat=new T.MeshStandardMaterial({map:col,normalMap:rep(tl.load('snow_nor_gl.jpg'),90),roughnessMap:rep(tl.load('snow_Rough.jpg'),90),roughness:.82,metalness:0,color:0xffffff,envMapIntensity:1.6,normalScale:new T.Vector2(.45,.45)});mat.userData.screenReflection=true;
+const mat=new T.MeshStandardMaterial({map:col,roughnessMap:rep(tl.load('snow_Rough.jpg'),90),roughness:.82,metalness:0,color:0xffffff,envMapIntensity:1.6,normalScale:new T.Vector2(.45,.45)});mat.userData.screenReflection=true;
 // 真實結冰湖面：風吹乾淨的地方是深色透明冰（ambientCG Ice003，CC0，裂紋網），其他地方是積雪；用大範圍雜訊自然混合
-const iceC=rep(tl.load('ice_Color.jpg'),60); iceC.encoding=T.sRGBEncoding; const iceN=rep(tl.load('ice_nor.jpg'),60);
+const iceC=rep(tl.load('ice_Color.jpg'),60); iceC.encoding=T.sRGBEncoding;
 // 湖面與洞緣從同一個世界座標取樣；移動／轉頭不會讓裂紋在洞口斷開。
 const cutHole={value:new T.Vector3(0,0,0)};
 function iceSurfaceShader(sh,cut){
-  sh.uniforms.iceMap={value:iceC}; sh.uniforms.iceNor={value:iceN}; sh.uniforms.iceHole=cutHole;
+  sh.uniforms.iceMap={value:iceC}; sh.uniforms.iceHole=cutHole;
   sh.vertexShader='varying vec3 vIceWorld;\n'+sh.vertexShader;
   sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
   vIceWorld=(modelMatrix*vec4(transformed,1.0)).xyz;
@@ -17,7 +17,7 @@ function iceSurfaceShader(sh,cut){
   sh.fragmentShader='varying vec3 vIceWorld; uniform vec3 iceHole;\n'+sh.fragmentShader;
   if(cut) sh.fragmentShader=sh.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
   if(iceHole.z>0.0 && distance(vIceWorld.xz,iceHole.xy)<iceHole.z) discard;`);
-  sh.fragmentShader='uniform sampler2D iceMap; uniform sampler2D iceNor;\nfloat hh_(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }\nfloat vn_(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hh_(i),hh_(i+vec2(1,0)),f.x),mix(hh_(i+vec2(0,1)),hh_(i+vec2(1,1)),f.x),f.y); }\n'+sh.fragmentShader;
+  sh.fragmentShader='uniform sampler2D iceMap;\nfloat hh_(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }\nfloat vn_(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hh_(i),hh_(i+vec2(1,0)),f.x),mix(hh_(i+vec2(0,1)),hh_(i+vec2(1,1)),f.x),f.y); }\n'+sh.fragmentShader;
   sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
   vec4 t2_=mapTexelToLinear(texture2D(map,vUv*0.27+vec2(0.31,0.17)));
   diffuseColor.rgb=mix(diffuseColor.rgb,t2_.rgb*diffuse,0.45);
@@ -27,7 +27,6 @@ function iceSurfaceShader(sh,cut){
   float edge_=smoothstep(0.47,0.53,n_)*(1.0-smoothstep(0.53,0.6,n_));
   diffuseColor.rgb=mix(diffuseColor.rgb,ic_,iceK)+vec3(0.18,0.2,0.22)*edge_*0.6;`);
   sh.fragmentShader=sh.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n  roughnessFactor=mix(roughnessFactor,0.12,iceK);');
-  sh.fragmentShader=sh.fragmentShader.replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n  { vec3 n2_=texture2D(iceNor,vUv*1.5).xyz*2.0-1.0; normal=normalize(mix(normal,normalize(normal+vec3(n2_.xy*0.25,0.0)),iceK)); }');
 }
 mat.onBeforeCompile=sh=>iceSurfaceShader(sh,true);
 mat.customProgramCacheKey=()=> 'ice-world-sheet-v2';

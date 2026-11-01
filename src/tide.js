@@ -48,14 +48,6 @@ float sandKf(vec2 p){ float e=34.+th(p*vec2(1.7,1.3))*7.+sin(p.x*.21)*2.5; retur
   vec4 texelColor=vec4(mix(pow(mudC,vec3(1.25))*.82*(1.-.25*wet),sandC*(.9-.1*wet),sk),1.);   // 泥比較深、對比高
   texelColor=mapTexelToLinear(texelColor); diffuseColor*=texelColor;
   float macro=th(vWP2.xz*.4)*.5+.5; diffuseColor.rgb*=.85+.2*macro;`)
-  .replace('#include <normal_fragment_maps>',`
-  { vec3 nm=mix(texture2D(normalMap,vWP2.xz*.29).xyz,texture2D(tSandN,vWP2.xz*.3).xyz,clamp(sandKf(vWP2.xz),0.,1.))*2.-1.; nm.xy*=normalScale;
-    #ifdef USE_TANGENT
-    normal=normalize(vTBN*nm);
-    #else
-    normal=perturbNormal2Arb(-vViewPosition,normal,nm,faceDirection);
-    #endif
-  }`)
   .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
   { float skR=clamp(sandKf(vWP2.xz),0.,1.); float wetR=1.-smoothstep(-.12,.02,vWP2.y);
     roughnessFactor=mix(mix(.3,.16,wetR),.88,skR);   // 泥：濕亮（越靠水越像抹了一層水）；沙：乾霧
