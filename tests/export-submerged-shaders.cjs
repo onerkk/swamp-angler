@@ -37,4 +37,5 @@ const ice=require('./ice-fixture.cjs').iceFixture(),iceDefs=defs+'#define USE_RO
 for(const [name,material] of [['iceSheet',ice.sheet.material],['iceRim',ice.rim.material]]){
  const sh=ice.shader(material);out[name+'VS']=iceDefs+vp+expand(sh.vertexShader);out[name+'FS']=iceDefs+fp+expand(sh.fragmentShader);
 }
+const worldCode=fs.readFileSync(require.resolve('../src/b.js'),'utf8'),skyContext={waterWaveGLSL};vm.createContext(skyContext);vm.runInContext(worldCode.slice(0,worldCode.indexOf('function createWorld('))+'\nglobalThis.PROBE_SH=SH;',skyContext);out.probeFS='precision highp float;uniform vec3 cameraPosition;\n'+T.ShaderChunk.encodings_pars_fragment+'\nvec4 linearToOutputTexel(vec4 v){return v;}\n'+expand(require('../src/material-lighting.js').photoProbeFragment(skyContext.PROBE_SH));
 process.stdout.write(JSON.stringify(out));

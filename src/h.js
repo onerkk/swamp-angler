@@ -8,7 +8,7 @@ const SETS={
  lake:{pre:'env_',mask:'env_mask.png',meta:{dawn:{u:.3633,el:6.33,exp:.252,lc:[1.0,.72,.52],li:1.2,light:.7},day:{u:.3496,el:5.62,exp:1.0,lc:[1.0,.86,.7],li:2.4,light:1},night:{u:.6865,el:44.3,exp:.14,lc:[.55,.62,.85],li:.5,light:.3}}},
  ice:{pre:'ice_',mask:'ice_mask.png',meta:{dawn:{u:.6191,el:17.05,exp:.9,lc:[.9,.93,.97],li:1.4,light:.85},day:{u:.5996,el:28.3,exp:1.0,lc:[1.0,.96,.9],li:2.5,light:1},night:{u:.6191,el:17.05,exp:.9,lc:[.55,.62,.85],li:.5,light:.3}}},
  sea:{pre:'sea_',mask:'sea_mask.png',meta:{dawn:{u:.3623,el:4.92,exp:.305,lc:[1.0,.72,.5],li:1.3,light:.7},day:{u:.3447,el:48.16,exp:.568,lc:[1.0,.95,.88],li:2.6,light:1},night:{u:.3486,el:17.23,exp:1.343,lc:[.6,.68,.9],li:.45,light:.35}}}};
-let SET='lake', META=SETS.lake.meta, started=false, envKey=null;
+let SET='lake', META=SETS.lake.meta, started=false;
 const YAW=.25; U.uYaw.value=YAW;
 let total=0, errors=0;
 const mgr=new T.LoadingManager();
@@ -20,12 +20,11 @@ const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter
 const tex={}, env={}, masks={};
 function loadKey(k){ const id=SET+'_'+k; if(tex[id]) return; const o={ready:false,n:0}; tex[id]=o; const fin=()=>{ if(++o.n===2) o.ready=true; }, p=SETS[SET].pre;
   o.band=prep(tl.load(`${p}${k}_band.jpg`,fin)); o.full=prep(tl.load(`${p}${k}_full.jpg`,fin)); }
-const pmrem=new T.PMREMGenerator(W.renderer);
 function loadEnv(k){ const id=SET+'_'+k; if(env[id]!==undefined) return; env[id]=null; if(!T.RGBELoader) return;
-  new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(`${SETS[SET].pre}${k}.hdr`,t=>{ env[id]=pmrem.fromEquirectangular(t).texture; t.dispose(); }); }
+  new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(`${SETS[SET].pre}${k}.hdr`,t=>{ env[id]=t;W.invalidateEnvironment(); }); }
 function useSet(name){ SET=name; META=SETS[name].meta; if(!masks[name]) masks[name]=prep(tl.load(SETS[name].mask)); U.uMask.value=masks[name];
   for(const id in tex){ if(!id.startsWith(name+'_')){ tex[id].band.dispose(); tex[id].full.dispose(); delete tex[id]; } }
-  ['day','dawn','night'].forEach(k=>{ loadKey(k); loadEnv(k); }); envKey=null; }
+  ['day','dawn','night'].forEach(k=>{ loadKey(k); loadEnv(k); });W.invalidateEnvironment(); }
 useSet('lake');
 
 function sched(h){
@@ -46,13 +45,13 @@ W.setPhotoHook((h,wx)=>{
   if(!A||!A.ready||!B||!B.ready) return null;
   if(!started){ started=true; W.setPhotoActive(); if(cb) cb(1,true,errors); }
   U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m;
-  const k=m<.5?a:b, ek=SET+'_'+k;
+  U.uRadianceA.value=env[SET+'_'+a]||null;U.uRadianceB.value=env[SET+'_'+b]||null;U.uRadianceReady.value=U.uRadianceA.value&&U.uRadianceB.value?1:0;
   const MA=META[a], MB=META[b], L=(x,y)=>x+(y-x)*m;
   sunDir(MA,dA); sunDir(MB,dB); dir.copy(dA).lerp(dB,m).normalize();
   /* 深夜係數：19:20 起天色轉暗，21:00～04:00 為深夜，05:00 前天亮。照片曝光、光照一起壓暗，天空與水面反射一致 */
   const H=((h%24)+24)%24, ss=(a0,a1,x)=>{ const t=Math.min(1,Math.max(0,(x-a0)/(a1-a0))); return t*t*(3-2*t); };
   const nk=H>=12?ss(19.3,21,H):1-ss(4,5,H), deep=SET==='sea'?.018:.05; U.uNight.value=nk; U.uNightDeep.value=deep;
-  { const want=env[ek]||null; if(W.scene.environment!==want){ W.scene.environment=want; envKey=ek; } }
+  // The world owns the filtered environment: never overwrite it with a null/stale HDR map.
   const li=L(MA.li,MB.li)*(1-wx.cloud*.75-wx.rain*.15)*(1-.6*nk);
   return {dir, lc:[L(MA.lc[0],MB.lc[0])*li,L(MA.lc[1],MB.lc[1])*li,L(MA.lc[2],MB.lc[2])*li],
     exp:Math.exp(L(Math.log(MA.exp),Math.log(MB.exp)))*(1-wx.cloud*.15), light:L(MA.light,MB.light)*(1-wx.cloud*.3)*(1-.55*nk)};

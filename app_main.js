@@ -1,4 +1,4 @@
-/*APPV:20261101001731*/
+/*APPV:20261101002244*/
 /* The aquarium is a close-up exhibit: keep texture detail and reduce repeated draw calls. */
 function aquariumGraphicsProfile(profile,scope,cap){
  if(scope!=='home-aquarium'||profile.mode!=='auto')return profile;
@@ -625,6 +625,16 @@ function createTacklePreview(W,build){
  };
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={TACKLE_FINISHES,tackleFinish,applyTackleFinish};
+/* Capture HDR radiance with the same panorama rotation and weather as the visible sky. */
+function photoProbeFragment(SH){return SH.common+`
+uniform sampler2D uRadianceA,uRadianceB;uniform float uRadianceReady;
+vec3 probeHDR(sampler2D image,vec3 d){vec2 uv=vec2(fract(atan(d.x,-d.z)*0.15915494+uYaw),asin(clamp(d.y,-1.0,1.0))*0.31830989+0.5);vec4 rgbe=texture2D(image,uv);return rgbe.rgb*exp2(rgbe.a*255.0-128.0);}
+`+SH.skyFS.replace('gl_FragColor = vec4(col, 1.0);',`if(uPhoto>0.5&&uRadianceReady>0.5){
+ vec3 rawPhoto=mix(photoS(uBandA,uFullA,rd),photoS(uBandB,uFullB,rd),uPMix);
+ vec3 hdr=mix(probeHDR(uRadianceA,rd),probeHDR(uRadianceB,rd),uPMix);
+ col=hdr*clamp(col/max(rawPhoto,vec3(0.004)),vec3(0.0),vec3(2.0));
+ }
+ gl_FragColor=vec4(col,1.0);`);}
 /* Tangent-space normals describe surface detail; they do not replace lighting or IBL. */
 function createDetailNormals(T){
  const n=256,out={};
@@ -656,7 +666,7 @@ function createInteriorReflection(T,R){
  }
  return{update};
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={createDetailNormals,auditSceneLighting,createInteriorReflection};
+if(typeof module!=='undefined'&&module.exports)module.exports={photoProbeFragment,createDetailNormals,auditSceneLighting,createInteriorReflection};
 /* Material assignments follow the yacht asset's named parts, not average pixel color. */
 const MARINE_PARTS={
  material_3:'teak',material_5:'navy',material_40:'navy',material_1:'gelcoat',material_33:'gelcoat',material_42:'steel',material_7:'steel',material_2:'steel',material_4:'steel',material_35:'steel',material_17:'fabric',material_8:'leather'
@@ -1318,8 +1328,8 @@ let waterDetail='mid';function setWaterDetail(q){if(q===waterDetail)return;let [
 
 // 環境光照貼圖（由同一套天空/樹林產生）
 const pmrem = new T.PMREMGenerator(renderer);
-const envScene = new T.Scene();
-envScene.add(new T.Mesh(new T.SphereGeometry(40,32,16), new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:SH.common+SH.skyFS, side:T.BackSide, depthWrite:false, depthTest:false})));
+const envScene = new T.Scene();Object.assign(U,{uRadianceA:{value:null},uRadianceB:{value:null},uRadianceReady:{value:0}});
+envScene.add(new T.Mesh(new T.SphereGeometry(40,32,16), new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:photoProbeFragment(SH), side:T.BackSide, depthWrite:false, depthTest:false})));
 let envRT = null, envHour = -99;
 function regenEnv(){ const rt = pmrem.fromScene(envScene, 0, 0.1, 100); if(envRT) envRT.dispose(); envRT = rt; scene.environment = rt.texture; }
 
@@ -1458,6 +1468,7 @@ function render(){ submerged.render(); if(reflEnabled){ try{ renderRefl(); }catc
 function setIce(on){water.visible=!on;seaGrid.visible=!on;}
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=water.visible; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
 let photoHook=null;
+function invalidateEnvironment(){wxDirty=true;}
 function setPhotoHook(f){ photoHook=f;wxDirty=true; }
 function setPhotoActive(){ wxDirty=true;envHour=-99;U.uPhoto.value=1; skyMat.toneMapped=false; skyMat.needsUpdate=true; waterMat.toneMapped=false; waterMat.needsUpdate=true; seaMat.toneMapped=false; seaMat.needsUpdate=true; }
 function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
@@ -1465,7 +1476,7 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { invalidateEnvironment,interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
 /* ===== 美人魚的骨架與表情（依新設定圖生成的模型，載入後在執行時自動加骨架）=====
    骨架：臀→腰→胸→頸→頭；左右肩→上臂→前臂→手；尾巴 6 節＋尾鰭；頭髮 3 節
@@ -3531,7 +3542,7 @@ const SETS={
  lake:{pre:'env_',mask:'env_mask.png',meta:{dawn:{u:.3633,el:6.33,exp:.252,lc:[1.0,.72,.52],li:1.2,light:.7},day:{u:.3496,el:5.62,exp:1.0,lc:[1.0,.86,.7],li:2.4,light:1},night:{u:.6865,el:44.3,exp:.14,lc:[.55,.62,.85],li:.5,light:.3}}},
  ice:{pre:'ice_',mask:'ice_mask.png',meta:{dawn:{u:.6191,el:17.05,exp:.9,lc:[.9,.93,.97],li:1.4,light:.85},day:{u:.5996,el:28.3,exp:1.0,lc:[1.0,.96,.9],li:2.5,light:1},night:{u:.6191,el:17.05,exp:.9,lc:[.55,.62,.85],li:.5,light:.3}}},
  sea:{pre:'sea_',mask:'sea_mask.png',meta:{dawn:{u:.3623,el:4.92,exp:.305,lc:[1.0,.72,.5],li:1.3,light:.7},day:{u:.3447,el:48.16,exp:.568,lc:[1.0,.95,.88],li:2.6,light:1},night:{u:.3486,el:17.23,exp:1.343,lc:[.6,.68,.9],li:.45,light:.35}}}};
-let SET='lake', META=SETS.lake.meta, started=false, envKey=null;
+let SET='lake', META=SETS.lake.meta, started=false;
 const YAW=.25; U.uYaw.value=YAW;
 let total=0, errors=0;
 const mgr=new T.LoadingManager();
@@ -3543,12 +3554,11 @@ const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter
 const tex={}, env={}, masks={};
 function loadKey(k){ const id=SET+'_'+k; if(tex[id]) return; const o={ready:false,n:0}; tex[id]=o; const fin=()=>{ if(++o.n===2) o.ready=true; }, p=SETS[SET].pre;
   o.band=prep(tl.load(`${p}${k}_band.jpg`,fin)); o.full=prep(tl.load(`${p}${k}_full.jpg`,fin)); }
-const pmrem=new T.PMREMGenerator(W.renderer);
 function loadEnv(k){ const id=SET+'_'+k; if(env[id]!==undefined) return; env[id]=null; if(!T.RGBELoader) return;
-  new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(`${SETS[SET].pre}${k}.hdr`,t=>{ env[id]=pmrem.fromEquirectangular(t).texture; t.dispose(); }); }
+  new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(`${SETS[SET].pre}${k}.hdr`,t=>{ env[id]=t;W.invalidateEnvironment(); }); }
 function useSet(name){ SET=name; META=SETS[name].meta; if(!masks[name]) masks[name]=prep(tl.load(SETS[name].mask)); U.uMask.value=masks[name];
   for(const id in tex){ if(!id.startsWith(name+'_')){ tex[id].band.dispose(); tex[id].full.dispose(); delete tex[id]; } }
-  ['day','dawn','night'].forEach(k=>{ loadKey(k); loadEnv(k); }); envKey=null; }
+  ['day','dawn','night'].forEach(k=>{ loadKey(k); loadEnv(k); });W.invalidateEnvironment(); }
 useSet('lake');
 
 function sched(h){
@@ -3569,13 +3579,13 @@ W.setPhotoHook((h,wx)=>{
   if(!A||!A.ready||!B||!B.ready) return null;
   if(!started){ started=true; W.setPhotoActive(); if(cb) cb(1,true,errors); }
   U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m;
-  const k=m<.5?a:b, ek=SET+'_'+k;
+  U.uRadianceA.value=env[SET+'_'+a]||null;U.uRadianceB.value=env[SET+'_'+b]||null;U.uRadianceReady.value=U.uRadianceA.value&&U.uRadianceB.value?1:0;
   const MA=META[a], MB=META[b], L=(x,y)=>x+(y-x)*m;
   sunDir(MA,dA); sunDir(MB,dB); dir.copy(dA).lerp(dB,m).normalize();
   /* 深夜係數：19:20 起天色轉暗，21:00～04:00 為深夜，05:00 前天亮。照片曝光、光照一起壓暗，天空與水面反射一致 */
   const H=((h%24)+24)%24, ss=(a0,a1,x)=>{ const t=Math.min(1,Math.max(0,(x-a0)/(a1-a0))); return t*t*(3-2*t); };
   const nk=H>=12?ss(19.3,21,H):1-ss(4,5,H), deep=SET==='sea'?.018:.05; U.uNight.value=nk; U.uNightDeep.value=deep;
-  { const want=env[ek]||null; if(W.scene.environment!==want){ W.scene.environment=want; envKey=ek; } }
+  // The world owns the filtered environment: never overwrite it with a null/stale HDR map.
   const li=L(MA.li,MB.li)*(1-wx.cloud*.75-wx.rain*.15)*(1-.6*nk);
   return {dir, lc:[L(MA.lc[0],MB.lc[0])*li,L(MA.lc[1],MB.lc[1])*li,L(MA.lc[2],MB.lc[2])*li],
     exp:Math.exp(L(Math.log(MA.exp),Math.log(MB.exp)))*(1-wx.cloud*.15), light:L(MA.light,MB.light)*(1-wx.cloud*.3)*(1-.55*nk)};
@@ -6787,7 +6797,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101001731'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101002244'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

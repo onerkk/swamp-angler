@@ -1,3 +1,13 @@
+/* Capture HDR radiance with the same panorama rotation and weather as the visible sky. */
+function photoProbeFragment(SH){return SH.common+`
+uniform sampler2D uRadianceA,uRadianceB;uniform float uRadianceReady;
+vec3 probeHDR(sampler2D image,vec3 d){vec2 uv=vec2(fract(atan(d.x,-d.z)*0.15915494+uYaw),asin(clamp(d.y,-1.0,1.0))*0.31830989+0.5);vec4 rgbe=texture2D(image,uv);return rgbe.rgb*exp2(rgbe.a*255.0-128.0);}
+`+SH.skyFS.replace('gl_FragColor = vec4(col, 1.0);',`if(uPhoto>0.5&&uRadianceReady>0.5){
+ vec3 rawPhoto=mix(photoS(uBandA,uFullA,rd),photoS(uBandB,uFullB,rd),uPMix);
+ vec3 hdr=mix(probeHDR(uRadianceA,rd),probeHDR(uRadianceB,rd),uPMix);
+ col=hdr*clamp(col/max(rawPhoto,vec3(0.004)),vec3(0.0),vec3(2.0));
+ }
+ gl_FragColor=vec4(col,1.0);`);}
 /* Tangent-space normals describe surface detail; they do not replace lighting or IBL. */
 function createDetailNormals(T){
  const n=256,out={};
@@ -29,4 +39,4 @@ function createInteriorReflection(T,R){
  }
  return{update};
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={createDetailNormals,auditSceneLighting,createInteriorReflection};
+if(typeof module!=='undefined'&&module.exports)module.exports={photoProbeFragment,createDetailNormals,auditSceneLighting,createInteriorReflection};
