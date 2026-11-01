@@ -398,8 +398,8 @@ function render(){
   } else if(cur==='set'){
     shT.textContent='設定';
     h+='<div class="note">切換時段</div><div class="tabs">'+PRESETS.map((p,i)=>`<button class="tab" data-a="time" data-v="${i}">${p[1]}</button>`).join('')+'</div>';
-    { const gq=save.gfx||'auto'; h+='<div class="note">畫質</div><div class="tabs">'+[['auto','自動'],['high','高'],['mid','中'],['low','低']].map(([k,n])=>`<button class="tab${gq===k?' on':''}" data-a="gfx" data-v="${k}">${n}</button>`).join('')+'</div><div class="note" style="font-size:12px">遊戲幀率上限 120 FPS，實際幀率取決於裝置與場景。自動（建議）：掉幀時降低解析度、倒影、陰影與特效；穩定達 60 FPS 時逐級升到最高。高／中／低：固定畫質。</div>'+`<div id="gfxLive" class="note" style="font-size:12px">${window.__gfxStatus?graphicsStatusText(window.__gfxStatus):'畫質初始化中'}</div>`; }
-    { const n=window.__DIAG?window.__DIAG.count():0; h+=`<div class="note">問題回報（本次執行記錄 ${n} 筆錯誤）</div><div class="tabs"><button class="tab" data-a="diag" data-v="copy">📋 複製診斷資訊</button><button class="tab" data-a="diag" data-v="clear">清除記錄</button></div><div class="note" style="font-size:12px">遇到怪問題時，按「複製診斷資訊」再貼給開發者，就能看到你手機上實際發生的錯誤和幀率。</div>`; }
+    { const gq=save.gfx||'auto'; h+='<div class="note">畫質</div><div class="tabs">'+[['auto','自動'],['high','高'],['mid','中'],['low','低']].map(([k,n])=>`<button class="tab${gq===k?' on':''}" data-a="gfx" data-v="${k}">${n}</button>`).join('')+'</div><div class="note" style="font-size:12px">遊戲幀率上限 120 FPS，實際幀率取決於裝置與場景。自動（建議）：掉幀時降低解析度、倒影、陰影與特效；穩定達 60 FPS 時逐級升到最高。高／中／低：固定畫質。手機自動模式也限制貼圖記憶體；高畫質貼圖於下次開啟時載入。</div>'+`<div id="gfxLive" class="note" style="font-size:12px">${window.__gfxStatus?graphicsStatusText(window.__gfxStatus):'畫質初始化中'}</div>`; }
+    { const n=window.__DIAG?window.__DIAG.count():0; h+=`<div class="note">問題回報（本次執行記錄 ${n} 筆錯誤）</div><div class="tabs"><button class="tab" data-a="diag" data-v="copy">📋 複製診斷摘要</button><button class="tab" data-a="diag" data-v="download">下載完整報告</button><button class="tab" data-a="diag" data-v="clear">清除記錄</button></div><div class="note" style="font-size:12px">摘要少於 1,000 字，適合貼訊息；完整報告包含前次中斷操作、貼圖尺寸、繪圖負載與錯誤堆疊。沒有 JS 錯誤不代表沒有系統中斷。</div>`; }
     h+='<div class="note">天氣</div><div class="tabs">'+[['auto','自動'],['clear','晴'],['breezy','有風'],['cloudy','陰'],['drizzle','毛毛雨'],['rain','雨'],['storm','雷雨'],['fog','霧']].map(w=>`<button class="tab${(save.wxMode||'auto')===w[0]?' on':''}" data-a="wx" data-v="${w[0]}">${w[1]}</button>`).join('')+'</div>';
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
     h+='<div class="note">魚訊放大視窗（自動：休閒、標準開，硬派、專家關）</div><div class="tabs">'+[['auto','自動'],['on','開'],['off','關']].map(m=>`<button class="tab${(save.mag||'auto')===m[0]?' on':''}" data-a="mag" data-v="${m[0]}">${m[1]}</button>`).join('')+'</div>';
@@ -552,7 +552,7 @@ $('baitChip').addEventListener('click',()=>{ shopTab='bait'; open('shop'); });
 $('shX').addEventListener('click',close);
 sheet.addEventListener('click',e=>{ if(e.target===sheet) close(); });
 shB.addEventListener('click',e=>{
-  const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(a==='diag'&&window.__DIAG){ if(v==='copy') window.__DIAG.copy().then(ok=>toast(ok?'已複製診斷資訊，可以直接貼上':'複製失敗，請截圖設定頁','good',2200)); else { window.__DIAG.clear(); toast('已清除錯誤記錄','good',1200); } render(); return; }
+  const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(a==='diag'&&window.__DIAG){ if(v==='copy') window.__DIAG.copy().then(ok=>toast(ok?'已複製精簡摘要，可以直接貼上':'複製失敗，請截圖設定頁','good',2200)); else if(v==='download'){window.__DIAG.download();toast('已送出完整診斷報告','good',1800);}else { window.__DIAG.clear(); toast('已清除錯誤記錄','good',1200); } render(); return; }
   if(a==='gfx'){ save.gfx=v;save.gfxRecoveryVersion=1; persist(); if(window.__applyGfx) window.__applyGfx(v); toast('畫質：'+({auto:'自動',high:'高',mid:'中',low:'低'})[v],'good',1200); render(); return; } if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
   if(a==='tab') shopTab=v;
   else if(a==='buy'){ const it=GEAR[shopTab][+v]; if(save.coins<it.price){ toast('金幣不夠','bad'); return; }
@@ -591,7 +591,7 @@ shB.addEventListener('click',e=>{
   else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else if(v==='rescue') window.__CLOUD.rescue(); else if(v==='comp') window.__CLOUD.compensate(); else if(v==='copy') window.__CLOUD.copyMain(); else window.__CLOUD.logout(); }
   else if(a==='tut'){ const sh=document.getElementById('sheet'); if(sh) sh.classList.add('hidden'); setTimeout(()=>startTutorial(true),300); return; }
   else if(a==='pwa'){ PWA.install().then(r=>{ if(r==='ios') toast('iPhone：按 Safari 的「分享」→「加入主畫面」','',4200); else if(r==='manual') toast('瀏覽器選單 ⋮ →「加到主畫面」或「安裝應用程式」','',4200); else if(r==='installed') toast('已經安裝了','',1600); }); }
-  else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem(window.__SAVE_KEY||'swampAngler.v1'); }catch(_){} location.reload(); return; } }
+  else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem(window.__SAVE_KEY||'swampAngler.v1'); }catch(_){} if(window.__DIAG)window.__DIAG.action('navigation','user-reset');location.reload(); return; } }
   render(); syncHUD();
 });
 fillQuests(); applyRod(); syncHUD(); document.body.classList.toggle('immersive',!!save.imm);

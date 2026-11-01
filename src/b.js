@@ -504,7 +504,7 @@ let seaMode=false;
 function shoreR(az){ return seaMode?1400:shoreR0(az); }
 function shoreR0(az){ const d=(az-0.12)/0.30; return 54+9*Math.sin(az*2.3+1.1)+6*Math.sin(az*5.1+0.3)+3*Math.sin(az*11.7+2.0)+45*Math.exp(-d*d); }
 
-const renderer = new T.WebGLRenderer({canvas:opts.canvas, antialias:true, powerPreference:'high-performance'});
+const renderer = new T.WebGLRenderer({canvas:opts.canvas, antialias:!window.__resourcePolicy?.mobile, powerPreference:'high-performance'});
 renderer.outputEncoding = T.sRGBEncoding;
 renderer.toneMapping = T.ACESFilmicToneMapping;
 
@@ -544,7 +544,7 @@ Object.assign(sunLight.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.
 function setShadows(q){renderer.shadowMap.enabled=q!=='low';const n=q==='ultra'?Math.min(4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='mid'?512:1024;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
 const hemi = new T.HemisphereLight(0xffffff, 0x223322, 0.55); scene.add(hemi);
 
-function qualityTextures(root){const max=renderer.capabilities.getMaxAnisotropy();root.traverse(m=>{if(!m.isMesh)return;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))if(mat)for(const key of['map','normalMap','roughnessMap','metalnessMap','bumpMap','emissiveMap'])tuneTextureSampling(T,mat[key],max,!!(mat.userData&&mat.userData.packedAtlas));});}
+function qualityTextures(root){const max=Math.min(renderer.capabilities.getMaxAnisotropy(),window.__resourcePolicy?.anisotropy||16);root.traverse(m=>{if(!m.isMesh)return;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))if(mat)for(const key of['map','normalMap','roughnessMap','metalnessMap','bumpMap','emissiveMap'])tuneTextureSampling(T,mat[key],max,!!(mat.userData&&mat.userData.packedAtlas));});}
 let waterDetail='mid';function setWaterDetail(q){if(q===waterDetail)return;let [rings,segments]=waterDetailSettings(q);if(rings*segments>65535&&!renderer.capabilities.isWebGL2&&!renderer.extensions.get('OES_element_index_uint'))[rings,segments]=waterDetailSettings('high');const old=seaGrid.geometry;seaGrid.geometry=makeWaterGrid(T,150,rings,segments);old.dispose();waterDetail=q;}
 
 // 環境光照貼圖（由同一套天空/樹林產生）
@@ -642,9 +642,9 @@ function update(dt, t){
   for(let i=0;i<12;i++){ const r = ripS[i]; r.age += dt; rip[i].set(r.x, r.z, r.age, r.age < 5 ? r.amp : 0); }
 }
 
-let pr = Math.min(window.devicePixelRatio || 1, 2), lw = 1, lh = 1;
-function resize(w, h){ lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ? FISHING_VIEW.fovPortrait : FISHING_VIEW.fovLandscape; camera.updateProjectionMatrix(); renderer.setPixelRatio(pr); renderer.setSize(w, h); }
-function setPR(v){if(Math.abs(v-pr)<.001)return; pr = v; renderer.setPixelRatio(pr); renderer.setSize(lw, lh); }
+let pr = window.__resourcePolicy?.mobile?1:Math.min(window.devicePixelRatio || 1, 2), lw = 0, lh = 0;renderer.setPixelRatio(pr);
+function resize(w, h){if(w===lw&&h===lh)return;lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ? FISHING_VIEW.fovPortrait : FISHING_VIEW.fovLandscape; camera.updateProjectionMatrix(); renderer.setSize(w, h); }
+function setPR(v){if(Math.abs(v-pr)<.001)return; pr = v; renderer.setPixelRatio(pr); }
 /* 水面倒影：鏡像相機只拍物體（不含天空、水面），水面依波紋扭曲取樣 */
 const reflRT=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true});
 const reflCam=new T.PerspectiveCamera(), reflTM=new T.Matrix4();

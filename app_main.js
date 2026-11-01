@@ -1,4 +1,18 @@
-/*APPV:20261101022656*/
+/*APPV:20261101052806*/
+/* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
+function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
+function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
+function createImageBudget(policy,makeCanvas=()=>document.createElement('canvas')){
+ const cache=new WeakMap(),stats={images:0,resized:0,sourcePixels:0,retainedPixels:0,failures:0,policy};
+ function resize(image){if(!image)return image;if(cache.has(image))return cache.get(image);if(!image.width||!image.height||image.data)return image;const size=budgetImageSize(image.width,image.height,policy);stats.images++;stats.sourcePixels+=image.width*image.height;let out=image;
+  if(size.width!==image.width||size.height!==image.height){let cv;try{cv=makeCanvas();cv.width=size.width;cv.height=size.height;const ctx=cv.getContext('2d',{alpha:true});if(!ctx)throw Error('image resize unavailable');ctx.drawImage(image,0,0,size.width,size.height);out=cv;stats.resized++;}catch(_){stats.failures++;if(cv){cv.width=cv.height=1;}}}
+  stats.retainedPixels+=out.width*out.height;cache.set(image,out);return out;
+ }
+ return{resize,stats};
+}
+function installImageBudget(T,budget){for(const name of['ImageLoader','ImageBitmapLoader']){if(!T[name])continue;const original=T[name].prototype.load;T[name].prototype.load=function(url,loaded,progress,failed){return original.call(this,url,image=>{const result=budget.resize(image);try{result.__assetURL=String(url).split('/').pop().slice(0,160);}catch(_){}try{if(loaded)loaded(result);}finally{if(result!==image&&typeof image.close==='function')image.close();}},progress,failed);};}}
+function createTextureVariants(T,loader){const textures=new Map(),sources=new Map();return function(file,rx=1,ry=1,rotation=0){const key=[file,rx,ry,rotation].join('|');if(textures.has(key))return textures.get(key);let source=sources.get(file);if(!source){source={variants:[],ready:false};sources.set(file,source);source.texture=loader.load(file,loaded=>{source.ready=true;source.texture=loaded;for(const t of source.variants){t.image=loaded.image;t.needsUpdate=true;}});}const t=source.texture.clone();source.variants.push(t);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(rx,ry);t.rotation=rotation;t.anisotropy=4;textures.set(key,t);return t;};}
+if(typeof module!=='undefined'&&module.exports)module.exports={deviceResourcePolicy,budgetImageSize,createImageBudget,installImageBudget,createTextureVariants};
 /* The aquarium is a close-up exhibit: keep texture detail and reduce repeated draw calls. */
 function aquariumGraphicsProfile(profile,scope,cap){
  if(scope!=='home-aquarium'||profile.mode!=='auto')return profile;
@@ -234,27 +248,47 @@ if(typeof module!=='undefined'&&module.exports)Object.assign(module.exports,{rel
 
 function createSceneLifetime(){return{alive:true,cancel(){this.alive=false;},wrap(fn){return(...args)=>{if(this.alive)return fn(...args);};}};}
 if(typeof module!=='undefined'&&module.exports)module.exports.createSceneLifetime=createSceneLifetime;
-/* Freeze the active frame directly; rasterize only visible HTML, not another copy of WebGL. */
-function captureDimensions(width,height,dpr=1){const scale=Math.min(Math.max(1,dpr),1920/Math.max(width,height));return{width:Math.max(1,Math.round(width*scale)),height:Math.max(1,Math.round(height*scale)),scale};}
-function screenshotIgnores(element,canvas,style=getComputedStyle){
- if(element===canvas||element.hasAttribute('data-screenshot-ignore'))return true;
- if(['HTML','HEAD','BODY','STYLE','LINK','SCRIPT'].includes(element.tagName))return false;
- const s=style(element);return s.display==='none'||s.visibility==='hidden'||Number(s.opacity)===0;
+/* Copy one rendered framebuffer and bounded visible UI. No DOM clone or second WebGL render. */
+function captureDimensions(width,height,dpr=1,sourceWidth=Infinity,sourceHeight=Infinity){const scale=Math.min(1.5,Math.max(.1,dpr),1280/Math.max(width,height),sourceWidth/width,sourceHeight/height,Math.sqrt(1200000/(width*height)));return{width:Math.max(1,Math.round(width*scale)),height:Math.max(1,Math.round(height*scale)),scale};}
+function screenshotIgnores(element,canvas,style=getComputedStyle){if(element===canvas||element.hasAttribute?.('data-screenshot-ignore'))return true;if(['STYLE','LINK','SCRIPT','HEAD','CANVAS','VIDEO'].includes(element.tagName))return true;const s=style(element);return s.display==='none'||s.visibility==='hidden'||Number(s.opacity)===0;}
+function drawCaptureUI(ctx,root,{width,height,canvas,button,style=getComputedStyle,limit=400}={}){
+ let count=0;const visible=r=>r.width>0&&r.height>0&&r.right>0&&r.bottom>0&&r.left<width&&r.top<height;
+ function visit(el,alpha=1){if(count>=limit||el===button||el===canvas||screenshotIgnores(el,canvas,style))return;const s=style(el),rect=el.getBoundingClientRect?.(),opacity=alpha*(Number(s.opacity)||1);count++;ctx.save();ctx.globalAlpha=opacity;
+  if(rect&&visible(rect)){
+   const r=Math.min(parseFloat(s.borderRadius)||0,rect.width/2,rect.height/2);ctx.beginPath();if(ctx.roundRect)ctx.roundRect(rect.left,rect.top,rect.width,rect.height,r);else ctx.rect(rect.left,rect.top,rect.width,rect.height);
+   if(el!==root&&s.backgroundColor&&s.backgroundColor!=='rgba(0, 0, 0, 0)'&&s.backgroundColor!=='transparent'){ctx.fillStyle=s.backgroundColor;ctx.fill();}if(parseFloat(s.borderTopWidth)>0&&s.borderTopColor){ctx.strokeStyle=s.borderTopColor;ctx.lineWidth=parseFloat(s.borderTopWidth);ctx.stroke();}
+   if(/hidden|auto|scroll|clip/.test(s.overflow||'')){ctx.clip();}
+   if(el.tagName==='IMG'&&el.complete&&el.naturalWidth)try{ctx.drawImage(el,rect.left,rect.top,rect.width,rect.height);}catch(_){}
+  }
+  const children=[...(el.childNodes||[])];for(const node of children){if(count>=limit)break;if(node.nodeType===1){visit(node,opacity);continue;}if(node.nodeType!==3||!node.textContent?.trim())continue;
+   const range=el.ownerDocument.createRange();range.selectNodeContents(node);const lines=[...range.getClientRects()].filter(visible);if(!lines.length)continue;count++;ctx.fillStyle=s.color||'white';ctx.font=s.font||`${s.fontWeight||400} ${s.fontSize||'14px'} ${s.fontFamily||'sans-serif'}`;ctx.textBaseline='top';let chars=[...node.textContent.replace(/\s+/g,' ').trim()],offset=0;for(const line of lines){let text='';while(offset<chars.length){const next=text+chars[offset];if(text&&ctx.measureText(next).width>line.width+1)break;text=next;offset++;}ctx.fillText(text,line.left,line.top,Math.max(1,line.width));}range.detach?.();
+  }ctx.restore();
+ }visit(root);return count;
 }
-function createScreenCapture({canvas,button,report=()=>{},onCaptured=()=>{},scene=()=>''}){
- let pending=null,busy=false;const label=button.textContent||'📷';
- async function take(){if(busy)return;busy=true;button.disabled=true;button.textContent='⏳';button.setAttribute('aria-busy','true');try{
-   const frozen=await new Promise((resolve,reject)=>{pending={resolve,reject};});
-   if(typeof window.html2canvas!=='function')throw Error('截圖元件尚未載入，請稍後再試');
-   const overlay=await window.html2canvas(document.body,{width:innerWidth,height:innerHeight,windowWidth:innerWidth,windowHeight:innerHeight,scrollX:0,scrollY:0,x:0,y:0,scale:frozen.size.scale,useCORS:true,allowTaint:false,imageTimeout:1200,logging:false,backgroundColor:null,ignoreElements:e=>screenshotIgnores(e,canvas),onclone:doc=>{doc.body.style.background='transparent';doc.documentElement.style.background='transparent';}});
-   frozen.image.getContext('2d').drawImage(overlay,0,0,frozen.size.width,frozen.size.height);
-   const blob=await new Promise((resolve,reject)=>frozen.image.toBlob(b=>b?resolve(b):reject(Error('截圖儲存失敗')),'image/jpeg',.9));
-   const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='濕地垂釣_截圖_'+Date.now()+'.jpg';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-   report('📷 截圖已送出下載','good');onCaptured(frozen.scene);
- }catch(error){report(error.message||'截圖失敗，請重試','warn');}finally{busy=false;button.disabled=false;button.textContent=label;button.setAttribute('aria-busy','false');pending=null;}}
- function afterFrame(){if(!pending)return;const job=pending;pending=null;try{const size=captureDimensions(innerWidth,innerHeight,window.devicePixelRatio||1),image=document.createElement('canvas');image.width=size.width;image.height=size.height;image.getContext('2d').drawImage(canvas,0,0,size.width,size.height);job.resolve({image,size,scene:scene()});}catch(e){job.reject(e);}}
+function createScreenCapture({canvas,button,report=()=>{},onCaptured=()=>{},scene=()=>'',drawUI=drawCaptureUI,diagnostics=()=>window.__DIAG,save=()=>{},now=()=>performance.now(),encodeTimeout=12000}){
+ let pending=null,busy=false,preview=null,image=null,objectURL=null,cancelled=false;const label=button.textContent||'📷';
+ const action=(phase,detail)=>diagnostics()?.action('photo',phase,detail);
+ function releasePreview(){if(preview){preview.remove();preview=null;}if(objectURL){URL.revokeObjectURL(objectURL);objectURL=null;}}
+ function offer(blob,scope){releasePreview();objectURL=URL.createObjectURL(blob);preview=document.createElement('div');preview.setAttribute('data-screenshot-ignore','');preview.setAttribute('data-photo-preview','');for(const type of['pointerdown','pointerup','click'])preview.addEventListener(type,e=>e.stopPropagation());preview.style.cssText='position:fixed;inset:0;z-index:180;background:rgba(4,13,17,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;color:white';
+  const photo=document.createElement('img');photo.src=objectURL;photo.alt='剛拍好的遊戲截圖';photo.style.cssText='max-width:100%;max-height:72vh;object-fit:contain';preview.appendChild(photo);
+  const message=document.createElement('div');message.textContent='照片已拍好，選擇儲存或分享。';preview.appendChild(message);const controls=document.createElement('div');controls.style.cssText='display:flex;gap:12px';preview.appendChild(controls);
+  function control(text,fn){const b=document.createElement('button');b.textContent=text;b.style.cssText='border:0;border-radius:20px;padding:12px 18px;font:600 16px sans-serif;background:#efc04c;color:#102c2b';b.onclick=fn;controls.appendChild(b);return b;}
+  control('儲存／分享',async()=>{try{save();const file=typeof File==='function'?new File([blob],'濕地垂釣_'+Date.now()+'.jpg',{type:'image/jpeg'}):null;
+    if(file&&navigator.canShare?.({files:[file]})&&navigator.share){action('sharing');await navigator.share({files:[file],title:'濕地垂釣'});action('done','share returned');message.textContent='分享已完成';}
+    else{const a=document.createElement('a');a.href=objectURL;a.download='濕地垂釣_'+Date.now()+'.jpg';a.target='_blank';a.rel='noopener';document.body.appendChild(a);action('export','user initiated, separate target');a.click();a.remove();action('done','download requested');message.textContent='已送出，若開啟圖片預覽，請長按圖片儲存。';}
+   }catch(error){action('done',error.name||error.message);if(error.name!=='AbortError')message.textContent='請長按照片儲存圖片，或再試一次。';}});
+  control('返回遊戲',()=>{action('done','preview closed');releasePreview();});document.body.appendChild(preview);report('📷 已拍好照片','good');onCaptured(scope);
+ }
+ async function take(){if(busy||preview)return;busy=true;cancelled=false;button.disabled=true;button.textContent='⏳';button.setAttribute('aria-busy','true');const start=now();let timer;
+  try{save();action('begin',{scene:scene(),width:canvas.width,height:canvas.height});const frozen=await new Promise((resolve,reject)=>{pending={resolve,reject};timer=setTimeout(()=>{if(pending){pending=null;reject(Error('畫面尚未準備好，請稍後拍照'));}},2500);});clearTimeout(timer);image=frozen.image;
+   action('encode',{width:image.width,height:image.height,copyMs:Math.round(now()-start)});const blob=await new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(Error('照片編碼逾時，請稍後再試')),encodeTimeout);image.toBlob(b=>{if(b)resolve(b);else reject(Error('照片儲存失敗'));},'image/jpeg',.85);});clearTimeout(timer);
+   if(cancelled)return;action('done',{durationMs:Math.round(now()-start),bytes:blob.size,width:image.width,height:image.height});offer(blob,frozen.scene);
+  }catch(error){action('error',error.message);report(error.message||'拍照失敗，請重試','warn');}finally{clearTimeout(timer);if(image){image.width=image.height=1;image=null;}pending=null;busy=false;button.disabled=false;button.textContent=label;button.setAttribute('aria-busy','false');}
+ }
+ function afterFrame(){if(!pending)return;const job=pending;pending=null;let output;try{const size=captureDimensions(innerWidth,innerHeight,window.devicePixelRatio||1,canvas.width,canvas.height);output=document.createElement('canvas');output.width=size.width;output.height=size.height;const ctx=output.getContext('2d',{alpha:false});if(!ctx)throw Error('照片畫布無法建立');ctx.drawImage(canvas,0,0,size.width,size.height);ctx.save();ctx.scale(size.scale,size.scale);const nodes=drawUI(ctx,document.body,{width:innerWidth,height:innerHeight,canvas,button});ctx.restore();diagnostics()?.event('photo-copy',{pixels:size.width*size.height,nodes});job.resolve({image:output,size,scene:scene()});}catch(error){if(output)output.width=output.height=1;job.reject(error);}}
+ function cancel(){cancelled=true;if(pending){pending.reject(Error('畫面重置，請恢復後再拍照'));pending=null;}releasePreview();}
  button.addEventListener('pointerdown',e=>e.stopPropagation());button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();take();});
- return{take,afterFrame,isBusy:()=>busy};
+ return{take,afterFrame,cancel,isBusy:()=>busy,isPreview:()=>!!preview,paused:()=>!!preview||(busy&&!pending)};
 }
 function cameraButtonPosition(slot,top,width,safeTop=0,obstacles=[],height=900){
  const clear=p=>!obstacles.some(r=>p.left<r.right+6&&p.left+p.width>r.left-6&&p.top<r.bottom+6&&p.top+p.height>r.top-6);
@@ -268,7 +302,7 @@ function dockCameraButton(button,slot,top){let queued=false;const obstacles=['ma
  function schedule(){if(queued)return;queued=true;requestAnimationFrame(update);}
  window.addEventListener('resize',schedule);if(typeof ResizeObserver!=='undefined'){const ro=new ResizeObserver(schedule);for(const el of[slot,top,...obstacles])ro.observe(el);}if(typeof MutationObserver!=='undefined')new MutationObserver(schedule).observe(document.body,{attributes:true,attributeFilter:['class','data-fishing-state']});schedule();return update;
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={createScreenCapture,captureDimensions,screenshotIgnores,cameraButtonPosition};
+if(typeof module!=='undefined'&&module.exports)module.exports={createScreenCapture,captureDimensions,screenshotIgnores,cameraButtonPosition,drawCaptureUI};
 /* Cap game updates, not browser callback reporting. Preserve phase at 120 Hz. */
 const GAME_FPS_LIMIT=120;
 function createFrameLimiter(limit=GAME_FPS_LIMIT,start=0){
@@ -289,17 +323,17 @@ function graphicsProfiles(cap){
  const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[0,0,.22,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
  return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
 }
-function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null}){
- const sceneLevels=new Map();let emergencyTime=0,emergencyFrames=0;
+function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null,initialLevel=4}){
+ const initial=Math.max(0,Math.min(7,Math.round(Number(initialLevel)||0)));const sceneLevels=new Map();let emergencyTime=0,emergencyFrames=0;
  let mode='auto',level=4,scope='',elapsed=0,frames=0,slow=0,warm=3,cool=0,fast=0,bad=0,clock=0,blocked=-1,blockedUntil=0,probe=null,fps=0,reason='初始化';
  const reset=()=>{elapsed=0;frames=0;slow=0;fast=0;bad=0;};
  function status(){const s={mode,level,maxLevel:7,fps,reason,...graphicsProfiles(cap())[level]};return profile?profile(s,scope,cap()):s;}
  function commit(next,why){level=Math.max(0,Math.min(7,next));if(scope)sceneLevels.set(scope,level);emergencyTime=emergencyFrames=0;reason=why;apply(status());reset();cool=4;}
- function configure(next){sceneLevels.clear();emergencyTime=emergencyFrames=0;mode=['auto','high','mid','low'].includes(next)?next:'auto';probe=null;blocked=-1;warm=3;reset();level=mode==='auto'?4:mode==='high'?7:mode==='mid'?3:0;commit(level,mode==='auto'?'開始自動調整':'固定畫質');}
+ function configure(next){sceneLevels.clear();emergencyTime=emergencyFrames=0;mode=['auto','high','mid','low'].includes(next)?next:'auto';probe=null;blocked=-1;warm=3;reset();level=mode==='auto'?initial:mode==='high'?7:mode==='mid'?3:0;commit(level,mode==='auto'?'開始自動調整':'固定畫質');}
  function pause(){reset();warm=3;probe=null;emergencyTime=emergencyFrames=0;}
  function sample(seconds,{ready=true,scene='',enabled=true}={}){
   if(!ready||!enabled||!Number.isFinite(seconds)||seconds<=0){pause();return;}
-  if(scene!==scope){const previousLevel=level;if(scope)sceneLevels.set(scope,level);scope=scene;pause();blocked=-1;if(mode==='auto')level=sceneLevels.has(scope)?sceneLevels.get(scope):(scope==='home-aquarium'?6:4);if(profile||previousLevel!==level)apply(status());}
+  if(scene!==scope){const previousLevel=level;if(scope)sceneLevels.set(scope,level);scope=scene;pause();blocked=-1;if(mode==='auto')level=sceneLevels.has(scope)?sceneLevels.get(scope):(typeof window!=='undefined'&&window.__resourcePolicy?.mobile?Math.min(level,2):scope==='home-aquarium'?6:4);if(profile||previousLevel!==level)apply(status());}
   clock+=seconds;cool=Math.max(0,cool-seconds);
   if(mode==='auto'){if(seconds>1/30){emergencyTime+=seconds;emergencyFrames++;}else{emergencyTime=emergencyFrames=0;}if(emergencyTime>=.8&&emergencyFrames>=8){const severe=emergencyFrames/emergencyTime<22;emergencyTime=emergencyFrames=0;if(severe&&level>0){commit(level-2,'嚴重掉幀，快速降低負載');warm=.5;return;}}}
   if(warm>0){warm-=seconds;return;}
@@ -1358,7 +1392,7 @@ let seaMode=false;
 function shoreR(az){ return seaMode?1400:shoreR0(az); }
 function shoreR0(az){ const d=(az-0.12)/0.30; return 54+9*Math.sin(az*2.3+1.1)+6*Math.sin(az*5.1+0.3)+3*Math.sin(az*11.7+2.0)+45*Math.exp(-d*d); }
 
-const renderer = new T.WebGLRenderer({canvas:opts.canvas, antialias:true, powerPreference:'high-performance'});
+const renderer = new T.WebGLRenderer({canvas:opts.canvas, antialias:!window.__resourcePolicy?.mobile, powerPreference:'high-performance'});
 renderer.outputEncoding = T.sRGBEncoding;
 renderer.toneMapping = T.ACESFilmicToneMapping;
 
@@ -1398,7 +1432,7 @@ Object.assign(sunLight.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.
 function setShadows(q){renderer.shadowMap.enabled=q!=='low';const n=q==='ultra'?Math.min(4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='mid'?512:1024;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
 const hemi = new T.HemisphereLight(0xffffff, 0x223322, 0.55); scene.add(hemi);
 
-function qualityTextures(root){const max=renderer.capabilities.getMaxAnisotropy();root.traverse(m=>{if(!m.isMesh)return;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))if(mat)for(const key of['map','normalMap','roughnessMap','metalnessMap','bumpMap','emissiveMap'])tuneTextureSampling(T,mat[key],max,!!(mat.userData&&mat.userData.packedAtlas));});}
+function qualityTextures(root){const max=Math.min(renderer.capabilities.getMaxAnisotropy(),window.__resourcePolicy?.anisotropy||16);root.traverse(m=>{if(!m.isMesh)return;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))if(mat)for(const key of['map','normalMap','roughnessMap','metalnessMap','bumpMap','emissiveMap'])tuneTextureSampling(T,mat[key],max,!!(mat.userData&&mat.userData.packedAtlas));});}
 let waterDetail='mid';function setWaterDetail(q){if(q===waterDetail)return;let [rings,segments]=waterDetailSettings(q);if(rings*segments>65535&&!renderer.capabilities.isWebGL2&&!renderer.extensions.get('OES_element_index_uint'))[rings,segments]=waterDetailSettings('high');const old=seaGrid.geometry;seaGrid.geometry=makeWaterGrid(T,150,rings,segments);old.dispose();waterDetail=q;}
 
 // 環境光照貼圖（由同一套天空/樹林產生）
@@ -1496,9 +1530,9 @@ function update(dt, t){
   for(let i=0;i<12;i++){ const r = ripS[i]; r.age += dt; rip[i].set(r.x, r.z, r.age, r.age < 5 ? r.amp : 0); }
 }
 
-let pr = Math.min(window.devicePixelRatio || 1, 2), lw = 1, lh = 1;
-function resize(w, h){ lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ? FISHING_VIEW.fovPortrait : FISHING_VIEW.fovLandscape; camera.updateProjectionMatrix(); renderer.setPixelRatio(pr); renderer.setSize(w, h); }
-function setPR(v){if(Math.abs(v-pr)<.001)return; pr = v; renderer.setPixelRatio(pr); renderer.setSize(lw, lh); }
+let pr = window.__resourcePolicy?.mobile?1:Math.min(window.devicePixelRatio || 1, 2), lw = 0, lh = 0;renderer.setPixelRatio(pr);
+function resize(w, h){if(w===lw&&h===lh)return;lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ? FISHING_VIEW.fovPortrait : FISHING_VIEW.fovLandscape; camera.updateProjectionMatrix(); renderer.setSize(w, h); }
+function setPR(v){if(Math.abs(v-pr)<.001)return; pr = v; renderer.setPixelRatio(pr); }
 /* 水面倒影：鏡像相機只拍物體（不含天空、水面），水面依波紋扭曲取樣 */
 const reflRT=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true});
 const reflCam=new T.PerspectiveCamera(), reflTM=new T.Matrix4();
@@ -2915,8 +2949,8 @@ function render(){
   } else if(cur==='set'){
     shT.textContent='設定';
     h+='<div class="note">切換時段</div><div class="tabs">'+PRESETS.map((p,i)=>`<button class="tab" data-a="time" data-v="${i}">${p[1]}</button>`).join('')+'</div>';
-    { const gq=save.gfx||'auto'; h+='<div class="note">畫質</div><div class="tabs">'+[['auto','自動'],['high','高'],['mid','中'],['low','低']].map(([k,n])=>`<button class="tab${gq===k?' on':''}" data-a="gfx" data-v="${k}">${n}</button>`).join('')+'</div><div class="note" style="font-size:12px">遊戲幀率上限 120 FPS，實際幀率取決於裝置與場景。自動（建議）：掉幀時降低解析度、倒影、陰影與特效；穩定達 60 FPS 時逐級升到最高。高／中／低：固定畫質。</div>'+`<div id="gfxLive" class="note" style="font-size:12px">${window.__gfxStatus?graphicsStatusText(window.__gfxStatus):'畫質初始化中'}</div>`; }
-    { const n=window.__DIAG?window.__DIAG.count():0; h+=`<div class="note">問題回報（本次執行記錄 ${n} 筆錯誤）</div><div class="tabs"><button class="tab" data-a="diag" data-v="copy">📋 複製診斷資訊</button><button class="tab" data-a="diag" data-v="clear">清除記錄</button></div><div class="note" style="font-size:12px">遇到怪問題時，按「複製診斷資訊」再貼給開發者，就能看到你手機上實際發生的錯誤和幀率。</div>`; }
+    { const gq=save.gfx||'auto'; h+='<div class="note">畫質</div><div class="tabs">'+[['auto','自動'],['high','高'],['mid','中'],['low','低']].map(([k,n])=>`<button class="tab${gq===k?' on':''}" data-a="gfx" data-v="${k}">${n}</button>`).join('')+'</div><div class="note" style="font-size:12px">遊戲幀率上限 120 FPS，實際幀率取決於裝置與場景。自動（建議）：掉幀時降低解析度、倒影、陰影與特效；穩定達 60 FPS 時逐級升到最高。高／中／低：固定畫質。手機自動模式也限制貼圖記憶體；高畫質貼圖於下次開啟時載入。</div>'+`<div id="gfxLive" class="note" style="font-size:12px">${window.__gfxStatus?graphicsStatusText(window.__gfxStatus):'畫質初始化中'}</div>`; }
+    { const n=window.__DIAG?window.__DIAG.count():0; h+=`<div class="note">問題回報（本次執行記錄 ${n} 筆錯誤）</div><div class="tabs"><button class="tab" data-a="diag" data-v="copy">📋 複製診斷摘要</button><button class="tab" data-a="diag" data-v="download">下載完整報告</button><button class="tab" data-a="diag" data-v="clear">清除記錄</button></div><div class="note" style="font-size:12px">摘要少於 1,000 字，適合貼訊息；完整報告包含前次中斷操作、貼圖尺寸、繪圖負載與錯誤堆疊。沒有 JS 錯誤不代表沒有系統中斷。</div>`; }
     h+='<div class="note">天氣</div><div class="tabs">'+[['auto','自動'],['clear','晴'],['breezy','有風'],['cloudy','陰'],['drizzle','毛毛雨'],['rain','雨'],['storm','雷雨'],['fog','霧']].map(w=>`<button class="tab${(save.wxMode||'auto')===w[0]?' on':''}" data-a="wx" data-v="${w[0]}">${w[1]}</button>`).join('')+'</div>';
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
     h+='<div class="note">魚訊放大視窗（自動：休閒、標準開，硬派、專家關）</div><div class="tabs">'+[['auto','自動'],['on','開'],['off','關']].map(m=>`<button class="tab${(save.mag||'auto')===m[0]?' on':''}" data-a="mag" data-v="${m[0]}">${m[1]}</button>`).join('')+'</div>';
@@ -3069,7 +3103,7 @@ $('baitChip').addEventListener('click',()=>{ shopTab='bait'; open('shop'); });
 $('shX').addEventListener('click',close);
 sheet.addEventListener('click',e=>{ if(e.target===sheet) close(); });
 shB.addEventListener('click',e=>{
-  const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(a==='diag'&&window.__DIAG){ if(v==='copy') window.__DIAG.copy().then(ok=>toast(ok?'已複製診斷資訊，可以直接貼上':'複製失敗，請截圖設定頁','good',2200)); else { window.__DIAG.clear(); toast('已清除錯誤記錄','good',1200); } render(); return; }
+  const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(a==='diag'&&window.__DIAG){ if(v==='copy') window.__DIAG.copy().then(ok=>toast(ok?'已複製精簡摘要，可以直接貼上':'複製失敗，請截圖設定頁','good',2200)); else if(v==='download'){window.__DIAG.download();toast('已送出完整診斷報告','good',1800);}else { window.__DIAG.clear(); toast('已清除錯誤記錄','good',1200); } render(); return; }
   if(a==='gfx'){ save.gfx=v;save.gfxRecoveryVersion=1; persist(); if(window.__applyGfx) window.__applyGfx(v); toast('畫質：'+({auto:'自動',high:'高',mid:'中',low:'低'})[v],'good',1200); render(); return; } if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
   if(a==='tab') shopTab=v;
   else if(a==='buy'){ const it=GEAR[shopTab][+v]; if(save.coins<it.price){ toast('金幣不夠','bad'); return; }
@@ -3108,7 +3142,7 @@ shB.addEventListener('click',e=>{
   else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else if(v==='rescue') window.__CLOUD.rescue(); else if(v==='comp') window.__CLOUD.compensate(); else if(v==='copy') window.__CLOUD.copyMain(); else window.__CLOUD.logout(); }
   else if(a==='tut'){ const sh=document.getElementById('sheet'); if(sh) sh.classList.add('hidden'); setTimeout(()=>startTutorial(true),300); return; }
   else if(a==='pwa'){ PWA.install().then(r=>{ if(r==='ios') toast('iPhone：按 Safari 的「分享」→「加入主畫面」','',4200); else if(r==='manual') toast('瀏覽器選單 ⋮ →「加到主畫面」或「安裝應用程式」','',4200); else if(r==='installed') toast('已經安裝了','',1600); }); }
-  else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem(window.__SAVE_KEY||'swampAngler.v1'); }catch(_){} location.reload(); return; } }
+  else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem(window.__SAVE_KEY||'swampAngler.v1'); }catch(_){} if(window.__DIAG)window.__DIAG.action('navigation','user-reset');location.reload(); return; } }
   render(); syncHUD();
 });
 fillQuests(); applyRod(); syncHUD(); document.body.classList.toggle('immersive',!!save.imm);
@@ -5482,32 +5516,51 @@ function grip(side,out){ auger.updateMatrixWorld(true); if(side==='R'){ gripTmp.
 function drilling(){ return auger.visible&&!drilled&&prog>0&&prog<1; }
 return {update,holePos:()=>holePos,drilled:()=>drilled,drill,progress:()=>prog,grip,drilling};
 }
-/* ===== 診斷：錯誤記錄、效能取樣、一鍵複製給開發者 ===== */
-function createDiag(W,c){
-'use strict';
-const KEY='swampAngler.log',startedAt=new Date();let current=[];let log=[]; try{ log=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ log=[]; }
-let history=log.slice(),lastScene='',previousScene=null;try{previousScene=JSON.parse(localStorage.getItem('swampAngler.scene')||'null');}catch(_){}
-function scene(name,phase){const key=name+':'+phase;if(key===lastScene)return;lastScene=key;try{localStorage.setItem('swampAngler.scene',JSON.stringify({scene:name,phase,version:window.__APP_VER||'unknown',at:Date.now()}));}catch(_){}}
-function add(kind,msg){ const t=new Date(); const entry=`${t.getMonth()+1}/${t.getDate()} ${t.toTimeString().slice(0,8)} [${kind}] ${String(msg).slice(0,600)}`;current.push(entry);if(current.length>30)current.shift();log.push(entry); if(log.length>30) log=log.slice(-30); try{ localStorage.setItem(KEY,JSON.stringify(log)); }catch(e){} }
-window.addEventListener('error',e=>{ if(e.target&&e.target!==window&&(e.target.src||e.target.href)) add('load',e.target.src||e.target.href); else add('error',(e.message||'')+' @'+(e.filename||'').split('/').pop()+':'+(e.lineno||'')); },true);
-window.addEventListener('unhandledrejection',e=>add('promise',e.reason&&(e.reason.message||e.reason)));
-const ce=console.error.bind(console); console.error=function(){ try{ add('console',[...arguments].map(a=>a&&a.message?a.message:String(a)).join(' ')); }catch(e){} ce(...arguments); };
-/* 效能：最近 10 秒的平均與最低幀率 */
-const fr=[];
-function frame(seconds){const n=performance.now(),dt=seconds*1000;if(dt>0&&dt<2000)fr.push([n,dt]);while(fr.length&&n-fr[0][0]>10000)fr.shift();}
-function fps(){if(!fr.length)return{avg:0,min:0,worst:0};let total=0,worst=0;for(const f of fr){total+=f[1];worst=Math.max(worst,f[1]);}return{avg:Math.round(1000*fr.length/total),min:Math.round(1000/worst),worst:Math.round(worst)};}
-function gpu(){ try{ const gl=W.renderer.getContext(), ext=gl.getExtension('WEBGL_debug_renderer_info'); return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER); }catch(e){ return '?'; } }
-function report(){ const f=fps(), G=c.G, S=c.save;
-  return ['【濕地垂釣 診斷資訊】','程式版本：'+(window.__APP_VER||'未知'),'本次啟動：'+startedAt.toLocaleString('zh-TW'),'時間：'+new Date().toLocaleString('zh-TW'),'裝置：'+navigator.userAgent,'螢幕：'+screen.width+'×'+screen.height+' DPR '+(window.devicePixelRatio||1)+'，畫布解析度 '+(W.getPR?W.getPR():'?'),
-    'GPU 資源數量：'+(W.renderer.info?JSON.stringify(W.renderer.info.memory):'未知'),'上次頁面狀態（不代表閃退）：'+(previousScene?JSON.stringify(previousScene):'無紀錄'),'遊戲幀率上限：'+(window.__frameLimit||120)+' FPS（實際遊戲更新取樣）','畫布實際像素：'+(W.renderer.domElement?W.renderer.domElement.width+'×'+W.renderer.domElement.height:'?'),'顯示晶片：'+gpu(),'畫質設定：'+(S.gfx||'auto')+'／實際等級 '+(window.__gfxStatus?window.__gfxStatus.level:'?'),'幀率（近 10 秒）：平均 '+f.avg+'，最低 '+f.min+'，最長幀耗時 '+f.worst+' ms',
-    '位置：'+(G.loc||'?')+'／釣點 '+(G.spot)+'／狀態 '+G.state+'／時間 '+(((G.hour%24)+24)%24).toFixed(1)+'／Lv '+S.lv,
-    '本次執行錯誤（最近 '+current.length+' 筆）：',...(current.length?current:['（本次沒有記錄到錯誤）']),'歷史錯誤（本次啟動前留存 '+history.length+' 筆）：',...(history.length?history:['（沒有歷史錯誤）'])].join('\n'); }
-async function copy(){ const txt=report();
-  try{ await navigator.clipboard.writeText(txt); return true; }
-  catch(e){ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); let ok=false; try{ ok=document.execCommand('copy'); }catch(e2){} ta.remove(); return ok; } }
-function clear(){ current=[];history=[];log=[]; try{ localStorage.removeItem(KEY); }catch(e){} }
-return {scene,frame,report,copy,clear,add,count:()=>current.length};
+/* Persistent operation journal survives process termination where JS error handlers cannot run. */
+function readDiagnosticJournal(){try{return JSON.parse(localStorage.getItem('swampAngler.diagSession')||'null');}catch(_){return null;}}
+function diagnosticValue(value){
+ try{if(value==null)return String(value);if(typeof value==='string')return value;if(value.stack)return String(value.stack);const target=value.target||value.currentTarget;
+  if(target){return JSON.stringify({type:value.type,url:target.responseURL||target.currentSrc||target.src||target.href,status:target.status,statusText:target.statusText,loaded:value.loaded,total:value.total});}
+  if(value.message)return String(value.message);return JSON.stringify(value)||String(value);
+ }catch(_){return String(value);}
 }
+function auditResources(roots,uniforms={}){const textures=new Set(),buffers=new Set(),large=[];let bytes=0;function texture(t){if(!t||!t.isTexture||textures.has(t))return;textures.add(t);const im=t.image,w=im&&(im.width||im.videoWidth)||0,h=im&&(im.height||im.videoHeight)||0,estimate=w*h*4*(t.generateMipmaps?4/3:1);bytes+=estimate;if(w&&h)large.push({name:t.name||im?.__assetURL||t.uuid,width:w,height:h,MiB:+(estimate/1048576).toFixed(2)});}
+ for(const root of roots.filter(Boolean))root.traverse(o=>{if(o.geometry){for(const a of Object.values(o.geometry.attributes||{})){if(a.array)buffers.add(a.array);else if(a.data?.array)buffers.add(a.data.array);}if(o.geometry.index?.array)buffers.add(o.geometry.index.array);}for(const m of(o.material?(Array.isArray(o.material)?o.material:[o.material]):[])){for(const v of Object.values(m))texture(v);for(const u of Object.values(m.uniforms||{}))texture(u.value);}if(o.skeleton?.boneTexture)texture(o.skeleton.boneTexture);});for(const u of Object.values(uniforms))texture(u.value);for(const b of buffers)bytes+=b.byteLength;large.sort((a,b)=>b.MiB-a.MiB);return{estimatedSourceMiB:+(bytes/1048576).toFixed(1),textures:textures.size,largest:large.slice(0,12),note:'來源資源估算，非系統實測 VRAM/RAM'};}
+function createDiag(W,c){
+ 'use strict';
+ const KEY='swampAngler.log',SESSION='swampAngler.diagSession',startedAt=new Date(),previous=readDiagnosticJournal(),session=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6),listeners=[];let log=[],current=[],history=[],lastScene='',lastBeat=0,lastCheckpoint=0,operation=null,events=[],stages={},frameAt=0,stageAt=0,snapshot={},clean=false,started=false,visible=true,stalls=0,observer=null;
+ try{log=JSON.parse(localStorage.getItem(KEY)||'[]');if(!Array.isArray(log))log=[];}catch(_){}history=log.slice();
+ const nav=performance.getEntriesByType?.('navigation')?.[0];const navigation={type:nav?.type||'unknown',wasDiscarded:typeof document!=='undefined'?document.wasDiscarded:undefined};
+ const short=(v,n=180)=>diagnosticValue(v).slice(0,n);
+ function state(){const G=c.G||{},S=c.save||{},info=W.renderer.info;return{scene:G.state==='home'?'home':G.loc||'lake',state:G.state,spot:G.spot,hour:G.hour,lv:S.lv,gfx:S.gfx||'auto',level:window.__gfxStatus?.level,pr:W.getPR?.(),pixels:W.renderer.domElement?W.renderer.domElement.width+'×'+W.renderer.domElement.height:'?',gpu:info?{...info.memory,draws:info.render?.calls,triangles:info.render?.triangles,programs:info.programs?.length}:null,fps:fps(),stages:{...stages}};}
+ function checkpoint(force=false){const now=performance.now();if(!force&&now-lastCheckpoint<5000)return;lastCheckpoint=now;try{localStorage.setItem(SESSION,JSON.stringify({schema:3,session,version:window.__APP_VER,at:Date.now(),started,clean,visible,recovery:!!window.__resourcePolicy?.recovery,navigation,operation,state:snapshot,events:events.slice(-16),errors:current.slice(-4)}));}catch(_){} }
+ function event(name,data=''){events.push({at:Date.now(),name,data:short(data,160)});if(events.length>24)events.shift();}
+ function action(name,phase='begin',detail=''){operation={name,phase,at:Date.now(),detail:short(detail,140)};event(name+':'+phase,detail);snapshot=state();checkpoint(true);}
+ function scene(name,phase){const key=name+':'+phase;if(key===lastScene)return;lastScene=key;event('scene',key);if(phase!=='ready'){action(name,phase);}try{localStorage.setItem('swampAngler.scene',JSON.stringify({scene:name,phase,version:window.__APP_VER,at:Date.now()}));}catch(_){} }
+ function add(kind,msg){const t=new Date(),entry=`${t.getMonth()+1}/${t.getDate()} ${t.toTimeString().slice(0,8)} [${kind}] ${short(msg,1000)}`;current.push(entry);if(current.length>20)current.shift();log.push(entry);if(log.length>30)log.shift();try{localStorage.setItem(KEY,JSON.stringify(log));}catch(_){}event(kind,msg);checkpoint(true);}
+ function listen(target,name,fn,capture){if(target?.addEventListener){target.addEventListener(name,fn,capture);listeners.push([target,name,fn,capture]);}}
+ listen(window,'error',e=>{if(e.target&&e.target!==window)add('load',e);else add('error',e.error||`${e.message||''} @${e.filename||''}:${e.lineno||''}:${e.colno||''}`);},true);
+ listen(window,'unhandledrejection',e=>add('promise',e.reason));
+ const ce=console.error.bind(console);console.error=function(){try{add('console',[...arguments].map(diagnosticValue).join(' '));}catch(_){}ce(...arguments);};
+ listen(window,'pagehide',e=>{visible=false;clean=true;event('pagehide',{persisted:e.persisted});snapshot=state();checkpoint(true);});
+ listen(window,'pageshow',e=>{visible=true;clean=false;event('pageshow',{persisted:e.persisted});checkpoint(true);});
+ if(typeof document!=='undefined')listen(document,'visibilitychange',()=>{visible=!document.hidden;event('visibility',visible?'visible':'hidden');snapshot=state();checkpoint(true);if(!visible&&c.persist)c.persist();});
+ try{if(typeof PerformanceObserver!=='undefined'){observer=new PerformanceObserver(list=>{for(const e of list.getEntries()){stalls++;event('longtask',Math.round(e.duration)+'ms');}});observer.observe({type:'longtask',buffered:true});}}catch(_){observer=null;}
+ const fr=[];
+ function frame(seconds){const n=performance.now(),dt=seconds*1000;if(dt>0&&Number.isFinite(dt))fr.push([n,dt]);while(fr.length&&(n-fr[0][0]>10000||fr.length>1500))fr.shift();if(n-lastBeat>=5000){lastBeat=n;snapshot=state();checkpoint();}}
+ function fps(){if(!fr.length)return{avg:0,min:0,worst:0};let total=0,worst=0;for(const f of fr){total+=f[1];worst=Math.max(worst,f[1]);}return{avg:Math.round(1000*fr.length/total),min:Math.round(1000/worst),worst:Math.round(worst)};}
+ function beginFrame(){frameAt=stageAt=performance.now();if(W.renderer.info?.reset)W.renderer.info.reset();}
+ function stage(name){const now=performance.now();stages[name]=+(now-stageAt).toFixed(1);stageAt=now;}
+ function gpu(){try{const gl=W.renderer.getContext(),ext=gl.getExtension('WEBGL_debug_renderer_info');return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);}catch(_){return'?';}}
+ function compact(){snapshot=state();const prev=previous?(previous.clean?'上次正常離開／還原':previous.visible===false?'上次在背景中斷，原因未確認':'上次未記錄正常離開，疑似重載／程序中斷'):'首次新版診斷';return['【濕地垂釣診斷 v3】','版本 '+(window.__APP_VER||'未知')+'｜ID '+session,navigator.userAgent.slice(0,160),'目前 '+[snapshot.scene,snapshot.spot,snapshot.state].join('/')+' Lv'+snapshot.lv,'FPS '+snapshot.fps.avg+' 最低 '+snapshot.fps.min+' 最長 '+snapshot.fps.worst+'ms｜等級 '+snapshot.level+' PR '+Number(snapshot.pr||0).toFixed(2)+' '+snapshot.pixels,'GPU '+JSON.stringify(snapshot.gpu),'CPU階段ms '+JSON.stringify(stages),prev,previous?'前次操作 '+JSON.stringify(previous.operation)+'／'+previous.state?.scene+' '+previous.state?.state:'','本次操作 '+JSON.stringify(operation),'保護模式 '+!!window.__resourcePolicy?.recovery+'｜貼圖 '+(window.__resourcePolicy?.textureEdge||'?'),'最近事件 '+events.slice(-5).map(e=>e.name+':'+e.data).join(' → '),'錯誤 '+current.length+'（不含歷史）；沒有 JS 錯誤不代表沒有系統中斷',...current.slice(-2).map(x=>x.slice(0,130))].filter(Boolean).join('\n').slice(0,950);}
+ function report(){const f=fps(),G=c.G||{},S=c.save||{},audit=auditResources([W.scene,window.__HOME_SCENE],W.U||{});return['【濕地垂釣 診斷資訊】','程式版本：'+(window.__APP_VER||'未知'),'本次啟動：'+startedAt.toLocaleString('zh-TW'),'時間：'+new Date().toLocaleString('zh-TW'),'裝置：'+navigator.userAgent,'畫布實際像素：'+state().pixels,'遊戲幀率上限：'+(window.__frameLimit||120)+' FPS','幀率（近 10 秒）：平均 '+f.avg+'，最低 '+f.min+'，最長幀耗時 '+f.worst+' ms','位置：'+(G.loc||'?')+'／釣點 '+G.spot+'／狀態 '+G.state+'／Lv '+S.lv,'本次執行錯誤（最近 '+current.length+' 筆）：',...current,'歷史錯誤（本次啟動前留存 '+history.length+' 筆）：',...history,'完整診斷 JSON：',JSON.stringify({schema:3,session,version:window.__APP_VER,navigation,previous,current:state(),operation,events,errors:current,history,gpu:gpu(),sourceResources:audit,imageBudget:window.__imageBudget?.stats,policy:window.__resourcePolicy,longTasks:observer?stalls:'unsupported',lastAsset:window.__LASTURL,assetProgress:window.__LOADN,storage:{saveBytes:typeof localStorage!=='undefined'?(localStorage.getItem(window.__SAVE_KEY||'swampAngler.v1')||'').length:0},capabilities:{webgl2:W.renderer.capabilities?.isWebGL2,maxTextureSize:W.renderer.capabilities?.maxTextureSize}},null,2)].join('\n');}
+ async function copy(){const txt=compact();try{await navigator.clipboard.writeText(txt);return true;}catch(_){const ta=document.createElement('textarea');ta.value=txt;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy');}catch(_){}ta.remove();return ok;}}
+ function download(){const blob=new Blob([report()],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='swamp-diagnostic-'+session+'.txt';a.target='_blank';a.rel='noopener';a.click();setTimeout(()=>URL.revokeObjectURL(url),15000);}
+ function clear(){current=[];history=[];log=[];try{localStorage.removeItem(KEY);}catch(_){} }
+ snapshot=state();event('boot',navigation);checkpoint(true);
+ return{scene,frame,beginFrame,stage,action,event,report,compact,copy,download,clear,add,previous,start(){started=true;clean=false;action('game','done');},count:()=>current.length};
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={readDiagnosticJournal,diagnosticValue,auditResources,createDiag};
 /* ===== 主線故事「老漁人的手記」：章節、任務、地圖開放、手記面板 ===== */
 function createStory(c){
 'use strict';
@@ -5784,13 +5837,14 @@ return {TANKS,SEA_TANK,SEA_TANKS,seaT,CHILLER,MOUNT_MAX,unlocked,check,keep,moun
 function createHomeScene(W,c){
 'use strict';
 const T=THREE, R=W.renderer, scene=new T.Scene(), cam=new T.PerspectiveCamera(62,1,.05,60), TL=new T.TextureLoader();
+window.__HOME_SCENE=scene;
 let on=false, yaw=0, pitch=-.08, yawT=0, pitchT=-.08, drag=null, t=0;
 const EYE=1.6, ROOM={x:4.4,zb:-4.2,zf:2.8,h:2.9}   /* 房間加寬（6.4→8.8 公尺），兩個水族箱升到最大也能並排、一樣大 */;
 // 站在房間中段：轉頭時左邊窗戶、右邊壁爐都在畫面中央
 cam.position.set(0,EYE,.9); scene.background=new T.Color(0x1a120c);
 // 真實木紋貼圖（碼頭用的那組），每個用途各自一份，才能設不同重複次數
-const wood=(rx,ry,rot,tint)=>{ const mk=f=>{ const x=TL.load(f); x.wrapS=x.wrapT=T.RepeatWrapping; x.repeat.set(rx,ry); x.rotation=rot||0; x.anisotropy=4; return x; };
-  const d=mk('dock_diff.jpg'); d.encoding=T.sRGBEncoding; return new T.MeshStandardMaterial({map:d,normalMap:mk('dock_nor.jpg'),roughnessMap:mk('dock_rough.jpg'),roughness:.85,color:tint||0xffffff}); };
+const woodTexture=createTextureVariants(T,TL);
+const wood=(rx,ry,rot,tint)=>{const mk=f=>woodTexture(f,rx,ry,rot||0);const d=mk('dock_diff.jpg');d.encoding=T.sRGBEncoding;return new T.MeshStandardMaterial({map:d,normalMap:mk('dock_nor.jpg'),roughnessMap:mk('dock_rough.jpg'),roughness:.85,color:tint||0xffffff});};
 const box=(w,h,d,m,x,y,z)=>{ const o=new T.Mesh(new T.BoxGeometry(w,h,d),m); o.position.set(x,y,z); o.receiveShadow=true; o.castShadow=true; scene.add(o); return o; };
 const plane=(w,h,m,x,y,z,ry,rx)=>{ const o=new T.Mesh(new T.PlaneGeometry(w,h),m); o.position.set(x,y,z); o.rotation.set(rx||0,ry||0,0); o.receiveShadow=true; scene.add(o); return o; };
 const RW=ROOM.x*2, RD=ROOM.zf-ROOM.zb, H=ROOM.h, cz=(ROOM.zf+ROOM.zb)/2;
@@ -6884,29 +6938,23 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101022656'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101052806'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
-  async function doUpdate(){ upB.textContent='更新中…'; upB.disabled=true;
-    try{ if(window.__saveNow) window.__saveNow(); }catch(e){}
-    try{ const r=await navigator.serviceWorker.getRegistration(); if(r) await r.update(); }catch(e){}
-    location.reload(true); }
-  upB.addEventListener('click',doUpdate); noB.addEventListener('click',()=>{ bar.style.display='none'; dismissed=bar.dataset.v||''; });
-  /* 自動更新：發現新版，等玩家不在搏魚、挖掘、劇情中（閒置、在小屋、在泥灘走路）時自動存檔並重新載入；
-     網址加上 v=新版本號，瀏覽器一定重新下載網頁本身（不會拿到 GitHub 快取 10 分鐘的舊網頁） */
-  const safe=()=>{ const G=window.__G; if(!G) return true; return (G.state==='idle'||G.state==='home'||G.state==='tide')&&!document.querySelector('#digBox[style*="flex"]'); };
-  let pend='';
-  function autoGo(v){ const u=new URL(location.href); if(u.searchParams.get('v')===v){ bar.dataset.v=v; bar.style.display='flex'; return; }   // 已經用新網址載過還是舊版（極少見）：改顯示按鈕，不無限重整
-    try{ if(window.__saveNow) window.__saveNow(); }catch(e){} try{ localStorage.setItem('swampAngler.updatedTo',v); }catch(e){}
-    u.searchParams.set('v',v); location.replace(u.toString()); }
-  function tryPend(){ if(pend&&safe()) autoGo(pend); }
-  async function check(){ try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const j=await r.json();
-      if(j.v&&j.v!==APP_VER&&j.v>APP_VER){ pend=j.v; tryPend(); } }catch(e){} }
-  setTimeout(check,1500); setInterval(check,3*60*1000); setInterval(tryPend,4000);
-  try{ const up=localStorage.getItem('swampAngler.updatedTo'); if(up&&up===APP_VER){ localStorage.removeItem('swampAngler.updatedTo'); setTimeout(()=>{ const t=document.createElement('div'); t.textContent='✅ 已自動更新到最新版本'; t.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;padding:8px 14px;border-radius:999px;background:rgba(10,30,20,.85);color:#bff5c8;font-size:14px'; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); },2500); } }catch(e){} document.addEventListener('visibilitychange',()=>{ if(!document.hidden) check(); });
+  let pendingVersion='';
+  async function doUpdate(){if(!pendingVersion)return;upB.textContent='更新中…';upB.disabled=true;
+    try{if(window.__DIAG)window.__DIAG.action('navigation','intentional-update',pendingVersion);if(window.__saveNow)window.__saveNow();}catch(e){}
+    try{const r=await navigator.serviceWorker.getRegistration();if(r)await r.update();}catch(e){}
+    try{localStorage.setItem('swampAngler.updatedTo',pendingVersion);}catch(e){}const u=new URL(location.href);u.searchParams.set('v',pendingVersion);location.replace(u.toString());
+  }
+  upB.addEventListener('click',doUpdate);noB.addEventListener('click',()=>{bar.style.display='none';dismissed=bar.dataset.v||'';});
+  // 版本檢查只提示，不因回家、閒置、拍照切回頁面而中斷遊戲。
+  async function check(){try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();if(j.v&&j.v!==APP_VER&&j.v>APP_VER){pendingVersion=j.v;bar.dataset.v=j.v;if(dismissed!==j.v)bar.style.display='flex';if(window.__DIAG)window.__DIAG.event('update-available',j.v);}}catch(e){}}
+  setTimeout(check,1500);setInterval(check,3*60*1000);
+  try{ const up=localStorage.getItem('swampAngler.updatedTo'); if(up&&up===APP_VER){ localStorage.removeItem('swampAngler.updatedTo'); setTimeout(()=>{ const t=document.createElement('div'); t.textContent='✅ 已更新到最新版本'; t.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;padding:8px 14px;border-radius:999px;background:rgba(10,30,20,.85);color:#bff5c8;font-size:14px'; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); },2500); } }catch(e){} document.addEventListener('visibilitychange',()=>{ if(!document.hidden) check(); });
 })();
   if('serviceWorker' in navigator) window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
   async function install(){ if(installed) return 'installed'; if(deferred){ deferred.prompt(); const r=await deferred.userChoice; deferred=null; return r.outcome; }
@@ -8812,9 +8860,9 @@ function homeEnter(){ const hd=HOME.data();
   const pool=BAITS.filter(b=>['corn','shrimp','live'].includes(b.id)&&save.lv>=b.lv), bt=pool[Math.floor(Math.random()*pool.length)]; if(!bt) return;
   const n=Math.min(8,1+Math.floor(kinds/2)); hd.visit=day; save.baits[bt.id]=(save.baits[bt.id]||0)+n; persist();
   setTimeout(()=>toast('釣友來參觀你的 '+kinds+' 種收藏，留下了 '+bt.icon+bt.name+' ×'+n,'good',2600),1200); }
-function recoverHome(err){console.error('home recovery',err);try{HOME3D.exit();}catch(_){}G.state='idle';document.body.classList.remove('athome','tankview','tankdive','grilling');fadeEl.classList.remove('on');toast('小屋載入暫時失敗，已返回釣點，遊戲進度保留','warn',4200);}
-function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收線再回家','warn');return;}if(!HOME.unlocked()){toast('完成主線第一章後才能整理小屋','warn');return;}persist();G.state='travel';fadeEl.classList.add('on');Snd.paddle();
- setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;HOME3D.enter();G.state='home';document.body.classList.add('athome');fadeEl.classList.remove('on');toast('回到老漁人的小屋','good',1400);}catch(err){recoverHome(err);}},650);}
+function recoverHome(err){if(window.__DIAG)window.__DIAG.action('home','error',err.message);console.error('home recovery',err);try{HOME3D.exit();}catch(_){}G.state='idle';document.body.classList.remove('athome','tankview','tankdive','grilling');fadeEl.classList.remove('on');toast('小屋載入暫時失敗，已返回釣點，遊戲進度保留','warn',4200);}
+function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收線再回家','warn');return;}if(!HOME.unlocked()){toast('完成主線第一章後才能整理小屋','warn');return;}persist();if(window.__DIAG)window.__DIAG.action('home','begin');G.state='travel';fadeEl.classList.add('on');Snd.paddle();
+ setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;HOME3D.enter();G.state='home';document.body.classList.add('athome');fadeEl.classList.remove('on');toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit(); document.body.classList.remove('athome'); G.state='idle'; fadeEl.classList.remove('on'); if(then) then(); else if(G.spot!==0) goSpot(0); },650); }
 window.__goHome=goHome; window.__HOMEOK=()=>HOME.unlocked();
@@ -8886,10 +8934,10 @@ window.addEventListener('touchend',e=>{ if(e.touches.length===0) setTimeout(()=>
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) releaseAll(); });
 let dragY0=0, pitch0=0;
 const keys={};
-window.addEventListener('keydown',e=>{ if(e.repeat) return; keys[e.code]=true; if(e.code==='Space'&&G.state!=='intro'&&G.state!=='catch'){ e.preventDefault(); actDown(); } });
+window.addEventListener('keydown',e=>{ if(e.repeat||document.querySelector('[data-photo-preview]')) return; keys[e.code]=true; if(e.code==='Space'&&G.state!=='intro'&&G.state!=='catch'){ e.preventDefault(); actDown(); } });
 window.addEventListener('keyup',e=>{ keys[e.code]=false; if(e.code==='Space'){ e.preventDefault(); actUp(); } });
 
-$('startBtn').addEventListener('click',()=>{ if(/[?&]ending=1/.test(location.search)) setTimeout(function endT(){ if(G.state==='idle'&&window.__STORY&&window.__STORY.showEnding) window.__STORY.showEnding(); else setTimeout(endT,800); },2500);   /* 測試：?ending=1 按開始後直接播結局動畫 */ Snd.init(); $('intro').classList.add('hidden'); G.state='idle'; toast('按住按鈕蓄力，放開拋竿','',2200);
+$('startBtn').addEventListener('click',()=>{ if(/[?&]ending=1/.test(location.search)) setTimeout(function endT(){ if(G.state==='idle'&&window.__STORY&&window.__STORY.showEnding) window.__STORY.showEnding(); else setTimeout(endT,800); },2500);   /* 測試：?ending=1 按開始後直接播結局動畫 */ Snd.init(); $('intro').classList.add('hidden'); G.state='idle';if(window.__DIAG)window.__DIAG.start(); toast('按住按鈕蓄力，放開拋竿','',2200);
   // 預覽結局：網址帶 ending 參數時，開始後直接播放結局（測試與重看用）
   if(/[?&]ending=[1-9]/.test(location.search)) setTimeout(()=>window.__playEnding(),1200);
   else if(!save.tutDone&&!(save.total>0)) setTimeout(()=>startTutorial(),2400);   // 新玩家：第一次開始遊戲時跑新手指引
@@ -8950,7 +8998,7 @@ $('bHomeShop').addEventListener('click',openShop);
 window.__CLOUD=createCloud({save:()=>save,toast,test:TESTACC,
   grant:()=>{ if((save.coins||0)<999999){ save.coins=999999; setCoins(); META.syncHUD(); persist(); } toast('🧪 測試帳號：金幣 999,999','good',2600); },refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
   assistGrant:()=>{ if(window.__ASSIST&&window.__ASSIST.grant(save)){ setCoins(); META.syncHUD(); persist(); toast("輕鬆模式已啟用・全地圖開放・金幣 9,999,999","good",2800); } },
-  apply:obj=>{ if(window.__ASSIST) window.__ASSIST.grant(obj); try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} location.reload(); }});
+  apply:obj=>{ if(window.__ASSIST) window.__ASSIST.grant(obj); try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} if(window.__DIAG)window.__DIAG.action('navigation','cloud-save-applied');location.reload(); }});
 const GHOST=createGhost(W,{toast:(m,c2,ms)=>toast(m,c2,ms),splash:(x,z,n,s)=>P.splash(x,0,z,n,s),ripple:(x,z,r)=>W.addRipple(x,z,r),splashSnd:k=>Snd.splash&&Snd.splash(k),save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>uiBusy()?'menu':G.state,base:()=>G.base,head:()=>G.head,yaw:()=>G.yaw,to:()=>G.to,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
 window.__GHOST=GHOST;
 // 烤好了：依兩面熟度評分，吃下去依魚的來源得到效果
@@ -9034,7 +9082,7 @@ window.__STORY=createStory({save,persist,toast,Snd,vib,goSpot:i=>goSpot(i),curSp
 const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* Adaptive profiles change resolution, reflection, shadow and effect budgets together. */
 window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;return Math.max(.35,Math.min(3.25,Math.max(2,window.devicePixelRatio||1),Math.sqrt(12000000/(w*h)),limit/w,limit/h));};
-const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,profile:aquariumGraphicsProfile,apply:s=>{
+const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,initialLevel:window.__resourcePolicy?.mobile?1:4,profile:(p,scope,cap)=>{if(window.__resourcePolicy?.recovery&&p.mode==='auto'){const safe={...p,...graphicsProfiles(cap)[Math.min(p.level,2)],maxLevel:2,reason:'前次中斷後的保護模式'};return{...safe,pr:Math.min(safe.pr,.8)};}return aquariumGraphicsProfile(p,scope,cap);},apply:s=>{
   window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;
   if(W.setWaterDetail)W.setWaterDetail(s.geometry);if(W.setShadows)W.setShadows(s.shadow);if(W.setRefl)W.setRefl(s.reflection>0,s.reflection);W.setPR(s.pr);
   document.body.dataset.gfx=s.effect;document.body.dataset.gfxMode=s.mode;const el=document.getElementById('gfxLive');if(el)el.textContent=graphicsStatusText(s);
@@ -9469,15 +9517,16 @@ window.addEventListener('resize',onResize); onResize();
 if(typeof save.hour==='number'&&isFinite(save.hour)) G.hour=save.hour;
 W.setTime(G.hour,true);
 dockCameraButton($('bCam'),$('cameraSlot'),$('top'));
-const screenCapture=createScreenCapture({canvas:W.renderer.domElement,button:$('bCam'),report:(m,k)=>toast(m,k,2200),onCaptured:scene=>SEA.recordPhoto(scene),scene:()=>TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':END.on()?'ending':G.loc||'lake'});
+const screenCapture=createScreenCapture({canvas:W.renderer.domElement,button:$('bCam'),report:(m,k)=>toast(m,k,2200),onCaptured:scene=>SEA.recordPhoto(scene),scene:()=>TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':END.on()?'ending':G.loc||'lake',save:persist});
 const frameLimiter=createFrameLimiter(GAME_FPS_LIMIT,performance.now());window.__frameLimit=GAME_FPS_LIMIT;
 const gpuStatus=document.createElement('div');gpuStatus.style.cssText='display:none;position:fixed;inset:0;z-index:200;background:rgba(6,16,20,.92);color:white;align-items:center;justify-content:center;text-align:center;padding:28px;font:18px sans-serif';document.body.appendChild(gpuStatus);
-const graphicsRecovery=createGraphicsRecovery(W.renderer.domElement,{save:persist,report:(kind,msg)=>{if(window.__DIAG)window.__DIAG.add(kind,msg);},lost:()=>{releaseAll();if(window.__DIAG)window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','context-lost');gpuStatus.textContent='畫面正在恢復，遊戲進度已保存。';gpuStatus.style.display='flex';setTimeout(()=>{if(graphicsRecovery.paused()){gpuStatus.innerHTML='<div>畫面尚未恢復，遊戲進度已保存。<br><button style="margin-top:20px;padding:12px 24px">重新載入</button></div>';gpuStatus.querySelector('button').onclick=()=>{persist();location.reload();};}},8000);},restored:()=>{W.resetGraphics();HOME3D.resetGraphics();frameLimiter.reset(performance.now());gfxAuto.pause();gpuStatus.style.display='none';}});
+const graphicsRecovery=createGraphicsRecovery(W.renderer.domElement,{save:persist,report:(kind,msg)=>{if(window.__DIAG)window.__DIAG.add(kind,msg);},lost:()=>{screenCapture.cancel();releaseAll();if(window.__DIAG)window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','context-lost');gpuStatus.textContent='畫面正在恢復，遊戲進度已保存。';gpuStatus.style.display='flex';setTimeout(()=>{if(graphicsRecovery.paused()){gpuStatus.innerHTML='<div>畫面尚未恢復，遊戲進度已保存。<br><button style="margin-top:20px;padding:12px 24px">重新載入</button></div>';gpuStatus.querySelector('button').onclick=()=>{persist();if(window.__DIAG)window.__DIAG.action('navigation','manual-gpu-recovery');location.reload();};}},8000);},restored:()=>{W.resetGraphics();HOME3D.resetGraphics();frameLimiter.reset(performance.now());gfxAuto.pause();gpuStatus.style.display='none';}});
+let homeWarmAt=0;
 function frame(now){
   const frameSeconds=frameLimiter.step(now);if(frameSeconds===null){requestAnimationFrame(frame);return;}
-  if(graphicsRecovery.paused()){requestAnimationFrame(frame);return;}const dt=Math.min(.05,frameSeconds);window.__frameSeconds=frameSeconds;
-  try{ window.__UWON=UW.active(); update(dt);if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);} if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
-  screenCapture.afterFrame();if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
+  if(graphicsRecovery.paused()||document.hidden||screenCapture.paused()){frameLimiter.reset(now);requestAnimationFrame(frame);return;}const dt=Math.min(.05,frameSeconds);window.__frameSeconds=frameSeconds;
+  if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
+  if(HOME3D.active()){if(!homeWarmAt)homeWarmAt=now;if(homeWarmAt>0&&now-homeWarmAt>5000){homeWarmAt=-1;if(window.__DIAG)window.__DIAG.action('home','done','5 seconds rendered');}}else homeWarmAt=0;if(window.__DIAG)window.__DIAG.stage('render');screenCapture.afterFrame();if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
   gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?HOME3D.qualityScope():UW.active()?'underwater':G.loc||'lake'});
   requestAnimationFrame(frame);
 }
@@ -9492,12 +9541,14 @@ requestAnimationFrame(frame);
       const self=this; return orig.call(this,cu,onLoad,onProg,e=>{ console.warn('CDN 失敗，改從本站下載',url); orig.call(self,url,onLoad,onProg,onErr); }); }; };
     wrap(THREE.FileLoader.prototype); wrap(THREE.ImageLoader.prototype);
     // 所有模型都經過 Draco 幾何壓縮（體積約剩 1/4）：每個 GLTF 載入器自動接上同一個 Draco 解壓器
-    if(THREE.DRACOLoader&&THREE.GLTFLoader){ const dl=new THREE.DRACOLoader(); dl.setDecoderPath('vendor/draco/'); dl.preload();
+    let resourceSave={};try{resourceSave=JSON.parse(localStorage.getItem('swampAngler.v1')||'{}');}catch(_){}const previous=readDiagnosticJournal();const recovery=!!(previous&&!previous.clean&&Date.now()-previous.at<600000&&((previous.started&&previous.visible!==false)||previous.recovery));window.__resourcePolicy=deviceResourcePolicy(navigator.userAgent,resourceSave.gfx||'auto',recovery);window.__imageBudget=createImageBudget(window.__resourcePolicy);installImageBudget(THREE,window.__imageBudget);
+    if(THREE.DRACOLoader&&THREE.GLTFLoader){ const dl=new THREE.DRACOLoader();dl.setWorkerLimit(1); dl.setDecoderPath('vendor/draco/'); dl.preload();
       for(const k of ['load','parse']){ const o=THREE.GLTFLoader.prototype[k]; THREE.GLTFLoader.prototype[k]=function(...a){ if(!this.dracoLoader) this.setDRACOLoader(dl); return o.apply(this,a); }; } } if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); }catch(e){ console.warn('cdn',e); }
   try{
-    const W=createWorld({canvas:document.getElementById('c')}); window.__DIAG=createDiag(W,{get G(){ return window.__G||{}; },get save(){ return (window.__G&&window.__G.saveRef)||{}; }}); const P=createProps(W);
+    const W=createWorld({canvas:document.getElementById('c')});W.renderer.info.autoReset=false; window.__DIAG=createDiag(W,{get G(){ return window.__G||{}; },get save(){ return (window.__G&&window.__G.saveRef)||{}; },persist:()=>{if(window.__G?.saveRef)localStorage.setItem(window.__SAVE_KEY||'swampAngler.v1',JSON.stringify(window.__G.saveRef));}}); const P=createProps(W);
     // 主畫面的載入提示：進度條、第一次進入的說明、網路慢時的提醒（避免玩家以為當機）
     const ln=document.getElementById('loadNote'), lbox=document.getElementById('loadBox'), lbar=document.querySelector('#loadBar i'), ltip=document.getElementById('loadTip'), sb=document.getElementById('startBtn');
+    if(window.__resourcePolicy?.recovery){sb.textContent='繼續釣魚（保護模式）';const note=document.createElement('p');note.textContent='前次頁面未正常結束，本次已降低記憶體負載，遊戲進度保留。';note.style.cssText='color:#efc04c;font-size:14px';sb.parentNode.insertBefore(note,sb);}
     const first=!localStorage.getItem('swampAngler.loaded'); let lastP=-1, lastT=performance.now();
     if(ltip) ltip.textContent=first?'第一次進入需要下載真實的湖景、模型與貼圖（約 60MB），視網路速度約 1～3 分鐘。下載完會存在裝置裡，下次幾秒就好。':'正在從裝置讀取場景，請稍候…';
     if(sb&&first){ sb.dataset.t=sb.textContent; sb.textContent='場景下載中，請稍候…'; sb.style.opacity=.7; }

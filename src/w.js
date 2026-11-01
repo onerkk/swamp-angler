@@ -113,13 +113,14 @@ return {TANKS,SEA_TANK,SEA_TANKS,seaT,CHILLER,MOUNT_MAX,unlocked,check,keep,moun
 function createHomeScene(W,c){
 'use strict';
 const T=THREE, R=W.renderer, scene=new T.Scene(), cam=new T.PerspectiveCamera(62,1,.05,60), TL=new T.TextureLoader();
+window.__HOME_SCENE=scene;
 let on=false, yaw=0, pitch=-.08, yawT=0, pitchT=-.08, drag=null, t=0;
 const EYE=1.6, ROOM={x:4.4,zb:-4.2,zf:2.8,h:2.9}   /* 房間加寬（6.4→8.8 公尺），兩個水族箱升到最大也能並排、一樣大 */;
 // 站在房間中段：轉頭時左邊窗戶、右邊壁爐都在畫面中央
 cam.position.set(0,EYE,.9); scene.background=new T.Color(0x1a120c);
 // 真實木紋貼圖（碼頭用的那組），每個用途各自一份，才能設不同重複次數
-const wood=(rx,ry,rot,tint)=>{ const mk=f=>{ const x=TL.load(f); x.wrapS=x.wrapT=T.RepeatWrapping; x.repeat.set(rx,ry); x.rotation=rot||0; x.anisotropy=4; return x; };
-  const d=mk('dock_diff.jpg'); d.encoding=T.sRGBEncoding; return new T.MeshStandardMaterial({map:d,normalMap:mk('dock_nor.jpg'),roughnessMap:mk('dock_rough.jpg'),roughness:.85,color:tint||0xffffff}); };
+const woodTexture=createTextureVariants(T,TL);
+const wood=(rx,ry,rot,tint)=>{const mk=f=>woodTexture(f,rx,ry,rot||0);const d=mk('dock_diff.jpg');d.encoding=T.sRGBEncoding;return new T.MeshStandardMaterial({map:d,normalMap:mk('dock_nor.jpg'),roughnessMap:mk('dock_rough.jpg'),roughness:.85,color:tint||0xffffff});};
 const box=(w,h,d,m,x,y,z)=>{ const o=new T.Mesh(new T.BoxGeometry(w,h,d),m); o.position.set(x,y,z); o.receiveShadow=true; o.castShadow=true; scene.add(o); return o; };
 const plane=(w,h,m,x,y,z,ry,rx)=>{ const o=new T.Mesh(new T.PlaneGeometry(w,h),m); o.position.set(x,y,z); o.rotation.set(rx||0,ry||0,0); o.receiveShadow=true; scene.add(o); return o; };
 const RW=ROOM.x*2, RD=ROOM.zf-ROOM.zb, H=ROOM.h, cz=(ROOM.zf+ROOM.zb)/2;

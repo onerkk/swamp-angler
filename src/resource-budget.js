@@ -1,0 +1,14 @@
+/* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
+function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
+function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
+function createImageBudget(policy,makeCanvas=()=>document.createElement('canvas')){
+ const cache=new WeakMap(),stats={images:0,resized:0,sourcePixels:0,retainedPixels:0,failures:0,policy};
+ function resize(image){if(!image)return image;if(cache.has(image))return cache.get(image);if(!image.width||!image.height||image.data)return image;const size=budgetImageSize(image.width,image.height,policy);stats.images++;stats.sourcePixels+=image.width*image.height;let out=image;
+  if(size.width!==image.width||size.height!==image.height){let cv;try{cv=makeCanvas();cv.width=size.width;cv.height=size.height;const ctx=cv.getContext('2d',{alpha:true});if(!ctx)throw Error('image resize unavailable');ctx.drawImage(image,0,0,size.width,size.height);out=cv;stats.resized++;}catch(_){stats.failures++;if(cv){cv.width=cv.height=1;}}}
+  stats.retainedPixels+=out.width*out.height;cache.set(image,out);return out;
+ }
+ return{resize,stats};
+}
+function installImageBudget(T,budget){for(const name of['ImageLoader','ImageBitmapLoader']){if(!T[name])continue;const original=T[name].prototype.load;T[name].prototype.load=function(url,loaded,progress,failed){return original.call(this,url,image=>{const result=budget.resize(image);try{result.__assetURL=String(url).split('/').pop().slice(0,160);}catch(_){}try{if(loaded)loaded(result);}finally{if(result!==image&&typeof image.close==='function')image.close();}},progress,failed);};}}
+function createTextureVariants(T,loader){const textures=new Map(),sources=new Map();return function(file,rx=1,ry=1,rotation=0){const key=[file,rx,ry,rotation].join('|');if(textures.has(key))return textures.get(key);let source=sources.get(file);if(!source){source={variants:[],ready:false};sources.set(file,source);source.texture=loader.load(file,loaded=>{source.ready=true;source.texture=loaded;for(const t of source.variants){t.image=loaded.image;t.needsUpdate=true;}});}const t=source.texture.clone();source.variants.push(t);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(rx,ry);t.rotation=rotation;t.anisotropy=4;textures.set(key,t);return t;};}
+if(typeof module!=='undefined'&&module.exports)module.exports={deviceResourcePolicy,budgetImageSize,createImageBudget,installImageBudget,createTextureVariants};
