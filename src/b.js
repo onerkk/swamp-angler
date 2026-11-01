@@ -400,7 +400,10 @@ void main(){
     float waterDepth=bankDepth+.22*noise2(p*.23);
     float travel=waterDepth/max(.22,-underRay.y);
     vec2 bedPoint=p+underRay.xz*travel;
-    vec3 gravel=texture2D(uLakeBed,bedPoint*.68).rgb;
+    // 湖底卵石：同一張 512 小圖若只用一種尺寸重複鋪，遠看會排成規則的黑點格子。改成兩種尺寸、轉一個角度的取樣，依雜訊混合打散重複感，越遠越接近平均色
+    vec2 bedQ=bedPoint*.68, bedR=mat2(.8,-.6,.6,.8)*bedPoint*.27+vec2(.37,.11);
+    vec3 gravel=mix(texture2D(uLakeBed,bedQ).rgb,texture2D(uLakeBed,bedR).rgb,smoothstep(.32,.68,noise2(bedPoint*.19)));
+    gravel=mix(gravel,vec3(.40,.38,.31),smoothstep(3.0,12.0,dist)*.65);
     gravel=pow(max(gravel,vec3(.001)),vec3(2.2));
     float silt=noise2(bedPoint*.37)*.62+noise2(bedPoint*1.9)*.38;
     gravel=mix(gravel,vec3(.085,.105,.046),smoothstep(.46,.7,silt)*.55);

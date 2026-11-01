@@ -70,9 +70,12 @@ pads.userData.lake=true; scene.add(pads);
 const petalMat=new T.MeshStandardMaterial({color:0xf3dfe4, roughness:.5, emissive:0x1a0a0c});
 const coreMat=new T.MeshStandardMaterial({color:0xe8c040, roughness:.6});
 const petalGeo=new T.SphereGeometry(1,10,8);
+{ const flowerParts=[];
 for(const k of [3,12,25,40,57,70]){ const p=padPos[k%padPos.length]; const g=new T.Group();
   for(let i=0;i<10;i++){ const m=new T.Mesh(petalGeo,petalMat); const a=i/10*6.283; m.scale.set(.05,.014,.022); m.position.set(Math.cos(a)*.04,.02,Math.sin(a)*.04); m.rotation.set(0,-a,.55); g.add(m); }
-  const cm=new T.Mesh(new T.SphereGeometry(.022,10,8),coreMat); cm.position.y=.025; g.add(cm); g.position.set(p[0]+.05,.01,p[1]); g.userData.lake=true; scene.add(g); }
+  const cm=new T.Mesh(new T.SphereGeometry(.022,10,8),coreMat); cm.position.y=.025; g.add(cm); g.position.set(p[0]+.05,.01,p[1]); g.traverse(o=>{ if(o.isMesh) flowerParts.push(o); }); }
+  // 六朵睡蓮共 66 個零件合成兩個網格（花瓣、花心），從 66 次繪製變 2 次
+  mergeMeshesByMaterial(T,flowerParts,null).forEach(m=>{ m.userData.lake=true; scene.add(m); }); }
 
 const bladeGeo=new T.PlaneGeometry(.022,1,1,5); bladeGeo.translate(0,.5,0);
 { const p=bladeGeo.attributes.position; for(let i=0;i<p.count;i++){ const y=p.getY(i); p.setX(i,p.getX(i)*(1-y*.9)); p.setZ(i,y*y*.06); } bladeGeo.computeVertexNormals(); }

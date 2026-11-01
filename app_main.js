@@ -1,4 +1,4 @@
-/*APPV:20261101230735*/
+/*APPV:20261101232648*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -55,6 +55,37 @@ function createGeometryLOD(){
  return{install,update,stats};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={LOD_MODELS,lodFileFor,lodDistance,pairLODMeshes,createGeometryLOD};
+/* 合併繪製：同一種材質的小零件（睡蓮花瓣、水黽的腳）合成一個網格，岸邊植物改用實例化；外觀、數量不變，只是 GPU 一次畫完。
+   手機上「繪製次數」比三角形更容易成為瓶頸，每次繪製都有固定的 CPU 與驅動成本。 */
+function mergeMeshesByMaterial(T,meshes,relativeTo){
+ const inv=new T.Matrix4();if(relativeTo){relativeTo.updateWorldMatrix(true,false);inv.copy(relativeTo.matrixWorld).invert();}
+ const groups=new Map();
+ for(const m of meshes){if(!m||!m.isMesh||Array.isArray(m.material)||m.isSkinnedMesh||m.isInstancedMesh)continue;m.updateWorldMatrix(true,false);if(!groups.has(m.material))groups.set(m.material,[]);groups.get(m.material).push(m);}
+ const out=[];
+ for(const [mat,list]of groups){
+  const hasUV=list.every(m=>m.geometry.attributes.uv),hasN=list.every(m=>m.geometry.attributes.normal);let vc=0,ic=0;
+  for(const m of list){const g=m.geometry;vc+=g.attributes.position.count;ic+=g.index?g.index.count:g.attributes.position.count;}
+  const pos=new Float32Array(vc*3),nor=hasN?new Float32Array(vc*3):null,uv=hasUV?new Float32Array(vc*2):null,idx=vc>65535?new Uint32Array(ic):new Uint16Array(ic);
+  const mtx=new T.Matrix4(),nm=new T.Matrix3(),v=new T.Vector3();let vo=0,io=0;
+  for(const m of list){const g=m.geometry,p=g.attributes.position,n=g.attributes.normal,u=g.attributes.uv;mtx.multiplyMatrices(inv,m.matrixWorld);nm.getNormalMatrix(mtx);
+   for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(mtx);pos.set([v.x,v.y,v.z],(vo+i)*3);if(nor){v.fromBufferAttribute(n,i).applyMatrix3(nm).normalize();nor.set([v.x,v.y,v.z],(vo+i)*3);}if(uv)uv.set([u.getX(i),u.getY(i)],(vo+i)*2);}
+   if(g.index)for(let i=0;i<g.index.count;i++)idx[io+i]=g.index.getX(i)+vo;else for(let i=0;i<p.count;i++)idx[io+i]=vo+i;
+   io+=g.index?g.index.count:p.count;vo+=p.count;}
+  const geo=new T.BufferGeometry();geo.setAttribute('position',new T.BufferAttribute(pos,3));if(nor)geo.setAttribute('normal',new T.BufferAttribute(nor,3));if(uv)geo.setAttribute('uv',new T.BufferAttribute(uv,2));geo.setIndex(new T.BufferAttribute(idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();
+  const merged=new T.Mesh(geo,mat);merged.castShadow=list.some(m=>m.castShadow);merged.receiveShadow=list.some(m=>m.receiveShadow);merged.renderOrder=list[0].renderOrder;out.push(merged);
+ }
+ return out;
+}
+/* 把同一個模型的多份複本（每份可有不同位置、旋轉、大小）改成實例化：每個子網格一個 InstancedMesh */
+function instanceCopies(T,template,matrices){
+ template.updateWorldMatrix(true,true);const inv=new T.Matrix4().copy(template.matrixWorld).invert(),out=[],local=new T.Matrix4(),m4=new T.Matrix4();
+ template.traverse(o=>{if(!o.isMesh||o.isSkinnedMesh||o.isInstancedMesh)return;local.multiplyMatrices(inv,o.matrixWorld);
+  const im=new T.InstancedMesh(o.geometry,o.material,matrices.length);matrices.forEach((mx,i)=>{m4.multiplyMatrices(mx,local);im.setMatrixAt(i,m4);});im.instanceMatrix.needsUpdate=true;
+  // 實例分散在岸邊，基底幾何的包圍球不能代表全部實例，所以不做視錐剔除
+  im.frustumCulled=false;im.castShadow=o.castShadow;im.receiveShadow=o.receiveShadow;im.renderOrder=o.renderOrder;out.push(im);});
+ return out;
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={mergeMeshesByMaterial,instanceCopies};
 /* Effect costs are controlled independently from framebuffer resolution. */
 /* 畫質分兩層：tier（高／中／低）決定材質用哪些貼圖與光澤，整段遊戲固定不變，避免著色器重新編譯造成卡頓；
    level（0～7）只調數量、更新頻率與解析度，所有特效在每一級都保留，只是用較省的版本。 */
@@ -367,13 +398,13 @@ function createScreenCapture({canvas,button,report=()=>{},onCaptured=()=>{},capt
  function releasePreview(){if(preview){preview.remove();preview=null;}if(objectURL){URL.revokeObjectURL(objectURL);objectURL=null;}}
  function offer(blob,scope,context){releasePreview();objectURL=URL.createObjectURL(blob);preview=document.createElement('div');preview.setAttribute('data-screenshot-ignore','');preview.setAttribute('data-photo-preview','');for(const type of['pointerdown','pointerup','click'])preview.addEventListener(type,e=>e.stopPropagation());preview.style.cssText='position:fixed;inset:0;z-index:180;background:rgba(4,13,17,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;color:white';
   const photo=document.createElement('img');photo.src=objectURL;photo.alt='剛拍好的遊戲截圖';photo.style.cssText='max-width:100%;max-height:72vh;object-fit:contain';preview.appendChild(photo);
-  const message=document.createElement('div');message.textContent='照片已拍好，選擇儲存或分享。';preview.appendChild(message);const controls=document.createElement('div');controls.style.cssText='display:flex;gap:12px';preview.appendChild(controls);
+  const message=document.createElement('div');message.textContent='照片已拍好，可以下載到手機或分享。';preview.appendChild(message);const controls=document.createElement('div');controls.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:center';preview.appendChild(controls);
   function control(text,fn){const b=document.createElement('button');b.textContent=text;b.style.cssText='border:0;border-radius:20px;padding:12px 18px;font:600 16px sans-serif;background:#efc04c;color:#102c2b';b.onclick=fn;controls.appendChild(b);return b;}
-  control('儲存／分享',async()=>{try{save();const file=typeof File==='function'?new File([blob],'濕地垂釣_'+Date.now()+'.jpg',{type:'image/jpeg'}):null;
-    if(file&&navigator.canShare?.({files:[file]})&&navigator.share){action('sharing');await navigator.share({files:[file],title:'濕地垂釣'});action('done','share returned');message.textContent='分享已完成';}
-    else{const a=document.createElement('a');a.href=objectURL;a.download='濕地垂釣_'+Date.now()+'.jpg';a.target='_blank';a.rel='noopener';document.body.appendChild(a);action('export','user initiated, separate target');a.click();a.remove();action('done','download requested');message.textContent='已送出，若開啟圖片預覽，請長按圖片儲存。';}
-   }catch(error){action('done',error.name||error.message);if(error.name!=='AbortError')message.textContent='請長按照片儲存圖片，或再試一次。';}});
-  control('返回遊戲',()=>{action('done','preview closed');releasePreview();});document.body.appendChild(preview);report('📷 已拍好照片','good');try{const result=onCaptured(scope,context);if(result?.message)message.textContent=result.message+'。可儲存照片或返回遊戲。';}catch(error){action('record-error',error.message);message.textContent='照片已拍好，但任務記錄失敗，請返回遊戲再試一次。';}
+  const name='濕地垂釣_'+Date.now()+'.jpg',file=typeof File==='function'?new File([blob],name,{type:'image/jpeg'}):null,canShare=!!(file&&navigator.share&&navigator.canShare?.({files:[file]}));
+  // 下載與分享分成兩個按鈕：手機支援分享時，以前只會開分享選單，沒有直接存到手機的選項
+  control('下載到手機',()=>{try{save();const a=document.createElement('a');a.href=objectURL;a.download=name;a.target='_blank';a.rel='noopener';document.body.appendChild(a);action('export','download');a.click();a.remove();action('done','download requested');message.textContent='已下載，可在手機的「下載」資料夾或相簿找到；若只開啟了圖片，請長按圖片儲存。';}catch(error){action('done',error.name||error.message);message.textContent='請長按照片儲存圖片，或再試一次。';}});
+  if(canShare)control('分享',async()=>{try{save();action('sharing');await navigator.share({files:[file],title:'濕地垂釣'});action('done','share returned');message.textContent='分享已完成';}catch(error){action('done',error.name||error.message);if(error.name!=='AbortError')message.textContent='分享失敗，可改按「下載到手機」。';}});
+  control('返回遊戲',()=>{action('done','preview closed');releasePreview();});document.body.appendChild(preview);report('📷 已拍好照片','good');try{const result=onCaptured(scope,context);if(result?.message)message.textContent=result.message+'。可下載、分享或返回遊戲。';}catch(error){action('record-error',error.message);message.textContent='照片已拍好，但任務記錄失敗，請返回遊戲再試一次。';}
  }
  async function take(){if(busy||preview)return;busy=true;cancelled=false;button.disabled=true;button.textContent='⏳';button.setAttribute('aria-busy','true');const start=now();let timer;
   try{const scope=scene(),context=captureState(scope);save();action('begin',{scene:scope,width:canvas.width,height:canvas.height});const frozen=await new Promise((resolve,reject)=>{pending={resolve,reject,scene:scope,context};timer=setTimeout(()=>{if(pending){pending=null;reject(Error('畫面尚未準備好，請稍後拍照'));}},2500);});clearTimeout(timer);image=frozen.image;
@@ -1368,7 +1399,10 @@ void main(){
     float waterDepth=bankDepth+.22*noise2(p*.23);
     float travel=waterDepth/max(.22,-underRay.y);
     vec2 bedPoint=p+underRay.xz*travel;
-    vec3 gravel=texture2D(uLakeBed,bedPoint*.68).rgb;
+    // 湖底卵石：同一張 512 小圖若只用一種尺寸重複鋪，遠看會排成規則的黑點格子。改成兩種尺寸、轉一個角度的取樣，依雜訊混合打散重複感，越遠越接近平均色
+    vec2 bedQ=bedPoint*.68, bedR=mat2(.8,-.6,.6,.8)*bedPoint*.27+vec2(.37,.11);
+    vec3 gravel=mix(texture2D(uLakeBed,bedQ).rgb,texture2D(uLakeBed,bedR).rgb,smoothstep(.32,.68,noise2(bedPoint*.19)));
+    gravel=mix(gravel,vec3(.40,.38,.31),smoothstep(3.0,12.0,dist)*.65);
     gravel=pow(max(gravel,vec3(.001)),vec3(2.2));
     float silt=noise2(bedPoint*.37)*.62+noise2(bedPoint*1.9)*.38;
     gravel=mix(gravel,vec3(.085,.105,.046),smoothstep(.46,.7,silt)*.55);
@@ -1931,9 +1965,12 @@ pads.userData.lake=true; scene.add(pads);
 const petalMat=new T.MeshStandardMaterial({color:0xf3dfe4, roughness:.5, emissive:0x1a0a0c});
 const coreMat=new T.MeshStandardMaterial({color:0xe8c040, roughness:.6});
 const petalGeo=new T.SphereGeometry(1,10,8);
+{ const flowerParts=[];
 for(const k of [3,12,25,40,57,70]){ const p=padPos[k%padPos.length]; const g=new T.Group();
   for(let i=0;i<10;i++){ const m=new T.Mesh(petalGeo,petalMat); const a=i/10*6.283; m.scale.set(.05,.014,.022); m.position.set(Math.cos(a)*.04,.02,Math.sin(a)*.04); m.rotation.set(0,-a,.55); g.add(m); }
-  const cm=new T.Mesh(new T.SphereGeometry(.022,10,8),coreMat); cm.position.y=.025; g.add(cm); g.position.set(p[0]+.05,.01,p[1]); g.userData.lake=true; scene.add(g); }
+  const cm=new T.Mesh(new T.SphereGeometry(.022,10,8),coreMat); cm.position.y=.025; g.add(cm); g.position.set(p[0]+.05,.01,p[1]); g.traverse(o=>{ if(o.isMesh) flowerParts.push(o); }); }
+  // 六朵睡蓮共 66 個零件合成兩個網格（花瓣、花心），從 66 次繪製變 2 次
+  mergeMeshesByMaterial(T,flowerParts,null).forEach(m=>{ m.userData.lake=true; scene.add(m); }); }
 
 const bladeGeo=new T.PlaneGeometry(.022,1,1,5); bladeGeo.translate(0,.5,0);
 { const p=bladeGeo.attributes.position; for(let i=0;i<p.count;i++){ const y=p.getY(i); p.setX(i,p.getX(i)*(1-y*.9)); p.setZ(i,y*y*.06); } bladeGeo.computeVertexNormals(); }
@@ -3638,6 +3675,8 @@ const legG=new T.CylinderGeometry(.0009,.0009,.06,3); legG.rotateZ(Math.PI/2); l
 const striders=[];
 for(let k=0;k<7;k++){ const g=new T.Group(); const bd=new T.Mesh(new T.SphereGeometry(1,8,6),stMat); bd.scale.set(.004,.003,.013); g.add(bd);
   [-.55,0,.55].forEach((a,j)=>{ for(const s of [1,-1]){ const l=new T.Mesh(legG,stMat); l.position.z=(1-j)*.006; l.rotation.y=s>0?a:Math.PI-a; g.add(l); } });
+  // 身體和六隻腳合成一個網格：每隻水黽從 7 次繪製變 1 次，群組仍照原本方式移動
+  const parts=g.children.slice(); const merged=mergeMeshesByMaterial(T,parts,g); parts.forEach(o=>g.remove(o)); merged.forEach(m=>g.add(m));
   g.scale.setScalar(1.6); g.visible=false; g.userData={vx:0,vz:0,t:0}; S.add(g); striders.push(g); }
 /* ---------- 跳出水面的魚 ---------- */
 const jumpers={}; let jf=null;
@@ -3860,11 +3899,14 @@ if(T.GLTFLoader){
       const w=new T.Group(); const c=o.clone(true); w.add(c); w.updateMatrixWorld(true); const b=new T.Box3().setFromObject(w), ct=b.getCenter(new T.Vector3());
       c.position.x-=ct.x; c.position.z-=ct.z; c.position.y-=b.min.y; return {w,h:b.max.y-b.min.y}; });
     if(!kinds.length) return;
+    // 同一種植物的所有株改用實例化：位置、大小、方向和亂數順序都跟以前一樣，只是一種一次畫完
+    const perKind=new Map(), tmp=new T.Object3D();
     for(let i=0;i<n;i++){ const z=zones[i%zones.length], x=z[0]+rnd()*(z[1]-z[0]), zz=z[2]+rnd()*(z[3]-z[2]), y=groundY(x,zz);
-      if(y===null||y<minY) continue; const k=kinds[Math.floor(rnd()*kinds.length)], inst=k.w.clone(true);
-      inst.scale.setScalar((hMin+rnd()*(hMax-hMin))/Math.max(k.h,1e-3)); inst.position.set(x,y-.02,zz); inst.rotation.y=rnd()*Math.PI*2;
-      inst.traverse(o=>{ if(o.isMesh){ o.castShadow=false; if(o.material){ o.material.envMapIntensity=.9; } } });
-      inst.userData.lake=true; inst.userData.veg=true; inst.visible=!(W.isSea&&W.isSea()); W.scene.add(inst); } });
+      if(y===null||y<minY) continue; const k=kinds[Math.floor(rnd()*kinds.length)];
+      tmp.scale.setScalar((hMin+rnd()*(hMax-hMin))/Math.max(k.h,1e-3)); tmp.position.set(x,y-.02,zz); tmp.rotation.set(0,rnd()*Math.PI*2,0); tmp.updateMatrix();
+      if(!perKind.has(k)) perKind.set(k,[]); perKind.get(k).push(tmp.matrix.clone()); }
+    for(const [k,mats] of perKind){ k.w.traverse(o=>{ if(o.isMesh){ o.castShadow=false; if(o.material){ o.material.envMapIntensity=.9; } } });
+      instanceCopies(T,k.w,mats).forEach(im=>{ im.userData.lake=true; im.userData.veg=true; im.visible=!(W.isSea&&W.isSea()); W.scene.add(im); }); } });
   scatter('grass_medium_01.glb',34,.3,.6,ZONES,.12);
   scatter('grass_medium_02.glb',14,.35,.7,ZONES,.12);
   scatter('shrub_03.glb',10,.6,1.1,ZONES,.2);
@@ -7054,7 +7096,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101230735'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261101232648'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

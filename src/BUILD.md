@@ -58,3 +58,4 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 畫質分兩層：材質等級 tier（高／中／低，effect-budget.js effectTier）整段遊戲固定，決定貼圖與光澤，不隨自動調整切換（避免著色器重新編譯卡頓）；等級 level 0～7 只調解析度、數量、更新頻率（effectBudget 的 rainLines、reflectionHz、shadowHz、probeHz、particleScale）
 - 規則：任何畫質都不得關閉特效，只能改用較省的版本；陰影 shadowMap.enabled 一律 true
 - 遠近細節 lod.js：models/lod/*_lod1.glb 是倒木、樹樁、岸邊岩石的簡化幾何（無貼圖、Draco），由 GLTFLoader 掛鉤自動配對，遠處換幾何、材質不變；新增大型岸邊模型時用 /tmp 的 gltf-transform 腳本（simplify ratio 0.12、prune keepAttributes、draco）產生並加入 LOD_MODELS
+- 合併繪製 batching.js：mergeMeshesByMaterial（同材質小零件合成一個網格，例：睡蓮花、水黽）、instanceCopies（岸邊散植改實例化）；湖區繪製次數約 446 → 202

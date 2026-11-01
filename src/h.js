@@ -108,11 +108,14 @@ if(T.GLTFLoader){
       const w=new T.Group(); const c=o.clone(true); w.add(c); w.updateMatrixWorld(true); const b=new T.Box3().setFromObject(w), ct=b.getCenter(new T.Vector3());
       c.position.x-=ct.x; c.position.z-=ct.z; c.position.y-=b.min.y; return {w,h:b.max.y-b.min.y}; });
     if(!kinds.length) return;
+    // 同一種植物的所有株改用實例化：位置、大小、方向和亂數順序都跟以前一樣，只是一種一次畫完
+    const perKind=new Map(), tmp=new T.Object3D();
     for(let i=0;i<n;i++){ const z=zones[i%zones.length], x=z[0]+rnd()*(z[1]-z[0]), zz=z[2]+rnd()*(z[3]-z[2]), y=groundY(x,zz);
-      if(y===null||y<minY) continue; const k=kinds[Math.floor(rnd()*kinds.length)], inst=k.w.clone(true);
-      inst.scale.setScalar((hMin+rnd()*(hMax-hMin))/Math.max(k.h,1e-3)); inst.position.set(x,y-.02,zz); inst.rotation.y=rnd()*Math.PI*2;
-      inst.traverse(o=>{ if(o.isMesh){ o.castShadow=false; if(o.material){ o.material.envMapIntensity=.9; } } });
-      inst.userData.lake=true; inst.userData.veg=true; inst.visible=!(W.isSea&&W.isSea()); W.scene.add(inst); } });
+      if(y===null||y<minY) continue; const k=kinds[Math.floor(rnd()*kinds.length)];
+      tmp.scale.setScalar((hMin+rnd()*(hMax-hMin))/Math.max(k.h,1e-3)); tmp.position.set(x,y-.02,zz); tmp.rotation.set(0,rnd()*Math.PI*2,0); tmp.updateMatrix();
+      if(!perKind.has(k)) perKind.set(k,[]); perKind.get(k).push(tmp.matrix.clone()); }
+    for(const [k,mats] of perKind){ k.w.traverse(o=>{ if(o.isMesh){ o.castShadow=false; if(o.material){ o.material.envMapIntensity=.9; } } });
+      instanceCopies(T,k.w,mats).forEach(im=>{ im.userData.lake=true; im.userData.veg=true; im.visible=!(W.isSea&&W.isSea()); W.scene.add(im); }); } });
   scatter('grass_medium_01.glb',34,.3,.6,ZONES,.12);
   scatter('grass_medium_02.glb',14,.35,.7,ZONES,.12);
   scatter('shrub_03.glb',10,.6,1.1,ZONES,.2);

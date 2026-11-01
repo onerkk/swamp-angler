@@ -118,6 +118,8 @@ const legG=new T.CylinderGeometry(.0009,.0009,.06,3); legG.rotateZ(Math.PI/2); l
 const striders=[];
 for(let k=0;k<7;k++){ const g=new T.Group(); const bd=new T.Mesh(new T.SphereGeometry(1,8,6),stMat); bd.scale.set(.004,.003,.013); g.add(bd);
   [-.55,0,.55].forEach((a,j)=>{ for(const s of [1,-1]){ const l=new T.Mesh(legG,stMat); l.position.z=(1-j)*.006; l.rotation.y=s>0?a:Math.PI-a; g.add(l); } });
+  // 身體和六隻腳合成一個網格：每隻水黽從 7 次繪製變 1 次，群組仍照原本方式移動
+  const parts=g.children.slice(); const merged=mergeMeshesByMaterial(T,parts,g); parts.forEach(o=>g.remove(o)); merged.forEach(m=>g.add(m));
   g.scale.setScalar(1.6); g.visible=false; g.userData={vx:0,vz:0,t:0}; S.add(g); striders.push(g); }
 /* ---------- 跳出水面的魚 ---------- */
 const jumpers={}; let jf=null;

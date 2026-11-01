@@ -214,6 +214,7 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #scene small{display:block;font-size:10px;font-weight:700;opacity:.85}
 #scene.mini{padding:4px 9px;font-size:12px}#scene.mini small{display:none}
 #cameraSlot{display:inline-block;flex:0 0 40px;width:40px;height:40px}#bCam{display:flex;align-items:center;justify-content:center;padding:0;position:fixed;right:12px;top:calc(env(safe-area-inset-top,0px) + 142px);z-index:150;pointer-events:auto;opacity:1;min-width:44px;min-height:44px}#bCam:disabled{opacity:.5}
+body.sheetOn #bCam{display:none!important}
 #bCam.pulse{animation:camp .8s ease-in-out infinite alternate;box-shadow:0 0 0 2px #ffd56a,0 0 14px rgba(255,213,106,.8)}@keyframes camp{from{transform:scale(1)}to{transform:scale(1.12)}}
 #actSub.fade{animation:subfade 6s forwards}@keyframes subfade{0%,65%{opacity:1}100%{opacity:0}}
 @keyframes sceneIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
@@ -439,7 +440,7 @@ function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classLi
 </script>
 <script>
 /* 主程式載入器：先試 CDN（快），檢查版本號一致才執行；不一致或失敗就改從本站下載。依序執行兩個檔案 */
-(function(){ var V='20261101230735', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@0a608ed7734be622e6595247c95d795dffbdf33d/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
+(function(){ var V='20261101232648', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
   var note=function(t){ var e=document.getElementById('loadTip'); if(e&&t) e.textContent=t; };
   function run(code){ var b=new Blob([code],{type:'text/javascript'}), s=document.createElement('script'); s.src=URL.createObjectURL(b); return new Promise(function(ok){ s.onload=ok; s.onerror=ok; document.body.appendChild(s); }); }
   function get(u){ return fetch(u,{cache:'no-cache'}).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }); }

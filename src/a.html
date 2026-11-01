@@ -214,6 +214,7 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #scene small{display:block;font-size:10px;font-weight:700;opacity:.85}
 #scene.mini{padding:4px 9px;font-size:12px}#scene.mini small{display:none}
 #cameraSlot{display:inline-block;flex:0 0 40px;width:40px;height:40px}#bCam{display:flex;align-items:center;justify-content:center;padding:0;position:fixed;right:12px;top:calc(env(safe-area-inset-top,0px) + 142px);z-index:150;pointer-events:auto;opacity:1;min-width:44px;min-height:44px}#bCam:disabled{opacity:.5}
+body.sheetOn #bCam{display:none!important}
 #bCam.pulse{animation:camp .8s ease-in-out infinite alternate;box-shadow:0 0 0 2px #ffd56a,0 0 14px rgba(255,213,106,.8)}@keyframes camp{from{transform:scale(1)}to{transform:scale(1.12)}}
 #actSub.fade{animation:subfade 6s forwards}@keyframes subfade{0%,65%{opacity:1}100%{opacity:0}}
 @keyframes sceneIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
