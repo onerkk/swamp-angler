@@ -1,4 +1,4 @@
-/*APPV:20261102161820*/
+/*APPV:20261102162708*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -3327,11 +3327,16 @@ return { scene,cam,start, end, update, resize, active:()=>on, setProgress:a=>{ p
 /* ---------- 釣具與魚餌資料 ---------- */
 const GEAR={
  rod:[{name:'入門碳竿',price:0,lv:1,cast:30,tens:1,col:'#1d4fb8'},{name:'中調碳竿',price:1500,lv:3,cast:36,tens:.92,col:'#1f6e48'},
-      {name:'高模數競技竿',price:6000,lv:6,cast:42,tens:.85,col:'#141418',gold:true},{name:'傳奇手工竿',price:20000,lv:10,cast:50,tens:.78,col:'#8e1a20',gold:true},{name:'人魚之竿',price:0,lv:1,cast:54,tens:.72,col:'#dfeef4',gold:true,req:'mer3'},{name:'月神之竿',price:0,lv:1,cast:60,tens:.64,col:'#bcd8ff',gold:true,req:'moon'}],
+      {name:'高模數競技竿',price:6000,lv:6,cast:42,tens:.85,col:'#141418',gold:true},{name:'傳奇手工竿',price:20000,lv:10,cast:50,tens:.78,col:'#8e1a20',gold:true},{name:'人魚之竿',price:0,lv:1,cast:54,tens:.72,col:'#dfeef4',gold:true,req:'mer3'},{name:'月神之竿',price:0,lv:1,cast:60,tens:.64,col:'#bcd8ff',gold:true,req:'moon'},
+      {name:'碳纖船釣重竿',price:90000,lv:34,cast:56,tens:.68,col:'#23262b'},{name:'深海重型竿',price:220000,lv:44,cast:58,tens:.6,col:'#0f2d4a',gold:true},{name:'老漁人的竹節竿',price:0,lv:1,cast:62,tens:.55,col:'#b8945c',gold:true,req:'oldrod'}],
  line:[{name:'尼龍線 6 lb',price:0,lv:1,s:4.2},{name:'尼龍線 10 lb',price:800,lv:2,s:5.0},{name:'碳纖線 14 lb',price:3000,lv:4,s:6.0},
-       {name:'PE 編織線 20 lb',price:9000,lv:7,s:7.2},{name:'PE 編織線 30 lb',price:25000,lv:11,s:8.6}],
+       {name:'PE 編織線 20 lb',price:9000,lv:7,s:7.2},{name:'PE 編織線 30 lb',price:25000,lv:11,s:8.6},
+       {name:'PE 編織線 50 lb',price:60000,lv:30,s:10.0},{name:'PE 編織線 80 lb',price:150000,lv:42,s:11.6}],
  reel:[{name:'2000 型紡車輪',price:0,lv:1,spd:1.9,drag:1},{name:'3000 型紡車輪',price:1200,lv:3,spd:2.2,drag:.85},
-       {name:'4000 型高速輪',price:5000,lv:5,spd:2.6,drag:.7},{name:'碳纖旗艦輪',price:16000,lv:9,spd:3.0,drag:.55}]};
+       {name:'4000 型高速輪',price:5000,lv:5,spd:2.6,drag:.7},{name:'碳纖旗艦輪',price:16000,lv:9,spd:3.0,drag:.55},
+       {name:'重型鼓式捲線器',price:80000,lv:30,spd:3.3,drag:.48},{name:'頂級鼓式捲線器',price:200000,lv:44,spd:3.6,drag:.42}]};
+// 依取得條件找裝備編號（Boss 獎勵發竿用）
+window.__GEARIDX=(k,req)=>GEAR[k].findIndex(x=>x.req===req);
 const BAITS=[
  {id:'worm',name:'蚯蚓',icon:'🪱',price:0,pack:0,lv:1,desc:'什麼魚都吃一點，用不完',aff:{prawn:1.5},rare:0,wait:1},
  {id:'corn',name:'甜玉米',icon:'🌽',price:60,pack:10,lv:1,desc:'鯉魚、草魚、鯽魚、印度鯪愛吃，咬口快',aff:{reba:2.2,bluegill:1.6,crappie:1.3,crucian:2.2,tilapia:1.8,carp:2.5,grasscarp:2.2,silvercarp:1.2,clarias:.5,mekong:1.5,yperch:.8,whitefish:.8,rabbit:1.8,scat:1.4},rare:-.2,wait:.75},
@@ -3347,8 +3352,9 @@ const BOAT_COST={coins:25000,scale:30,bone:10,pearl:2};   // 修復老漁人的�
 const xpNext=lv=>Math.round(120*Math.pow(lv,1.75));   // 升級曲線：Lv 10 約 6,700、Lv 20 約 22,600
 /* 等級里程碑：每級解鎖什麼（升級提示與 ⭐ 面板共用） */
 const LV_TITLES={10:'見習漁人',20:'湖畔好手',30:'老練漁夫',40:'傳說釣手',50:'守湖宗師'};
-const LV_EVENTS={5:'主線第三章「暴風雨之後」',8:'主線第四章「湖心的秘密」',10:'主線第五章「冰下的歌聲」',15:'大師挑戰：巨型鱷雀鱔',18:'主線終章「深淵之王」、大師挑戰：鯰魚之王',20:'大師挑戰：旗魚王',24:'大師挑戰：滄淵',25:'大師挑戰：大白鯊女王'};
-function lvGains(lv){ const g=[]; if(lv>=5) g.push('天賦點 +1'); if(lv%3===0&&lv<=30) g.push('強化上限提高到 +'+Math.min(10,lv/3)); if(LV_TITLES[lv]) g.push('稱號「'+LV_TITLES[lv]+'」'); if(LV_EVENTS[lv]) g.push(LV_EVENTS[lv]); return g; }
+const LV_EVENTS={5:'主線第三章「暴風雨之後」',8:'主線第四章「湖心的秘密」',10:'主線第五章「冰下的歌聲」',15:'大師挑戰：巨型鱷雀鱔',18:'主線終章「深淵之王」、大師挑戰：鯰魚之王',20:'大師挑戰：旗魚王',24:'大師挑戰：滄淵',25:'大師挑戰：大白鯊女王',
+  28:'大師挑戰：沉鐘（巨骨舌魚）',30:'新裝備：PE 50 lb、重型鼓式捲線器',32:'大師挑戰：石佛（湄公河巨鯰）',34:'新裝備：碳纖船釣重竿',35:'大師挑戰：冰湖之狼',38:'大師挑戰：礁洞之主',42:'大師挑戰：斷線者、新裝備：PE 80 lb',44:'新裝備：頂級鼓式捲線器、深海重型竿',46:'大師挑戰：黑潮之王',50:'大師挑戰：夜行劍客',53:'大師挑戰：月下銀王',60:'大師挑戰：老青'};
+function lvGains(lv){ const g=[]; if(lv>=5) g.push('天賦點 +1'); { const n=ENH_LV.indexOf(lv); if(n>0) g.push('強化上限提高到 +'+n+(n>10?'（需要潮心石）':'')); } if(LV_TITLES[lv]) g.push('稱號「'+LV_TITLES[lv]+'」'); if(LV_EVENTS[lv]) g.push(LV_EVENTS[lv]); return g; }
 window.__LVINFO={gains:lvGains,titles:LV_TITLES,xpNext:lv=>xpNext(lv)};
 
 function createMeta(c){
@@ -3427,9 +3433,9 @@ function render(){
     h+=`<div class="note">🪙 ${save.coins.toLocaleString()}，Lv ${save.lv}</div>`+ECO.matLine();
     if(['enh','item','skin','market'].includes(shopTab)) h+=ECO.render(shopTab,GEAR);
     else if(shopTab!=='bait'){
-      h+=GEAR[shopTab].map((it,i)=>{ const own=save.gear[shopTab].includes(i), eq=save.eq[shopTab]===i, lock=save.lv<it.lv||(it.req==='mer3'&&!(save.mer&&save.mer.n>=3))||(it.req==='moon'&&!(save.moon&&save.moon.done));
+      h+=GEAR[shopTab].map((it,i)=>{ const own=save.gear[shopTab].includes(i), eq=save.eq[shopTab]===i, lock=save.lv<it.lv||(it.req==='mer3'&&!(save.mer&&save.mer.n>=3))||(it.req==='moon'&&!(save.moon&&save.moon.done))||(it.req==='oldrod'&&!(save.boss&&save.boss.oldblue));
         const sub=shopTab==='rod'?`拋投 ${it.cast} m，拉扯張力 −${Math.round((1-it.tens)*100)}%`:shopTab==='line'?`強度 ${it.s.toFixed(1)}，越高越不容易斷`:`收線 ${it.spd} m/s，爆線累積 −${Math.round((1-it.drag)*100)}%`;
-        const btn=eq?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="eq" data-v="${i}">裝備</button>`:lock?`<span class="lk">${it.req==='moon'?'完成月光灣的故事':it.req?'美人魚第 3 次相遇':'Lv '+it.lv+' 解鎖'}</span>`:`<button class="sbtn pri" data-a="buy" data-v="${i}">🪙 ${it.price.toLocaleString()}</button>`;
+        const btn=eq?'<span class="eqd">使用中</span>':own?`<button class="sbtn" data-a="eq" data-v="${i}">裝備</button>`:lock?`<span class="lk">${it.req==='moon'?'完成月光灣的故事':it.req==='oldrod'?'釣起「老青」':it.req?'美人魚第 3 次相遇':'Lv '+it.lv+' 解鎖'}</span>`:`<button class="sbtn pri" data-a="buy" data-v="${i}">🪙 ${it.price.toLocaleString()}</button>`;
         return row(it.name,sub,btn); }).join('');
     } else {
       h+=BAITS.map((b,i)=>{ const n=b.id==='worm'?'∞':(save.baits[b.id]||0), lock=save.lv<b.lv, using=save.bait===b.id;
@@ -5001,7 +5007,10 @@ function update(dt,t){
 return {update,snatch,snatchOver,offerDodge,busy:()=>!!(snatchJob||overJob)};
 }
 /* ===== 商店循環：素材掉落、裝備強化、道具、流浪商人、魚市行情、外觀 ===== */
-const MATS={scale:{n:'魚鱗',i:'🐟'},bone:{n:'魚骨',i:'🦴'},pearl:{n:'珍珠',i:'⚪'},crystal:{n:'海晶',i:'💎'}};
+const MATS={scale:{n:'魚鱗',i:'🐟'},bone:{n:'魚骨',i:'🦴'},pearl:{n:'珍珠',i:'⚪'},crystal:{n:'海晶',i:'💎'},tide:{n:'潮心石',i:'🔷'}};
+/* 強化上限：Lv 30 前每 3 級 +1（到 +10）；之後要靠 Boss 給的潮心石，Lv 33／36／40／45／50 各開一級，最高 +15 */
+const ENH_MAX=15, ENH_LV=[0,3,6,9,12,15,18,21,24,27,30,33,36,40,45,50];
+const enhCapAt=lv=>{ let n=0; for(let i=1;i<=ENH_MAX;i++) if(lv>=ENH_LV[i]) n=i; return n; };
 const CONS=[
  {id:'lure',n:'魚群誘餌',i:'🧆',p:400,d:'立刻在附近引來一群魚'},
  {id:'repel',n:'鯊魚驅逐劑',i:'🧪',p:600,d:'10 分鐘內鯊魚和鱷魚不會來搶魚',min:10},
@@ -5015,7 +5024,7 @@ const SKINS={
 
 function createEco(c){
 'use strict';
-const capOf=()=>Math.min(10,Math.floor((c.save.lv||1)/3));   // 強化上限：每 3 級 +1，Lv 30 到 +10
+const capOf=()=>enhCapAt(c.save.lv||1);
 const S=c.save, now=()=>Date.now();
 S.mat=S.mat||{scale:0,bone:0,pearl:0,crystal:0}; S.enh=S.enh||{rod:{},line:{},reel:{}}; S.inv=S.inv||{}; S.fx=S.fx||{};
 S.skin=S.skin||{rod:'def',bob:'classic'}; S.skinOwn=S.skinOwn||{rod:['def'],bob:['classic']}; S.merch=S.merch||{};
@@ -5026,7 +5035,10 @@ const lvOf=(k,i)=>(S.enh[k]&&S.enh[k][i])||0;
 function enhance(g){ const r=lvOf('rod',S.eq.rod), l=lvOf('line',S.eq.line), e=lvOf('reel',S.eq.reel);
   return {rod:Object.assign({},g.rod,{cast:g.rod.cast*(1+.02*r),tens:g.rod.tens*(1-.025*r)}),line:Object.assign({},g.line,{s:g.line.s*(1+.06*l)}),reel:Object.assign({},g.reel,{spd:g.reel.spd*(1+.04*e),drag:g.reel.drag*(1-.03*e)})}; }
 function enhCost(lv,tier){ const coins=Math.round(300*Math.pow(1.5,lv)*(1+tier*.5)/10)*10, m={};
-  if(lv<3) m.scale=4*(lv+1); else if(lv<6) m.bone=lv-1; else if(lv<9) m.pearl=lv-4; else m.crystal=lv-7; return {coins,m}; }
+  if(lv<3) m.scale=4*(lv+1); else if(lv<6) m.bone=lv-1; else if(lv<9) m.pearl=lv-4; else m.crystal=lv-7;
+  if(lv>=10) m.tide=lv-9;   // +11 起每級多要潮心石（1～5 顆），只能從大師挑戰取得，不能用其他素材抵
+  return {coins,m}; }
+const tideOk=m=>(S.mat.tide||0)>=(m.tide||0);
 const TIER=['scale','bone','pearl','crystal'];
 /* 付素材：不夠時用上一階抵（1 抵 3），回傳實際扣除量；付不起回傳 null */
 function plan(m){ const have={}, use={}; TIER.forEach(k=>{ have[k]=S.mat[k]||0; use[k]=0; });
@@ -5084,11 +5096,11 @@ function render(tab,GEAR){
     [['rod','釣竿'],['line','釣線'],['reel','捲線器']].forEach(([k,label])=>{ const idx=S.eq[k], it=GEAR[k][idx], lv=lvOf(k,idx);
       const st='★'.repeat(Math.min(lv,10))+'☆'.repeat(Math.max(0,10-lv));
       const eff=k==='rod'?`拋投 +${lv*2}%、張力 −${(lv*2.5).toFixed(1)}%`:k==='line'?`強度 +${lv*6}%`:`收線 +${lv*4}%、爆線累積 −${lv*3}%`;
-      if(lv>=10){ h+=row(`${label}：${it.name} +10`,`${st}<br>${eff}`,'<span class="eqd">已滿級</span>'); return; }
-      if(lv>=capOf()){ h+=row(`${label}：${it.name} +${lv}`,`${st}<br>${eff}`,`<span class="lk">Lv ${(lv+1)*3} 解鎖 +${lv+1}</span>`); return; }
-      const cs=enhCost(lv,idx), pl=plan(cs.m), cOk=S.coins>=cs.coins, ok=cOk&&!!pl;
+      if(lv>=ENH_MAX){ h+=row(`${label}：${it.name} +${ENH_MAX}`,`${st}<br>${eff}`,'<span class="eqd">已滿級</span>'); return; }
+      if(lv>=capOf()){ h+=row(`${label}：${it.name} +${lv}`,`${st}<br>${eff}`,`<span class="lk">Lv ${ENH_LV[lv+1]} 解鎖 +${lv+1}</span>`); return; }
+      const cs=enhCost(lv,idx), pl=tideOk(cs.m)?plan(cs.m):null, cOk=S.coins>=cs.coins, ok=cOk&&!!pl;
       let st2=''; if(!cOk) st2+=`<span class="bad">金幣差 ${(cs.coins-S.coins).toLocaleString()}</span> `;
-      if(!pl) st2+=`<span class="bad">素材不夠</span>`; else if(Object.keys(cs.m).some(x=>pl[x]!==cs.m[x])) st2+=`<span class="cv">將使用 ${mtxt(pl)}（高階素材自動抵扣）</span>`;
+      if(!tideOk(cs.m)) st2+=`<span class="bad">潮心石不夠（大師挑戰取得）</span>`; else if(!pl) st2+=`<span class="bad">素材不夠</span>`; else if(Object.keys(cs.m).some(x=>pl[x]!==cs.m[x])) st2+=`<span class="cv">將使用 ${mtxt(pl)}（高階素材自動抵扣）</span>`;
       h+=row(`${label}：${it.name} +${lv}`,`${st}<br>${eff}<br>下一級：🪙${cs.coins.toLocaleString()} ${mtxt(cs.m)}${st2?'<br>'+st2:''}`,`<button class="sbtn${ok?' pri':''}" data-a="enh" data-v="${k}">強化</button>`); });
     h+='<div class="note">素材不夠時，會自動用高一階的素材抵：1 魚骨＝3 魚鱗、1 珍珠＝3 魚骨、1 海晶＝3 珍珠。</div>';
     h+='<div class="note">換裝其他裝備時，各自的強化等級會保留。</div>';
@@ -5115,9 +5127,9 @@ function render(tab,GEAR){
   return h;
 }
 function click(a,v,GEAR){
-  if(a==='enh'){ const idx=S.eq[v], lv=lvOf(v,idx); if(lv>=10) return true; if(lv>=capOf()){ c.toast('等級不足：Lv '+(lv+1)*3+' 才能強化到 +'+(lv+1),'warn',2200); return true; } const cs=enhCost(lv,idx);
-    const pl=plan(cs.m); if(S.coins<cs.coins||!pl) return true;
-    S.coins-=cs.coins; TIER.forEach(k=>{ S.mat[k]=pl.left[k]; }); S.enh[v]=S.enh[v]||{}; S.enh[v][idx]=lv+1; c.persist(); c.setCoins(); c.Snd.fanfare(1); c.toast('強化成功！+'+(lv+1),'good'); return true; }
+  if(a==='enh'){ const idx=S.eq[v], lv=lvOf(v,idx); if(lv>=ENH_MAX) return true; if(lv>=capOf()){ c.toast('等級不足：Lv '+ENH_LV[lv+1]+' 才能強化到 +'+(lv+1),'warn',2200); return true; } const cs=enhCost(lv,idx);
+    const pl=tideOk(cs.m)?plan(cs.m):null; if(S.coins<cs.coins||!pl) return true;
+    S.coins-=cs.coins; TIER.forEach(k=>{ S.mat[k]=pl.left[k]; }); if(cs.m.tide) S.mat.tide=(S.mat.tide||0)-cs.m.tide; S.enh[v]=S.enh[v]||{}; S.enh[v][idx]=lv+1; c.persist(); c.setCoins(); c.Snd.fanfare(1); c.toast('強化成功！+'+(lv+1),'good'); return true; }
   if(a==='buyc'){ const it=CONS.find(x=>x.id===v); if(S.coins<it.p){ c.toast('金幣不夠','bad'); return true; } S.coins-=it.p; S.inv[v]=(S.inv[v]||0)+1; c.persist(); c.setCoins(); c.Snd.coin(); return true; }
   if(a==='usec'){ useCon(v); return true; }
   if(a==='merch'){ const o=offers().find(x=>x.id===v); if(!o||bought().includes(v)) return true; if(S.coins<o.p){ c.toast('金幣不夠','bad'); return true; }
@@ -5458,7 +5470,27 @@ const BOSS=[
   {id:'flat',lv:18,name:'鯰魚之王',sp:'flathead',loc:'lake',zone:'wood',per:['night'],size:1.45,pow:1.45,title:'鯰魚王者',hint:'倒木區・夜晚',coins:20000,cry:3},
   {id:'marlin',lv:20,name:'旗魚王',sp:'marlin',loc:'sea',zone:'blue',per:['dawn','day'],size:1.35,pow:1.5,title:'怒海旗手',hint:'遠洋深藍・清晨或白天',coins:30000,cry:4},
   {id:'gw',lv:25,name:'大白鯊女王',sp:'gwhite',loc:'sea',zone:'blue',per:['dusk','night'],size:1.3,pow:.92,title:'深海霸主',hint:'遠洋深藍・黃昏或夜晚',coins:50000,cry:6},
-  {id:'king',lv:24,name:'滄淵',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'滄淵征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10}];
+  {id:'king',lv:24,name:'滄淵',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'滄淵征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10},
+  /* 老漁人《漁獲簿》：他四十年來沒釣上岸的魚，一頁一隻。拉力、衝刺、耐力倍率以實際搏魚程式模擬校準：
+     該等級買得到的裝備＋強化上限，熟練玩家十場十勝；裝備落後 8 級幾乎都會失敗（月下銀王、老青例外：湖區線量 80 公尺，靠長時間搏魚） */
+  {id:'arapaima',lv:28,name:'沉鐘',sp:'arapaima',loc:'lake',zone:'deep',per:['day','dusk'],size:1.3,pow:2.6,spd:1.05,stam:1.15,title:'聽鐘人',hint:'深水中央・白天或黃昏',coins:60000,cry:6,tide:2,
+    page:'民國六十八年夏。深水中央有東西浮上來換氣，聲音像寺廟的鐘。我拉了牠一個下午，竿子斷成三截。'},
+  {id:'mekong',lv:32,name:'石佛',sp:'mekong',loc:'lake',zone:'deep',per:['night'],size:1.25,pow:3.1,spd:1.1,stam:1.35,title:'撼佛者',hint:'深水中央・夜晚',coins:75000,cry:7,tide:2,
+    page:'牠趴在湖底一動也不動，像一尊石佛。秋月說牠在睡覺，叫我別吵牠。那年她七歲。'},
+  {id:'taimen',lv:35,name:'冰湖之狼',sp:'taimen',loc:'ice',zone:'ice',per:['dawn','dusk'],size:1.4,pow:6,spd:1.15,stam:1.5,title:'冰原獵手',hint:'冰湖・清晨或黃昏',coins:90000,cry:8,tide:3,
+    page:'冰層底下有狼。牠咬走我三支假餌，每一支都是秋月替我挑的顏色。'},
+  {id:'grouper',lv:38,name:'礁洞之主',sp:'grouper2',loc:'sea',zone:'reef',per:['day'],size:1.2,pow:2.9,spd:1.2,stam:1.65,title:'礁洞征服者',hint:'近海礁岩・白天',coins:110000,cry:9,tide:3,
+    page:'牠一上鉤就鑽回洞裡，線在礁石上磨斷的聲音，我到現在還記得。'},
+  {id:'gt',lv:42,name:'斷線者',sp:'gt',loc:'sea',zone:'reef',per:['dawn','dusk'],size:1.35,pow:6.2,spd:1.25,stam:1.85,title:'斷線終結者',hint:'近海礁岩・清晨或黃昏',coins:130000,cry:10,tide:4,
+    page:'港口的人都叫牠斷線者。那年我換了最粗的線，還是被牠在浪頭上拉斷。'},
+  {id:'tuna',lv:46,name:'黑潮之王',sp:'tuna',loc:'sea',zone:'blue',per:['dawn','day'],size:1.3,pow:6.3,spd:1.3,stam:2.05,title:'黑潮之王',hint:'遠洋深藍・清晨或白天',coins:160000,cry:12,tide:4,
+    page:'跟著黑潮北上的那一條，拉了我兩個鐘頭。我答應秋月颱風前回家，所以剪了線。'},
+  {id:'sword',lv:50,name:'夜行劍客',sp:'swordfish',loc:'sea',zone:'blue',per:['night'],size:1.15,pow:5,spd:1.36,stam:2.25,title:'月下劍客',hint:'遠洋深藍・夜晚',coins:190000,cry:14,tide:5,
+    page:'牠只在沒有月亮的夜裡上來吃魷魚。那天晚上颱風來了，我沒有回去。'},
+  {id:'tarpon',lv:53,name:'月下銀王',sp:'tarpon',loc:'lake',zone:'moon',per:['night'],size:2.6,pow:8,spd:1.4,stam:7,title:'銀王之友',hint:'月光灣・夜晚',coins:220000,cry:16,tide:5,
+    page:'霜汐說，月光灣有一條銀色的老魚，比她還老。牠是看著秋月長大的。'},
+  {id:'oldblue',lv:60,name:'老青',sp:'blackcarp',loc:'lake',zone:'deep',per:['night'],size:1.9,pow:6,spd:1.5,stam:12,title:'老漁人的傳人',hint:'深水中央・夜晚',coins:300000,cry:20,tide:6,
+    page:'最後一頁。老青是我這輩子的對手。如果有一天你把牠拉上來了，替我摸摸牠的頭，然後放牠回去。我的竹竿，就交給你了。'}];
 const PER_NAME={dawn:'清晨',day:'白天',dusk:'黃昏',night:'夜晚'};
 
 function createTalents(c){
@@ -5477,8 +5509,10 @@ function applyBoss(G,SPECIES,RAR){ const b=bossRoll(); if(!b) return false; cons
   G.sp=sp2; G.fd={sp:sp2,L,w,u:1,lvl:99,boss:b,value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*2.5),xpMul:3};
   c.toast('👑 有什麼巨大的東西在靠近……','warn',2400); c.vib([60,40,60]); return true; }
 function bossWin(fd){ const b=fd.boss, first=!S.boss[b.id]; S.boss[b.id]=(S.boss[b.id]||0)+1; S.bossOn=null; if(window.__STORY) window.__STORY.onBoss(b.id);
-  let bxp=0; if(first){ S.coins+=b.coins; S.mat=S.mat||{}; S.mat.crystal=(S.mat.crystal||0)+b.cry; if(S.titles.indexOf(b.title)<0) S.titles.push(b.title); c.setCoins(); if(c.addXP&&window.__LVINFO){ bxp=Math.round(window.__LVINFO.xpNext(S.lv||1)*.3); c.addXP(bxp); } }
-  showTitle(); c.persist(); setTimeout(()=>c.toast(first?`👑 擊敗${b.name}！稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}${bxp?'・經驗 '+bxp.toLocaleString():''}`:`👑 再次擊敗${b.name}！`,'good',4200),1600); c.Snd.fanfare(2); dot(); }
+  let bxp=0; S.mat=S.mat||{}; const tide=first?(b.tide||1):1; S.mat.tide=(S.mat.tide||0)+tide;   /* 潮心石：首勝給 Boss 設定的數量，再戰每次 1 顆（強化 +11 起要用） */
+  if(b.id==='oldblue'&&window.__GEARIDX){ const i=window.__GEARIDX('rod','oldrod'); if(i>=0&&S.gear&&S.gear.rod&&S.gear.rod.indexOf(i)<0) S.gear.rod.push(i); }   /* 老青：老漁人的竹節竿交到你手上 */
+  if(first){ S.coins+=b.coins; S.mat.crystal=(S.mat.crystal||0)+b.cry; if(S.titles.indexOf(b.title)<0) S.titles.push(b.title); c.setCoins(); if(c.addXP&&window.__LVINFO){ bxp=Math.round(window.__LVINFO.xpNext(S.lv||1)*.3); c.addXP(bxp); } }
+  showTitle(); c.persist(); setTimeout(()=>c.toast(first?`👑 擊敗${b.name}！稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷潮心石×${tide}${bxp?'・經驗 '+bxp.toLocaleString():''}`:`👑 再次擊敗${b.name}！🔷潮心石×${tide}`,'good',4200),1600); c.Snd.fanfare(2); dot(); }
 
 /* Boss 登場演出與光暈 */
 const T=THREE, bc=document.createElement('canvas'); bc.width=bc.height=128; { const x=bc.getContext('2d'), gr=x.createRadialGradient(64,64,4,64,64,64); gr.addColorStop(0,'rgba(255,230,140,.9)'); gr.addColorStop(.35,'rgba(255,150,60,.45)'); gr.addColorStop(1,'rgba(255,80,40,0)'); x.fillStyle=gr; x.fillRect(0,0,128,128); }
@@ -5527,11 +5561,11 @@ function render(){ const p=pts();
   if(spent()>0) h+=`<div style="text-align:right;margin-top:6px"><button class="sbtn danger" data-t="reset">重置天賦（🪙${TAL_RESET.toLocaleString()}）</button></div>`;
   h+='<div class="sec">大師挑戰：接受後，在指定釣點與時段會遇到 Boss。Boss 體型巨大、拉力極強，建議先強化裝備。</div>';
   for(const b of BOSS){ const done=S.boss[b.id], on=S.bossOn===b.id, lock=(S.lv||1)<b.lv;
-    const sub=lock?`<span class="lock">Lv ${b.lv} 解鎖</span>`:`${b.hint}<br>首勝：稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}${done?`<br>已擊敗 ${done} 次`:''}`;
+    const sub=lock?`<span class="lock">Lv ${b.lv} 解鎖</span>`:`${b.hint}<br>首勝：稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷×${b.tide||1}${done?`<br>已擊敗 ${done} 次（再戰 🔷×1）`:''}${done&&b.page?`<br><i style="color:#d8c79a">📖 ${b.page}</i>`:''}`;
     const r=lock?'🔒':on?'<span class="on">進行中</span><br><button class="sbtn" data-t="quit">放棄</button>':`<button class="sbtn${done?'':' pri'}" data-t="boss" data-v="${b.id}">${done?'再戰':'接受挑戰'}</button>`;
     h+=row(`${done?'👑':'🐉'} ${b.name}`,sub,r); }
   if(window.__LVINFO){ const L=window.__LVINFO, lv=S.lv||1, need=L.xpNext(lv), up=[]; for(let k=lv+1;k<=lv+12&&up.length<4;k++){ const g=L.gains(k).filter(x=>x!=='天賦點 +1'); if(g.length) up.push(`<div class="tk"><b>Lv ${k}</b>　${g.join('、')}</div>`); }
-    h+=`<div class="sec">等級里程碑</div><div class="pt">Lv ${lv}：經驗 ${Math.floor(S.xp||0).toLocaleString()} / ${need.toLocaleString()}　｜　強化上限 +${Math.min(10,Math.floor(lv/3))}</div>${up.join('')}`; }
+    h+=`<div class="sec">等級里程碑</div><div class="pt">Lv ${lv}：經驗 ${Math.floor(S.xp||0).toLocaleString()} / ${need.toLocaleString()}　｜　強化上限 +${enhCapAt(lv)}</div>${up.join('')}`; }
   if(S.titles.length){ const cur=S.titleSel&&S.titles.indexOf(S.titleSel)>=0?S.titleSel:S.titles[S.titles.length-1]; h+=`<div class="sec">已獲得稱號（點選要顯示在主畫面的稱號）</div><div>${S.titles.map(t=>`<button class="ttl${t===cur?' on':''}" data-t="title" data-v="${t}">${t}</button>`).join('')}</div>`; }
   box.firstChild.innerHTML=h; }
 btn.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); render(); box.classList.remove('hidden'); });
@@ -7638,7 +7672,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102161820'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102162708'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

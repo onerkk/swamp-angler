@@ -1,5 +1,8 @@
 /* ===== 商店循環：素材掉落、裝備強化、道具、流浪商人、魚市行情、外觀 ===== */
-const MATS={scale:{n:'魚鱗',i:'🐟'},bone:{n:'魚骨',i:'🦴'},pearl:{n:'珍珠',i:'⚪'},crystal:{n:'海晶',i:'💎'}};
+const MATS={scale:{n:'魚鱗',i:'🐟'},bone:{n:'魚骨',i:'🦴'},pearl:{n:'珍珠',i:'⚪'},crystal:{n:'海晶',i:'💎'},tide:{n:'潮心石',i:'🔷'}};
+/* 強化上限：Lv 30 前每 3 級 +1（到 +10）；之後要靠 Boss 給的潮心石，Lv 33／36／40／45／50 各開一級，最高 +15 */
+const ENH_MAX=15, ENH_LV=[0,3,6,9,12,15,18,21,24,27,30,33,36,40,45,50];
+const enhCapAt=lv=>{ let n=0; for(let i=1;i<=ENH_MAX;i++) if(lv>=ENH_LV[i]) n=i; return n; };
 const CONS=[
  {id:'lure',n:'魚群誘餌',i:'🧆',p:400,d:'立刻在附近引來一群魚'},
  {id:'repel',n:'鯊魚驅逐劑',i:'🧪',p:600,d:'10 分鐘內鯊魚和鱷魚不會來搶魚',min:10},
@@ -13,7 +16,7 @@ const SKINS={
 
 function createEco(c){
 'use strict';
-const capOf=()=>Math.min(10,Math.floor((c.save.lv||1)/3));   // 強化上限：每 3 級 +1，Lv 30 到 +10
+const capOf=()=>enhCapAt(c.save.lv||1);
 const S=c.save, now=()=>Date.now();
 S.mat=S.mat||{scale:0,bone:0,pearl:0,crystal:0}; S.enh=S.enh||{rod:{},line:{},reel:{}}; S.inv=S.inv||{}; S.fx=S.fx||{};
 S.skin=S.skin||{rod:'def',bob:'classic'}; S.skinOwn=S.skinOwn||{rod:['def'],bob:['classic']}; S.merch=S.merch||{};
@@ -24,7 +27,10 @@ const lvOf=(k,i)=>(S.enh[k]&&S.enh[k][i])||0;
 function enhance(g){ const r=lvOf('rod',S.eq.rod), l=lvOf('line',S.eq.line), e=lvOf('reel',S.eq.reel);
   return {rod:Object.assign({},g.rod,{cast:g.rod.cast*(1+.02*r),tens:g.rod.tens*(1-.025*r)}),line:Object.assign({},g.line,{s:g.line.s*(1+.06*l)}),reel:Object.assign({},g.reel,{spd:g.reel.spd*(1+.04*e),drag:g.reel.drag*(1-.03*e)})}; }
 function enhCost(lv,tier){ const coins=Math.round(300*Math.pow(1.5,lv)*(1+tier*.5)/10)*10, m={};
-  if(lv<3) m.scale=4*(lv+1); else if(lv<6) m.bone=lv-1; else if(lv<9) m.pearl=lv-4; else m.crystal=lv-7; return {coins,m}; }
+  if(lv<3) m.scale=4*(lv+1); else if(lv<6) m.bone=lv-1; else if(lv<9) m.pearl=lv-4; else m.crystal=lv-7;
+  if(lv>=10) m.tide=lv-9;   // +11 起每級多要潮心石（1～5 顆），只能從大師挑戰取得，不能用其他素材抵
+  return {coins,m}; }
+const tideOk=m=>(S.mat.tide||0)>=(m.tide||0);
 const TIER=['scale','bone','pearl','crystal'];
 /* 付素材：不夠時用上一階抵（1 抵 3），回傳實際扣除量；付不起回傳 null */
 function plan(m){ const have={}, use={}; TIER.forEach(k=>{ have[k]=S.mat[k]||0; use[k]=0; });
@@ -82,11 +88,11 @@ function render(tab,GEAR){
     [['rod','釣竿'],['line','釣線'],['reel','捲線器']].forEach(([k,label])=>{ const idx=S.eq[k], it=GEAR[k][idx], lv=lvOf(k,idx);
       const st='★'.repeat(Math.min(lv,10))+'☆'.repeat(Math.max(0,10-lv));
       const eff=k==='rod'?`拋投 +${lv*2}%、張力 −${(lv*2.5).toFixed(1)}%`:k==='line'?`強度 +${lv*6}%`:`收線 +${lv*4}%、爆線累積 −${lv*3}%`;
-      if(lv>=10){ h+=row(`${label}：${it.name} +10`,`${st}<br>${eff}`,'<span class="eqd">已滿級</span>'); return; }
-      if(lv>=capOf()){ h+=row(`${label}：${it.name} +${lv}`,`${st}<br>${eff}`,`<span class="lk">Lv ${(lv+1)*3} 解鎖 +${lv+1}</span>`); return; }
-      const cs=enhCost(lv,idx), pl=plan(cs.m), cOk=S.coins>=cs.coins, ok=cOk&&!!pl;
+      if(lv>=ENH_MAX){ h+=row(`${label}：${it.name} +${ENH_MAX}`,`${st}<br>${eff}`,'<span class="eqd">已滿級</span>'); return; }
+      if(lv>=capOf()){ h+=row(`${label}：${it.name} +${lv}`,`${st}<br>${eff}`,`<span class="lk">Lv ${ENH_LV[lv+1]} 解鎖 +${lv+1}</span>`); return; }
+      const cs=enhCost(lv,idx), pl=tideOk(cs.m)?plan(cs.m):null, cOk=S.coins>=cs.coins, ok=cOk&&!!pl;
       let st2=''; if(!cOk) st2+=`<span class="bad">金幣差 ${(cs.coins-S.coins).toLocaleString()}</span> `;
-      if(!pl) st2+=`<span class="bad">素材不夠</span>`; else if(Object.keys(cs.m).some(x=>pl[x]!==cs.m[x])) st2+=`<span class="cv">將使用 ${mtxt(pl)}（高階素材自動抵扣）</span>`;
+      if(!tideOk(cs.m)) st2+=`<span class="bad">潮心石不夠（大師挑戰取得）</span>`; else if(!pl) st2+=`<span class="bad">素材不夠</span>`; else if(Object.keys(cs.m).some(x=>pl[x]!==cs.m[x])) st2+=`<span class="cv">將使用 ${mtxt(pl)}（高階素材自動抵扣）</span>`;
       h+=row(`${label}：${it.name} +${lv}`,`${st}<br>${eff}<br>下一級：🪙${cs.coins.toLocaleString()} ${mtxt(cs.m)}${st2?'<br>'+st2:''}`,`<button class="sbtn${ok?' pri':''}" data-a="enh" data-v="${k}">強化</button>`); });
     h+='<div class="note">素材不夠時，會自動用高一階的素材抵：1 魚骨＝3 魚鱗、1 珍珠＝3 魚骨、1 海晶＝3 珍珠。</div>';
     h+='<div class="note">換裝其他裝備時，各自的強化等級會保留。</div>';
@@ -113,9 +119,9 @@ function render(tab,GEAR){
   return h;
 }
 function click(a,v,GEAR){
-  if(a==='enh'){ const idx=S.eq[v], lv=lvOf(v,idx); if(lv>=10) return true; if(lv>=capOf()){ c.toast('等級不足：Lv '+(lv+1)*3+' 才能強化到 +'+(lv+1),'warn',2200); return true; } const cs=enhCost(lv,idx);
-    const pl=plan(cs.m); if(S.coins<cs.coins||!pl) return true;
-    S.coins-=cs.coins; TIER.forEach(k=>{ S.mat[k]=pl.left[k]; }); S.enh[v]=S.enh[v]||{}; S.enh[v][idx]=lv+1; c.persist(); c.setCoins(); c.Snd.fanfare(1); c.toast('強化成功！+'+(lv+1),'good'); return true; }
+  if(a==='enh'){ const idx=S.eq[v], lv=lvOf(v,idx); if(lv>=ENH_MAX) return true; if(lv>=capOf()){ c.toast('等級不足：Lv '+ENH_LV[lv+1]+' 才能強化到 +'+(lv+1),'warn',2200); return true; } const cs=enhCost(lv,idx);
+    const pl=tideOk(cs.m)?plan(cs.m):null; if(S.coins<cs.coins||!pl) return true;
+    S.coins-=cs.coins; TIER.forEach(k=>{ S.mat[k]=pl.left[k]; }); if(cs.m.tide) S.mat.tide=(S.mat.tide||0)-cs.m.tide; S.enh[v]=S.enh[v]||{}; S.enh[v][idx]=lv+1; c.persist(); c.setCoins(); c.Snd.fanfare(1); c.toast('強化成功！+'+(lv+1),'good'); return true; }
   if(a==='buyc'){ const it=CONS.find(x=>x.id===v); if(S.coins<it.p){ c.toast('金幣不夠','bad'); return true; } S.coins-=it.p; S.inv[v]=(S.inv[v]||0)+1; c.persist(); c.setCoins(); c.Snd.coin(); return true; }
   if(a==='usec'){ useCon(v); return true; }
   if(a==='merch'){ const o=offers().find(x=>x.id===v); if(!o||bought().includes(v)) return true; if(S.coins<o.p){ c.toast('金幣不夠','bad'); return true; }

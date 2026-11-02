@@ -16,7 +16,27 @@ const BOSS=[
   {id:'flat',lv:18,name:'鯰魚之王',sp:'flathead',loc:'lake',zone:'wood',per:['night'],size:1.45,pow:1.45,title:'鯰魚王者',hint:'倒木區・夜晚',coins:20000,cry:3},
   {id:'marlin',lv:20,name:'旗魚王',sp:'marlin',loc:'sea',zone:'blue',per:['dawn','day'],size:1.35,pow:1.5,title:'怒海旗手',hint:'遠洋深藍・清晨或白天',coins:30000,cry:4},
   {id:'gw',lv:25,name:'大白鯊女王',sp:'gwhite',loc:'sea',zone:'blue',per:['dusk','night'],size:1.3,pow:.92,title:'深海霸主',hint:'遠洋深藍・黃昏或夜晚',coins:50000,cry:6},
-  {id:'king',lv:24,name:'滄淵',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'滄淵征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10}];
+  {id:'king',lv:24,name:'滄淵',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'滄淵征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10},
+  /* 老漁人《漁獲簿》：他四十年來沒釣上岸的魚，一頁一隻。拉力、衝刺、耐力倍率以實際搏魚程式模擬校準：
+     該等級買得到的裝備＋強化上限，熟練玩家十場十勝；裝備落後 8 級幾乎都會失敗（月下銀王、老青例外：湖區線量 80 公尺，靠長時間搏魚） */
+  {id:'arapaima',lv:28,name:'沉鐘',sp:'arapaima',loc:'lake',zone:'deep',per:['day','dusk'],size:1.3,pow:2.6,spd:1.05,stam:1.15,title:'聽鐘人',hint:'深水中央・白天或黃昏',coins:60000,cry:6,tide:2,
+    page:'民國六十八年夏。深水中央有東西浮上來換氣，聲音像寺廟的鐘。我拉了牠一個下午，竿子斷成三截。'},
+  {id:'mekong',lv:32,name:'石佛',sp:'mekong',loc:'lake',zone:'deep',per:['night'],size:1.25,pow:3.1,spd:1.1,stam:1.35,title:'撼佛者',hint:'深水中央・夜晚',coins:75000,cry:7,tide:2,
+    page:'牠趴在湖底一動也不動，像一尊石佛。秋月說牠在睡覺，叫我別吵牠。那年她七歲。'},
+  {id:'taimen',lv:35,name:'冰湖之狼',sp:'taimen',loc:'ice',zone:'ice',per:['dawn','dusk'],size:1.4,pow:6,spd:1.15,stam:1.5,title:'冰原獵手',hint:'冰湖・清晨或黃昏',coins:90000,cry:8,tide:3,
+    page:'冰層底下有狼。牠咬走我三支假餌，每一支都是秋月替我挑的顏色。'},
+  {id:'grouper',lv:38,name:'礁洞之主',sp:'grouper2',loc:'sea',zone:'reef',per:['day'],size:1.2,pow:2.9,spd:1.2,stam:1.65,title:'礁洞征服者',hint:'近海礁岩・白天',coins:110000,cry:9,tide:3,
+    page:'牠一上鉤就鑽回洞裡，線在礁石上磨斷的聲音，我到現在還記得。'},
+  {id:'gt',lv:42,name:'斷線者',sp:'gt',loc:'sea',zone:'reef',per:['dawn','dusk'],size:1.35,pow:6.2,spd:1.25,stam:1.85,title:'斷線終結者',hint:'近海礁岩・清晨或黃昏',coins:130000,cry:10,tide:4,
+    page:'港口的人都叫牠斷線者。那年我換了最粗的線，還是被牠在浪頭上拉斷。'},
+  {id:'tuna',lv:46,name:'黑潮之王',sp:'tuna',loc:'sea',zone:'blue',per:['dawn','day'],size:1.3,pow:6.3,spd:1.3,stam:2.05,title:'黑潮之王',hint:'遠洋深藍・清晨或白天',coins:160000,cry:12,tide:4,
+    page:'跟著黑潮北上的那一條，拉了我兩個鐘頭。我答應秋月颱風前回家，所以剪了線。'},
+  {id:'sword',lv:50,name:'夜行劍客',sp:'swordfish',loc:'sea',zone:'blue',per:['night'],size:1.15,pow:5,spd:1.36,stam:2.25,title:'月下劍客',hint:'遠洋深藍・夜晚',coins:190000,cry:14,tide:5,
+    page:'牠只在沒有月亮的夜裡上來吃魷魚。那天晚上颱風來了，我沒有回去。'},
+  {id:'tarpon',lv:53,name:'月下銀王',sp:'tarpon',loc:'lake',zone:'moon',per:['night'],size:2.6,pow:8,spd:1.4,stam:7,title:'銀王之友',hint:'月光灣・夜晚',coins:220000,cry:16,tide:5,
+    page:'霜汐說，月光灣有一條銀色的老魚，比她還老。牠是看著秋月長大的。'},
+  {id:'oldblue',lv:60,name:'老青',sp:'blackcarp',loc:'lake',zone:'deep',per:['night'],size:1.9,pow:6,spd:1.5,stam:12,title:'老漁人的傳人',hint:'深水中央・夜晚',coins:300000,cry:20,tide:6,
+    page:'最後一頁。老青是我這輩子的對手。如果有一天你把牠拉上來了，替我摸摸牠的頭，然後放牠回去。我的竹竿，就交給你了。'}];
 const PER_NAME={dawn:'清晨',day:'白天',dusk:'黃昏',night:'夜晚'};
 
 function createTalents(c){
@@ -35,8 +55,10 @@ function applyBoss(G,SPECIES,RAR){ const b=bossRoll(); if(!b) return false; cons
   G.sp=sp2; G.fd={sp:sp2,L,w,u:1,lvl:99,boss:b,value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*2.5),xpMul:3};
   c.toast('👑 有什麼巨大的東西在靠近……','warn',2400); c.vib([60,40,60]); return true; }
 function bossWin(fd){ const b=fd.boss, first=!S.boss[b.id]; S.boss[b.id]=(S.boss[b.id]||0)+1; S.bossOn=null; if(window.__STORY) window.__STORY.onBoss(b.id);
-  let bxp=0; if(first){ S.coins+=b.coins; S.mat=S.mat||{}; S.mat.crystal=(S.mat.crystal||0)+b.cry; if(S.titles.indexOf(b.title)<0) S.titles.push(b.title); c.setCoins(); if(c.addXP&&window.__LVINFO){ bxp=Math.round(window.__LVINFO.xpNext(S.lv||1)*.3); c.addXP(bxp); } }
-  showTitle(); c.persist(); setTimeout(()=>c.toast(first?`👑 擊敗${b.name}！稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}${bxp?'・經驗 '+bxp.toLocaleString():''}`:`👑 再次擊敗${b.name}！`,'good',4200),1600); c.Snd.fanfare(2); dot(); }
+  let bxp=0; S.mat=S.mat||{}; const tide=first?(b.tide||1):1; S.mat.tide=(S.mat.tide||0)+tide;   /* 潮心石：首勝給 Boss 設定的數量，再戰每次 1 顆（強化 +11 起要用） */
+  if(b.id==='oldblue'&&window.__GEARIDX){ const i=window.__GEARIDX('rod','oldrod'); if(i>=0&&S.gear&&S.gear.rod&&S.gear.rod.indexOf(i)<0) S.gear.rod.push(i); }   /* 老青：老漁人的竹節竿交到你手上 */
+  if(first){ S.coins+=b.coins; S.mat.crystal=(S.mat.crystal||0)+b.cry; if(S.titles.indexOf(b.title)<0) S.titles.push(b.title); c.setCoins(); if(c.addXP&&window.__LVINFO){ bxp=Math.round(window.__LVINFO.xpNext(S.lv||1)*.3); c.addXP(bxp); } }
+  showTitle(); c.persist(); setTimeout(()=>c.toast(first?`👑 擊敗${b.name}！稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷潮心石×${tide}${bxp?'・經驗 '+bxp.toLocaleString():''}`:`👑 再次擊敗${b.name}！🔷潮心石×${tide}`,'good',4200),1600); c.Snd.fanfare(2); dot(); }
 
 /* Boss 登場演出與光暈 */
 const T=THREE, bc=document.createElement('canvas'); bc.width=bc.height=128; { const x=bc.getContext('2d'), gr=x.createRadialGradient(64,64,4,64,64,64); gr.addColorStop(0,'rgba(255,230,140,.9)'); gr.addColorStop(.35,'rgba(255,150,60,.45)'); gr.addColorStop(1,'rgba(255,80,40,0)'); x.fillStyle=gr; x.fillRect(0,0,128,128); }
@@ -85,11 +107,11 @@ function render(){ const p=pts();
   if(spent()>0) h+=`<div style="text-align:right;margin-top:6px"><button class="sbtn danger" data-t="reset">重置天賦（🪙${TAL_RESET.toLocaleString()}）</button></div>`;
   h+='<div class="sec">大師挑戰：接受後，在指定釣點與時段會遇到 Boss。Boss 體型巨大、拉力極強，建議先強化裝備。</div>';
   for(const b of BOSS){ const done=S.boss[b.id], on=S.bossOn===b.id, lock=(S.lv||1)<b.lv;
-    const sub=lock?`<span class="lock">Lv ${b.lv} 解鎖</span>`:`${b.hint}<br>首勝：稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}${done?`<br>已擊敗 ${done} 次`:''}`;
+    const sub=lock?`<span class="lock">Lv ${b.lv} 解鎖</span>`:`${b.hint}<br>首勝：稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷×${b.tide||1}${done?`<br>已擊敗 ${done} 次（再戰 🔷×1）`:''}${done&&b.page?`<br><i style="color:#d8c79a">📖 ${b.page}</i>`:''}`;
     const r=lock?'🔒':on?'<span class="on">進行中</span><br><button class="sbtn" data-t="quit">放棄</button>':`<button class="sbtn${done?'':' pri'}" data-t="boss" data-v="${b.id}">${done?'再戰':'接受挑戰'}</button>`;
     h+=row(`${done?'👑':'🐉'} ${b.name}`,sub,r); }
   if(window.__LVINFO){ const L=window.__LVINFO, lv=S.lv||1, need=L.xpNext(lv), up=[]; for(let k=lv+1;k<=lv+12&&up.length<4;k++){ const g=L.gains(k).filter(x=>x!=='天賦點 +1'); if(g.length) up.push(`<div class="tk"><b>Lv ${k}</b>　${g.join('、')}</div>`); }
-    h+=`<div class="sec">等級里程碑</div><div class="pt">Lv ${lv}：經驗 ${Math.floor(S.xp||0).toLocaleString()} / ${need.toLocaleString()}　｜　強化上限 +${Math.min(10,Math.floor(lv/3))}</div>${up.join('')}`; }
+    h+=`<div class="sec">等級里程碑</div><div class="pt">Lv ${lv}：經驗 ${Math.floor(S.xp||0).toLocaleString()} / ${need.toLocaleString()}　｜　強化上限 +${enhCapAt(lv)}</div>${up.join('')}`; }
   if(S.titles.length){ const cur=S.titleSel&&S.titles.indexOf(S.titleSel)>=0?S.titleSel:S.titles[S.titles.length-1]; h+=`<div class="sec">已獲得稱號（點選要顯示在主畫面的稱號）</div><div>${S.titles.map(t=>`<button class="ttl${t===cur?' on':''}" data-t="title" data-v="${t}">${t}</button>`).join('')}</div>`; }
   box.firstChild.innerHTML=h; }
 btn.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); render(); box.classList.remove('hidden'); });
