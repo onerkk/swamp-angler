@@ -12,11 +12,16 @@ const TAL_MAX=6, TAL_RESET=5000;
 const talMax=k=>TAL[k].max||TAL_MAX, talZero=()=>Object.fromEntries(Object.keys(TAL).map(k=>[k,0]));
 /* Boss 拉力以實際搏魚程式模擬校準：該等級買得到的裝備，熟練玩家一定拉得上來（大白鯊女王原本 1.6：任何裝備開場 1 秒內就斷線） */
 const BOSS=[
-  {id:'gar',lv:15,name:'巨型鱷雀鱔',sp:'gar',loc:'lake',zone:'deep',per:['dusk','night'],size:1.5,pow:1.35,title:'鱷雀鱔獵人',hint:'深水中央・黃昏或夜晚',coins:15000,cry:2},
-  {id:'flat',lv:18,name:'鯰魚之王',sp:'flathead',loc:'lake',zone:'wood',per:['night'],size:1.45,pow:1.45,title:'鯰魚王者',hint:'倒木區・夜晚',coins:20000,cry:3},
-  {id:'marlin',lv:20,name:'旗魚王',sp:'marlin',loc:'sea',zone:'blue',per:['dawn','day'],size:1.35,pow:1.5,title:'怒海旗手',hint:'遠洋深藍・清晨或白天',coins:30000,cry:4},
-  {id:'gw',lv:25,name:'大白鯊女王',sp:'gwhite',loc:'sea',zone:'blue',per:['dusk','night'],size:1.3,pow:.92,title:'深海霸主',hint:'遠洋深藍・黃昏或夜晚',coins:50000,cry:6},
-  {id:'king',lv:24,name:'滄淵',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'滄淵征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10},
+  {id:'gar',lv:15,name:'巨型鱷雀鱔',sp:'gar',loc:'lake',zone:'deep',per:['dusk','night'],size:1.5,pow:1.35,title:'鱷雀鱔獵人',hint:'深水中央・黃昏或夜晚',coins:15000,cry:2,
+    page:'第一頁。深水中央那條鱷雀鱔，嘴裡還掛著我年輕時的鉤子。秋月出生那年，我第一次跟牠對上。'},
+  {id:'flat',lv:18,name:'鯰魚之王',sp:'flathead',loc:'lake',zone:'wood',per:['night'],size:1.45,pow:1.45,title:'鯰魚王者',hint:'倒木區・夜晚',coins:20000,cry:3,
+    page:'倒木區的鯰魚王，專門把線拖進沉木裡。秋月說牠是湖的看門人，叫我讓牠睡。'},
+  {id:'marlin',lv:20,name:'旗魚王',sp:'marlin',loc:'sea',zone:'blue',per:['dawn','day'],size:1.35,pow:1.5,title:'怒海旗手',hint:'遠洋深藍・清晨或白天',coins:30000,cry:4,
+    page:'第一次開船出海，旗魚在船邊跳了七次。我站不穩，跌坐在甲板上，牠就這樣走了。'},
+  {id:'gw',lv:25,name:'大白鯊女王',sp:'gwhite',loc:'sea',zone:'blue',per:['dusk','night'],size:1.3,pow:.92,title:'深海霸主',hint:'遠洋深藍・黃昏或夜晚',coins:50000,cry:6,
+    page:'大白鯊在船底繞了一整晚。我沒敢下鉤。有些魚不是拿來贏的，是拿來記住的。'},
+  {id:'king',lv:24,name:'滄淵',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'滄淵征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10,
+    page:'這一頁我寫不下去。等你見到牠，替我跟牠說：月潮回家了。'},
   /* 老漁人《漁獲簿》：他四十年來沒釣上岸的魚，一頁一隻。拉力、衝刺、耐力倍率以實際搏魚程式模擬校準：
      該等級買得到的裝備＋強化上限，熟練玩家十場十勝；裝備落後 8 級幾乎都會失敗（月下銀王、老青例外：湖區線量 80 公尺，靠長時間搏魚） */
   {id:'arapaima',lv:28,name:'沉鐘',sp:'arapaima',loc:'lake',zone:'deep',per:['day','dusk'],size:1.3,pow:2.6,spd:1.05,stam:1.15,title:'聽鐘人',hint:'深水中央・白天或黃昏',coins:60000,cry:6,tide:2,
@@ -58,8 +63,44 @@ function bossWin(fd){ const b=fd.boss, first=!S.boss[b.id]; S.boss[b.id]=(S.boss
   let bxp=0; S.mat=S.mat||{}; const tide=first?(b.tide||1):1; S.mat.tide=(S.mat.tide||0)+tide;   /* 潮心石：首勝給 Boss 設定的數量，再戰每次 1 顆（強化 +11 起要用） */
   if(b.id==='oldblue'&&window.__GEARIDX){ const i=window.__GEARIDX('rod','oldrod'); if(i>=0&&S.gear&&S.gear.rod&&S.gear.rod.indexOf(i)<0) S.gear.rod.push(i); }   /* 老青：老漁人的竹節竿交到你手上 */
   if(first){ S.coins+=b.coins; S.mat.crystal=(S.mat.crystal||0)+b.cry; if(S.titles.indexOf(b.title)<0) S.titles.push(b.title); c.setCoins(); if(c.addXP&&window.__LVINFO){ bxp=Math.round(window.__LVINFO.xpNext(S.lv||1)*.3); c.addXP(bxp); } }
-  showTitle(); c.persist(); setTimeout(()=>c.toast(first?`👑 擊敗${b.name}！稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷潮心石×${tide}${bxp?'・經驗 '+bxp.toLocaleString():''}`:`👑 再次擊敗${b.name}！🔷潮心石×${tide}`,'good',4200),1600); c.Snd.fanfare(2); dot(); }
+  showTitle(); c.persist(); winQ.push({b,first,tide,bxp,rod:b.id==='oldblue'});  c.Snd.fanfare(2); dot(); }
 
+/* ===== 挑戰成功：老漁人的《漁獲簿》翻開，補上這一頁；印章蓋下，獎勵一項一項飛進來 =====
+   漁獲卡還開著時先排隊，等玩家收起漁獲卡（離開 catching）才播放 */
+const winQ=[];
+const wcss=document.createElement('style'); wcss.textContent=`
+#ledger{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 45%,rgba(40,28,10,.55),rgba(0,0,0,.88));opacity:0;transition:opacity .5s;perspective:1400px;font-family:'Noto Serif TC','Songti TC',serif}
+#ledger.on{opacity:1}#ledger .rays{position:absolute;width:150vmax;height:150vmax;background:repeating-conic-gradient(from 0deg,rgba(255,214,140,.10) 0 8deg,rgba(255,214,140,0) 8deg 20deg);animation:lgRot 30s linear infinite;-webkit-mask:radial-gradient(circle,#000 0,transparent 60%);mask:radial-gradient(circle,#000 0,transparent 60%)}
+@keyframes lgRot{to{transform:rotate(360deg)}}
+#ledger .book{position:relative;width:min(84vw,380px);height:min(118vw,520px);transform:translateY(30px) scale(.9);transition:transform .9s cubic-bezier(.2,1.2,.3,1)}#ledger.on .book{transform:none}
+#ledger .pg{position:absolute;inset:0;border-radius:6px 14px 14px 6px;background:#e9dcbc url(end_paper.jpg) center/cover;box-shadow:0 18px 50px rgba(0,0,0,.6),inset 18px 0 30px -18px rgba(80,50,20,.6);padding:26px 24px;color:#3b2a16;overflow:hidden}
+#ledger .cover{position:absolute;inset:0;border-radius:6px 14px 14px 6px;background:linear-gradient(135deg,#4a2f18,#2a190c);box-shadow:inset 0 0 0 3px #8a6532,inset 0 0 0 7px #2a190c,inset 0 0 0 8px #8a6532;transform-origin:left center;transition:transform 1.3s cubic-bezier(.5,0,.3,1) .5s;backface-visibility:hidden;display:flex;align-items:center;justify-content:center;color:#e7c98a;font-size:26px;letter-spacing:.4em;writing-mode:vertical-rl}
+#ledger.open .cover{transform:rotateY(-170deg)}
+#ledger .no{font-size:12px;letter-spacing:.3em;color:#7a5a32}#ledger .nm{font-size:30px;margin:6px 0 2px;letter-spacing:.15em;color:#2c1d0c}#ledger .sub{font-size:13px;color:#6b5030}
+#ledger .txt{margin-top:16px;font-size:16px;line-height:2;min-height:7em;white-space:pre-wrap}
+#ledger .seal{position:absolute;right:22px;top:92px;width:84px;height:84px;border:4px solid #b2261c;border-radius:10px;color:#b2261c;font-size:20px;font-weight:900;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;transform:rotate(-12deg) scale(2.4);opacity:0;transition:transform .25s cubic-bezier(.3,1.6,.5,1),opacity .2s;mix-blend-mode:multiply}
+#ledger .seal.go{transform:rotate(-12deg) scale(1);opacity:.85}
+#ledger .rw{position:absolute;left:20px;right:20px;bottom:64px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+#ledger .rw span{padding:6px 12px;border-radius:999px;background:rgba(60,40,15,.85);color:#ffe9a8;font-family:sans-serif;font-weight:800;font-size:14px;opacity:0;transform:translateY(30px) scale(.6);transition:all .45s cubic-bezier(.3,1.5,.5,1)}#ledger .rw span.go{opacity:1;transform:none}
+#ledger .ok{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);padding:10px 22px;border-radius:999px;border:1px solid #8a6532;background:#3b2a16;color:#ffe9a8;font-size:15px;font-family:inherit;opacity:0;transition:opacity .4s}#ledger .ok.go{opacity:1}`;
+document.head.appendChild(wcss);
+function playWin(w){ const b=w.b, idx=BOSS.indexOf(b)+1, el=document.createElement('div'); el.id='ledger';
+  const rw=[w.first?`稱號「${b.title}」`:null,w.first?`🪙 ${b.coins.toLocaleString()}`:null,w.first?`💎 ×${b.cry}`:null,`🔷 潮心石 ×${w.tide}`,w.bxp?`經驗 +${w.bxp.toLocaleString()}`:null,w.rod?'🎋 老漁人的竹節竿':null].filter(Boolean);
+  el.innerHTML=`<div class="rays"></div><div class="book"><div class="pg"><div class="no">漁獲簿・第 ${idx} 頁</div><div class="nm">${b.name}</div><div class="sub">${b.hint}</div><div class="txt"></div><div class="seal">${w.first?'上岸':'再會'}</div><div class="rw">${rw.map(x=>`<span>${x}</span>`).join('')}</div><button class="ok">收進漁獲簿</button></div><div class="cover">漁獲簿</div></div>`;
+  document.body.appendChild(el); requestAnimationFrame(()=>el.classList.add('on')); c.Snd.fanfare(2); c.vib&&c.vib([40,40,80]);
+  const T0=[]; const at=(ms,f)=>T0.push(setTimeout(f,ms));
+  at(400,()=>el.classList.add('open'));
+  // 老漁人的字一個一個寫上去
+  const txt=b.page||'', box=el.querySelector('.txt'); let n=0; at(1900,()=>{ const iv=setInterval(()=>{ n+=1; box.textContent=txt.slice(0,n); if(n>=txt.length) clearInterval(iv); },55); T0.push(iv); });
+  const done=1900+txt.length*55+300;
+  at(done,()=>{ el.querySelector('.seal').classList.add('go'); c.vib&&c.vib(60); c.Snd.splash&&c.Snd.splash(.4); });
+  el.querySelectorAll('.rw span').forEach((sp,i)=>at(done+500+i*260,()=>{ sp.classList.add('go'); c.Snd.coin(); }));
+  at(done+700+rw.length*260,()=>el.querySelector('.ok').classList.add('go'));
+  const close=()=>{ T0.forEach(t=>{ clearTimeout(t); clearInterval(t); }); el.classList.remove('on'); setTimeout(()=>el.remove(),500); };
+  // 點一下：還在寫字就直接寫完；寫完了就收起來
+  el.addEventListener('click',()=>{ if(!el.querySelector('.ok.go')){ T0.forEach(t=>{ clearTimeout(t); clearInterval(t); }); el.classList.add('open'); box.textContent=txt; el.querySelector('.seal').classList.add('go'); el.querySelectorAll('.rw span').forEach(x=>x.classList.add('go')); el.querySelector('.ok').classList.add('go'); return; } close(); });
+}
+setInterval(()=>{ if(winQ.length&&!document.body.classList.contains('catching')&&!document.body.classList.contains('ending')&&!document.getElementById('ledger')) playWin(winQ.shift()); },500);
 /* Boss 登場演出與光暈 */
 const T=THREE, bc=document.createElement('canvas'); bc.width=bc.height=128; { const x=bc.getContext('2d'), gr=x.createRadialGradient(64,64,4,64,64,64); gr.addColorStop(0,'rgba(255,230,140,.9)'); gr.addColorStop(.35,'rgba(255,150,60,.45)'); gr.addColorStop(1,'rgba(255,80,40,0)'); x.fillStyle=gr; x.fillRect(0,0,128,128); }
 const aura=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(bc),blending:T.AdditiveBlending,depthWrite:false,transparent:true})); aura.renderOrder=6;
@@ -93,11 +134,13 @@ const st=document.createElement('style'); st.textContent=`
 #bossBan.in{opacity:1;transform:translate(-50%,-50%) scale(1)}#bossBan.out{opacity:0;transform:translate(-50%,-60%) scale(.9)}#bossBan.hidden{display:none}
 #bossBan b{display:block;font-size:30px;color:#ffe9a8;letter-spacing:2px;text-shadow:0 2px 12px rgba(255,120,40,.9)}#bossBan small{display:block;margin-top:4px;font-size:13px;color:#ffd0a0;font-weight:700}
 #bossFlash{position:fixed;inset:0;z-index:24;background:#fff;opacity:0;pointer-events:none}#bossFlash.go{animation:bfl .6s ease-out}@keyframes bfl{0%{opacity:.85}100%{opacity:0}}#talBox .lock{color:var(--fg-dim);font-size:12px}#talBox .on{color:#7ff0a8;font-weight:800}
-#bossBtn{position:fixed;right:12px;top:calc(env(safe-area-inset-top,0px) + 196px);z-index:6;display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding:7px 14px 7px 12px;border-radius:16px;border:1px solid rgba(255,213,106,.7);background:linear-gradient(135deg,rgba(92,58,8,.92),rgba(150,98,20,.9));color:#ffe9a8;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,.35);max-width:58vw;text-align:right}
+#top3{position:fixed;left:12px;top:calc(var(--hud2,110px) + 6px);z-index:5;display:flex;gap:8px;align-items:stretch;max-width:calc(100vw - 24px)}
+#talBtn{font-size:14px;padding:7px 14px;border-color:rgba(255,213,106,.45)}#talBtn em{font-style:normal;margin-left:6px;min-width:20px;padding:1px 6px;border-radius:999px;background:#e5483a;color:#fff;font-size:12px}#talBtn.has{box-shadow:0 0 0 1px rgba(255,213,106,.5),0 0 10px rgba(255,190,80,.45)}
+#bossBtn{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;padding:5px 14px 5px 12px;border-radius:16px;border:1px solid rgba(255,213,106,.7);background:linear-gradient(135deg,rgba(92,58,8,.92),rgba(150,98,20,.9));color:#ffe9a8;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,.35);max-width:56vw;text-align:left}
 #bossBtn b{font-size:14px;letter-spacing:.5px;white-space:nowrap}#bossBtn small{font-size:11px;color:#ffd9a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52vw}
 #bossBtn.glow{animation:bossGlow 1.6s ease-in-out infinite alternate}@keyframes bossGlow{from{box-shadow:0 0 0 1px rgba(255,213,106,.5),0 0 6px rgba(255,190,80,.4)}to{box-shadow:0 0 0 2px #ffd56a,0 0 18px rgba(255,190,80,.9)}}
 #bossBtn.on{background:linear-gradient(135deg,rgba(110,30,20,.94),rgba(170,70,25,.92))}#bossBtn.ready{border-color:#7ff0a8;box-shadow:0 0 14px rgba(127,240,168,.6)}
-body.sheetOn #bossBtn,body.ending #bossBtn,body.athome #bossBtn,body.catching #bossBtn{display:none!important}
+body.sheetOn #top3,body.ending #top3,body.athome #top3,body.catching #top3{display:none!important}
 #talBox .bcards{display:flex;flex-direction:column;gap:10px;margin-top:10px}
 #talBox .bcard{padding:12px 14px;border-radius:16px;background:linear-gradient(135deg,rgba(255,213,106,.10),rgba(255,140,60,.05));border:1px solid rgba(255,213,106,.28)}
 #talBox .bcard.on{border-color:#ffb067;background:linear-gradient(135deg,rgba(255,120,60,.18),rgba(255,213,106,.06))}#talBox .bcard.done{border-color:rgba(127,240,168,.35)}#talBox .bcard.lock{opacity:.5}
@@ -106,9 +149,9 @@ body.sheetOn #bossBtn,body.ending #bossBtn,body.athome #bossBtn,body.catching #b
 #talBox .ba{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}#talBox .ba .big{padding:10px 18px;font-size:15px}#talBox .bst{width:100%;font-size:13px;color:#ffd9a0}#talBox .bst.ok{color:#7ff0a8;font-weight:800}`;
 document.head.appendChild(st);
 const box=document.createElement('div'); box.id='talBox'; box.className='hidden'; box.innerHTML='<div class="tb"></div>'; document.body.appendChild(box);
-const btn=document.createElement('button'); btn.className='chip sm'; btn.id='talBtn'; btn.setAttribute('aria-label','天賦與挑戰'); btn.textContent='⭐';
-const t2=document.getElementById('top2'); if(t2) t2.appendChild(btn);
-function dot(){ btn.classList.toggle('dot',pts()>0||(!S.bossOn&&BOSS.some(b=>(S.lv||1)>=b.lv&&!S.boss[b.id]))); }
+const row3=document.createElement('div'); row3.id='top3'; document.body.appendChild(row3);
+const btn=document.createElement('button'); btn.className='chip'; btn.id='talBtn'; btn.setAttribute('aria-label','天賦'); btn.innerHTML='⭐ 天賦'; row3.appendChild(btn);
+function dot(){ const p=pts(); btn.innerHTML=`⭐ 天賦${p>0?`<em>${p}</em>`:''}`; btn.classList.toggle('has',p>0); }
 const row=(a,b,r)=>`<div class="row"><div class="nm"><b>${a}</b><small>${b}</small></div><div class="rt">${r}</div></div>`;
 let mode='tal';
 const spotIdx=z=>typeof SPOTS!=='undefined'?SPOTS.findIndex(q=>q.id===z):-1;
@@ -141,7 +184,7 @@ function render(){ if(mode==='boss'){ box.firstChild.innerHTML=bossView(); retur
   box.firstChild.innerHTML=h; }
 btn.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); mode='tal'; render(); box.classList.remove('hidden'); });
 /* 主畫面的大師挑戰入口：金色膠囊按鈕。沒接挑戰時顯示可挑戰數量並發光；接了挑戰顯示目標、地點與目前是否符合條件 */
-const bb2=document.createElement('button'); bb2.id='bossBtn'; bb2.setAttribute('aria-label','大師挑戰'); document.body.appendChild(bb2);
+const bb2=document.createElement('button'); bb2.id='bossBtn'; bb2.setAttribute('aria-label','大師挑戰'); row3.appendChild(bb2);
 function bossBtn(){ const b=BOSS.find(x=>x.id===S.bossOn), avail=BOSS.filter(x=>(S.lv||1)>=x.lv&&!S.boss[x.id]).length;
   if(b){ const st=bossState(b); bb2.className='on'+(st.ready?' ready':''); bb2.innerHTML=`<b>👑 ${b.name}</b><small>${st.ready?'✅ 條件符合，等牠咬餌':b.hint}</small>`; }
   else { bb2.className=avail?'glow':''; bb2.innerHTML=`<b>👑 大師挑戰</b><small>${avail?avail+' 隻等你挑戰':'漁獲簿'}</small>`; }

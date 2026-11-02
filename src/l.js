@@ -136,7 +136,11 @@ function click(a,v,GEAR){
 /* 生效中的道具、自動調整提示位置 */
 const fxBar=document.getElementById('fxBar');
 function tick(){ const t1=document.getElementById('top'), t2=document.getElementById('top2');
-  const bot=e=>{ if(!e) return 0; const r=e.getBoundingClientRect(); return r.height>0?r.bottom:0; }; const y=Math.max(bot(t1),bot(t2));
+  const bot=e=>{ if(!e) return 0; const r=e.getBoundingClientRect(); return r.height>0?r.bottom:0; }; const y0=Math.max(bot(t1),bot(t2)), t3=document.getElementById('top3');
+  document.documentElement.style.setProperty('--hud2',Math.round(y0)+'px');
+  // 第三列（天賦、大師挑戰）跟著第二列一起顯示、隱藏、變淡
+  if(t3&&t2){ const cs=getComputedStyle(t2); t3.style.visibility=cs.display==='none'||cs.visibility==='hidden'?'hidden':''; t3.style.opacity=cs.opacity; }
+  const y=Math.max(y0,t3&&t3.style.visibility!=='hidden'?bot(t3):0);
   document.documentElement.style.setProperty('--hudY',Math.round(y)+'px');
   if(fxBar) fxBar.innerHTML=CONS.filter(it=>it.min&&fxOn(it.id)).map(it=>`<span>${it.i} ${Math.ceil((S.fx[it.id]-now())/60000)}分</span>`).join('')+(fxOn('meal_str')?`<span>💪 ${Math.ceil((S.fx.meal_str-now())/60000)}分</span>`:''); }
 setInterval(tick,1000); window.addEventListener('resize',tick); setTimeout(tick,300);
