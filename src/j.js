@@ -278,7 +278,10 @@ function update(dt,t){
     const v=G.boatV||0, k=Math.min(1,Math.abs(v)/22), plane=k*k*(3-2*k), slam=Math.sin(t*5.3)*Math.max(0,Math.sin(t*1.7))*.012*plane*(.4+(c.wx().w||3)/8);
     yacht.position.set(b.x,h0*.9-.05-.14*plane,b.z); yacht.rotation.set((hf-h0)/3*.7*(1-.5*plane)+.045*plane+slam,G.head,(hs-h0)/1.5*-.5-(G.boatW||0)*.16*k,'YXZ');
     const hull=yacht.userData.hull||{bow:-4.5,stern:21.5,beam:2.6};
-    WAKE.update(dt,t,{on:loc==='sea',x:b.x,z:b.z,head:G.head,speed:Math.abs(v),bow:hull.bow,stern:hull.stern,beam:hull.beam,water:h0});
+    // 船頭撞浪：跟上面那下輕撞同一個節奏，撞到最深的瞬間掀起一片水花；風浪越大越常、越猛
+    const sw=Math.sin(t*5.3)*Math.max(0,Math.sin(t*1.7)), wind=(c.wx().w||3); let slamK=0;
+    if(sw>.72&&!yacht.userData.slamUp){ yacht.userData.slamUp=true; if(Math.random()<.45+wind*.06) slamK=Math.min(1,.35+wind*.08+Math.random()*.3); } else if(sw<.3) yacht.userData.slamUp=false;
+    WAKE.update(dt,t,{on:loc==='sea',x:b.x,z:b.z,y:yacht.position.y,head:G.head,speed:Math.abs(v),bow:hull.bow,stern:hull.stern,beam:hull.beam,water:h0,deckBow:hull.deckBow,deckMain:hull.deckMain,slam:slamK});
     const station=yacht.userData.stations[G.boatStation==='helm'?'helm':'fishing'],pose=yachtAnglerPose(T,yacht,station);G.angler=G.angler||new T.Vector3();G.angler.copy(pose.position);G.fishingYaw=pose.yaw;W.player.position.copy(pose.position);
   }else{G.angler=null;G.fishingYaw=0;WAKE.update(dt,t,null);}
 }

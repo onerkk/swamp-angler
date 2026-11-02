@@ -2,27 +2,34 @@
 const TAL={
   cast:{n:'遠投',i:'🎯',d:r=>`拋投距離 +${r*4}%，稀有魚需要的拋投距離 −${r*5}%`},
   power:{n:'力量',i:'💪',d:r=>`線張力 −${r*3}%，爆線累積 −${r*5}%`},
-  sea:{n:'海洋',i:'🌊',d:r=>`海上稀有魚 +${r*8}%，鯊魚搶魚機率 −${r*12}%，閃避少點 ${Math.floor(r/2)} 下`}};
+  sea:{n:'海洋',i:'🌊',d:r=>`海上稀有魚 +${r*8}%，鯊魚搶魚機率 −${r*12}%，閃避少點 ${Math.floor(r/2)} 下`},
+  /* 進階天賦（Lv 25／30 開放）：給後面的大師挑戰用，點滿約 28 點 */
+  fight:{n:'搏魚',i:'🎣',max:8,lv:25,d:r=>`魚的體力消耗 +${r*5}%，遛魚更快`},
+  reel:{n:'捲線',i:'⚙️',max:8,lv:25,d:r=>`收線速度 +${r*4}%`},
+  calm:{n:'定力',i:'🧘',max:8,lv:30,d:r=>`Boss 的拉力 −${r*3}%、衝刺速度 −${r*3}%`},
+  hunt:{n:'尋蹤',i:'🧭',max:4,lv:30,d:r=>`Boss 出現機率 +${r*5}%，連續 ${4-Math.floor(r/2)} 次咬餌內一定現身`}};
 const TAL_MAX=6, TAL_RESET=5000;
+const talMax=k=>TAL[k].max||TAL_MAX, talZero=()=>Object.fromEntries(Object.keys(TAL).map(k=>[k,0]));
+/* Boss 拉力以實際搏魚程式模擬校準：該等級買得到的裝備，熟練玩家一定拉得上來（大白鯊女王原本 1.6：任何裝備開場 1 秒內就斷線） */
 const BOSS=[
   {id:'gar',lv:15,name:'巨型鱷雀鱔',sp:'gar',loc:'lake',zone:'deep',per:['dusk','night'],size:1.5,pow:1.35,title:'鱷雀鱔獵人',hint:'深水中央・黃昏或夜晚',coins:15000,cry:2},
   {id:'flat',lv:18,name:'鯰魚之王',sp:'flathead',loc:'lake',zone:'wood',per:['night'],size:1.45,pow:1.45,title:'鯰魚王者',hint:'倒木區・夜晚',coins:20000,cry:3},
   {id:'marlin',lv:20,name:'旗魚王',sp:'marlin',loc:'sea',zone:'blue',per:['dawn','day'],size:1.35,pow:1.5,title:'怒海旗手',hint:'遠洋深藍・清晨或白天',coins:30000,cry:4},
-  {id:'gw',lv:25,name:'大白鯊女王',sp:'gwhite',loc:'sea',zone:'blue',per:['dusk','night'],size:1.3,pow:1.6,title:'深海霸主',hint:'遠洋深藍・黃昏或夜晚',coins:50000,cry:6},
+  {id:'gw',lv:25,name:'大白鯊女王',sp:'gwhite',loc:'sea',zone:'blue',per:['dusk','night'],size:1.3,pow:.92,title:'深海霸主',hint:'遠洋深藍・黃昏或夜晚',coins:50000,cry:6},
   {id:'king',lv:24,name:'滄淵',sp:'seaking',loc:'sea',zone:'blue',per:['night'],size:1,pow:1.75,title:'滄淵征服者',hint:'遠洋深藍・夜晚',coins:80000,cry:10}];
 const PER_NAME={dawn:'清晨',day:'白天',dusk:'黃昏',night:'夜晚'};
 
 function createTalents(c){
 'use strict';
-const S=c.save; S.tal=S.tal||{cast:0,power:0,sea:0}; S.boss=S.boss||{}; S.titles=S.titles||[];
+const S=c.save; S.tal=Object.assign(talZero(),S.tal||{}); S.boss=S.boss||{}; S.titles=S.titles||[];
 const spent=()=>Object.values(S.tal).reduce((a,b)=>a+b,0), pts=()=>Math.max(0,(S.lv||1)-4)-spent(), rank=b=>S.tal[b]||0;
-function apply(g){ g.rod.cast*=1+.04*rank('cast'); g.rod.tens*=1-.03*rank('power'); return g; }
+function apply(g){ g.rod.cast*=1+.04*rank('cast'); g.rod.tens*=1-.03*rank('power'); g.reel.spd*=1+.04*rank('reel'); return g; }
 
 /* Boss：指定釣點與時段，咬餌時 30% 機率出現，連續 4 次沒出現就保證出現 */
 let tries=0;
 function bossRoll(){ const b=BOSS.find(x=>x.id===S.bossOn); if(!b) return null;
   if(c.loc()!==b.loc||c.zoneId()!==b.zone||b.per.indexOf(c.period())<0) return null;
-  tries++; if(Math.random()<.3||tries>=4){ tries=0; return b; } return null; }
+  tries++; if(Math.random()<.3+.05*rank('hunt')||tries>=4-Math.floor(rank('hunt')/2)){ tries=0; return b; } return null; }
 function applyBoss(G,SPECIES,RAR){ const b=bossRoll(); if(!b) return false; const sp=SPECIES.find(x=>x.id===b.sp); if(!sp) return false;
   const L=sp.len[1]/100*b.size, w=sp.k*L*L*L, sp2=Object.assign({},sp);
   G.sp=sp2; G.fd={sp:sp2,L,w,u:1,lvl:99,boss:b,value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*2.5),xpMul:3};
@@ -73,8 +80,8 @@ const row=(a,b,r)=>`<div class="row"><div class="nm"><b>${a}</b><small>${b}</sma
 function render(){ const p=pts();
   let h=`<h3>天賦與大師挑戰<button class="sbtn" data-t="x">✕</button></h3>`;
   h+=`<div class="pt">${(S.lv||1)<5?'Lv 5 起每升一級得 1 點天賦':`可用天賦點：${p}（Lv ${S.lv}，已用 ${spent()}）`}</div>`;
-  for(const k in TAL){ const r=rank(k), T=TAL[k];
-    h+=row(`${T.i} ${T.n} <span class="pips">${'●'.repeat(r)}${'○'.repeat(TAL_MAX-r)}</span>`,r?T.d(r):'尚未投入',r>=TAL_MAX?'<span class="on">滿級</span>':`<button class="sbtn${p>0?' pri':''}" data-t="add" data-v="${k}">＋1</button>`); }
+  for(const k in TAL){ const r=rank(k), T=TAL[k], mx=talMax(k), lock=(S.lv||1)<(T.lv||0);
+    h+=row(`${T.i} ${T.n} <span class="pips">${'●'.repeat(r)}${'○'.repeat(mx-r)}</span>`,lock?`<span class="lock">Lv ${T.lv} 開放：${T.d(1)}（每級）</span>`:r?T.d(r):'尚未投入',lock?'🔒':r>=mx?'<span class="on">滿級</span>':`<button class="sbtn${p>0?' pri':''}" data-t="add" data-v="${k}">＋1</button>`); }
   if(spent()>0) h+=`<div style="text-align:right;margin-top:6px"><button class="sbtn danger" data-t="reset">重置天賦（🪙${TAL_RESET.toLocaleString()}）</button></div>`;
   h+='<div class="sec">大師挑戰：接受後，在指定釣點與時段會遇到 Boss。Boss 體型巨大、拉力極強，建議先強化裝備。</div>';
   for(const b of BOSS){ const done=S.boss[b.id], on=S.bossOn===b.id, lock=(S.lv||1)<b.lv;
@@ -88,8 +95,8 @@ function render(){ const p=pts();
 btn.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); render(); box.classList.remove('hidden'); });
 box.addEventListener('click',e=>{ if(e.target===box){ box.classList.add('hidden'); return; } const b=e.target.closest('[data-t]'); if(!b) return; const t=b.dataset.t, v=b.dataset.v;
   if(t==='x'){ box.classList.add('hidden'); return; }
-  if(t==='add'&&pts()>0&&rank(v)<TAL_MAX){ S.tal[v]=rank(v)+1; c.Snd.coin(); }
-  if(t==='reset'){ if(S.coins<TAL_RESET){ c.toast('金幣不夠','bad'); } else { S.coins-=TAL_RESET; S.tal={cast:0,power:0,sea:0}; c.setCoins(); } }
+  if(t==='add'&&TAL[v]&&pts()>0&&rank(v)<talMax(v)&&(S.lv||1)>=(TAL[v].lv||0)){ S.tal[v]=rank(v)+1; c.Snd.coin(); }
+  if(t==='reset'){ if(S.coins<TAL_RESET){ c.toast('金幣不夠','bad'); } else { S.coins-=TAL_RESET; S.tal=talZero(); c.setCoins(); } }
   if(t==='boss'){ S.bossOn=v; tries=0; const B=BOSS.find(x=>x.id===v); c.toast(`🐉 已接受挑戰：${B.name}（${B.hint}）`,'good',3000); }
   if(t==='quit') S.bossOn=null;
   if(t==='title'){ S.titleSel=v; showTitle(); }

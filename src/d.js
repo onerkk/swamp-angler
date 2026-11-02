@@ -724,7 +724,7 @@ joy.addEventListener('pointerup',joyEnd); joy.addEventListener('pointercancel',j
 function zoneOf(x,z){ let best=G.spot, bd=22; for(let i=1;i<SPOTS.length;i++){ const s=SPOTS[i]; if(s.loc==='sea') continue; if(s.req==='mer1'&&!(save.mer&&save.mer.n>=1)) continue; const d=Math.hypot(x-s.pos[0],z-s.pos[1]); if(d<bd){ bd=d; best=i; } } return best; }
 // 握槳時把竿子降低、竿尖朝前放倒在船裡（pk＝握槳程度 0～1）
 function stowRod(pk){ P.rodGroup.position.set(0,-.55*pk,.1*pk); P.rodGroup.rotation.x=-.75*pk; }
-const boatStationButton=document.createElement('button');boatStationButton.hidden=true;boatStationButton.className='btn';boatStationButton.style.cssText='position:fixed;right:16px;bottom:calc(210px + env(safe-area-inset-bottom));z-index:25;padding:12px 16px;border-radius:22px;background:#163b37;color:#fff;border:1px solid #c6ab6c;font:600 14px sans-serif';document.body.appendChild(boatStationButton);
+const boatStationButton=document.createElement('button');boatStationButton.id='boatStation';boatStationButton.hidden=true;boatStationButton.className='btn';boatStationButton.style.cssText='position:fixed;right:16px;bottom:calc(210px + env(safe-area-inset-bottom));z-index:25;padding:12px 16px;border-radius:22px;background:#163b37;color:#fff;border:1px solid #c6ab6c;font:600 14px sans-serif';document.body.appendChild(boatStationButton);
 function switchBoatStation(){if(!SPOTS[G.spot].yacht||G.state!=='idle')return;G.boatStation=G.boatStation==='helm'?'fishing':'helm';KY.v=KY.w=KY.thr=KY.turn=0;G.yaw=G.yawT=0;toast(G.boatStation==='helm'?'駕駛座：搖桿控制航行，停船後返回側舷釣位':'船艉側舷釣位：已停船，向船外拋竿');}
 boatStationButton.addEventListener('click',switchBoatStation);
 function updateKayak(dt){
@@ -756,6 +756,11 @@ function updateKayak(dt){
   KY.wake-=dt; const spd=Math.abs(KY.v);
   if(!s.yacht&&spd>.25&&KY.wake<=0){   /* 遊艇的艏浪與航跡由 wake.js 畫（留在水上、往外散開），這裡的水圈只給獨木舟 */ KY.wake=.4; AT.ring(G.base.x-fx*1.9,G.base.z-fz*1.9,.6+spd*.5); AT.ring(G.base.x+fx*1.8,G.base.z+fz*1.8,.3+spd*.3); if(spd>.9) P.splash(G.base.x+fx*1.9,0,G.base.z+fz*1.9,3,.3); }
 }
+// 任何一個面板（釣具店、手記、天賦與挑戰、霜汐對話、故事）打開時，主畫面上浮著的按鈕（拍照、駕駛座、距離標記）都要收起來，不能蓋在面板上
+{ const st=document.createElement('style'); st.textContent='body.sheetOn #boatStation{display:none!important}'; document.head.appendChild(st);
+  const PANELS=['sheet','talBox','moonBox','storyBox'].map(id=>document.getElementById(id)).filter(Boolean);
+  const sync=()=>document.body.classList.toggle('sheetOn',PANELS.some(e=>!e.classList.contains('hidden')));
+  const mo=new MutationObserver(sync); PANELS.forEach(e=>mo.observe(e,{attributes:true,attributeFilter:['class']})); sync(); }
 const fadeEl=$('fade'), uwTag=$('uwTag');
 // 診斷：替幾個可能很重的動作計時，長任務就能指名是誰（存檔、換釣點、場景釋放、避障路徑、小屋進出）
 if(window.__DIAG&&window.__DIAG.timed){ const D=window.__DIAG; persist=D.timed('存檔',persist); startRetrieve=D.timed('收線路徑',startRetrieve); goSpot=D.timed('換釣點',goSpot);
@@ -781,6 +786,8 @@ function guardUW(){ if(UW.active()&&!uwExiting&&G.state!=='wait'&&G.state!=='bit
 
 /* ---------- 每幀更新 ---------- */
 function updateFight(dt){
+  // 天賦等級（沒有天賦系統時一律當 0）
+  const talR=k=>window.__TAL&&window.__TAL.rank?window.__TAL.rank(k):0;
   if(easy()){
     const f=G.f,boat=!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht);f.assistT=(f.assistT||0)+dt;f.T=.35;f.brk=0;f.slk=0;f.abr=0;f.lostWhy=null;
     if(boat&&!G.fd.item&&!G.fd.sp.special){
@@ -816,7 +823,7 @@ function updateFight(dt){
   if(shake&&f.T<.18&&!fd.item&&Math.random()<dt*1.6*(1-f.hq)) { f.lostWhy='shook'; }
   if(f.jumpT>0&&G.held&&f.T>.85&&!fd.item&&Math.random()<dt*1.2*(1.15-f.hq)) { f.lostWhy='jump'; }
   const stamF=.4+.6*f.stam/100;
-  const F=fs.pow*(.8+.25*Math.pow(fd.w,.45))*(1+.22*sp.rar)*(fd.boss?fd.boss.pow:1)*stamF*(f.run?ST.mul:1)*(dive?1.35:1);
+  const F=fs.pow*(.8+.25*Math.pow(fd.w,.45))*(1+.22*sp.rar)*(fd.boss?fd.boss.pow*(1-.03*talR('calm')):1)*stamF*(f.run?ST.mul:1)*(dive?1.35:1);
   const good=-f.latDir*G.rodSide, steerMul=1-.28*clamp(good,0,1)+.15*clamp(-good,0,1);
   // Contact and line wear are evaluated after the swept fish motion below.
   // 魚種的線組容錯（f.win）：牙齒會咬線、嘴巴骨質硬容易脫鉤、會往礁洞鑽磨線的魚，同樣的拉力下線更容易斷
@@ -832,10 +839,10 @@ function updateFight(dt){
   const lightCatch=!!(fd.item||fs.pow<.7||fd.w<.25);   // 漂流物、遺物（fd.item）、力氣很小或很輕的魚
   if(f.T<.1&&!G.held&&!lightCatch) f.slk+=dt/(2.8*DF.slack); else f.slk=Math.max(0,f.slk-dt*(G.held?3:1.5));
   const zone=f.T>.4&&f.T<.8;
-  const drain=(3+18*f.T)*(1+.8*clamp(good,0,1))*(zone?1.2:1)/(fs.stam*DF.stam*(.7+.25*Math.sqrt(fd.w))*(fd.boss&&fd.boss.stam||1));   /* Boss 的耐力倍率：越後面的 Boss 遛越久 */
+  const drain=(3+18*f.T)*(1+.8*clamp(good,0,1))*(zone?1.2:1)/(fs.stam*DF.stam*(.7+.25*Math.sqrt(fd.w))*(fd.boss&&fd.boss.stam||1)/(1+.05*talR('fight')));   /* Boss 的耐力倍率：越後面的 Boss 遛越久；搏魚天賦讓魚體力掉得快 */
   f.stam=clamp(f.stam-drain*(window.__ECO&&window.__ECO.fxOn('meal_str')?1.3:1)*dt+(f.T<.2?2.5*dt:0),0,100);
   const reel=G.held?[.75,1,1.2][f.drag]*META.gear().reel.spd*clamp(1.25-f.T,.15,1)*(f.stam<8?1.4:1)*(zone?1.15:1)*(dive?.3:1):0;
-  const run=f.run?fs.spd*ST.spd*stamF*1.5*(G.held?.35:1)*(dive?.4:1)*(fd.boss&&fd.boss.spd||1):(G.held?0:.05);   /* Boss 的衝刺速度倍率：衝得越快越容易把線放光，捲線器的速度與線量就變得重要 */
+  const run=f.run?fs.spd*ST.spd*stamF*1.5*(G.held?.35:1)*(dive?.4:1)*(fd.boss?(fd.boss.spd||1)*(1-.03*talR('calm')):1):(G.held?0:.05);   /* Boss 的衝刺速度倍率：衝得越快越容易把線放光，捲線器的速度與線量就變得重要 */
   f.d=Math.max(0,f.d+(run-reel)*dt);
   f.theta=clamp(f.theta+f.latDir*fs.agi*ST.lat*.16*stamF*dt*(G.held?.7:1),-.85,.85);
   let az=f.az0+f.theta; { fishPos(tv,0); const r=Math.hypot(tv.x,tv.z), Rm=W.shoreR(Math.atan2(tv.x,-tv.z))-3; if(r>Rm) f.d=Math.max(2,f.d-(r-Rm)); }

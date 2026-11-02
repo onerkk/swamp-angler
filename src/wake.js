@@ -35,7 +35,7 @@ const all=[...arms,wash];
 const NP=1100, sp=new Float32Array(NP*3), sv=new Float32Array(NP*3), sl=new Float32Array(NP), ssz=new Float32Array(NP); sl.fill(-1);
 const pg=new T.BufferGeometry(); pg.setAttribute('position',new T.BufferAttribute(sp,3)); pg.setAttribute('aL',new T.BufferAttribute(sl,1)); pg.setAttribute('aS',new T.BufferAttribute(ssz,1)); pg.boundingSphere=new T.Sphere(new T.Vector3(),1e5);
 const pm=new T.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,
-  vertexShader:`attribute float aL; attribute float aS; varying float vL; void main(){ vL=aL; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=aL<0.0?0.0:aS*520.0/max(-mv.z,.5); gl_Position=projectionMatrix*mv; }`,
+  vertexShader:`attribute float aL; attribute float aS; varying float vL; void main(){ vL=aL; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=aL<0.0?0.0:min(aS*520.0/max(-mv.z,.5),180.0); gl_Position=projectionMatrix*mv; }`,
   fragmentShader:`uniform float uLight; varying float vL; void main(){ if(vL<0.0) discard; vec2 q=gl_PointCoord-.5; float r=dot(q,q); if(r>.25) discard; float a=(1.0-r*4.0)*(1.0-r*4.0)*.6*clamp(vL*2.0,0.0,1.0); gl_FragColor=vec4(vec3(.9,.95,1.0)*(.2+.8*uLight),a); }`});
 const pts=new T.Points(pg,pm); pts.frustumCulled=false; pts.renderOrder=4; pts.userData.flatOnWater=true; pts.visible=false; S.add(pts);
 let pHead=0, emitAcc=0, sampleT=0, wasOn=false;
@@ -68,9 +68,18 @@ function update(dt,t,o){
     while(emitAcc>=1){ emitAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random(), [x,z]=at(sg*o.beam*(.22+.3*along),sh+along*3.5), out=1.5+Math.random()*2.5+s*.12*(1-along*.5), up=(.8+Math.random()*1.4)*(1+2.2*k)*(1-along*.5), fwd=s*(.04+Math.random()*.1);
       // 大顆的是被劈開往外翻的水團，小顆的是被風吹散的細霧
       const big=Math.random()<.35; emit(x,o.water+.2,z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,(big?.8:1.4)+Math.random()*.6,big?.28+Math.random()*.3:.08+Math.random()*.12); } }
+  // 破浪：船頭撞進浪裡的瞬間，整片白水被往上掀到甲板以上；水本身幾乎留在原地，船以二十幾公尺的秒速衝過去，
+  // 所以從駕駛座看是一片水花越過船頭往你迎面打來，落在甲板上就散掉
+  if(o.slam>0&&s>7){ const n=Math.round((50+90*o.slam)*Math.min(1,(s-7)/10));
+    for(let i=0;i<n;i++){ const sg=Math.random()<.5?-1:1, lx=sg*Math.random()*o.beam*.35, [x,z]=at(lx,o.bow+.5+Math.random()*2.5), up=(4.5+Math.random()*4.5)*(.7+.5*o.slam), fwd=s*(.3+Math.random()*.32), side=sg*(.4+Math.random()*1.8);
+      emit(x,o.water+.4+Math.random()*.6,z,fx*fwd+rx*side,up,fz*fwd+rz*side,1.6+Math.random()*1.1,Math.random()<.45?.35+Math.random()*.4:.1+Math.random()*.15); } }
   let live=0;
-  for(let i=0;i<NP;i++){ if(sl[i]<0) continue; sl[i]-=dt; sv[i*3+1]-=9.8*dt; sp[i*3]+=sv[i*3]*dt; sp[i*3+1]+=sv[i*3+1]*dt; sp[i*3+2]+=sv[i*3+2]*dt;
-    if(sl[i]<=0||sp[i*3+1]<W.swell(sp[i*3],sp[i*3+2],t)-.05) sl[i]=-1; else live++; }
+  const deckAt=lz=>(lz<o.bow+9?(o.deckBow||2.6):(o.deckMain||2.0))+(o.y||0);
+  for(let i=0;i<NP;i++){ if(sl[i]<0) continue; sl[i]-=dt; sv[i*3+1]-=9.8*dt; sv[i*3]*=1-dt*.35; sv[i*3+2]*=1-dt*.35; sp[i*3]+=sv[i*3]*dt; sp[i*3+1]+=sv[i*3+1]*dt; sp[i*3+2]+=sv[i*3+2]*dt;
+    // 落到船身範圍內、低於甲板：打在甲板上散掉（不會穿過船身）
+    const dx=sp[i*3]-o.x, dz=sp[i*3+2]-o.z, lz=-(dx*fx+dz*fz), lx=dx*rx+dz*rz;
+    const onDeck=lz>o.bow&&lz<o.stern&&Math.abs(lx)<o.beam*Math.min(1,.35+(lz-o.bow)/8)&&sp[i*3+1]<deckAt(lz);
+    if(sl[i]<=0||onDeck||sp[i*3+1]<W.swell(sp[i*3],sp[i*3+2],t)-.05) sl[i]=-1; else live++; }
   pts.visible=live>0; if(live){ pg.attributes.position.needsUpdate=true; pg.attributes.aL.needsUpdate=true; pg.attributes.aS.needsUpdate=true; } }
 return {update,clear,stats:()=>all.map(r=>({n:r.pts.length,vis:r.m.visible,a0:r.al[0],p0:[r.pos[0],r.pos[1],r.pos[2]]}))};
 }
