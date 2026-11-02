@@ -1,4 +1,4 @@
-/*APPV:20261102192205*/
+/*APPV:20261102201139*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -6765,7 +6765,7 @@ const TANKS=[{n:'小水族箱',cap:6,maxL:.6,price:0},{n:'大型水族箱',cap:1
 // 海水缸也能升級（原本只有一種，沒辦法變大）：越大能養越多、越大的海魚
 const SEA_TANKS=[{n:'海水缸',cap:6,maxL:.8,price:25000},{n:'大型海水缸',cap:12,maxL:1.2,price:60000},{n:'珊瑚礁展示缸',cap:20,maxL:1.8,price:150000},{n:'海洋館',cap:30,maxL:2.4,price:300000}];
 const SEA_TANK=SEA_TANKS[0], seaT=()=>SEA_TANKS[Math.min(SEA_TANKS.length-1,H().seaTier||0)];
-const CHILLER={n:'冷水機',price:12000,lv:10}, MOUNT_MAX=8;
+const CHILLER={n:'冷水機',price:12000,lv:10}, MOUNT_MAX=30;   /* 標本依真實長度掛在前牆與天花板，數量依空間決定 */
 function H(){ const h=S.home=S.home||{}; h.fresh=h.fresh||[]; h.sea=h.sea||[]; h.mounts=h.mounts||[]; h.tier=h.tier||0; return h; }
 // 小屋在完成主線第一章後開放（開場就說老漁人留下了小屋）
 const unlocked=()=>!!(window.__ASSIST&&window.__ASSIST.active())||!!(S.story&&S.story.done&&S.story.done.includes('c1'));
@@ -7297,8 +7297,10 @@ function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.s
       o.rotation.y=f.yaw; const b=bounds(tk,rec.L);o.position.set(0,(b.y0+b.y1)/2,tk.spec.d*.2);
       if(W.qualityTextures)W.qualityTextures(o);tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.motion.add(f);pickTarget(f,tk);tk.fish.push(f);tk.motion.pack();
       }catch(err){if(created){for(let i=tk.motion.bodies.length-1;i>=0;i--)if(tk.motion.bodies[i].o===created)tk.motion.bodies.splice(i,1);disposeAquariumResident(created,tk.optics);}tk.pending.push(rec);if(tk.lastError!==String(err)){tk.lastError=String(err);console.error('tank fish',rec&&rec.id,err);}}},'aquarium resident '+rec.id);}); } }
-// 標本牆：右牆、壁爐後方，兩排各四個；大魚統一縮到木板放得下的長度
-const MSLOT=[]; for(const y of [1.8,2.45]) for(const z of [-3.95,-3.25,-2.55,-1.85]) MSLOT.push({y,z});   // 先掛視線高度那一排
+// 標本：依真實長度展示（做標本就是要看牠真正有多大）
+// · 1 公尺以下：掛在前牆右半邊的木板上，木板依魚長裁切，兩排依長度由大到小排
+// · 超過 1 公尺：像真正的釣魚小屋一樣，用細繩從天花板吊起來，沿著房間寬度（8.8 公尺）的五條吊掛線排
+const MW={z0:-4.25,z1:-.5,rows:[2.42,1.72]}, CEIL_Z=[-3.35,-2.45,-.7,.3,1.3], CEIL_X=[-4.05,4.05], WALL_MAX_L=1.0;
 const mountG=new T.Group(); mountG.rotation.y=-Math.PI/2;mountG.position.z=ROOM.zf-ROOM.x;scene.add(mountG); let mountSig='';
 const plaqueM=new T.MeshStandardMaterial({color:0x3a2416,roughness:.6}), plaqueEdge=new T.MeshStandardMaterial({color:0x8a6a3a,roughness:.4,metalness:.3});
 function nameTex(t1,t2){ const cv=document.createElement('canvas'); cv.width=256; cv.height=64; const g=cv.getContext('2d');
@@ -7306,13 +7308,34 @@ function nameTex(t1,t2){ const cv=document.createElement('canvas'); cv.width=256
   const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; return tx; }
 function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.isReal(r.id)?'r':'')).join('|'); if(sig===mountSig) return; mountSig=sig;
   while(mountG.children.length) mountG.remove(mountG.children[0]);
-  list.slice(0,MSLOT.length).forEach((rec,i)=>{ try{ const sl=MSLOT[i], sp=c.species(rec.id); if(!sp) return; c.want(rec.id);
-    const b=new T.Mesh(new T.BoxGeometry(.04,.48,.62),plaqueM); b.position.set(ROOM.x-.03,sl.y,sl.z); mountG.add(b);
-    const e=new T.Mesh(new T.BoxGeometry(.02,.52,.66),plaqueEdge); e.position.set(ROOM.x-.015,sl.y,sl.z); mountG.add(e);
-    const f=fishObj(rec); if(f){ f.scale.setScalar(.56); f.rotation.set(0,-Math.PI/2,0); f.position.set(ROOM.x-.13,sl.y+.04,sl.z); f.userData.rec=rec; mountG.add(f); }
-    const np=new T.Mesh(new T.PlaneGeometry(.36,.09),new T.MeshBasicMaterial({map:nameTex(sp.name,(rec.w<1?Math.round(rec.w*1000)+' g':rec.w.toFixed(1)+' kg')+'・'+new Date(rec.d).toLocaleDateString('zh-TW'))}));
-    np.position.set(ROOM.x-.055,sl.y-.2,sl.z); np.rotation.y=-Math.PI/2; mountG.add(np);
-    }catch(err){ console.error('mount',rec&&rec.id,err); } }); }   // 單一個標本出錯就跳過，不影響其他東西
+  const label=(rec,sp)=>new T.MeshBasicMaterial({map:nameTex(sp.name,(rec.w<1?Math.round(rec.w*1000)+' g':rec.w.toFixed(1)+' kg')+'・'+Math.round(rec.L*100)+' cm')});
+  const recs=list.map(rec=>({rec,sp:c.species(rec.id)})).filter(o=>o.sp).sort((a,b)=>b.rec.L-a.rec.L);
+  const small=recs.filter(o=>o.rec.L<=WALL_MAX_L), big=recs.filter(o=>o.rec.L>WALL_MAX_L);
+  // 前牆木板：依長度排進兩排
+  const cur=MW.rows.map(()=>MW.z1); let overflow=0;
+  small.forEach(({rec,sp})=>{ try{ const L=rec.L, bw=Math.max(.42,L+.16), bh=Math.max(.36,Math.min(.62,L*.42+.2)); let r=cur.findIndex(z=>z-bw>=MW.z0); if(r<0){ overflow++; return; } const zc=cur[r]-bw/2; cur[r]-=bw+.06; const y=MW.rows[r]; c.want(rec.id);
+    const b=new T.Mesh(new T.BoxGeometry(.04,bh,bw),plaqueM); b.position.set(ROOM.x-.03,y,zc); mountG.add(b);
+    const e=new T.Mesh(new T.BoxGeometry(.02,bh+.04,bw+.04),plaqueEdge); e.position.set(ROOM.x-.015,y,zc); mountG.add(e);
+    const f=fishObj(rec); if(f){ f.scale.setScalar(L); f.rotation.set(0,-Math.PI/2,0); f.position.set(ROOM.x-.06-Math.min(.12,L*.12),y+.03,zc); f.userData.rec=rec; mountG.add(f); }
+    const np=new T.Mesh(new T.PlaneGeometry(.34,.085),label(rec,sp)); np.position.set(ROOM.x-.055,y-bh/2+.06,zc); np.rotation.y=-Math.PI/2; mountG.add(np);
+    }catch(err){ console.error('mount',rec&&rec.id,err); } });
+  // 天花板吊掛：真實長度，沿房間寬度排；吊繩接到天花板。座標換到標本群組（它轉了 −90°、往前移）的本地座標
+  const pz=mountG.position.z, toLocal=(x,y,z)=>new T.Vector3(z-pz,y,-x), lanes=CEIL_Z.map(()=>CEIL_X[0]), ropeM=new T.MeshStandardMaterial({color:0x8a7a5a,roughness:.9});
+  const tooBig=[];
+  big.forEach(({rec,sp})=>{ try{ const L=rec.L; let li=lanes.findIndex(x=>x+L<=CEIL_X[1]); if(li<0){ overflow++; return; } const xc=lanes[li]+L/2; lanes[li]+=L+.35; c.want(rec.id);
+    const f=fishObj(rec); if(!f) return; f.scale.setScalar(L); f.rotation.set(0,0,0); f.updateMatrixWorld(true);   /* 先用最後在房間裡的朝向（頭朝 +x）量高度與鰭展，再轉成群組的本地朝向 */
+    const bb=new T.Box3().setFromObject(f); f.rotation.set(0,Math.PI/2,0); const hh=Math.max(.08,(bb.max.y-bb.min.y)/2||L*.12), hd=Math.max(.05,(bb.max.z-bb.min.z)/2), y=ROOM.h-.2-hh;
+    // 吊起來以後最低點要高過視線（1.65 公尺以上），鰭展也不能穿牆；做不到的巨物（大白鯊、旗魚這類）小屋放不下
+    if(y-hh<1.65||CEIL_Z[li]-hd<ROOM.zb+.05||CEIL_Z[li]+hd>ROOM.zf-.05){ lanes[li]-=L+.35; tooBig.push(rec); return; }
+    f.position.copy(toLocal(xc,y,CEIL_Z[li])); f.userData.rec=rec; mountG.add(f);
+    for(const s2 of [-.3,.3]){ const top=ROOM.h-.02, bot=y+hh*.7, rope=new T.Mesh(new T.CylinderGeometry(.006,.006,Math.max(.05,top-bot),5),ropeM); rope.position.copy(toLocal(xc+s2*L,(top+bot)/2,CEIL_Z[li])); mountG.add(rope); }
+    const np=new T.Mesh(new T.PlaneGeometry(.34,.085),label(rec,sp)); np.material.side=T.DoubleSide; np.position.copy(toLocal(xc,y-hh-.1,CEIL_Z[li])); np.rotation.y=Math.PI/2; mountG.add(np);
+    }catch(err){ console.error('mount',rec&&rec.id,err); } });
+  // 放不下的巨物：前牆上釘一張手寫紙條記下來（不讓玩家以為標本不見了）
+  if(tooBig.length){ const cv=document.createElement('canvas'); cv.width=320; cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#e9dcbc'; g.fillRect(0,0,320,256); g.fillStyle='#3a2410'; g.font='bold 26px serif'; g.fillText('小屋放不下的巨物',20,40); g.font='22px serif';
+    tooBig.slice(0,6).forEach((r,k)=>{ const sp=c.species(r.id); g.fillText('・'+(sp?sp.name:r.id)+'　'+Math.round(r.L*100)+' cm',20,84+k*30); }); g.font='18px serif'; g.fillStyle='#6b5030'; g.fillText('天花板太低，掛不下牠們的真實大小',20,244);
+    const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; const note=new T.Mesh(new T.PlaneGeometry(.5,.4),new T.MeshStandardMaterial({map:tx,roughness:.9})); note.position.set(ROOM.x-.02,1.75,-.25); note.rotation.y=-Math.PI/2; mountG.add(note); }
+  mountG.userData.overflow=overflow; mountG.userData.tooBig=tooBig.map(r=>r.id); }   // 單一個標本出錯就跳過，不影響其他東西
 const tv=new T.Vector3();
 // 底棲生物：貝類躺在沙上不動（偶爾微微張殼）、竹蟶半埋直立、螃蟹在缸底橫著走、沙蠶在沙上爬、彈塗魚趴著偶爾一跳——不會像魚一樣在水中游
 const BENTHIC={hardclam:'shell',gomphina:'shell',tellin:'shell',razor:'razor',ghostcrab:'crab',fiddler:'crab',hermit:'crab',ragworm:'worm',mudskip:'skip',lobster:'walk',prawn:'walk'};
@@ -7991,7 +8014,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102192205'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102201139'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
