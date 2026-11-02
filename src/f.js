@@ -222,7 +222,7 @@ function updateWeather(dt){
   wt+=dt; cur.w+=(tg.w-cur.w)*k; windAng+=dt*.012*Math.sin(wt*.05);
   windNow=Math.max(0,cur.w*(1+tg.g*(Math.sin(wt*.37)*.35+Math.sin(wt*1.13+1.7)*.25+Math.sin(wt*2.9+.4)*.12)));
   W.setWind(Math.cos(windAng),Math.sin(windAng),clamp(windNow*(W.isSea&&W.isSea()?1.6:1)/12,0,1));   // 海上沒有遮蔽，風比湖上大
-  W.setWeather(cur.c,cur.r,cur.f); Snd.rain(cur.r);
+  (window.__wxOverride?W.setWeather(window.__wxOverride.c,window.__wxOverride.r,window.__wxOverride.f):W.setWeather(cur.c,cur.r,cur.f)); Snd.rain(cur.r);
   if(wxType==='storm'&&cur.r>.7){ thT-=dt; if(thT<=0){ thT=rand(25,60); flash=1; setTimeout(()=>Snd.thunder(),rand(300,1600)); } }
   if(flash>0){ W.renderer.toneMappingExposure*=1+flash*(Math.random()<.5?2.2:1.2); flash=Math.max(0,flash-dt*4); }
   const ic=((W.info.day<.2&&cur.c<.4)?(window.__MOONPH?window.__MOONPH.emo():'🌙'):wxEmo(wxType))+' '+Math.round(windNow*(W.isSea&&W.isSea()?1.6:1))+'m/s'; if(ic!==lastIcon){ lastIcon=ic; const el=wxIcon('wxI'); if(el) el.textContent=ic; }

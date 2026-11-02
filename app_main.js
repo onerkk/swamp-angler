@@ -1,4 +1,4 @@
-/*APPV:20261102133453*/
+/*APPV:20261102141746*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -3798,7 +3798,7 @@ function updateWeather(dt){
   wt+=dt; cur.w+=(tg.w-cur.w)*k; windAng+=dt*.012*Math.sin(wt*.05);
   windNow=Math.max(0,cur.w*(1+tg.g*(Math.sin(wt*.37)*.35+Math.sin(wt*1.13+1.7)*.25+Math.sin(wt*2.9+.4)*.12)));
   W.setWind(Math.cos(windAng),Math.sin(windAng),clamp(windNow*(W.isSea&&W.isSea()?1.6:1)/12,0,1));   // 海上沒有遮蔽，風比湖上大
-  W.setWeather(cur.c,cur.r,cur.f); Snd.rain(cur.r);
+  (window.__wxOverride?W.setWeather(window.__wxOverride.c,window.__wxOverride.r,window.__wxOverride.f):W.setWeather(cur.c,cur.r,cur.f)); Snd.rain(cur.r);
   if(wxType==='storm'&&cur.r>.7){ thT-=dt; if(thT<=0){ thT=rand(25,60); flash=1; setTimeout(()=>Snd.thunder(),rand(300,1600)); } }
   if(flash>0){ W.renderer.toneMappingExposure*=1+flash*(Math.random()<.5?2.2:1.2); flash=Math.max(0,flash-dt*4); }
   const ic=((W.info.day<.2&&cur.c<.4)?(window.__MOONPH?window.__MOONPH.emo():'🌙'):wxEmo(wxType))+' '+Math.round(windNow*(W.isSea&&W.isSea()?1.6:1))+'m/s'; if(ic!==lastIcon){ lastIcon=ic; const el=wxIcon('wxI'); if(el) el.textContent=ic; }
@@ -5444,7 +5444,7 @@ const SYN=29.530588853, NEW0=Date.UTC(2000,0,6,18,14);
 let phaseFix=null;
 const phase=()=>phaseFix!=null?phaseFix:((((Date.now()-NEW0)/864e5)/SYN)%1+1)%1, illum=()=>(1-Math.cos(2*Math.PI*phase()))/2;
 const PH_EMO=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'], phEmo=()=>PH_EMO[Math.round(phase()*8)%8];
-window.__MOONPH={phase,illum,emo:phEmo,fix:v=>{ phaseFix=v; },dir:(h,out)=>moonDir(h,out)};
+window.__MOONPH={phase,illum,emo:phEmo,dir:(h,out)=>moonDir(h,out),fix:v=>{ phaseFix=v; },dir:(h,out)=>moonDir(h,out)};
 const uL={value:new T.Vector3(0,0,1)};
 moon.material.onBeforeCompile=sh=>{ sh.uniforms.uL=uL;
   sh.vertexShader='varying vec3 vNw;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvNw=normalize(mat3(modelMatrix)*normal);');
@@ -6230,11 +6230,10 @@ dot();
 function freePage(t,h){ box.innerHTML=`<div class="pn"><button class="x" data-s="close">✕</button><h3>📖 ${t}</h3><div class="page">${h}</div></div>`; box.classList.remove('hidden'); }
 return {progOf:id=>{ const ch=byId(id); return ch?prog(ch).slice():null; },isActive:id=>active().some(ch=>ch.id===id),page:freePage,intro:showIntro,needs,boost,onMeet,wants:id=>active().some(ch=>ch.tasks.some((t,i)=>t.t==='item'&&t.id===id&&prog(ch)[i]<t.n)),showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
 }
-/* 終幕「霜汐的邀請」完成後的回禮：月光灣滿月的夜景動畫（月亮升起、水面月光、遠處霜汐的尾巴在月光下揮一下）
-   → 玩家按下「跟著霜汐潛入水中」→ 畫面沉入水裡（水面往上退、光束、氣泡）→ 接上真人美人魚的影片 → 回禮卡。
+/* 終幕「霜汐的邀請」完成後的回禮：先在真實的月光灣 3D 場景演出（z.js 結局系統，霜汐浮出水面、說話、鴨式潛水）
+   → 黑畫面上玩家按下「跟著霜汐潛入水中」→ 接上真人美人魚的影片 → 回禮卡。
    影片是玩家提供的真人美人魚表演，轉成 720p H.264（media/mermaid_reward.mp4，約 7MB），要看的時候才下載。 */
 (function(){
- const LINES=['滿月的夜晚，月光灣的水面亮了起來。','遠處的水面，輕輕動了一下。','一條粉色的尾巴在月光下揮了一下，又沉了下去。','「你替我們守住了這片湖。」','「跟我來——讓你看看我在水裡的樣子。」'];
  const css=`#mrBox{position:fixed;inset:0;z-index:320;background:#000;color:#f2ecdf;font-family:inherit;overflow:hidden;opacity:0;transition:opacity 1.2s}
 #mrBox.on{opacity:1}#mrBox canvas{position:absolute;inset:0;width:100%;height:100%}
 #mrLine{position:absolute;left:8%;right:8%;bottom:22%;text-align:center;font-size:20px;line-height:1.7;letter-spacing:.06em;text-shadow:0 2px 12px #000;opacity:0;transition:opacity 1.1s}
@@ -6247,7 +6246,7 @@ return {progOf:id=>{ const ch=byId(id); return ch?prog(ch).slice():null; },isAct
 #mrCard button{position:static!important;transform:none!important;margin-top:10px}`;
  let st=null;
  function el(tag,attrs,parent){ const e=document.createElement(tag); Object.assign(e,attrs||{}); if(parent) parent.appendChild(e); return e; }
- function close(){ if(!st) return; const s=st; st=null; cancelAnimationFrame(s.raf); try{ s.vid&&s.vid.pause(); }catch(_){} try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(_){}
+ function close(){ if(!st) return; const s=st; st=null; try{ s.vid&&s.vid.pause(); }catch(_){} try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(_){}
   s.box.classList.remove('on'); setTimeout(()=>{ s.box.remove(); if(s.after) s.after(); },900); }
  function card(){ const s=st; if(!s||s.carded) return; s.carded=true; const ch=s.ch, c=el('div',{id:'mrCard'},s.box);
   c.innerHTML=`<h2>🧜‍♀️ 霜汐的回禮</h2><p>她游得那麼自在，像整片海都是她的。<br>游到水面前，她停下來，對你揮了揮手。</p>`+(s.replay?'':`<p>🏆 獲得稱號「${ch.title||'海之友'}」<br><small>經驗 ${(ch.xp||0).toLocaleString()}・金幣 ${(ch.coins||0).toLocaleString()}</small></p>`)+`<p><small style="opacity:.7">想再看一次：📖 手記 →「終幕」→ 閱讀</small></p><button>回到遊戲</button>`;
@@ -6262,49 +6261,23 @@ return {progOf:id=>{ const ch=byId(id); return ch?prog(ch).slice():null; },isAct
   requestAnimationFrame(()=>v.style.opacity=1);
   const p=v.play(); if(p&&p.catch) p.catch(()=>{ v.muted=true; v.play().catch(()=>{}); });
   try{ const r=s.box.requestFullscreen&&s.box.requestFullscreen(); if(r&&r.then) r.then(()=>{ try{ screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{}); }catch(_){} }).catch(()=>{}); }catch(_){} }
- // 夜景與潛水的畫布動畫
- function draw(now){ const s=st; if(!s) return; s.raf=requestAnimationFrame(draw); const t=(now-s.t0)/1000, cv=s.cv, x=s.ctx, W=cv.width, H=cv.height, m=Math.min(W,H);
-  const dive=s.phase==='dive'?Math.min(1,(now-s.diveAt)/2400):s.phase==='video'?1:0;
-  // 天空與星星
-  const y0=H*(.56-dive*.72);
-  let g=x.createLinearGradient(0,0,0,Math.max(1,y0)); g.addColorStop(0,'#03060f'); g.addColorStop(1,'#16274a'); x.fillStyle=g; x.fillRect(0,0,W,Math.max(0,y0));
-  for(const sp of s.stars){ const a=.35+.65*Math.abs(Math.sin(t*sp.f+sp.p)); x.fillStyle=`rgba(255,248,230,${a*sp.b})`; x.fillRect(sp.x*W,sp.y*y0,1.6,1.6); }
-  // 月亮：慢慢升起，帶光暈
-  const mr=m*.065, mx=W*.68, my=H*(.44-.22*Math.min(1,t/7))-dive*H*.7;
-  let gl=x.createRadialGradient(mx,my,mr*.6,mx,my,mr*5); gl.addColorStop(0,'rgba(255,240,205,.45)'); gl.addColorStop(1,'rgba(255,240,205,0)'); x.fillStyle=gl; x.fillRect(mx-mr*5,my-mr*5,mr*10,mr*10);
-  x.fillStyle='#fdf3d8'; x.beginPath(); x.arc(mx,my,mr,0,6.283); x.fill();
-  // 水面
-  g=x.createLinearGradient(0,y0,0,H); g.addColorStop(0,dive>0?'#123a66':'#0c1d36'); g.addColorStop(1,dive>0?'#061a36':'#02060f'); x.fillStyle=g; x.fillRect(0,y0,W,H-y0);
-  // 月光倒影：越近越寬、碎成一條條晃動的亮紋
-  if(dive<.6){ x.globalCompositeOperation='lighter'; for(let i=0;i<110;i++){ const k=i/110, yy=y0+(H-y0)*Math.pow(k,1.7), wd=(3+k*k*W*.16)*(.3+.7*Math.abs(Math.sin(i*7.3+t*1.7))), off=Math.sin(i*3.1+t*1.3)*k*W*.05+Math.sin(i*11.7)*k*W*.03;
-    x.fillStyle=`rgba(255,214,150,${Math.max(0,(.42-k*.22)*(.35+.65*Math.sin(i*5.7+t*2.3)))*(1-dive*1.6)})`; x.fillRect(mx-wd/2+off,yy,wd,1+k*2); } x.globalCompositeOperation='source-over'; }
-  // 遠處的霜汐：水紋一圈圈擴散，尾巴在月光下揮一下
-  const tt=t-6.6; if(tt>0&&tt<6&&dive===0){ const cx=W*.32, cy=y0+(H-y0)*.18;
-   for(let r=0;r<3;r++){ const rr=(tt-r*.6)*m*.05; if(rr<=0) continue; x.strokeStyle=`rgba(220,230,255,${Math.max(0,.5-rr/(m*.25))})`; x.lineWidth=1.4; x.beginPath(); x.ellipse(cx,cy,rr,rr*.22,0,0,6.283); x.stroke(); }
-   if(tt<1.8){ const up=Math.sin(Math.min(1,tt/1.8)*Math.PI), h=m*.09*up, sw=Math.sin(tt*4)*.25;
-    x.save(); x.translate(cx,cy); x.rotate(sw); x.fillStyle='rgba(240,150,190,.9)'; x.beginPath(); x.moveTo(-m*.008,0); x.quadraticCurveTo(-m*.012,-h*.6,-m*.035,-h); x.quadraticCurveTo(0,-h*.82,m*.035,-h); x.quadraticCurveTo(m*.012,-h*.6,m*.008,0); x.closePath(); x.fill();
-    x.strokeStyle='rgba(255,235,245,.8)'; x.lineWidth=1; x.stroke(); x.restore(); } }
-  // 潛入水中：光束與氣泡
-  if(dive>0){ for(let i=0;i<6;i++){ const bx=W*(.15+i*.15)+Math.sin(t*.4+i)*W*.03; x.fillStyle=`rgba(160,210,255,${.06*dive})`; x.beginPath(); x.moveTo(bx-W*.03,Math.max(0,y0)); x.lineTo(bx+W*.03,Math.max(0,y0)); x.lineTo(bx+W*.12,H); x.lineTo(bx-W*.06,H); x.fill(); }
-   for(const b of s.bub){ b.y-=b.v*(1/60); if(b.y<-.05){ b.y=1.05; b.x=Math.random(); } x.strokeStyle='rgba(220,240,255,.55)'; x.lineWidth=1; x.beginPath(); x.arc(b.x*W+Math.sin(t*2+b.p)*6,b.y*H,b.r*m,0,6.283); x.stroke(); }
-   if(s.phase==='dive'&&dive>=1) playVideo(); }
-  // 旁白
-  if(s.phase==='night'){ const i=Math.floor((t-.8)/3); if(i>=0&&i<LINES.length&&i!==s.li){ s.li=i; s.line.style.opacity=0; setTimeout(()=>{ if(!st) return; s.line.textContent=LINES[i]; s.line.style.opacity=1; },500); }
-   if(t>.8+LINES.length*3&&s.go.style.opacity!=='1'){ s.go.style.opacity=1; } } }
+ // 3D 演出結束後：黑畫面上一個按鈕。由玩家按下（手勢）再播放影片，手機才允許帶聲音
+ function stage(){ const s=st; if(!s) return; s.phase='ready';
+  s.line.textContent='她潛進了月光底下的水裡。'; requestAnimationFrame(()=>{ s.box.classList.add('on'); s.line.style.opacity=1; s.go.style.opacity=1; }); }
  window.__mermaidReward=function(ch,after,replay){ if(st) return;
   if(!document.getElementById('mrCss')){ const sc=el('style',{id:'mrCss',textContent:css}); document.head.appendChild(sc); }
-  const box=el('div',{id:'mrBox'},document.body), cv=el('canvas',{},box), line=el('div',{id:'mrLine'},box), go=el('button',{id:'mrGo',textContent:'▶ 跟著霜汐潛入水中'},box), skip=el('button',{id:'mrSkip',textContent:'跳過'},box);
-  const fit=()=>{ const d=Math.min(2,window.devicePixelRatio||1); cv.width=Math.round(innerWidth*d); cv.height=Math.round(innerHeight*d); }; fit(); addEventListener('resize',fit);
-  st={ch,after,replay,box,cv,ctx:cv.getContext('2d'),line,go,phase:'night',li:-1,t0:performance.now(),
-   stars:Array.from({length:140},()=>({x:Math.random(),y:Math.random()*.95,b:.4+Math.random()*.6,f:.5+Math.random()*2,p:Math.random()*6})),
-   bub:Array.from({length:46},()=>({x:Math.random(),y:Math.random()*1.1,r:.003+Math.random()*.01,v:.12+Math.random()*.3,p:Math.random()*6}))};
-  // 按鈕是玩家的手勢，之後播放影片才能帶聲音
-  go.onclick=()=>{ if(!st||st.phase!=='night') return; st.phase='dive'; st.diveAt=performance.now(); go.style.opacity=0; line.style.opacity=0; const pre=document.createElement('link'); pre.rel='preload'; pre.as='video'; pre.href=document.createElement('video').canPlayType('video/mp4; codecs="avc1.640028"')?'media/mermaid_reward.mp4':'media/mermaid_reward.webm'; document.head.appendChild(pre); };
-  skip.onclick=()=>{ if(!st) return; if(st.phase==='video'){ try{ st.vid.pause(); }catch(_){} st.vid.style.opacity=0; card(); } else if(st.phase==='night'){ go.onclick(); } else { st.diveAt=-1e9; } };
-  requestAnimationFrame(()=>box.classList.add('on')); st.raf=requestAnimationFrame(draw);
+  const box=el('div',{id:'mrBox'},document.body), line=el('div',{id:'mrLine'},box), go=el('button',{id:'mrGo',textContent:'▶ 跟著霜汐潛入水中'},box), skip=el('button',{id:'mrSkip',textContent:'跳過'},box);
+  box.style.pointerEvents='none'; box.style.background='transparent';
+  st={ch,after,replay,box,line,go,phase:'film'};
+  go.onclick=()=>{ if(!st||st.phase!=='ready') return; go.style.opacity=0; line.style.opacity=0; playVideo(); };
+  skip.onclick=()=>{ if(!st) return; if(st.phase==='video'){ try{ st.vid.pause(); }catch(_){} st.vid.style.opacity=0; card(); } else if(st.phase==='ready') go.onclick(); };
+  const show=()=>{ if(!st) return; box.style.pointerEvents=''; box.style.background='#000'; stage(); };
+  // 真實場景的演出（結局系統）；萬一不能演（例如還在載入），直接進影片前的畫面
+  if(window.__playMermaidInvite){ try{ window.__playMermaidInvite(show); return; }catch(e){ console.warn('mermaid invite',e); } }
+  show();
  };
  // 預覽網址：?mermaid=1 直接播終幕回禮（只播放、不發獎勵、不改存檔）
- if(typeof location!=='undefined'&&/[?&]mermaid=1(&|$)/.test(location.search)) setTimeout(()=>window.__mermaidReward({title:'海之友',xp:20000,coins:12000},null,false),2500);
+ if(typeof location!=='undefined'&&/[?&]mermaid=1(&|$)/.test(location.search)){ const wait=()=>{ if(window.__REALDONE&&window.__playMermaidInvite) setTimeout(()=>window.__mermaidReward({title:'海之友',xp:20000,coins:12000},null,false),800); else setTimeout(wait,500); }; setTimeout(wait,1500); }
 })();
 /* ===== 老漁人的小屋：水族箱與標本牆（資料與規則） ===== */
 function createHome(c){
@@ -7532,7 +7505,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102133453'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102141746'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -7862,6 +7835,63 @@ function endingShots(E,c){
     const L=Math.max(sz.x,sz.z); o.scale.setScalar(2.8/L); if(sz.x>sz.z) o.rotation.y=Math.PI/2; const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y-.12,-c2.z); boat.add(o); });
   const title=document.createElement('div'); title.style.cssText='position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:41;pointer-events:none;color:#f2ecdf;font-family:serif;opacity:0;transition:opacity 1.6s ease';
   title.innerHTML='<div style="font-size:13px;letter-spacing:.6em;opacity:.7">終章之後</div><div style="font-size:34px;letter-spacing:.5em;margin-top:14px;color:#ffe3a3">月潮</div>';
+  // 後日談終幕〈霜汐的邀請〉：同一套真實場景與角色，月光灣滿月夜，霜汐浮出水面說話，轉身鴨式潛水、魚尾翻出水面拍下，鏡頭跟著貼近水面後轉黑，接玩家的真人美人魚影片
+  if(c.mode==='mermaid'){
+    const ttl=document.createElement('div'); ttl.style.cssText=title.style.cssText;
+    ttl.innerHTML='<div style="font-size:13px;letter-spacing:.6em;opacity:.7">後日談・終幕</div><div style="font-size:30px;letter-spacing:.45em;margin-top:14px;color:#f6d9e4">霜汐的邀請</div>';
+    const smooth=x=>{ x=Math.min(1,Math.max(0,x)); return x*x*(3-2*x); };
+    // 構圖：月亮在霜汐正後方——鏡頭、霜汐、月亮排成一直線，月光在水面鋪成一條路通到她身邊
+    const HOUR=22.4, A=BAY.clone(), F=new T.Vector3(0,0,-1), R=new T.Vector3(1,0,0);
+    const P3=(a,b,h)=>[A.x+F.x*a+R.x*b, h, A.z+F.z*a+R.z*b];
+    const faceCam=()=>Math.atan2(-F.x,-F.z);
+    const shots=[
+      {d:5,hour:HOUR,sea:false,music:'theme',vol:.6,from:[[0,0,0],[0,0,0]],to:[[0,0,0],[0,0,0]],
+        enter:()=>{ window.__wxOverride={c:.06,r:0,f:.04}; if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(.5); // 用遊戲算月亮位置的同一個函式，依這一幕的時間算出月亮方向（不能用上一幀的值，那時時間還沒切到深夜）
+          if(window.__MOONPH&&window.__MOONPH.dir) window.__MOONPH.dir(HOUR,md); else md.copy(W.U.uMoonDir.value); F.set(md.x,0,md.z); if(F.lengthSq()<1e-6) F.set(0,0,-1); F.normalize(); R.set(-F.z,0,F.x);
+          // 依月亮方向把後面每一鏡的機位算出來
+          shots[1].from=[P3(-15,1.6,1.7),P3(40,1.2,14)]; shots[1].to=[P3(-12,1.0,1.5),P3(30,.6,6.5)];
+          shots[2].from=[P3(-6.2,.9,1.3),P3(0,0,.1)]; shots[2].to=[P3(-5,.7,1.2),P3(0,0,.45)];
+          shots[3].from=[P3(-2.4,.4,.95),P3(0,0,.6)]; shots[3].to=[P3(-2.05,.32,.92),P3(0,0,.62)];
+          shots[4].from=[P3(-5.2,1.1,1.4),P3(0,0,.3)]; shots[4].to=[P3(-3.2,.6,.38),P3(2.2,0,.05)];
+          shots[0].from=shots[0].to=[P3(-15,1.6,1.7),P3(40,1.2,14)];
+          E.layer().appendChild(ttl); E.fade(1); setTimeout(()=>ttl.style.opacity=1,300); sc.wait=0; },
+        tick:(t)=>{ E.fade(1); if(t>3.6&&pending>0&&sc.wait<8){ sc.wait+=1/60; return 'hold'; } if(t>3.6) ttl.style.opacity=0; },
+        exit:()=>ttl.remove(), cleanup:()=>{ ttl.remove(); window.__wxOverride=null; if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(null); merG.children.forEach(o=>o.visible=true); merW.traverse(m=>{ if(m.isMesh&&m.userData.emi0!=null){ m.material.emissiveIntensity=m.userData.emi0; delete m.userData.emi0; } }); }},
+      // 一：滿月在灣上，鏡頭從月亮慢慢往下帶到水面；月光鋪成一條碎銀路；遠處水面輕輕一動
+      {d:10.5,hour:HOUR,sea:false,from:null,to:null,
+        enter:()=>{ keep(merG); merG.children.forEach(o=>{ if(o!==merW) o.visible=false; });
+          // 原本的結局裡她半身坐在岩石邊、自身微微發光；這裡她泡在水中，水面下的魚尾不能自己發亮，否則看起來像浮在水上
+          merW.traverse(m=>{ if(m.isMesh&&m.material&&m.material.emissiveIntensity!=null){ if(m.userData.emi0==null) m.userData.emi0=m.material.emissiveIntensity; m.material.emissiveIntensity=.05; } }); merG.position.copy(A); merW.rotation.set(0,faceCam(),0); merW.position.set(0,-3,0); merG.visible=false; merL.intensity=0; sc.rp=0; },
+        tick:(t,k,P,L)=>{ const up=1-smooth((t-2.5)/6); L.set(P.x+md.x*100,P.y+Math.max(4,md.y*100)*up+(1-up)*-1.5,P.z+md.z*100); if(t>6.6&&t<10){ sc.rp-=1/60; if(sc.rp<=0){ sc.rp=.55; W.addRipple(A.x+(Math.random()-.5)*.6,A.z+(Math.random()-.5)*.6,.35); } } },
+        subs:[[1.4,'滿月的夜晚，月光灣的水面亮了起來。','',4.8],[6.7,'遠處的水面，輕輕動了一下。','',3.2]]},
+      // 二：霜汐從月光裡浮上來，看著你
+      {d:10,hour:HOUR,sea:false,from:null,to:null,
+        enter:()=>{ merG.visible=true; merW.rotation.set(0,faceCam(),0); merW.position.set(0,-2.6,0); merL.intensity=0; RP.mer.tail=.15; RP.mer.headYaw=0; sc.s1=0; sc.s2=0; },
+        tick:(t)=>{ const r=smooth(t/3.2); merW.position.y=-2.6+1.93*r+Math.sin(t*.9)*.015*r; merW.rotation.x=(1-r)*.35; merL.intensity=.9*smooth((t-2.2)/1.6);
+          if(t>.25&&!sc.s1){ sc.s1=1; spl(A.x,A.z,26,.9); W.addRipple(A.x,A.z,.7); } if(t>2.2&&!sc.s2){ sc.s2=1; spl(A.x+.3,A.z+.2,10,.5); W.addRipple(A.x,A.z,.45); }
+          RP.mer.headYaw=Math.sin(t*.5)*.08; },
+        subs:[[4.0,'霜汐：「你替我們守住了這片湖。」','q',4.6]]},
+      // 三：近景，她邀請你
+      {d:8.5,hour:HOUR,sea:false,from:null,to:null,
+        enter:()=>{ merW.rotation.set(0,faceCam(),0); merW.position.set(0,-.67,0); merL.intensity=1.0; RP.mer.tail=.18; },
+        tick:(t)=>{ merW.position.y=-.67+Math.sin(t*.9)*.015; RP.mer.headYaw=Math.sin(t*.4)*.06; RP.mer.headPitch=-.04; },
+        subs:[[1.0,'霜汐：「跟我來——','q',3],[4.2,'讓你看看我在水裡的樣子。」','q',3.8]]},
+      // 四：轉身朝月亮、鴨式潛水，魚尾翻出水面拍下，鏡頭貼近水面後轉黑
+      {d:6.8,hour:HOUR,sea:false,fadeOut:false,from:null,to:null,
+        enter:()=>{ merW.rotation.order='YXZ'; merW.rotation.set(0,faceCam(),0); merW.position.set(0,-.67,0); sc.d1=0; sc.d2=0; sc.d3=0; },
+        tick:(t)=>{ const turn=smooth(t/1.1), pitch=smooth((t-1.0)/1.5), go=Math.max(0,t-1.1);
+          merW.rotation.y=faceCam()+Math.PI*turn; merW.rotation.x=2.5*pitch;
+          merW.position.set(F.x*go*.75,-.67+.45*smooth((t-.9)/.6)-Math.max(0,t-1.6)*.9,F.z*go*.75);
+          RP.mer.tail=t>1.2?.55:.2; RP.mer.headPitch=0; RP.mer.headYaw=0;
+          const wp=merW.getWorldPosition(new T.Vector3());
+          if(t>1.35&&!sc.d1){ sc.d1=1; spl(wp.x,wp.z,30,1.1); W.addRipple(wp.x,wp.z,.8); }
+          if(t>2.55&&!sc.d2){ sc.d2=1; spl(wp.x+F.x*.6,wp.z+F.z*.6,46,1.5); W.addRipple(wp.x+F.x*.6,wp.z+F.z*.6,1.1); c.Snd&&c.Snd.splash&&c.Snd.splash(1.2); }
+          if(t>3.4&&!sc.d3){ sc.d3=1; W.addRipple(wp.x+F.x*.9,wp.z+F.z*.9,.6); }
+          if(t>4.8) E.fade(Math.min(1,(t-4.8)/1.4)); },
+        exit:()=>{ merW.rotation.order='XYZ'; merW.rotation.set(0,merFace(),0); merW.position.set(0,0,0); merG.position.copy(BAY); merG.visible=true; }}
+    ];
+    return shots;
+  }
   return [
     // 開場：黑底片名〈月潮〉；同時等模型載完（最多 12 秒），避免主角還沒出現就開演
     {d:6,hour:20.4,sea:true,music:'piano',vol:.7,fadeOut:true,from:[[3.2,1.5,-3.5],[0,3.2,-28]],to:[[3.2,1.5,-3.5],[0,3.2,-28]],
@@ -9591,6 +9621,8 @@ const SCH=createSchools(W,P,{loc:()=>G.loc||'lake',period:()=>period(G.hour),ok:
 // 結局之後的湖：碼頭盡頭的紀念與滿月夜的月潮
 const AFTER=createEndingWorld(W,{done:()=>!!(save.story&&save.story.ending),lake:()=>(G.loc||'lake')==='lake'&&G.state!=='home',ending:()=>END.on(),hour:()=>G.hour});
 window.__playEnding=done=>{ if(G.state==='home'){ leaveHome(()=>window.__playEnding(done)); return; } END.play(endingShots(END,{save,W,P,G}),done); };
+// 後日談終幕〈霜汐的邀請〉：同一套結局演出系統，在真實的月光灣演出後接真人美人魚影片
+window.__playMermaidInvite=done=>{ if(G.state==='home'){ leaveHome(()=>window.__playMermaidInvite(done)); return; } END.play(endingShots(END,{save,W,P,G,Snd,mode:'mermaid'}),done); };
 // 靜月之光：作者的水晶小店（遊戲免費，喜歡的話可以支持作者）
 const SHOP_URL=SHOP_BRAND.url;
 let shopReturnFocus=null;
@@ -10169,7 +10201,7 @@ function frame(now){
   if(graphicsRecovery.paused()||document.hidden||screenCapture.paused()){frameLimiter.reset(now);requestAnimationFrame(frame);return;}const dt=Math.min(.05,frameSeconds);window.__frameSeconds=frameSeconds;
   // Resolution changes clear the drawing buffer: apply them BEFORE drawing this frame.
   gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?HOME3D.qualityScope():UW.active()?'underwater':G.loc||'lake'});
-  if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { if(window.__GEOLOD) window.__GEOLOD.update(W.scene,W.camera,dt,window.__effectTier); W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
+  if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.rodGroup.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { if(window.__GEOLOD) window.__GEOLOD.update(W.scene,W.camera,dt,window.__effectTier); W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
   if(HOME3D.active()){if(!homeWarmAt)homeWarmAt=now;if(homeWarmAt>0&&now-homeWarmAt>5000){homeWarmAt=-1;if(window.__DIAG)window.__DIAG.action('home','done','5 seconds rendered');}}else homeWarmAt=0;if(window.__DIAG)window.__DIAG.stage('render');screenCapture.afterFrame();fpsDisplay.frame(frameSeconds);if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
 
   requestAnimationFrame(frame);

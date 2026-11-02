@@ -305,6 +305,63 @@ function endingShots(E,c){
     const L=Math.max(sz.x,sz.z); o.scale.setScalar(2.8/L); if(sz.x>sz.z) o.rotation.y=Math.PI/2; const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y-.12,-c2.z); boat.add(o); });
   const title=document.createElement('div'); title.style.cssText='position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:41;pointer-events:none;color:#f2ecdf;font-family:serif;opacity:0;transition:opacity 1.6s ease';
   title.innerHTML='<div style="font-size:13px;letter-spacing:.6em;opacity:.7">終章之後</div><div style="font-size:34px;letter-spacing:.5em;margin-top:14px;color:#ffe3a3">月潮</div>';
+  // 後日談終幕〈霜汐的邀請〉：同一套真實場景與角色，月光灣滿月夜，霜汐浮出水面說話，轉身鴨式潛水、魚尾翻出水面拍下，鏡頭跟著貼近水面後轉黑，接玩家的真人美人魚影片
+  if(c.mode==='mermaid'){
+    const ttl=document.createElement('div'); ttl.style.cssText=title.style.cssText;
+    ttl.innerHTML='<div style="font-size:13px;letter-spacing:.6em;opacity:.7">後日談・終幕</div><div style="font-size:30px;letter-spacing:.45em;margin-top:14px;color:#f6d9e4">霜汐的邀請</div>';
+    const smooth=x=>{ x=Math.min(1,Math.max(0,x)); return x*x*(3-2*x); };
+    // 構圖：月亮在霜汐正後方——鏡頭、霜汐、月亮排成一直線，月光在水面鋪成一條路通到她身邊
+    const HOUR=22.4, A=BAY.clone(), F=new T.Vector3(0,0,-1), R=new T.Vector3(1,0,0);
+    const P3=(a,b,h)=>[A.x+F.x*a+R.x*b, h, A.z+F.z*a+R.z*b];
+    const faceCam=()=>Math.atan2(-F.x,-F.z);
+    const shots=[
+      {d:5,hour:HOUR,sea:false,music:'theme',vol:.6,from:[[0,0,0],[0,0,0]],to:[[0,0,0],[0,0,0]],
+        enter:()=>{ window.__wxOverride={c:.06,r:0,f:.04}; if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(.5); // 用遊戲算月亮位置的同一個函式，依這一幕的時間算出月亮方向（不能用上一幀的值，那時時間還沒切到深夜）
+          if(window.__MOONPH&&window.__MOONPH.dir) window.__MOONPH.dir(HOUR,md); else md.copy(W.U.uMoonDir.value); F.set(md.x,0,md.z); if(F.lengthSq()<1e-6) F.set(0,0,-1); F.normalize(); R.set(-F.z,0,F.x);
+          // 依月亮方向把後面每一鏡的機位算出來
+          shots[1].from=[P3(-15,1.6,1.7),P3(40,1.2,14)]; shots[1].to=[P3(-12,1.0,1.5),P3(30,.6,6.5)];
+          shots[2].from=[P3(-6.2,.9,1.3),P3(0,0,.1)]; shots[2].to=[P3(-5,.7,1.2),P3(0,0,.45)];
+          shots[3].from=[P3(-2.4,.4,.95),P3(0,0,.6)]; shots[3].to=[P3(-2.05,.32,.92),P3(0,0,.62)];
+          shots[4].from=[P3(-5.2,1.1,1.4),P3(0,0,.3)]; shots[4].to=[P3(-3.2,.6,.38),P3(2.2,0,.05)];
+          shots[0].from=shots[0].to=[P3(-15,1.6,1.7),P3(40,1.2,14)];
+          E.layer().appendChild(ttl); E.fade(1); setTimeout(()=>ttl.style.opacity=1,300); sc.wait=0; },
+        tick:(t)=>{ E.fade(1); if(t>3.6&&pending>0&&sc.wait<8){ sc.wait+=1/60; return 'hold'; } if(t>3.6) ttl.style.opacity=0; },
+        exit:()=>ttl.remove(), cleanup:()=>{ ttl.remove(); window.__wxOverride=null; if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(null); merG.children.forEach(o=>o.visible=true); merW.traverse(m=>{ if(m.isMesh&&m.userData.emi0!=null){ m.material.emissiveIntensity=m.userData.emi0; delete m.userData.emi0; } }); }},
+      // 一：滿月在灣上，鏡頭從月亮慢慢往下帶到水面；月光鋪成一條碎銀路；遠處水面輕輕一動
+      {d:10.5,hour:HOUR,sea:false,from:null,to:null,
+        enter:()=>{ keep(merG); merG.children.forEach(o=>{ if(o!==merW) o.visible=false; });
+          // 原本的結局裡她半身坐在岩石邊、自身微微發光；這裡她泡在水中，水面下的魚尾不能自己發亮，否則看起來像浮在水上
+          merW.traverse(m=>{ if(m.isMesh&&m.material&&m.material.emissiveIntensity!=null){ if(m.userData.emi0==null) m.userData.emi0=m.material.emissiveIntensity; m.material.emissiveIntensity=.05; } }); merG.position.copy(A); merW.rotation.set(0,faceCam(),0); merW.position.set(0,-3,0); merG.visible=false; merL.intensity=0; sc.rp=0; },
+        tick:(t,k,P,L)=>{ const up=1-smooth((t-2.5)/6); L.set(P.x+md.x*100,P.y+Math.max(4,md.y*100)*up+(1-up)*-1.5,P.z+md.z*100); if(t>6.6&&t<10){ sc.rp-=1/60; if(sc.rp<=0){ sc.rp=.55; W.addRipple(A.x+(Math.random()-.5)*.6,A.z+(Math.random()-.5)*.6,.35); } } },
+        subs:[[1.4,'滿月的夜晚，月光灣的水面亮了起來。','',4.8],[6.7,'遠處的水面，輕輕動了一下。','',3.2]]},
+      // 二：霜汐從月光裡浮上來，看著你
+      {d:10,hour:HOUR,sea:false,from:null,to:null,
+        enter:()=>{ merG.visible=true; merW.rotation.set(0,faceCam(),0); merW.position.set(0,-2.6,0); merL.intensity=0; RP.mer.tail=.15; RP.mer.headYaw=0; sc.s1=0; sc.s2=0; },
+        tick:(t)=>{ const r=smooth(t/3.2); merW.position.y=-2.6+1.93*r+Math.sin(t*.9)*.015*r; merW.rotation.x=(1-r)*.35; merL.intensity=.9*smooth((t-2.2)/1.6);
+          if(t>.25&&!sc.s1){ sc.s1=1; spl(A.x,A.z,26,.9); W.addRipple(A.x,A.z,.7); } if(t>2.2&&!sc.s2){ sc.s2=1; spl(A.x+.3,A.z+.2,10,.5); W.addRipple(A.x,A.z,.45); }
+          RP.mer.headYaw=Math.sin(t*.5)*.08; },
+        subs:[[4.0,'霜汐：「你替我們守住了這片湖。」','q',4.6]]},
+      // 三：近景，她邀請你
+      {d:8.5,hour:HOUR,sea:false,from:null,to:null,
+        enter:()=>{ merW.rotation.set(0,faceCam(),0); merW.position.set(0,-.67,0); merL.intensity=1.0; RP.mer.tail=.18; },
+        tick:(t)=>{ merW.position.y=-.67+Math.sin(t*.9)*.015; RP.mer.headYaw=Math.sin(t*.4)*.06; RP.mer.headPitch=-.04; },
+        subs:[[1.0,'霜汐：「跟我來——','q',3],[4.2,'讓你看看我在水裡的樣子。」','q',3.8]]},
+      // 四：轉身朝月亮、鴨式潛水，魚尾翻出水面拍下，鏡頭貼近水面後轉黑
+      {d:6.8,hour:HOUR,sea:false,fadeOut:false,from:null,to:null,
+        enter:()=>{ merW.rotation.order='YXZ'; merW.rotation.set(0,faceCam(),0); merW.position.set(0,-.67,0); sc.d1=0; sc.d2=0; sc.d3=0; },
+        tick:(t)=>{ const turn=smooth(t/1.1), pitch=smooth((t-1.0)/1.5), go=Math.max(0,t-1.1);
+          merW.rotation.y=faceCam()+Math.PI*turn; merW.rotation.x=2.5*pitch;
+          merW.position.set(F.x*go*.75,-.67+.45*smooth((t-.9)/.6)-Math.max(0,t-1.6)*.9,F.z*go*.75);
+          RP.mer.tail=t>1.2?.55:.2; RP.mer.headPitch=0; RP.mer.headYaw=0;
+          const wp=merW.getWorldPosition(new T.Vector3());
+          if(t>1.35&&!sc.d1){ sc.d1=1; spl(wp.x,wp.z,30,1.1); W.addRipple(wp.x,wp.z,.8); }
+          if(t>2.55&&!sc.d2){ sc.d2=1; spl(wp.x+F.x*.6,wp.z+F.z*.6,46,1.5); W.addRipple(wp.x+F.x*.6,wp.z+F.z*.6,1.1); c.Snd&&c.Snd.splash&&c.Snd.splash(1.2); }
+          if(t>3.4&&!sc.d3){ sc.d3=1; W.addRipple(wp.x+F.x*.9,wp.z+F.z*.9,.6); }
+          if(t>4.8) E.fade(Math.min(1,(t-4.8)/1.4)); },
+        exit:()=>{ merW.rotation.order='XYZ'; merW.rotation.set(0,merFace(),0); merW.position.set(0,0,0); merG.position.copy(BAY); merG.visible=true; }}
+    ];
+    return shots;
+  }
   return [
     // 開場：黑底片名〈月潮〉；同時等模型載完（最多 12 秒），避免主角還沒出現就開演
     {d:6,hour:20.4,sea:true,music:'piano',vol:.7,fadeOut:true,from:[[3.2,1.5,-3.5],[0,3.2,-28]],to:[[3.2,1.5,-3.5],[0,3.2,-28]],

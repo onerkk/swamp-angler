@@ -24,7 +24,7 @@ const SYN=29.530588853, NEW0=Date.UTC(2000,0,6,18,14);
 let phaseFix=null;
 const phase=()=>phaseFix!=null?phaseFix:((((Date.now()-NEW0)/864e5)/SYN)%1+1)%1, illum=()=>(1-Math.cos(2*Math.PI*phase()))/2;
 const PH_EMO=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'], phEmo=()=>PH_EMO[Math.round(phase()*8)%8];
-window.__MOONPH={phase,illum,emo:phEmo,fix:v=>{ phaseFix=v; },dir:(h,out)=>moonDir(h,out)};
+window.__MOONPH={phase,illum,emo:phEmo,dir:(h,out)=>moonDir(h,out),fix:v=>{ phaseFix=v; },dir:(h,out)=>moonDir(h,out)};
 const uL={value:new T.Vector3(0,0,1)};
 moon.material.onBeforeCompile=sh=>{ sh.uniforms.uL=uL;
   sh.vertexShader='varying vec3 vNw;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvNw=normalize(mat3(modelMatrix)*normal);');

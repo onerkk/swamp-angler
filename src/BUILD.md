@@ -98,3 +98,4 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 診斷：近 10 秒長停頓 >1 秒時判定為停頓造成，不再誤判 GPU 瓶頸
 - 泰國蝦咬餌（d.js wait 分支）：計時到時若是 prawn，先進 G.prawnDrag 2.5～5 秒拖餌（G.to 以 0.16m/s 橫移、小水紋），結束才 bite()；拖餌中揚竿＝太早，收線提示
 - 後日談（v.js e1～e5，c7 之後開放）：蚵仔寮（zone 'tide'，d.js 潮間帶 dex 回呼呼叫 STORY.onCatch）與冰湖（loc 'ice'）任務；e5 reward:'mermaid' 完成時播 mermaid-reward.js：月光灣夜景動畫→按鈕潛水→真人美人魚影片 media/mermaid_reward.mp4（720p H.264）／.webm（VP9 備援）→回禮卡（稱號「海之友」），手記可重看
+- 終幕回禮改為真實 3D：z.js endingShots mode 'mermaid'（月光灣滿月、霜汐浮出水面說話、轉身鴨式潛水），結束後 mermaid-reward.js 黑底按鈕接影片；月亮方向用 __MOONPH.dir(hour)；天氣用 window.__wxOverride 暫時固定晴朗
