@@ -41,7 +41,8 @@ function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
   function render(){
     if(!roots.size){WU.uSubmergedOn.value=0;return;}
     camera.updateWorldMatrix(true,false);camera.matrixWorldInverse.copy(camera.matrixWorld).invert();cam.matrix.copy(camera.matrixWorld);cam.matrixWorld.copy(camera.matrixWorld);cam.matrixWorldInverse.copy(camera.matrixWorldInverse);cam.projectionMatrix.copy(camera.projectionMatrix);cam.projectionMatrixInverse.copy(camera.projectionMatrixInverse);cam.near=camera.near;cam.far=camera.far;
-    R.getDrawingBufferSize(size);const cap=window.__gfxStatus&&window.__gfxStatus.level===7?1536:window.__GFX==='low'?768:1024,scale=Math.min(window.__waterQuality??(window.__GFX==='low'?.5:.85),cap/Math.max(size.x,size.y)),w=Math.max(64,Math.round(size.x*scale)),h=Math.max(64,Math.round(size.y*scale));
+    R.getDrawingBufferSize(size);// 手機上水下那一層最長邊 ≤1024：透過水面看到的東西本來就被折射模糊，全解析度只是多畫一倍像素
+const mobile=!!window.__resourcePolicy?.mobile,cap=mobile?(window.__gfxStatus&&window.__gfxStatus.level>=6?1024:window.__GFX==='low'?640:768):(window.__gfxStatus&&window.__gfxStatus.level===7?1536:window.__GFX==='low'?768:1024),scale=Math.min(window.__waterQuality??(window.__GFX==='low'?.5:.85),cap/Math.max(size.x,size.y)),w=Math.max(64,Math.round(size.x*scale)),h=Math.max(64,Math.round(size.y*scale));
     const key=w+'x'+h;if(rt.width===w&&rt.height===h&&lastSize===key&&U.uTime.value-lastPass+1e-6<1/(window.__effectBudget?.transmissionHz||120)){WU.uSubmergedOn.value=1;return;}WU.uSubmergedOn.value=0;if(rt.width!==w||rt.height!==h)rt.setSize(w,h);WU.uSubmergedSize.value.copy(size);
     if(U.uTime.value>=lightScanAt){scene.traverse(o=>{if(o.isLight)o.layers.enable(1);});lightScanAt=U.uTime.value+1;}
     const target=R.getRenderTarget(),color=R.getClearColor(new T.Color()),alpha=R.getClearAlpha(),background=scene.background,tone=R.toneMapping,encoding=R.outputEncoding,shadows=R.shadowMap.autoUpdate,shadowRequest=R.shadowMap.needsUpdate;

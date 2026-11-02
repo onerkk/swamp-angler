@@ -65,3 +65,4 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 程式浮萍已移除（真實路線，不要假綠毯）
 - 診斷 v4（u.js）：各繪製階段提交時間與繪製次數（b.js passStats）、像素負載、GPU／CPU 瓶頸判定、長任務歸因（著色器編譯／貼圖上傳／幾何上傳／純 JS）、最重物件、JS 記憶體、WebGL context lost 記錄與前次結束判定
 - 浮萍灣：睡蓮加密（c.js bay 叢）＋真實浮萍毯（dwTex 畫 2600 片小葉的 512 貼圖、不規則圓形網格合併成一個網格、renderOrder 1 排在水面後、DoubleSide）
+- 水下層 submerged.js 手機最長邊 ≤1024（高）／768／640；診斷加入場景切換資源趨勢，幀統計忽略背景空檔
