@@ -508,7 +508,7 @@ function finishCatch(sell){
   ui.catch.classList.add('hidden'); document.body.classList.remove('catching'); ui.actWrap.classList.remove('hidden'); ui.sub.classList.remove('hidden');
   const g=G.fish.group;
   if(G.fd.item) FUN.itemEffect(G.fd.item);
-  if(sell){ const v=Math.round(G.fd.value*(1+(save.mer&&save.mer.n>=15?.2:save.mer&&save.mer.n>=8?.1:0))); save.coins+=v; persist(); Snd.coin(); coinFly(v); }
+  if(sell){ const v=Math.round(G.fd.value*(1+(save.mer&&save.mer.n>=15?.2:save.mer&&save.mer.n>=8?.1:0))*(1+(window.__TAL&&window.__TAL.titleFx?window.__TAL.titleFx('coin'):0))); save.coins+=v; persist(); Snd.coin(); coinFly(v); }
   else if(keep){ Snd.coin(); }
   else { META.onRelease(); if(G.fd.sp.special==='mermaid'){ if(G.merShow){ G.merShow.leave=.01; G.merShow.ctl.wave(); G.merShow.ctl.smile(3); } const v=G.fd.value; save.coins+=v; persist(); Snd.coin(); coinFly(v); G.luck=.25; FUN.merMeet(); setTimeout(()=>{ if(window.__MERGIFT&&window.__whenFree) window.__whenFree(()=>window.__MERGIFT.give()); },800); }   /* 送她回家：她留下一片月鱗畫像 */ else { G.luck=Math.min(.25,G.luck+.08); toast('放生了，下一竿稀有魚機率提高','good',1800); } }
   W.scene.attach(g); G.state='post'; G.stT=0; G.postSell=sell||keep; G.from.copy(g.position);
@@ -803,7 +803,7 @@ function guardUW(){ if(UW.active()&&!uwExiting&&G.state!=='wait'&&G.state!=='bit
 /* ---------- 每幀更新 ---------- */
 function updateFight(dt){
   // 天賦等級（沒有天賦系統時一律當 0）
-  const talR=k=>window.__TAL&&window.__TAL.rank?window.__TAL.rank(k):0;
+  const talR=k=>window.__TAL&&window.__TAL.rank?window.__TAL.rank(k):0, ttlF=k=>window.__TAL&&window.__TAL.titleFx?window.__TAL.titleFx(k):0;
   if(easy()){
     const f=G.f,boat=!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht);f.assistT=(f.assistT||0)+dt;f.T=.35;f.brk=0;f.slk=0;f.abr=0;f.lostWhy=null;
     if(boat&&!G.fd.item&&!G.fd.sp.special){
@@ -839,7 +839,7 @@ function updateFight(dt){
   if(shake&&f.T<.18&&!fd.item&&Math.random()<dt*1.6*(1-f.hq)) { f.lostWhy='shook'; }
   if(f.jumpT>0&&G.held&&f.T>.85&&!fd.item&&Math.random()<dt*1.2*(1.15-f.hq)) { f.lostWhy='jump'; }
   const stamF=.4+.6*f.stam/100;
-  const F=fs.pow*(.8+.25*Math.pow(fd.w,.45))*(1+.22*sp.rar)*(fd.boss?fd.boss.pow*(1-.03*talR('calm')):1)*stamF*(f.run?ST.mul:1)*(dive?1.35:1);
+  const F=fs.pow*(.8+.25*Math.pow(fd.w,.45))*(1+.22*sp.rar)*(fd.boss?fd.boss.pow*(1-.03*talR('calm'))*(1-ttlF('boss')):1)*stamF*(f.run?ST.mul:1)*(dive?1.35:1);
   const good=-f.latDir*G.rodSide, steerMul=1-.28*clamp(good,0,1)+.15*clamp(-good,0,1);
   // Contact and line wear are evaluated after the swept fish motion below.
   // 魚種的線組容錯（f.win）：牙齒會咬線、嘴巴骨質硬容易脫鉤、會往礁洞鑽磨線的魚，同樣的拉力下線更容易斷
@@ -855,10 +855,10 @@ function updateFight(dt){
   const lightCatch=!!(fd.item||fs.pow<.7||fd.w<.25);   // 漂流物、遺物（fd.item）、力氣很小或很輕的魚
   if(f.T<.1&&!G.held&&!lightCatch) f.slk+=dt/(2.8*DF.slack); else f.slk=Math.max(0,f.slk-dt*(G.held?3:1.5));
   const zone=f.T>.4&&f.T<.8;
-  const drain=(3+18*f.T)*(1+.8*clamp(good,0,1))*(zone?1.2:1)/(fs.stam*DF.stam*(.7+.25*Math.sqrt(fd.w))*(fd.boss&&fd.boss.stam||1)/(1+.05*talR('fight')));   /* Boss 的耐力倍率：越後面的 Boss 遛越久；搏魚天賦讓魚體力掉得快 */
+  const drain=(3+18*f.T)*(1+.8*clamp(good,0,1))*(zone?1.2:1)/(fs.stam*DF.stam*(.7+.25*Math.sqrt(fd.w))*(fd.boss&&fd.boss.stam||1)/((1+.05*talR('fight'))*(1+ttlF('stam'))));   /* Boss 的耐力倍率：越後面的 Boss 遛越久；搏魚天賦讓魚體力掉得快 */
   f.stam=clamp(f.stam-drain*(window.__ECO&&window.__ECO.fxOn('meal_str')?1.3:1)*dt+(f.T<.2?2.5*dt:0),0,100);
   const reel=G.held?[.75,1,1.2][f.drag]*META.gear().reel.spd*clamp(1.25-f.T,.15,1)*(f.stam<8?1.4:1)*(zone?1.15:1)*(dive?.3:1):0;
-  const run=f.run?fs.spd*ST.spd*stamF*1.5*(G.held?.35:1)*(dive?.4:1)*(fd.boss?(fd.boss.spd||1)*(1-.03*talR('calm')):1):(G.held?0:.05);   /* Boss 的衝刺速度倍率：衝得越快越容易把線放光，捲線器的速度與線量就變得重要 */
+  const run=f.run?fs.spd*ST.spd*stamF*1.5*(G.held?.35:1)*(dive?.4:1)*(fd.boss?(fd.boss.spd||1)*(1-.03*talR('calm'))*(1-ttlF('boss')):1):(G.held?0:.05);   /* Boss 的衝刺速度倍率：衝得越快越容易把線放光，捲線器的速度與線量就變得重要 */
   f.d=Math.max(0,f.d+(run-reel)*dt);
   f.theta=clamp(f.theta+f.latDir*fs.agi*ST.lat*.16*stamF*dt*(G.held?.7:1),-.85,.85);
   let az=f.az0+f.theta; { fishPos(tv,0); const r=Math.hypot(tv.x,tv.z), Rm=W.shoreR(Math.atan2(tv.x,-tv.z))-3; if(r>Rm) f.d=Math.max(2,f.d-(r-Rm)); }

@@ -45,6 +45,18 @@ const BOSS=[
   {id:'oldblue',lv:60,name:'老青',sp:'blackcarp',loc:'lake',zone:'deep',per:['night'],size:1.9,pow:6,spd:1.5,stam:12,title:'老漁人的傳人',hint:'深水中央・夜晚',coins:300000,cry:20,tide:6,
     page:'最後一頁。老青是我這輩子的對手。如果有一天你把牠拉上來了，替我摸摸牠的頭，然後放牠回去。我的竹竿，就交給你了。'}];
 const PER_NAME={dawn:'清晨',day:'白天',dusk:'黃昏',night:'夜晚'};
+/* 稱號加成：只有顯示在主畫面的那一個稱號生效，越難拿的稱號加成越大，換稱號就是換能力。
+   效果：coin 賣魚金幣、xp 經驗、tens 線張力減少、reel 收線速度、stam 魚體力消耗、boss Boss 拉力與衝刺減少 */
+const TITLE_FX={
+  '見習漁人':{t:1,fx:{xp:.03}},'湖畔好手':{t:1,fx:{coin:.04}},'老練漁夫':{t:2,fx:{tens:.04}},'傳說釣手':{t:2,fx:{reel:.06}},'守湖宗師':{t:3,fx:{coin:.08,xp:.05}},
+  '鱷雀鱔獵人':{t:2,fx:{tens:.05}},'鯰魚王者':{t:2,fx:{stam:.08}},'怒海旗手':{t:2,fx:{reel:.08}},'深海霸主':{t:3,fx:{boss:.08}},'滄淵征服者':{t:3,fx:{boss:.08,coin:.05}},
+  '聽鐘人':{t:3,fx:{xp:.12}},'撼佛者':{t:3,fx:{stam:.12}},'冰原獵手':{t:3,fx:{tens:.09}},'礁洞征服者':{t:4,fx:{coin:.18}},'斷線終結者':{t:4,fx:{tens:.12}},
+  '黑潮之王':{t:4,fx:{reel:.14}},'月下劍客':{t:4,fx:{boss:.13}},'銀王之友':{t:5,fx:{xp:.22}},'老漁人的傳人':{t:5,fx:{boss:.12,tens:.08,coin:.12}},
+  '守燈人':{t:3,fx:{xp:.08,coin:.05}},'海之友':{t:4,fx:{coin:.1,reel:.08}},'守湖人':{t:2,fx:{coin:.06}}};
+const FX_NAME={coin:'賣魚金幣 +',xp:'經驗 +',tens:'線張力 −',reel:'收線速度 +',stam:'魚體力消耗 +',boss:'Boss 拉力與衝刺 −'};
+/* 沒列在表裡的稱號（主線章節、烤魚等）：紀念稱號，小小的金幣加成 */
+const titleInfo=t=>TITLE_FX[t]||{t:1,fx:{coin:.02}};
+const fxText=fx=>Object.keys(fx).map(k=>FX_NAME[k]+Math.round(fx[k]*100)+'%').join('、');
 
 function createTalents(c){
 'use strict';
@@ -53,7 +65,9 @@ const spent=()=>Object.keys(S.tal).reduce((a,k)=>a+talSum(S.tal[k]||0),0), pts=(
 /* 天賦改成越高級越貴：照新算法點數超過的存檔（含之後從雲端載入的舊存檔），免費全部退回讓玩家重新分配 */
 function checkTal(){ if(pts()<0){ S.tal=talZero(); c.persist(); setTimeout(()=>c.toast('⭐ 天賦改版：越高級花越多點數，你的點數已全部免費退回，請重新分配','warn',6000),1500); } }
 checkTal();
-function apply(g){ g.rod.cast*=1+.04*rank('cast'); g.rod.tens*=1-.03*rank('power'); g.reel.spd*=1+.04*rank('reel'); return g; }
+function curTitle(){ return S.titleSel&&S.titles.indexOf(S.titleSel)>=0?S.titleSel:S.titles[S.titles.length-1]; }
+function titleFx(k){ const t=curTitle(); return t?(titleInfo(t).fx[k]||0):0; }
+function apply(g){ g.rod.cast*=1+.04*rank('cast'); g.rod.tens*=(1-.03*rank('power'))*(1-titleFx('tens')); g.reel.spd*=(1+.04*rank('reel'))*(1+titleFx('reel')); return g; }
 
 /* Boss：指定釣點與時段，咬餌時 30% 機率出現，連續 4 次沒出現就保證出現 */
 let tries=0;
@@ -133,7 +147,7 @@ const st=document.createElement('style'); st.textContent=`
 #talBox .tb{width:min(560px,100%);max-height:86vh;overflow:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:rgba(18,22,26,.97);border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));color:var(--fg)}
 #talBox h3{margin:0 0 4px;font-size:20px;display:flex;justify-content:space-between;align-items:center}
 #talBox .pt{font-size:13px;color:#ffd56a;margin-bottom:6px}#talBox .sec{margin:14px 0 4px;font-size:13px;color:var(--fg-dim)}
-#talBox .pips{letter-spacing:2px;color:#ffd56a}#talBox .tk{padding:6px 10px;margin:4px 0;border-radius:10px;background:rgba(255,255,255,.05);font-size:13px}#talBox .tk b{color:#ffd56a}#talBox .ttl{display:inline-block;margin:4px 6px 0 0;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,213,106,.4);background:rgba(255,213,106,.08);color:#ffe9a8;font-size:13px}#talBox .ttl.on{background:#ffd56a;color:#2a1a00;font-weight:800}
+#talBox .pips{letter-spacing:2px;color:#ffd56a}#talBox .tk{padding:6px 10px;margin:4px 0;border-radius:10px;background:rgba(255,255,255,.05);font-size:13px}#talBox .tk b{color:#ffd56a}#talBox .ttl small{font-size:11px;opacity:.85;font-weight:400}#talBox .ttl{display:inline-block;margin:4px 6px 0 0;padding:5px 10px;border-radius:12px;text-align:left;line-height:1.35;border:1px solid rgba(255,213,106,.4);background:rgba(255,213,106,.08);color:#ffe9a8;font-size:13px}#talBox .ttl.on{background:#ffd56a;color:#2a1a00;font-weight:800}
 #titleC{display:block;font-size:10px;color:#ffd56a;font-weight:800;line-height:1;margin-top:1px;white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis}
 #bossBan{position:fixed;left:50%;top:30%;transform:translate(-50%,-50%) scale(.6);z-index:25;text-align:center;padding:14px 28px;border-radius:18px;background:linear-gradient(135deg,rgba(60,10,10,.92),rgba(120,40,10,.92));border:2px solid #ffd56a;box-shadow:0 0 40px rgba(255,150,60,.7);opacity:0;pointer-events:none;transition:transform .35s cubic-bezier(.2,1.6,.4,1),opacity .35s}
 #bossBan.in{opacity:1;transform:translate(-50%,-50%) scale(1)}#bossBan.out{opacity:0;transform:translate(-50%,-60%) scale(.9)}#bossBan.hidden{display:none}
@@ -173,7 +187,7 @@ function bossView(){
     else act=`<button class="sbtn big${done?'':' pri'}" data-t="boss" data-v="${b.id}">${done?'再戰（🔷×1）':'接受挑戰'}</button>`;
     h+=`<div class="bcard ${cls}"><div class="bh"><b>${done?'👑':'🐉'} ${b.name}</b><small>Lv ${b.lv}</small></div>
       <div class="bi">📍 ${b.hint}</div>
-      <div class="bi">首勝：稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷×${b.tide||1}${done?`<br>已擊敗 ${done} 次`:''}</div>
+      <div class="bi">首勝：稱號「${b.title}」（${fxText(titleInfo(b.title).fx)}）・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷×${b.tide||1}${done?`<br>已擊敗 ${done} 次`:''}</div>
       ${done&&b.page?`<div class="bp">📖 ${b.page}</div>`:''}<div class="ba">${act}</div></div>`; }
   return h+'</div>'; }
 function render(){ if(mode==='boss'){ box.firstChild.innerHTML=bossView(); return; } const p=pts();
@@ -185,7 +199,10 @@ function render(){ if(mode==='boss'){ box.firstChild.innerHTML=bossView(); retur
   h+=`<div class="sec"><button class="sbtn pri" data-t="mode" data-v="boss" style="width:100%">👑 大師挑戰（${BOSS.filter(x=>(S.lv||1)>=x.lv&&!S.boss[x.id]).length} 隻可挑戰）</button></div>`;
   if(window.__LVINFO){ const L=window.__LVINFO, lv=S.lv||1, need=L.xpNext(lv), up=[]; for(let k=lv+1;k<=lv+12&&up.length<4;k++){ const g=L.gains(k).filter(x=>x!=='天賦點 +1'); if(g.length) up.push(`<div class="tk"><b>Lv ${k}</b>　${g.join('、')}</div>`); }
     h+=`<div class="sec">等級里程碑</div><div class="pt">Lv ${lv}：經驗 ${Math.floor(S.xp||0).toLocaleString()} / ${need.toLocaleString()}　｜　強化上限 +${enhCapAt(lv)}</div>${up.join('')}`; }
-  if(S.titles.length){ const cur=S.titleSel&&S.titles.indexOf(S.titleSel)>=0?S.titleSel:S.titles[S.titles.length-1]; h+=`<div class="sec">已獲得稱號（點選要顯示在主畫面的稱號）</div><div>${S.titles.map(t=>`<button class="ttl${t===cur?' on':''}" data-t="title" data-v="${t}">${t}</button>`).join('')}</div>`; }
+  if(S.titles.length){ const cur=curTitle(), ci=titleInfo(cur);
+    h+=`<div class="sec">稱號（只有顯示在主畫面的那一個生效；越難拿的越強）</div><div class="tk"><b>目前：「${cur}」${'★'.repeat(ci.t)}</b>　${fxText(ci.fx)}</div>`;
+    const list=S.titles.slice().sort((a,b)=>titleInfo(b).t-titleInfo(a).t);
+    h+=`<div>${list.map(t=>{ const ti=titleInfo(t); return `<button class="ttl${t===cur?' on':''}" data-t="title" data-v="${t}">${t} <small>${'★'.repeat(ti.t)}</small><br><small>${fxText(ti.fx)}</small></button>`; }).join('')}</div>`; }
   box.firstChild.innerHTML=h; }
 btn.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); mode='tal'; render(); box.classList.remove('hidden'); });
 /* 主畫面的大師挑戰入口：金色膠囊按鈕。沒接挑戰時顯示可挑戰數量並發光；接了挑戰顯示目標、地點與目前是否符合條件 */
@@ -207,5 +224,5 @@ box.addEventListener('click',e=>{ if(e.target===box){ box.classList.add('hidden'
   if(t==='title'){ S.titleSel=v; showTitle(); }
   c.persist(); render(); dot(); });
 setInterval(()=>{ dot(); bossBtn(); },2000); dot(); bossBtn();
-return {rank,apply,applyBoss,bossWin,bossIntro,tick};
+return {rank,apply,applyBoss,bossWin,bossIntro,tick,titleFx,curTitle,titleInfo,fxText};
 }

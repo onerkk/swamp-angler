@@ -317,7 +317,7 @@ function newQuest(ex){
 const QDIFF={count:1,rare:1.6,weight:1.2,sp:1.5,per:1.2,perfect:1.3,release:.8,ice:1.4};
 (save.quests||[]).forEach(q=>{ const want=Math.round(xpNext(save.lv)*.06*(QDIFF[q.k]||1)); if(!q.xp||q.xp<want*.5) q.xp=want; });   // 舊任務的經驗用新公式重算
 function fillQuests(){ while(save.quests.length<3) save.quests.push(newQuest(save.quests.map(q=>q.k))); persist(); }
-function addXP(x){ save.xp+=x; while(save.xp>=xpNext(save.lv)){ save.xp-=xpNext(save.lv); save.lv++; const lv=save.lv;
+function addXP(x){ x=Math.round(x*(1+(window.__TAL&&window.__TAL.titleFx?window.__TAL.titleFx('xp'):0))); save.xp+=x; while(save.xp>=xpNext(save.lv)){ save.xp-=xpNext(save.lv); save.lv++; const lv=save.lv;
   if(LV_TITLES[lv]){ save.titles=save.titles||[]; if(save.titles.indexOf(LV_TITLES[lv])<0) save.titles.push(LV_TITLES[lv]); }
   const gs=lvGains(lv); setTimeout(()=>{ toast('升級！Lv '+lv+(gs.length?'<br><small>'+gs.join('、')+'</small>':''),'good',3600); Snd.fanfare(2); vib([40,40,80]); },1600); } }
 { save.titles=save.titles||[]; Object.keys(LV_TITLES).forEach(k=>{ if(save.lv>=+k&&save.titles.indexOf(LV_TITLES[k])<0) save.titles.push(LV_TITLES[k]); }); }   // 舊存檔補發等級稱號
