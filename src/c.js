@@ -69,7 +69,7 @@ const PAD_N=padPos.length, SHRED_MAX=48, pads=new T.InstancedMesh(padGeo,padMat,
 padPos.forEach((p,i)=>{ q4.setFromEuler(eu.set(0,p[3],0)); pv.set(p[0],.013+i*.00003,p[1]); sv.set(p[2],1,p[2]); m4.compose(pv,q4,sv); pads.setMatrixAt(i,m4);
   PH.addBox({x:p[0]-p[2],y:-.03,z:p[1]-p[2]},{x:p[0]+p[2],y:.025,z:p[1]+p[2]},()=>pads.visible,"睡蓮葉");
   const c=.85+((i*7919)%100)/100*.3; pads.setColorAt(i,new T.Color(c,c,c*.9)); });
-pads.userData.lake=true; pads.userData.flatOnWater=true; scene.add(pads);
+pads.userData.lake=true; pads.userData.flatOnWater=true; pads.renderOrder=-1; scene.add(pads);   // 先畫荷葉再畫水面：被荷葉蓋住的水面像素直接跳過昂貴的水面計算
 const petalMat=new T.MeshStandardMaterial({color:0xf3dfe4, roughness:.5, emissive:0x1a0a0c});
 const coreMat=new T.MeshStandardMaterial({color:0xe8c040, roughness:.6});
 const petalGeo=new T.SphereGeometry(1,10,8);
@@ -158,7 +158,7 @@ dwMat.onBeforeCompile=sh=>{ sh.uniforms.uBoat=U.uBoat; sh.uniforms.uTime=U.uTime
   sh.fragmentShader='varying vec3 vDwW; uniform vec4 uBoat; uniform float uTime; uniform vec4 uTrail['+DW_TRAIL+'];\n'+sh.fragmentShader.replace('#include <alphatest_fragment>',
    `{ vec2 p=vDwW.xz; float keep=1.0;
       if(uBoat.w>0.5){ vec2 d=p-uBoat.xy; float c=cos(uBoat.z), s=sin(uBoat.z); vec2 l=vec2(d.x*c-d.y*s, d.x*s+d.y*c+0.35); float e=(l.x*l.x)/0.36+(l.y*l.y)/5.9; keep*=smoothstep(.8,1.15,e); }
-      for(int i=0;i<${DW_TRAIL};i++){ vec4 t=uTrail[i]; float age=uTime-t.z; float r=.62*(1.0-age/28.0); if(r>0.0){ float q=length(p-t.xy)/r; keep*=smoothstep(.75,1.1,q); } }
+      if(uBoat.w>0.5&&dot(p-uBoat.xy,p-uBoat.xy)<196.0){ for(int i=0;i<${DW_TRAIL};i++){ vec4 t=uTrail[i]; float age=uTime-t.z; float r=.62*(1.0-age/28.0); if(r>0.0){ float q=length(p-t.xy)/r; keep*=smoothstep(.75,1.1,q); } } }
       diffuseColor.a*=keep; }
     #include <alphatest_fragment>`); };
 dwMat.customProgramCacheKey=()=>'duckweedPush';
@@ -172,8 +172,8 @@ dwMat.customProgramCacheKey=()=>'duckweedPush';
       const wx=m[0]+Math.cos(an)*r, wz=m[1]+Math.sin(an)*r; pos.setXYZ(i,wx,0,wz); uv.setXY(i,wx*2.6,wz*2.6);
       const edge=r0>.85?.78:1, tint=.88+.2*fbm(wx*.9,wz*.9,2); col[i*3]=edge*tint; col[i*3+1]=edge*tint; col[i*3+2]=edge*tint*.92; }
     g.setAttribute('color',new T.BufferAttribute(col,3)); g.computeVertexNormals(); const mesh=new T.Mesh(g,dwMat); parts.push(mesh); }
-  // renderOrder 1：水面不寫深度卻會蓋住比浪高低的東西，浮萍毯排在水面之後畫就不會被浪蓋掉
-  mergeMeshesByMaterial(T,parts,null).forEach(mm=>{ mm.position.y=.006; mm.renderOrder=1; mm.userData.lake=true; mm.receiveShadow=true; scene.add(mm); if(W.reflHide) W.reflHide(mm); }); }
+  // renderOrder -1：浮萍毯先畫並寫入深度，被它蓋住的水面像素直接跳過昂貴的水面計算（湖面是平的，不會有浪蓋過浮萍）
+  mergeMeshesByMaterial(T,parts,null).forEach(mm=>{ mm.position.y=.006; mm.renderOrder=-1; mm.userData.lake=true; mm.receiveShadow=true; scene.add(mm); if(W.reflHide) W.reflHide(mm); }); }
 
 const bladeGeo=new T.PlaneGeometry(.022,1,1,5); bladeGeo.translate(0,.5,0);
 { const p=bladeGeo.attributes.position; for(let i=0;i<p.count;i++){ const y=p.getY(i); p.setX(i,p.getX(i)*(1-y*.9)); p.setZ(i,y*y*.06); } bladeGeo.computeVertexNormals(); }

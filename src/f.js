@@ -201,7 +201,7 @@ function updateEagle(dt,t){
 }
 
 /* ---------- 天氣 ---------- */
-let wxType=WXT[save.wxCur]?save.wxCur:'cloudy', wxT=rand(45,90);
+let wxType=WXT[save.wxCur]?save.wxCur:'cloudy', wxT=rand(240,480);   // 天氣一次維持 6～12 分鐘，開局 4～8 分鐘後才第一次變
 const onIce=()=>window.__G&&window.__G.loc==='ice', SNOWN={drizzle:['小雪','🌨️'],rain:['下雪','❄️'],storm:['暴風雪','🌨️']};
 const wxName=k=>onIce()&&SNOWN[k]?SNOWN[k][0]:WXT[k].n, wxEmo=k=>onIce()&&SNOWN[k]?SNOWN[k][1]:WXT[k].i;
 const cur={c:WXT[wxType].c,r:WXT[wxType].r,f:WXT[wxType].f,w:WXT[wxType].w};
@@ -214,8 +214,8 @@ let wxPend=null;
 function updateWeather(dt){
   const mode=save.wxMode||'auto';
   if(mode!=='auto'&&WXT[mode]) wxType=mode;
-  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; const tg0=WXT[n]; wxPend={n,d0:Math.max(.05,Math.abs(tg0.c-cur.c)+Math.abs(tg0.r-cur.r)+Math.abs(tg0.f-cur.f))}; } wxT=rand(70,150); save.wxCur=wxType; } }
-  const tg=WXT[wxType], k=Math.min(1,dt*.22);
+  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; const tg0=WXT[n]; wxPend={n,d0:Math.max(.05,Math.abs(tg0.c-cur.c)+Math.abs(tg0.r-cur.r)+Math.abs(tg0.f-cur.f))}; } wxT=rand(360,720); save.wxCur=wxType; } }
+  const tg=WXT[wxType], k=Math.min(1,dt*.07);   // 轉變過程約半分鐘，雲慢慢積起來、雨慢慢變大
   cur.c+=(tg.c-cur.c)*k; cur.r+=(tg.r-cur.r)*k; cur.f+=(tg.f-cur.f)*k;
   // 天空、雨、霧真的變化過半時才提示，不會提示「轉晴」時還在下大雨
   if(wxPend){ const d=Math.abs(tg.c-cur.c)+Math.abs(tg.r-cur.r)+Math.abs(tg.f-cur.f); if(wxPend.n!==wxType) wxPend=null; else if(d<wxPend.d0*.45){ toast('天氣轉為'+wxName(wxType)+' '+wxEmo(wxType)); wxPend=null; } }

@@ -32,7 +32,7 @@ const Snd=(()=>{
     if(ctx){ if(ctx.state==='suspended') ctx.resume(); return; }
     const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
     try{ ctx=new AC(); }catch(e){ return; }
-    out=ctx.createGain(); out.gain.value=on?.8:0; out.connect(ctx.destination);outdoor=ctx.createGain();outdoor.gain.value=indoor?0:1;outdoor.connect(out);
+    out=ctx.createGain(); out.gain.value=on?.8:0; out.connect(ctx.destination);outdoor=ctx.createGain();outdoor.gain.value=indoor?0:1;outdoor.connect(out); if(indoor) setTimeout(()=>{ if(indoor) musicStart(); },0);
     // 真實錄音音效（OpenGameArt「Fisheefects」，CC0）：捲線器、水花；載入失敗就沿用合成音
     ['reel','splash'].forEach(k=>fetch('sfx_'+k+'.mp3').then(r=>r.arrayBuffer()).then(b=>ctx.decodeAudioData(b)).then(buf=>{ SMP[k]=buf; }).catch(()=>{}));
     nb=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate); const d=nb.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
@@ -58,7 +58,24 @@ const Snd=(()=>{
     o.connect(g); g.connect(soundBus||out); o.start(t); o.stop(t+dur+.05); }
   document.addEventListener('visibilitychange',()=>{ if(!ctx) return; if(document.hidden) ctx.suspend(); else ctx.resume(); });
   function outdoors(fn){return(...args)=>{if(indoor)return;const previous=soundBus;soundBus=outdoor;try{return fn(...args);}finally{soundBus=previous;}};}
-  function setIndoor(on){indoor=!!on;if(outdoor)outdoor.gain.setTargetAtTime(indoor?0:1,ctx.currentTime,.12);if(indoor)reelLoop(0,1);}
+  // 小屋裡的輕音樂：即時合成的木吉他／電鋼琴感分解和弦（Fmaj7 → Em7 → Dm7 → Cmaj7，每分鐘 70 拍），低音輕輕墊底、偶爾一個高音點綴，加一點房間殘響；進門淡入、出門淡出，跟著遊戲音效開關
+  let music=null;
+  function roomVerb(sec){ const n=Math.floor(ctx.sampleRate*sec), b=ctx.createBuffer(2,n,ctx.sampleRate); for(let c=0;c<2;c++){ const d=b.getChannelData(c); for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,3); } return b; }
+  function musicStart(){ if(!ctx||music||typeof setInterval!=='function') return; const bus=ctx.createGain(); bus.gain.value=0; bus.gain.setTargetAtTime(.5,ctx.currentTime,1.6);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2400; bus.connect(lp); lp.connect(out);
+    if(ctx.createConvolver&&ctx.createBuffer){ try{ const rv=ctx.createConvolver(); rv.buffer=roomVerb(2.4); const wet=ctx.createGain(); wet.gain.value=.32; lp.connect(rv); rv.connect(wet); wet.connect(out); }catch(_){} }
+    const beat=60/70, prog=[[53,57,60,64],[52,55,59,62],[50,53,57,60],[48,52,55,59]], pat=[0,2,1,3,2,1,3,2]; let next=ctx.currentTime+.4, step=0;
+    const note=(m,t,dur,g,type)=>{ const f=440*Math.pow(2,(m-69)/12), o=ctx.createOscillator(), o2=ctx.createOscillator(), h=ctx.createGain(), e=ctx.createGain(); o.type=type||'triangle'; o.frequency.value=f; o2.type='sine'; o2.frequency.value=f*2.003; h.gain.value=.16;
+      e.gain.setValueAtTime(.0001,t); e.gain.exponentialRampToValueAtTime(g,t+.015); e.gain.exponentialRampToValueAtTime(g*.3,t+.45); e.gain.exponentialRampToValueAtTime(.0001,t+dur);
+      o.connect(e); o2.connect(h); h.connect(e); e.connect(bus); o.start(t); o2.start(t); o.stop(t+dur+.05); o2.stop(t+dur+.05); };
+    const tick=()=>{ if(!music) return; while(next<ctx.currentTime+.7){ const ch=prog[Math.floor(step/8)%prog.length], s8=step%8;
+      if(s8===0) note(ch[0]-12,next,beat*4.2,.09,'sine');
+      if(Math.random()>.12) note(ch[pat[s8]]+12,next+(Math.random()-.5)*.02,beat*1.7,.04+Math.random()*.015);
+      if(s8===5&&Math.random()<.45) note(ch[3]+24,next+beat*.25,beat*2.2,.022);
+      next+=beat/2; step++; } };
+    music={bus,id:0}; music.id=setInterval(tick,120); tick(); }
+  function musicStop(){ if(!music) return; const m=music; music=null; clearInterval(m.id); try{ m.bus.gain.setTargetAtTime(0,ctx.currentTime,.5); }catch(_){} setTimeout(()=>{ try{ m.bus.disconnect(); }catch(_){} },3000); }
+  function setIndoor(on){indoor=!!on;if(outdoor)outdoor.gain.setTargetAtTime(indoor?0:1,ctx.currentTime,.12);if(indoor){reelLoop(0,1);musicStart();}else musicStop();}
   return { init,setIndoor, isOn:()=>on, set(v){ on=v; if(out) out.gain.value=v?.8:0; },
     whoosh:outdoors(function(){ nz(.4,'bandpass',2400,.9,.18,500); }),
     splash:outdoors(function(s){ s=s||1; if(sample('splash',Math.min(1,.25+.45*s),.85+Math.random()*.3+(s<.5?.25:0))) return; nz(.18+.3*s,'bandpass',1100,.7,.22*s,400); nz(.35+.4*s,'lowpass',700,.5,.16*s); tn(140,.12,'sine',.12*s,0,60); }),

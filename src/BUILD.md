@@ -77,3 +77,6 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 切背景時（idle/wait/bite/lure/retrieve）呼叫 W.suspendEffects 釋放湖區顯示資源，回來黑幕下重新上傳，降低被系統結束的機率
 - 倒影自動跳過水面以下或平貼水面的物件（b.js lowReflObjects，每 1.5 秒重算；userData.flatOnWater 強制跳過）
 - 診斷 timed()：存檔、換釣點、載入釣點／水域、釋放場景、避障路徑、進出小屋超過 8ms 會記錄，長任務直接標出函式名
+- 天氣（f.js）：一種天氣維持 6～12 分鐘、開局 4～8 分鐘才第一次變，轉變係數 dt*.07（約半分鐘）
+- 小屋輕音樂（d.js Snd musicStart/musicStop）：即時合成分解和弦 + 低音 + 房間殘響，setIndoor 進出時淡入淡出，跟遊戲音效開關
+- 浮萍灣效能：荷葉與浮萍毯 renderOrder -1 先畫、寫深度，蓋住的水面像素不跑水面著色器；浮萍水道 24 點迴圈只在船 14m 內才算

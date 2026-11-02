@@ -1,4 +1,4 @@
-/*APPV:20261102064540*/
+/*APPV:20261102071823*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -1970,7 +1970,7 @@ const PAD_N=padPos.length, SHRED_MAX=48, pads=new T.InstancedMesh(padGeo,padMat,
 padPos.forEach((p,i)=>{ q4.setFromEuler(eu.set(0,p[3],0)); pv.set(p[0],.013+i*.00003,p[1]); sv.set(p[2],1,p[2]); m4.compose(pv,q4,sv); pads.setMatrixAt(i,m4);
   PH.addBox({x:p[0]-p[2],y:-.03,z:p[1]-p[2]},{x:p[0]+p[2],y:.025,z:p[1]+p[2]},()=>pads.visible,"睡蓮葉");
   const c=.85+((i*7919)%100)/100*.3; pads.setColorAt(i,new T.Color(c,c,c*.9)); });
-pads.userData.lake=true; pads.userData.flatOnWater=true; scene.add(pads);
+pads.userData.lake=true; pads.userData.flatOnWater=true; pads.renderOrder=-1; scene.add(pads);   // 先畫荷葉再畫水面：被荷葉蓋住的水面像素直接跳過昂貴的水面計算
 const petalMat=new T.MeshStandardMaterial({color:0xf3dfe4, roughness:.5, emissive:0x1a0a0c});
 const coreMat=new T.MeshStandardMaterial({color:0xe8c040, roughness:.6});
 const petalGeo=new T.SphereGeometry(1,10,8);
@@ -2059,7 +2059,7 @@ dwMat.onBeforeCompile=sh=>{ sh.uniforms.uBoat=U.uBoat; sh.uniforms.uTime=U.uTime
   sh.fragmentShader='varying vec3 vDwW; uniform vec4 uBoat; uniform float uTime; uniform vec4 uTrail['+DW_TRAIL+'];\n'+sh.fragmentShader.replace('#include <alphatest_fragment>',
    `{ vec2 p=vDwW.xz; float keep=1.0;
       if(uBoat.w>0.5){ vec2 d=p-uBoat.xy; float c=cos(uBoat.z), s=sin(uBoat.z); vec2 l=vec2(d.x*c-d.y*s, d.x*s+d.y*c+0.35); float e=(l.x*l.x)/0.36+(l.y*l.y)/5.9; keep*=smoothstep(.8,1.15,e); }
-      for(int i=0;i<${DW_TRAIL};i++){ vec4 t=uTrail[i]; float age=uTime-t.z; float r=.62*(1.0-age/28.0); if(r>0.0){ float q=length(p-t.xy)/r; keep*=smoothstep(.75,1.1,q); } }
+      if(uBoat.w>0.5&&dot(p-uBoat.xy,p-uBoat.xy)<196.0){ for(int i=0;i<${DW_TRAIL};i++){ vec4 t=uTrail[i]; float age=uTime-t.z; float r=.62*(1.0-age/28.0); if(r>0.0){ float q=length(p-t.xy)/r; keep*=smoothstep(.75,1.1,q); } } }
       diffuseColor.a*=keep; }
     #include <alphatest_fragment>`); };
 dwMat.customProgramCacheKey=()=>'duckweedPush';
@@ -2073,8 +2073,8 @@ dwMat.customProgramCacheKey=()=>'duckweedPush';
       const wx=m[0]+Math.cos(an)*r, wz=m[1]+Math.sin(an)*r; pos.setXYZ(i,wx,0,wz); uv.setXY(i,wx*2.6,wz*2.6);
       const edge=r0>.85?.78:1, tint=.88+.2*fbm(wx*.9,wz*.9,2); col[i*3]=edge*tint; col[i*3+1]=edge*tint; col[i*3+2]=edge*tint*.92; }
     g.setAttribute('color',new T.BufferAttribute(col,3)); g.computeVertexNormals(); const mesh=new T.Mesh(g,dwMat); parts.push(mesh); }
-  // renderOrder 1：水面不寫深度卻會蓋住比浪高低的東西，浮萍毯排在水面之後畫就不會被浪蓋掉
-  mergeMeshesByMaterial(T,parts,null).forEach(mm=>{ mm.position.y=.006; mm.renderOrder=1; mm.userData.lake=true; mm.receiveShadow=true; scene.add(mm); if(W.reflHide) W.reflHide(mm); }); }
+  // renderOrder -1：浮萍毯先畫並寫入深度，被它蓋住的水面像素直接跳過昂貴的水面計算（湖面是平的，不會有浪蓋過浮萍）
+  mergeMeshesByMaterial(T,parts,null).forEach(mm=>{ mm.position.y=.006; mm.renderOrder=-1; mm.userData.lake=true; mm.receiveShadow=true; scene.add(mm); if(W.reflHide) W.reflHide(mm); }); }
 
 const bladeGeo=new T.PlaneGeometry(.022,1,1,5); bladeGeo.translate(0,.5,0);
 { const p=bladeGeo.attributes.position; for(let i=0;i<p.count;i++){ const y=p.getY(i); p.setX(i,p.getX(i)*(1-y*.9)); p.setZ(i,y*y*.06); } bladeGeo.computeVertexNormals(); }
@@ -3587,7 +3587,7 @@ function updateEagle(dt,t){
 }
 
 /* ---------- 天氣 ---------- */
-let wxType=WXT[save.wxCur]?save.wxCur:'cloudy', wxT=rand(45,90);
+let wxType=WXT[save.wxCur]?save.wxCur:'cloudy', wxT=rand(240,480);   // 天氣一次維持 6～12 分鐘，開局 4～8 分鐘後才第一次變
 const onIce=()=>window.__G&&window.__G.loc==='ice', SNOWN={drizzle:['小雪','🌨️'],rain:['下雪','❄️'],storm:['暴風雪','🌨️']};
 const wxName=k=>onIce()&&SNOWN[k]?SNOWN[k][0]:WXT[k].n, wxEmo=k=>onIce()&&SNOWN[k]?SNOWN[k][1]:WXT[k].i;
 const cur={c:WXT[wxType].c,r:WXT[wxType].r,f:WXT[wxType].f,w:WXT[wxType].w};
@@ -3600,8 +3600,8 @@ let wxPend=null;
 function updateWeather(dt){
   const mode=save.wxMode||'auto';
   if(mode!=='auto'&&WXT[mode]) wxType=mode;
-  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; const tg0=WXT[n]; wxPend={n,d0:Math.max(.05,Math.abs(tg0.c-cur.c)+Math.abs(tg0.r-cur.r)+Math.abs(tg0.f-cur.f))}; } wxT=rand(70,150); save.wxCur=wxType; } }
-  const tg=WXT[wxType], k=Math.min(1,dt*.22);
+  else { wxT-=dt; if(wxT<=0){ const n=pickWx(); if(n!==wxType){ wxType=n; const tg0=WXT[n]; wxPend={n,d0:Math.max(.05,Math.abs(tg0.c-cur.c)+Math.abs(tg0.r-cur.r)+Math.abs(tg0.f-cur.f))}; } wxT=rand(360,720); save.wxCur=wxType; } }
+  const tg=WXT[wxType], k=Math.min(1,dt*.07);   // 轉變過程約半分鐘，雲慢慢積起來、雨慢慢變大
   cur.c+=(tg.c-cur.c)*k; cur.r+=(tg.r-cur.r)*k; cur.f+=(tg.f-cur.f)*k;
   // 天空、雨、霧真的變化過半時才提示，不會提示「轉晴」時還在下大雨
   if(wxPend){ const d=Math.abs(tg.c-cur.c)+Math.abs(tg.r-cur.r)+Math.abs(tg.f-cur.f); if(wxPend.n!==wxType) wxPend=null; else if(d<wxPend.d0*.45){ toast('天氣轉為'+wxName(wxType)+' '+wxEmo(wxType)); wxPend=null; } }
@@ -7229,7 +7229,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102064540'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102071823'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8739,7 +8739,7 @@ const Snd=(()=>{
     if(ctx){ if(ctx.state==='suspended') ctx.resume(); return; }
     const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
     try{ ctx=new AC(); }catch(e){ return; }
-    out=ctx.createGain(); out.gain.value=on?.8:0; out.connect(ctx.destination);outdoor=ctx.createGain();outdoor.gain.value=indoor?0:1;outdoor.connect(out);
+    out=ctx.createGain(); out.gain.value=on?.8:0; out.connect(ctx.destination);outdoor=ctx.createGain();outdoor.gain.value=indoor?0:1;outdoor.connect(out); if(indoor) setTimeout(()=>{ if(indoor) musicStart(); },0);
     // 真實錄音音效（OpenGameArt「Fisheefects」，CC0）：捲線器、水花；載入失敗就沿用合成音
     ['reel','splash'].forEach(k=>fetch('sfx_'+k+'.mp3').then(r=>r.arrayBuffer()).then(b=>ctx.decodeAudioData(b)).then(buf=>{ SMP[k]=buf; }).catch(()=>{}));
     nb=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate); const d=nb.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
@@ -8765,7 +8765,24 @@ const Snd=(()=>{
     o.connect(g); g.connect(soundBus||out); o.start(t); o.stop(t+dur+.05); }
   document.addEventListener('visibilitychange',()=>{ if(!ctx) return; if(document.hidden) ctx.suspend(); else ctx.resume(); });
   function outdoors(fn){return(...args)=>{if(indoor)return;const previous=soundBus;soundBus=outdoor;try{return fn(...args);}finally{soundBus=previous;}};}
-  function setIndoor(on){indoor=!!on;if(outdoor)outdoor.gain.setTargetAtTime(indoor?0:1,ctx.currentTime,.12);if(indoor)reelLoop(0,1);}
+  // 小屋裡的輕音樂：即時合成的木吉他／電鋼琴感分解和弦（Fmaj7 → Em7 → Dm7 → Cmaj7，每分鐘 70 拍），低音輕輕墊底、偶爾一個高音點綴，加一點房間殘響；進門淡入、出門淡出，跟著遊戲音效開關
+  let music=null;
+  function roomVerb(sec){ const n=Math.floor(ctx.sampleRate*sec), b=ctx.createBuffer(2,n,ctx.sampleRate); for(let c=0;c<2;c++){ const d=b.getChannelData(c); for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,3); } return b; }
+  function musicStart(){ if(!ctx||music||typeof setInterval!=='function') return; const bus=ctx.createGain(); bus.gain.value=0; bus.gain.setTargetAtTime(.5,ctx.currentTime,1.6);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2400; bus.connect(lp); lp.connect(out);
+    if(ctx.createConvolver&&ctx.createBuffer){ try{ const rv=ctx.createConvolver(); rv.buffer=roomVerb(2.4); const wet=ctx.createGain(); wet.gain.value=.32; lp.connect(rv); rv.connect(wet); wet.connect(out); }catch(_){} }
+    const beat=60/70, prog=[[53,57,60,64],[52,55,59,62],[50,53,57,60],[48,52,55,59]], pat=[0,2,1,3,2,1,3,2]; let next=ctx.currentTime+.4, step=0;
+    const note=(m,t,dur,g,type)=>{ const f=440*Math.pow(2,(m-69)/12), o=ctx.createOscillator(), o2=ctx.createOscillator(), h=ctx.createGain(), e=ctx.createGain(); o.type=type||'triangle'; o.frequency.value=f; o2.type='sine'; o2.frequency.value=f*2.003; h.gain.value=.16;
+      e.gain.setValueAtTime(.0001,t); e.gain.exponentialRampToValueAtTime(g,t+.015); e.gain.exponentialRampToValueAtTime(g*.3,t+.45); e.gain.exponentialRampToValueAtTime(.0001,t+dur);
+      o.connect(e); o2.connect(h); h.connect(e); e.connect(bus); o.start(t); o2.start(t); o.stop(t+dur+.05); o2.stop(t+dur+.05); };
+    const tick=()=>{ if(!music) return; while(next<ctx.currentTime+.7){ const ch=prog[Math.floor(step/8)%prog.length], s8=step%8;
+      if(s8===0) note(ch[0]-12,next,beat*4.2,.09,'sine');
+      if(Math.random()>.12) note(ch[pat[s8]]+12,next+(Math.random()-.5)*.02,beat*1.7,.04+Math.random()*.015);
+      if(s8===5&&Math.random()<.45) note(ch[3]+24,next+beat*.25,beat*2.2,.022);
+      next+=beat/2; step++; } };
+    music={bus,id:0}; music.id=setInterval(tick,120); tick(); }
+  function musicStop(){ if(!music) return; const m=music; music=null; clearInterval(m.id); try{ m.bus.gain.setTargetAtTime(0,ctx.currentTime,.5); }catch(_){} setTimeout(()=>{ try{ m.bus.disconnect(); }catch(_){} },3000); }
+  function setIndoor(on){indoor=!!on;if(outdoor)outdoor.gain.setTargetAtTime(indoor?0:1,ctx.currentTime,.12);if(indoor){reelLoop(0,1);musicStart();}else musicStop();}
   return { init,setIndoor, isOn:()=>on, set(v){ on=v; if(out) out.gain.value=v?.8:0; },
     whoosh:outdoors(function(){ nz(.4,'bandpass',2400,.9,.18,500); }),
     splash:outdoors(function(s){ s=s||1; if(sample('splash',Math.min(1,.25+.45*s),.85+Math.random()*.3+(s<.5?.25:0))) return; nz(.18+.3*s,'bandpass',1100,.7,.22*s,400); nz(.35+.4*s,'lowpass',700,.5,.16*s); tn(140,.12,'sine',.12*s,0,60); }),
