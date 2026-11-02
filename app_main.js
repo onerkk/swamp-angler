@@ -1,4 +1,4 @@
-/*APPV:20261102032024*/
+/*APPV:20261102040121*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -48,10 +48,13 @@ function createGeometryLOD(){
   if(!scene||!camera)return;if(!cam){cam=new camera.position.constructor();pos=new camera.position.constructor();}
   const now=typeof performance!=='undefined'?performance.now()/1000:scanT+dt;if(now>=scanT){scanT=now+2;list=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&lodOf.has(fullOf.get(o.geometry)||o.geometry))list.push(o);});}
   camera.getWorldPosition(cam);const d=lodDistance(tier),near2=d*d,far2=(d*1.15)*(d*1.15);let n=0,f=0;
-  for(const m of list){const full=fullOf.get(m.geometry)||m.geometry,e=lodOf.get(full),lod=e&&e.far;if(!lod)continue;const near=tier==='high'?full:(e.mid||full);
-   if(!full.boundingSphere)full.computeBoundingSphere();pos.setFromMatrixPosition(m.matrixWorld);const r=full.boundingSphere?full.boundingSphere.radius*Math.max(m.matrixWorld.getMaxScaleOnAxis(),1e-3):0,dd=Math.max(0,pos.distanceTo(cam)-r),d2=dd*dd;
-   if(m.geometry!==lod){if(d2>far2)m.geometry=lod;else if(m.geometry!==near)m.geometry=near;}else if(d2<near2)m.geometry=near;
-   if(m.geometry===lod)f++;else n++;}
+  // 高畫質：7 公尺內原檔、7～18 公尺中間版、更遠簡化版（一根 8 萬面的枯木在 10 公尺外用 35% 面數已看不出差別）；中低畫質近處就用中間版
+  const fullD=tier==='high'?7:0;
+  for(const m of list){const full=fullOf.get(m.geometry)||m.geometry,e=lodOf.get(full),lod=e&&e.far;if(!lod)continue;const mid=e.mid||full;
+   if(!full.boundingSphere)full.computeBoundingSphere();pos.setFromMatrixPosition(m.matrixWorld);const r=full.boundingSphere?full.boundingSphere.radius*Math.max(m.matrixWorld.getMaxScaleOnAxis(),1e-3):0,dd=Math.max(0,pos.distanceTo(cam)-r);
+   let want=m.geometry;
+   if(dd>d*1.15)want=lod;else if(dd<d){if(fullD===0)want=mid;else if(dd<fullD)want=full;else if(dd>fullD*1.15)want=mid;else want=m.geometry===lod?mid:m.geometry;}else if(m.geometry===lod)want=lod;
+   m.geometry=want;if(m.geometry===lod)f++;else n++;}
   stats.near=n;stats.far=f;
  }
  return{install,update,stats};
@@ -1263,7 +1266,7 @@ SH.waterFS = `
 varying vec3 vNs;
 varying float vH;
 #endif
-uniform vec4 uRip[12];
+uniform vec4 uRip[12]; uniform vec4 uBoat;
 uniform vec3 uDeep;
 uniform sampler2D uLakeBed;
 uniform sampler2D uSubmerged;
@@ -1300,6 +1303,9 @@ void main(){
   if(uPhoto > 0.5){ vec3 dv = normalize(vW - uEye); float ev = asin(clamp(dv.y, -1.0, 1.0));
     if(ev > -0.2094){ float uu = fract(atan(dv.x, -dv.z)*0.15915494 + uYaw); if(texture2D(uMask, vec2(uu, clamp((ev + 0.2094)/0.2094, 0.0, 1.0))).r < 0.5) discard; } }
   vec2 p = vW.xz;
+  // 獨木舟船艙比水面低：船艙橢圓範圍內的水面跳過，船底就不會透出帶漣漪的水（uBoat 依序是船位置、船頭方向、是否在船上）
+  if(uBoat.w > 0.5){ vec2 d = p - uBoat.xy; float c = cos(uBoat.z), s = sin(uBoat.z); vec2 l = vec2(d.x*c - d.y*s, d.x*s + d.y*c + 0.35);
+    if((l.x*l.x)/0.1024 + (l.y*l.y)/3.61 < 1.0) discard; }
   float rp = length(p); float Rs = shoreR(atan(p.x, -p.y));
   float nearShore = 1.0 - smoothstep(2.0, 20.0, Rs - rp);
   float nearDock = 1.0 - smoothstep(2.5, 7.0, length(vec2(p.x*0.8, p.y - 0.5)));
@@ -1511,7 +1517,7 @@ const head = new T.Group(); head.rotation.x = -0.16; player.add(head); head.add(
 const V = () => new T.Vector3();
 const U = { uTime:{value:0}, uSunDir:{value:new T.Vector3(0,1,0)}, uLightCol:{value:V()}, uSunDisk:{value:new T.Vector3(0,1,0)},
   uSunCol:{value:V()}, uMoonDir:{value:new T.Vector3(0,1,0)}, uMoonCol:{value:V()}, uZenith:{value:V()}, uHorizon:{value:V()},
-  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0},uDetail:{value:1},uWaterLOD:{value:0}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.012,.075,.13)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
+  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0},uDetail:{value:1},uWaterLOD:{value:0},uBoat:{value:new T.Vector4(0,0,0,0)}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.012,.075,.13)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
 
 // 天空球（含樹林遠景）
 const skyMat = new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:SH.common+SH.skyFS, side:T.BackSide, depthWrite:false, depthTest:false});
@@ -1984,6 +1990,18 @@ const dwTex=(()=>{ const N=512, cv=document.createElement('canvas'); cv.width=cv
       x.fillStyle=g; x.beginPath(); x.arc(0,0,r,0,6.283); x.fill(); x.restore(); } }
   const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; t.anisotropy=4; t.encoding=T.sRGBEncoding; return t; })();
 const dwMat=new T.MeshStandardMaterial({map:dwTex, roughness:.8, metalness:0, alphaTest:.5, transparent:false, vertexColors:true, envMapIntensity:.15, side:T.DoubleSide});
+// 船推開浮萍：船身周圍一圈不畫，船走過的路留下一條慢慢合攏的水道（約 28 秒合回來）；uTrail 由 f.js 在船移動時寫入
+const DW_TRAIL=24, dwTrail=[]; for(let i=0;i<DW_TRAIL;i++) dwTrail.push(new T.Vector4(0,0,-1e9,0));
+window.__DW={trail:dwTrail,next:0};
+dwMat.onBeforeCompile=sh=>{ sh.uniforms.uBoat=U.uBoat; sh.uniforms.uTime=U.uTime; sh.uniforms.uTrail={value:dwTrail};
+  sh.vertexShader='varying vec3 vDwW;\n'+sh.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvDwW=(modelMatrix*vec4(transformed,1.0)).xyz;');
+  sh.fragmentShader='varying vec3 vDwW; uniform vec4 uBoat; uniform float uTime; uniform vec4 uTrail['+DW_TRAIL+'];\n'+sh.fragmentShader.replace('#include <alphatest_fragment>',
+   `{ vec2 p=vDwW.xz; float keep=1.0;
+      if(uBoat.w>0.5){ vec2 d=p-uBoat.xy; float c=cos(uBoat.z), s=sin(uBoat.z); vec2 l=vec2(d.x*c-d.y*s, d.x*s+d.y*c+0.35); float e=(l.x*l.x)/0.36+(l.y*l.y)/5.9; keep*=smoothstep(.8,1.15,e); }
+      for(int i=0;i<${DW_TRAIL};i++){ vec4 t=uTrail[i]; float age=uTime-t.z; float r=.62*(1.0-age/28.0); if(r>0.0){ float q=length(p-t.xy)/r; keep*=smoothstep(.75,1.1,q); } }
+      diffuseColor.a*=keep; }
+    #include <alphatest_fragment>`); };
+dwMat.customProgramCacheKey=()=>'duckweedPush';
 { const R=rng(37), parts=[];
   // 大片的毯子在睡蓮之間與岸邊，小團散在毯子外圍；形狀用角度雜訊做成不規則，邊緣再用頂點色壓暗、顏色略有深淺
   const mats=[[-12.5,-14,3.4],[-11,-20.5,3.8],[-14.8,-18,2.6],[-5,-22.8,2.4],[-9.5,-25.5,2.8],[-3.2,-15.5,1.6],[-15.5,-22.5,2.0],[-7.8,-11.5,1.8]];
@@ -3370,7 +3388,12 @@ canoeCollider.update=()=>{const b=ctx.base();canoeCollider.boxes[0].frame={x:b.x
 if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const source=x.material,mp=source.map; if(mp){ tuneTextureSampling(T,mp,W.renderer.capabilities.getMaxAnisotropy()); } x.material=new T.MeshStandardMaterial({map:mp||null,normalMap:source.normalMap||null,roughnessMap:source.roughnessMap||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.85,metalness:0}); x.castShadow=x.receiveShadow=true; } });
   const w=new T.Group(); w.add(o); w.rotation.y=Math.PI; w.updateMatrixWorld(true); let b=new T.Box3().setFromObject(w); const sz=b.getSize(new T.Vector3()); w.scale.set(.78/Math.max(sz.x,1e-6),.42/Math.max(sz.y,1e-6),4.2/Math.max(sz.z,1e-6));   // 長寬高分開縮放成真實獨木舟比例
   w.updateMatrixWorld(true); b=new T.Box3().setFromObject(w); const c=b.getCenter(new T.Vector3()); w.position.set(-c.x,-.2-b.min.y,-.35-c.z);
-  boat.children.forEach(ch=>{ if(ch!==padG) ch.visible=false; }); boat.add(w); });   // 只藏舊塑膠艇的船身，槳要留著
+  o.traverse(x=>{ if(x.isMesh) x.renderOrder=-2; });
+  // 船艙水線遮罩：一片只寫深度、不畫顏色的橢圓蓋在船艙水線上，排在船體之後、其他東西之前畫。
+  // 船艙比水面低，水面、浮萍、睡蓮、雨圈這些貼在水面的東西才不會畫進船裡（船看起來像沉了）；船板先畫好不受影響
+  const capGeo=new T.CircleGeometry(1,40); capGeo.rotateX(-Math.PI/2); const cap=new T.Mesh(capGeo,new T.MeshBasicMaterial({colorWrite:false,depthWrite:true,side:T.DoubleSide}));
+  cap.scale.set(.34,1,2.0); cap.position.set(0,.045,-.35); cap.renderOrder=-1; cap.frustumCulled=false; cap.userData.hullCap=true; boat.add(cap);
+  boat.children.forEach(ch=>{ if(ch!==padG&&ch!==w&&ch!==cap) ch.visible=false; }); boat.add(w); });   // 只藏舊塑膠艇的船身，槳要留著
 { const yel=new T.MeshStandardMaterial({color:0xf2b705,roughness:.32}), blk=new T.MeshStandardMaterial({color:0x151515,roughness:.6}), gry=new T.MeshStandardMaterial({color:0x33363b,metalness:.5,roughness:.4});
   const hull=new T.Mesh(new T.SphereGeometry(1,48,20),yel); hull.scale.set(.36,.22,1.95); hull.position.set(0,.02,-.15); boat.add(hull);
   const ridge=new T.Mesh(new T.SphereGeometry(1,24,10),yel); ridge.scale.set(.06,.05,1.2); ridge.position.set(0,.215,-.9); boat.add(ridge);
@@ -3558,10 +3581,12 @@ let snagRipT=0;
 function update(dt,t){
   snagRipT-=dt; if(snagRipT<=0&&SNAG_RIP.length&&!(W.isSea&&W.isSea())){ snagRipT=.7+Math.random()*.9; const r=SNAG_RIP[Math.floor(Math.random()*SNAG_RIP.length)]; W.addRipple(r[0]+(Math.random()-.5)*.4,r[1]+(Math.random()-.5)*.4,.22); }   // 樹幹入水處的小漣漪
   const s=sp(), bx=s.pos[0], bz=s.pos[1];
-  if(s.kayak){ const sw=W.swell(bx,bz,t)*2.2; boat.visible=true; boat.position.set(bx,sw,bz); boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
+  if(s.kayak){ const sw=W.swell(bx,bz,t)*2.2; boat.visible=true; boat.position.set(bx,sw,bz); if(W.U.uBoat) W.U.uBoat.value.set(bx,bz,s.head,1);
+    // 船每前進約半公尺就在浮萍的水道記錄裡加一個點
+    if(window.__DW){ const D=window.__DW, last=D.last; if(!last||Math.hypot(bx-last.x,bz-last.z)>.45){ D.last={x:bx,z:bz}; D.trail[D.next].set(bx,bz,t,0); D.next=(D.next+1)%D.trail.length; } } boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
     W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
-  else if(s.yacht){ boat.visible=false; const sw=W.swell(bx,bz,t)*.9; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
-  else { boat.visible=false; W.player.position.set(0,2.4,0); W.head.rotation.z=0; }
+  else if(s.yacht){ boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; const sw=W.swell(bx,bz,t)*.9; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
+  else { boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; W.player.position.set(0,2.4,0); W.head.rotation.z=0; }
   updateWeather(dt); updateRain(dt); updateGator(dt); updateEagle(dt,t);
   gEye.emissiveIntensity=(1-W.info.day)*2.2;
   sT-=dt; if(sT<=0){ sT=rand(3,9); if(cur.r<.5){ const per=ctx.period(); if(per==='night'||per==='dusk') Snd.frog(); else Snd.bird(); } }
@@ -7138,7 +7163,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102032024'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102040121'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9762,4 +9787,11 @@ requestAnimationFrame(frame);
       else ln.textContent='正在載入真實場景… '+Math.round(p*100)+'%'; }); }catch(e){ console.warn(e); }
     startGame(W,P); }
   catch(e){ console.error(e); showErr('這個瀏覽器無法啟動 WebGL 3D 畫面。<br><small>'+String(e&&e.message||e)+'</small>'); }
+})();
+// 自動更新：每分鐘（以及切回遊戲時）查一次線上版本，有新版就在畫面上方掛一條提示，點一下用新網址重新載入，繞過瀏覽器把舊 index.html 留在快取裡的問題
+(function(){ let shown=false, bar=null;
+  function offer(v){ if(shown) return; shown=true; bar=document.createElement('div'); bar.textContent='🔄 有新版本，點一下更新'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);transform:translateX(-50%);z-index:260;background:#f2c14e;color:#1a1a1a;font:600 15px/1 sans-serif;padding:12px 18px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:pointer';
+    bar.onclick=()=>{ try{ persist(); }catch(_){} if(window.__DIAG) window.__DIAG.action('navigation','update-reload '+v); location.replace(location.pathname+'?v='+encodeURIComponent(v)); }; document.body.appendChild(bar); }
+  async function check(){ if(shown||!window.__APP_VER) return; try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); const j=await r.json(); if(j&&j.v&&j.v!==window.__APP_VER&&j.v>window.__APP_VER) offer(j.v); }catch(_){} }
+  setTimeout(check,20000); setInterval(check,60000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) check(); });
 })();

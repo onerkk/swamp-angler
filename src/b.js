@@ -298,7 +298,7 @@ void main(){
   if(uPhoto > 0.5){ vec3 dv = normalize(vW - uEye); float ev = asin(clamp(dv.y, -1.0, 1.0));
     if(ev > -0.2094){ float uu = fract(atan(dv.x, -dv.z)*0.15915494 + uYaw); if(texture2D(uMask, vec2(uu, clamp((ev + 0.2094)/0.2094, 0.0, 1.0))).r < 0.5) discard; } }
   vec2 p = vW.xz;
-  // 獨木舟船艙在水面以下：船內那一圈水面不能畫，否則船底會透出帶漣漪的水（uBoat = 船位置 x,z、船頭方向、是否在船上）
+  // 獨木舟船艙比水面低：船艙橢圓範圍內的水面跳過，船底就不會透出帶漣漪的水（uBoat 依序是船位置、船頭方向、是否在船上）
   if(uBoat.w > 0.5){ vec2 d = p - uBoat.xy; float c = cos(uBoat.z), s = sin(uBoat.z); vec2 l = vec2(d.x*c - d.y*s, d.x*s + d.y*c + 0.35);
     if((l.x*l.x)/0.1024 + (l.y*l.y)/3.61 < 1.0) discard; }
   float rp = length(p); float Rs = shoreR(atan(p.x, -p.y));
