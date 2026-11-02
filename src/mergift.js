@@ -1,7 +1,7 @@
 /* ===== 月鱗畫像：送霜汐回家後，她留下一片月鱗，鱗面映出她的樣子（使用者用 AI 產生的美人魚圖） =====
    每次隨機一張，優先給還沒收集到的；收集過的可以在霜汐的對話視窗裡「🖼 月鱗畫像」重看
    圖片放在 media/mergift/，新增圖片只要把檔名加進 MERGIFT 清單 */
-const MERGIFT=[];
+const MERGIFT=['mg01.jpg','mg02.jpg','mg03.jpg','mg04.jpg','mg05.jpg','mg06.jpg','mg07.jpg','mg08.jpg'];
 (function(){
 'use strict';
 const st=document.createElement('style'); st.textContent=`
@@ -12,7 +12,7 @@ const st=document.createElement('style'); st.textContent=`
 #mgBox .fr::after{content:'';position:absolute;inset:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%);transform:translateX(-120%);animation:mgShine 2.4s ease .6s 1 forwards}
 @keyframes mgShine{to{transform:translateX(120%)}}
 #mgBox .row{display:flex;gap:10px}#mgBox button{padding:10px 18px;border-radius:999px;border:1px solid rgba(200,225,255,.45);background:rgba(20,40,70,.85);color:#e6f0ff;font-size:14px;font-family:inherit}
-#mgBox .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(92vw,520px);max-height:66vh;overflow:auto}#mgBox .grid img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px}#mgBox .grid .lk{aspect-ratio:3/4;border-radius:8px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;color:#8aa4c4;font-size:22px}`;
+#mgBox .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(92vw,520px);max-height:66vh;overflow:auto}#mgBox .grid img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px}#mgBox .grid .lk{aspect-ratio:1/1;border-radius:8px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;color:#8aa4c4;font-size:22px}`;
 document.head.appendChild(st);
 const save=()=>window.__SAVE||null;
 function got(){ const s=save(); if(!s) return []; s.merGift=s.merGift||[]; return s.merGift; }
