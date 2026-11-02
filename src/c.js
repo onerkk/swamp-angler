@@ -305,7 +305,7 @@ function setLine(end, slack, visible, light, trem){
 
 /* ---------- 浮標：照真實的磯釣棒浮標做——輕木紡錘形浮身、上段螢光漆、下段深色、細長的天線（彩色刻度）、
    頂端夜光珠、底部金屬轉環；亮光漆有清漆反光。原點在水線：水面上只露出天線和浮身最上面一小截 ---------- */
-const bobber=new T.Group(); scene.add(bobber);
+const bobber=new T.Group(); bobber.userData.isBobber=true; scene.add(bobber);
 const FLOAT_PROFILE=[[0,-.095],[.0035,-.095],[.004,-.08],[.009,-.06],[.019,-.035],[.026,-.01],[.028,.006],[.025,.022],[.017,.038],[.009,.05],[.0045,.058],[.0042,.062]];
 const floatTex=(()=>{ const cv=document.createElement('canvas'); cv.width=8; cv.height=256; const g=cv.getContext('2d');
   // 由下到上：深墨綠浮腳、金色細線、黑色底漆、水線上方螢光橘

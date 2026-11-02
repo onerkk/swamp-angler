@@ -267,7 +267,12 @@ function updDistMark(){ const st=G.state; let p=null;
   if(!p||document.body.classList.contains('sheetOn')||UW.active()){ DMK.style.display='none'; return; }   // 水下鏡頭時不顯示水面距離
   const d=Math.hypot(p.x-(G.angler||G.base).x,p.z-(G.angler||G.base).z); DMV.set(p.x,(p.y||0)+.05,p.z).project(W.camera); if(DMV.z>1){ DMK.style.display='none'; return; }
   DMK.style.display='block'; DMK.style.left=((DMV.x+1)/2*innerWidth)+'px'; DMK.style.top=((1-DMV.y)/2*innerHeight)+'px'; DMKt.textContent=d.toFixed(d<10?1:0)+' 米'; }
-function startRetrieve(msg,cls){ G.retrievePath=PH.route(rod.tipW,bob.position,.085).slice().reverse().map(p=>new T.Vector3(p.x,p.y,p.z)); G.retrieveNode=1;G.retrieveClock=0; exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
+// 收線：浮標貼著水面被拖回來，到竿尖前方約一公尺才離水提起；以前是從落點直接沿直線飛到竿尖，整段懸在空中
+function startRetrieve(msg,cls){ const tip=rod.tipW, b=bob.position, ang=G.angler||G.base, hx=tip.x-ang.x, hz=tip.z-ang.z, hl=Math.hypot(hx,hz)||1;
+  const near=new T.Vector3(tip.x+hx/hl*.9,.03,tip.z+hz/hl*.9), from=new T.Vector3(b.x,.03,b.z);
+  if(b.y<.5&&from.distanceTo(near)>1.2){ const surf=PH.route(near,from,.085).slice().reverse().map(p=>new T.Vector3(p.x,.03,p.z)); surf[0].copy(b); G.retrievePath=[...surf,tip.clone()]; G.retrieveLift=G.retrievePath.length-1; }
+  else { G.retrievePath=PH.route(rod.tipW,bob.position,.085).slice().reverse().map(p=>new T.Vector3(p.x,p.y,p.z)); G.retrieveLift=1; }
+  G.retrieveNode=1;G.retrieveClock=0; exitUW(); G.fd=null; G.sp=null; if(msg) toast(msg,cls); G.state='retrieve'; G.stT=0; G.from.copy(bob.position); P.shadow.material.opacity=0; }
 function nibble(){ const big=Math.random()<.25; G.dip=big?.75:.28; G.dipMax=G.dip; G.dipAmp=big?.14:.035; W.addRipple(G.to.x,G.to.z,big?.5:.18); if(big){ P.splash(G.to.x,0,G.to.z,5,.35); Snd.bite(); vib([40,30,60]); } else { Snd.nibble(); vib(12); } G.approach=Math.max(G.approach,.01); }
 // 體型等級：u 是這條魚在該魚種體型範圍內的位置（0 最小、1 最大，巨物可再超出）
 const GRADES=[[.2,'幼魚'],[.7,'成魚'],[.93,'大物'],[9,'巨物']];
@@ -446,7 +451,7 @@ function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收�
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; if(then){ fadeEl.classList.remove('on'); then(); } else if(G.spot!==0){ fadeEl.classList.remove('on'); goSpot(0); } else fadeOutWhenReady(); },650); }
-window.__goHome=goHome; window.__HOMEOK=()=>HOME.unlocked();
+window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__HOMEOK=()=>HOME.unlocked();
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
@@ -995,6 +1000,9 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
       if(q.contact){ G.state='wait'; G.bottom=false; G.to.set(q.pos.x,0,q.pos.z); tackleSnag(q.contact,old); break; }
       if(distance<=step+.001) G.retrieveNode++; else break;
     }
+    // 還在水面段：浮標跟著水面起伏、往拉的方向傾斜，後面拖出一串小水紋
+    if(G.state==='retrieve'&&G.retrieveNode<(G.retrieveLift||1)){ const pz=bob.position; pz.y=W.swell(pz.x,pz.z,G.t); const tg=path[Math.min(G.retrieveNode,path.length-1)], dx=tg.x-pz.x, dz=tg.z-pz.z, dl=Math.hypot(dx,dz)||1;
+      bob.quaternion.setFromAxisAngle(tv4b.set(dz/dl,0,-dx/dl),.5); G.wakeT=(G.wakeT||0)-dt; if(G.wakeT<=0){ G.wakeT=.16; W.addRipple(pz.x,pz.z,.07); } }
     rod.spin-=dt*20; if(Math.random()<dt*14) Snd.click(); lineEnd=bob.position; slack=.06; setAct('收線中','拖曳改變竿角可避開前方障礙物',false);
     if(G.state==='retrieve'&&G.retrieveNode>=path.length) G.state='idle';
   }
