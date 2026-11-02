@@ -1147,3 +1147,10 @@ requestAnimationFrame(frame);
     startGame(W,P); }
   catch(e){ console.error(e); showErr('這個瀏覽器無法啟動 WebGL 3D 畫面。<br><small>'+String(e&&e.message||e)+'</small>'); }
 })();
+// 自動更新：每分鐘（以及切回遊戲時）查一次線上版本，有新版就在畫面上方掛一條提示，點一下用新網址重新載入，繞過瀏覽器把舊 index.html 留在快取裡的問題
+(function(){ let shown=false, bar=null;
+  function offer(v){ if(shown) return; shown=true; bar=document.createElement('div'); bar.textContent='🔄 有新版本，點一下更新'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);transform:translateX(-50%);z-index:260;background:#f2c14e;color:#1a1a1a;font:600 15px/1 sans-serif;padding:12px 18px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:pointer';
+    bar.onclick=()=>{ try{ persist(); }catch(_){} if(window.__DIAG) window.__DIAG.action('navigation','update-reload '+v); location.replace(location.pathname+'?v='+encodeURIComponent(v)); }; document.body.appendChild(bar); }
+  async function check(){ if(shown||!window.__APP_VER) return; try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); const j=await r.json(); if(j&&j.v&&j.v!==window.__APP_VER&&j.v>window.__APP_VER) offer(j.v); }catch(_){} }
+  setTimeout(check,20000); setInterval(check,60000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) check(); });
+})();
