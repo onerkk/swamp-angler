@@ -85,3 +85,4 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 搏魚時魚本體在 14m 內放到水面下（透過水面看得到甩動翻身）；甩頭時尾巴拍水，c.js splash(x,y,z,n,pw,dx,dz) 可帶方向噴成弧；衝刺時兩側小漣漪成 V 形尾浪。測試：window.__testFight(x,z) 直接進入搏魚（可配 ?fish=bass）
 - 近海礁岩淺海（b.js uReef 分支）：海底深度依雜訊 1.8～8m 變化（沙洲碧綠、溝槽轉藍），白沙細沙紋，晴天光紋加強 1.45 倍，散射色依深度從碧綠到藍
 - 水族箱水草（aquarium-display.js setDetail）：房間看用 lod 中間版（fern 71%、grass 46%、nettle 35%），tankview 近看換回原檔；lod.js variant(geo,'mid'|'far'|'full')，LOD 掃描排除 InstancedMesh。搏魚時收線且魚沒衝刺，魚頭慢慢轉向船（f.headY）
+- 2026-11-02 新魚種：海雞母 maori、河豚 puffer（noSell）在近海礁岩；變身苦 scat、大眼海鰱 tarpon、星點臭肚 rabbit 在月光灣潟湖（water:'sea'）。模型 bake_planar 側面＋俯視流程，prep 腳本 src/fish6/sea2/prep.py

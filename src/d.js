@@ -166,8 +166,8 @@ function depNow(k){ const e=DEPL[k]; return e?Math.max(0,e.v-(performance.now()-
 function depAdd(k,n){ const v=depNow(k)+n, w=v>=2&&DEPL[k]&&DEPL[k].warned; DEPL[k]={v,t:performance.now(),warned:w}; if(v>=4&&!w){ DEPL[k].warned=true; setTimeout(()=>toast('這一帶的魚變警覺了，轉個方向或換釣點吧','warn',2600),1800); } }
 const reachK=()=>G.loc==='ice'?.78:clamp((G.castDist-4)/(24*(1-.05*TR('cast'))),0,1);
 // 釣棚：浮標調淺、中、深（觸底）；每種魚有偏好水層，水層對了比較容易咬，差太多就很少咬（路亞、冰釣不受影響）
-const LAYER_B=new Set(['channel','flathead','clarias','mekong','eel','carp','crucian','blackcarp','grasscarp','arapaima','reba','burbot','grouper','grouper2','halibut','stingray','emperor','porgy','knifejaw','redbream','wrasse','laketrout','taimen','ghost','moonkoi','golden']);
-const LAYER_S=new Set(['bluegill','crappie','tilapia','silvercarp','gar','spgar','mahi','sail','marlin','swordfish','skipjack','yellowfin','tuna','bigeye','flyfish','ribbon','amberjack','barracuda','sunfish','threadfin','sawara','amber','peacock']);
+const LAYER_B=new Set(['maori','puffer','channel','flathead','clarias','mekong','eel','carp','crucian','blackcarp','grasscarp','arapaima','reba','burbot','grouper','grouper2','halibut','stingray','emperor','porgy','knifejaw','redbream','wrasse','laketrout','taimen','ghost','moonkoi','golden']);
+const LAYER_S=new Set(['tarpon','bluegill','crappie','tilapia','silvercarp','gar','spgar','mahi','sail','marlin','swordfish','skipjack','yellowfin','tuna','bigeye','flyfish','ribbon','amberjack','barracuda','sunfish','threadfin','sawara','amber','peacock']);
 const layerOf=sp=>LAYER_B.has(sp.id)?2:LAYER_S.has(sp.id)?0:1, LAYER_N=['淺棚・水面','中層','深棚・觸底'];
 window.__layerOf=layerOf; window.__LAYER_N=LAYER_N;
 function layerK(sp){ const bt=G.baitUsed||BAITS[0]; if(bt.lure||G.loc==='ice'||sp.special) return 1; const d=Math.abs((save.depth==null?1:save.depth)-layerOf(sp)); return d===0?1.6:d===1?.9:.35; }
