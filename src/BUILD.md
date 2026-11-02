@@ -80,3 +80,4 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 天氣（f.js）：一種天氣維持 6～12 分鐘、開局 4～8 分鐘才第一次變，轉變係數 dt*.07（約半分鐘）
 - 小屋輕音樂（d.js Snd musicStart/musicStop）：即時合成分解和弦 + 低音 + 房間殘響，setIndoor 進出時淡入淡出，跟遊戲音效開關
 - 浮萍灣效能：荷葉與浮萍毯 renderOrder -1 先畫、寫深度，蓋住的水面像素不跑水面著色器；浮萍水道 24 點迴圈只在船 14m 內才算
+- 垃圾回收卡頓根因：physics.js hit/inside/clear/resolve/refresh 原本每次呼叫都配置物件與陣列（每幀上萬次），改成不配置；c.js setLine 繞路結果快取（兩端移動 <5cm 或 0.25 秒內沿用），短線不繞路；釣線碰撞忽略「船體」箱。headless 量測每分鐘配置 518MB → 161MB

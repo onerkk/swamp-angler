@@ -1,4 +1,4 @@
-/*APPV:20261102071823*/
+/*APPV:20261102075002*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -520,6 +520,7 @@ function underwaterViewDistance(length,aspect,fov,baitDistance){
 if(typeof module!=='undefined'&&module.exports) module.exports={FISHING_VIEW,fishingViewPitch,underwaterViewDistance};
 /* Shared swept collision for tackle, fish and line. Bounds follow visible scene meshes.
    No zone-based dice rolls: only physical contact can snag or abrade a line. */
+const AXES=['x','y','z'], HIT_A={x:0,y:0,z:0}, HIT_B={x:0,y:0,z:0};
 class FishingPhysics {
   constructor(){ this.items=[]; this.boxes=[]; }
   addBox(min,max,enabled=()=>true,label='障礙物'){ const item={boxes:[{min:{...min},max:{...max},label}],enabled}; this.items.push(item); return item; }
@@ -535,29 +536,36 @@ class FishingPhysics {
       if(!b.isEmpty()) item.boxes.push({min:{x:b.min.x,y:b.min.y,z:b.min.z},max:{x:b.max.x,y:b.max.y,z:b.max.z},label:item.label});
     });
   }
-  refresh(){ this.boxes.length=0; for(const i of this.items){ if(!i.enabled()) continue; if(i.update) i.update(); else if(i.dynamic) this.measure(i); this.boxes.push(...i.boxes); } }
-  static local(p,b){ if(!b.frame)return {...p}; const f=b.frame,c=Math.cos(f.head),s=Math.sin(f.head),x=p.x-f.x,z=p.z-f.z;return{x:x*c-z*s,y:p.y,z:x*s+z*c}; }
+  refresh(){ const out=this.boxes; out.length=0; const items=this.items; for(let n=0;n<items.length;n++){ const i=items[n]; if(!i.enabled()) continue; if(i.update) i.update(); else if(i.dynamic) this.measure(i); const bs=i.boxes; for(let k=0;k<bs.length;k++) out.push(bs[k]); } }
+  // 碰撞檢查每幀被呼叫上千次（每段釣線、浮標、船都要查每個障礙物）：全部不配置新物件，以免每秒產生數百 MB 垃圾、觸發長時間的垃圾回收卡頓
+  static local(p,b,out){ out=out||{x:0,y:0,z:0}; if(!b.frame){ out.x=p.x; out.y=p.y; out.z=p.z; return out; } const f=b.frame,c=Math.cos(f.head),s=Math.sin(f.head),x=p.x-f.x,z=p.z-f.z; out.x=x*c-z*s; out.y=p.y; out.z=x*s+z*c; return out; }
   static world(p,b){ if(!b.frame)return {...p};const f=b.frame,c=Math.cos(f.head),s=Math.sin(f.head);return{x:f.x+p.x*c+p.z*s,y:p.y,z:f.z-p.x*s+p.z*c}; }
-  static inside(p,b,r=0){ p=FishingPhysics.local(p,b); return ['x','y','z'].every(k=>p[k]>b.min[k]-r&&p[k]<b.max[k]+r); }
+  static inside(p,b,r=0){ let x=p.x,z=p.z; if(b.frame){ const f=b.frame,c=Math.cos(f.head),s=Math.sin(f.head),dx=p.x-f.x,dz=p.z-f.z; x=dx*c-dz*s; z=dx*s+dz*c; } return x>b.min.x-r&&x<b.max.x+r&&p.y>b.min.y-r&&p.y<b.max.y+r&&z>b.min.z-r&&z<b.max.z+r; }
   hit(a,b,r=0,accept=null){
     let best=null;
     const minX=Math.min(a.x,b.x)-r,maxX=Math.max(a.x,b.x)+r,minY=Math.min(a.y,b.y)-r,maxY=Math.max(a.y,b.y)+r,minZ=Math.min(a.z,b.z)-r,maxZ=Math.max(a.z,b.z)+r;
-    for(const box of this.boxes){
-      if(r===.025&&box.label==='睡蓮葉')continue;
+    const boxes=this.boxes;
+    for(let bi=0;bi<boxes.length;bi++){ const box=boxes[bi];
+      if(r===.025&&(box.label==='睡蓮葉'||box.label==='船體'))continue;   // 釣線不跟荷葉、自己的船殼做碰撞（船殼的箱子比船身粗很多，會讓垂在船邊的線每幀都去算繞路）
       // Reject distant static bounds before transforms, allocations and slab tests.
       if(!box.frame&&(box.min.x>maxX||box.max.x<minX||box.min.y>maxY||box.max.y<minY||box.min.z>maxZ||box.max.z<minZ))continue;
-      if(accept&&!accept(box))continue;const aa=box.frame?FishingPhysics.local(a,box):a,bb=box.frame?FishingPhysics.local(b,box):b; let lo=0,hi=1,axis=null,sign=0,valid=true;
-      for(const k of ['x','y','z']){ const d=bb[k]-aa[k], mn=box.min[k]-r,mx=box.max[k]+r;
-        if(Math.abs(d)<1e-10){ if(aa[k]<=mn||aa[k]>=mx){valid=false;break;} continue; }
-        let t0=(mn-aa[k])/d,t1=(mx-aa[k])/d,sg=-1; if(t0>t1){[t0,t1]=[t1,t0];sg=1;}
-        if(t0>=lo){lo=t0;axis=k;sign=sg;} hi=Math.min(hi,t1); if(lo>hi){valid=false;break;}
-      }
-      if(valid&&axis&&lo>=0&&lo<=1&&hi>1e-7&&(!best||lo<best.t)) best={t:lo,axis,sign,box,normal:(()=>{const v={x:0,y:0,z:0};v[axis]=sign;if(!box.frame)return v;const c=Math.cos(box.frame.head),s=Math.sin(box.frame.head);return{x:v.x*c+v.z*s,y:v.y,z:-v.x*s+v.z*c};})()};
+      if(accept&&!accept(box))continue;const aa=box.frame?FishingPhysics.local(a,box,HIT_A):a,bb=box.frame?FishingPhysics.local(b,box,HIT_B):b; let lo=0,hi=1,axis=0,sign=0,valid=true;
+      // 三個軸展開寫，不用字串鍵與陣列：手機上這段每幀跑上萬次
+      if(valid){ const d=bb.x-aa.x, mn=box.min.x-r, mx=box.max.x+r;
+        if(d>-1e-10&&d<1e-10){ if(aa.x<=mn||aa.x>=mx) valid=false; }
+        else { let t0=(mn-aa.x)/d,t1=(mx-aa.x)/d,sg=-1; if(t0>t1){const tt=t0;t0=t1;t1=tt;sg=1;} if(t0>=lo){lo=t0;axis=1;sign=sg;} if(t1<hi)hi=t1; if(lo>hi) valid=false; } }
+      if(valid){ const d=bb.y-aa.y, mn=box.min.y-r, mx=box.max.y+r;
+        if(d>-1e-10&&d<1e-10){ if(aa.y<=mn||aa.y>=mx) valid=false; }
+        else { let t0=(mn-aa.y)/d,t1=(mx-aa.y)/d,sg=-1; if(t0>t1){const tt=t0;t0=t1;t1=tt;sg=1;} if(t0>=lo){lo=t0;axis=2;sign=sg;} if(t1<hi)hi=t1; if(lo>hi) valid=false; } }
+      if(valid){ const d=bb.z-aa.z, mn=box.min.z-r, mx=box.max.z+r;
+        if(d>-1e-10&&d<1e-10){ if(aa.z<=mn||aa.z>=mx) valid=false; }
+        else { let t0=(mn-aa.z)/d,t1=(mx-aa.z)/d,sg=-1; if(t0>t1){const tt=t0;t0=t1;t1=tt;sg=1;} if(t0>=lo){lo=t0;axis=3;sign=sg;} if(t1<hi)hi=t1; if(lo>hi) valid=false; } }
+      if(valid&&axis&&lo>=0&&lo<=1&&hi>1e-7&&(!best||lo<best.t)){ const k=AXES[axis-1]; best={t:lo,axis:k,sign,box,normal:(()=>{const v={x:0,y:0,z:0};v[k]=sign;if(!box.frame)return v;const c=Math.cos(box.frame.head),s=Math.sin(box.frame.head);return{x:v.x*c+v.z*s,y:v.y,z:-v.x*s+v.z*c};})()}; }
     } return best;
   }
-  clear(p,r=0){ return !this.boxes.some(b=>FishingPhysics.inside(p,b,r)); }
+  clear(p,r=0){ const boxes=this.boxes; for(let i=0;i<boxes.length;i++) if(FishingPhysics.inside(p,boxes[i],r)) return false; return true; }
   resolve(p,r=0){ let q={...p};
-    for(let n=0;n<16;n++){ const b=this.boxes.find(b=>FishingPhysics.inside(q,b,r)); if(!b) break;
+    for(let n=0;n<16;n++){ let b=null; const boxes=this.boxes; for(let i=0;i<boxes.length;i++) if(FishingPhysics.inside(q,boxes[i],r)){ b=boxes[i]; break; } if(!b) break;
       // Waterborne objects go around posts rather than being pushed onto their tops.
       const local=FishingPhysics.local(q,b),choices=[]; for(const k of ['x','z']) for(const s of [-1,1]){const v=s<0?b.min[k]-r-.002:b.max[k]+r+.002; choices.push({k,v,d:Math.abs(v-local[k])});}
       choices.sort((a,b)=>a.d-b.d); local[choices[0].k]=choices[0].v;q=FishingPhysics.world(local,b);
@@ -574,7 +582,7 @@ class FishingPhysics {
   // Visibility graph around real contact bounds. Every rendered line segment is checked.
   route(a,b,r=.025){
     if(!this.hit(a,b,r)) return [a,b];
-    const nodes=[a,b], blockers=this.boxes.filter(o=>(r!==.025||o.label!=='睡蓮葉')&&o.max.y>=Math.min(a.y,b.y)-.04&&o.min.y<=Math.max(a.y,b.y)+.04&&(o.frame||o.max.x>=Math.min(a.x,b.x)-8&&o.min.x<=Math.max(a.x,b.x)+8&&o.max.z>=Math.min(a.z,b.z)-8&&o.min.z<=Math.max(a.z,b.z)+8));
+    const nodes=[a,b], blockers=this.boxes.filter(o=>(r!==.025||(o.label!=='睡蓮葉'&&o.label!=='船體'))&&o.max.y>=Math.min(a.y,b.y)-.04&&o.min.y<=Math.max(a.y,b.y)+.04&&(o.frame||o.max.x>=Math.min(a.x,b.x)-8&&o.min.x<=Math.max(a.x,b.x)+8&&o.max.z>=Math.min(a.z,b.z)-8&&o.min.z<=Math.max(a.z,b.z)+8));
     for(const o of blockers){for(const x of [o.min.x-r-.05,o.max.x+r+.05])for(const z of [o.min.z-r-.05,o.max.z+r+.05]){const p=FishingPhysics.world({x,y:b.y,z},o);if(this.clear(p,r))nodes.push(p);}}
     const dist=nodes.map(()=>Infinity),prev=[],done=new Set(); dist[0]=0;
     for(let step=0;step<nodes.length;step++){let u=-1;for(let i=0;i<nodes.length;i++)if(!done.has(i)&&(u<0||dist[i]<dist[u]))u=i;
@@ -2184,7 +2192,12 @@ function setLine(end, slack, visible, light, trem){
   lineMesh.visible=!!visible; if(!visible) return;
   let n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(rod.tipW);
   const tip=rod.tipW, dist=tip.distanceTo(end), sag=slack*Math.min(dist,40)*0.12, NC=LN-n;
-  const chordHit=PH.hit(tip,end,.025),path=chordHit?PH.route(tip,end):[tip,end];
+  // 繞障礙物的路徑很貴（每次要對每個障礙物做上百次檢查）：兩端移動不到 5 公分就沿用上一次的結果，最多每 0.25 秒重算；竿尖下垂掛的短線不繞路
+  const nowR=typeof performance!=='undefined'?performance.now():Date.now(), LC=setLine.cache||(setLine.cache={t:-1e9,tip:tip.clone().set(1e9,0,0),end:end.clone().set(1e9,0,0),hit:false,path:null});
+  let chordHit,path;
+  if(dist<1.2){ chordHit=false; path=[tip,end]; }
+  else if(LC.path&&LC.tip.distanceToSquared(tip)<4e-4&&LC.end.distanceToSquared(end)<.0025||(LC.path&&nowR-LC.t<250)){ chordHit=LC.hit; path=LC.hit?LC.path:[tip,end]; if(LC.hit){ path[0]=tip; path[path.length-1]=end; } }
+  else { chordHit=!!PH.hit(tip,end,.025); path=chordHit?PH.route(tip,end):[tip,end]; LC.t=nowR; LC.tip.copy(tip); LC.end.copy(end); LC.hit=chordHit; LC.path=path; }
   const ctrl=tmp2.copy(tip).add(end).multiplyScalar(.5); ctrl.y-=sag*2;
   if(trem){ const tq=performance.now()*.001; ctrl.x+=Math.sin(tq*61)*trem; ctrl.y+=Math.sin(tq*47+1.3)*trem*.7; ctrl.z+=Math.cos(tq*53)*trem; }   // 繃緊的釣線細微顫動
   for(let i=1;i<=NC;i++){ const t=i/NC, a=(1-t)*(1-t), b=2*(1-t)*t, c=t*t;
@@ -2192,7 +2205,7 @@ function setLine(end, slack, visible, light, trem){
     else LP[n++].set(a*tip.x+b*ctrl.x+c*end.x, a*tip.y+b*ctrl.y+c*end.y, a*tip.z+b*ctrl.z+c*end.z); }
   if(path.length>2){ n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(tip); for(let i=1;i<path.length&&n<LN;i++) LP[n++].copy(path[i]); }
   // A slack curve can touch a low branch even when its straight chord is clear.
-  let curveBlocked=false; for(let i=rod.guidesW.length+2;i<n;i++) if(PH.hit(LP[i-1],LP[i],.025)){curveBlocked=true;break;}
+  let curveBlocked=false; if(dist>=1.2&&(chordHit||sag>.05)) for(let i=rod.guidesW.length+2;i<n;i++) if(PH.hit(LP[i-1],LP[i],.025)){curveBlocked=true;break;}
   if(curveBlocked&&path.length===2&&!chordHit){const first=rod.guidesW.length+2, count=n-first;for(let i=0;i<count;i++)LP[first+i].copy(tip).lerp(end,(i+1)/count);}
   camera.getWorldPosition(camW);
   const pix=2*Math.tan(camera.fov*Math.PI/360)/Math.max(300,window.innerHeight);
@@ -7229,7 +7242,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102071823'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102075002'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9175,7 +9188,7 @@ function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收�
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; if(then){ fadeEl.classList.remove('on'); then(); } else if(G.spot!==0){ fadeEl.classList.remove('on'); goSpot(0); } else fadeOutWhenReady(); },650); }
-window.__goHome=goHome; window.__startRetrieve=startRetrieve;
+window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__goSpot=i=>goSpot(i);
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });

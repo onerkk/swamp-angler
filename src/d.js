@@ -468,7 +468,7 @@ function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收�
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; if(then){ fadeEl.classList.remove('on'); then(); } else if(G.spot!==0){ fadeEl.classList.remove('on'); goSpot(0); } else fadeOutWhenReady(); },650); }
-window.__goHome=goHome; window.__startRetrieve=startRetrieve;
+window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__goSpot=i=>goSpot(i);
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });

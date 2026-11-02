@@ -283,7 +283,12 @@ function setLine(end, slack, visible, light, trem){
   lineMesh.visible=!!visible; if(!visible) return;
   let n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(rod.tipW);
   const tip=rod.tipW, dist=tip.distanceTo(end), sag=slack*Math.min(dist,40)*0.12, NC=LN-n;
-  const chordHit=PH.hit(tip,end,.025),path=chordHit?PH.route(tip,end):[tip,end];
+  // 繞障礙物的路徑很貴（每次要對每個障礙物做上百次檢查）：兩端移動不到 5 公分就沿用上一次的結果，最多每 0.25 秒重算；竿尖下垂掛的短線不繞路
+  const nowR=typeof performance!=='undefined'?performance.now():Date.now(), LC=setLine.cache||(setLine.cache={t:-1e9,tip:tip.clone().set(1e9,0,0),end:end.clone().set(1e9,0,0),hit:false,path:null});
+  let chordHit,path;
+  if(dist<1.2){ chordHit=false; path=[tip,end]; }
+  else if(LC.path&&LC.tip.distanceToSquared(tip)<4e-4&&LC.end.distanceToSquared(end)<.0025||(LC.path&&nowR-LC.t<250)){ chordHit=LC.hit; path=LC.hit?LC.path:[tip,end]; if(LC.hit){ path[0]=tip; path[path.length-1]=end; } }
+  else { chordHit=!!PH.hit(tip,end,.025); path=chordHit?PH.route(tip,end):[tip,end]; LC.t=nowR; LC.tip.copy(tip); LC.end.copy(end); LC.hit=chordHit; LC.path=path; }
   const ctrl=tmp2.copy(tip).add(end).multiplyScalar(.5); ctrl.y-=sag*2;
   if(trem){ const tq=performance.now()*.001; ctrl.x+=Math.sin(tq*61)*trem; ctrl.y+=Math.sin(tq*47+1.3)*trem*.7; ctrl.z+=Math.cos(tq*53)*trem; }   // 繃緊的釣線細微顫動
   for(let i=1;i<=NC;i++){ const t=i/NC, a=(1-t)*(1-t), b=2*(1-t)*t, c=t*t;
@@ -291,7 +296,7 @@ function setLine(end, slack, visible, light, trem){
     else LP[n++].set(a*tip.x+b*ctrl.x+c*end.x, a*tip.y+b*ctrl.y+c*end.y, a*tip.z+b*ctrl.z+c*end.z); }
   if(path.length>2){ n=0; LP[n++].copy(rod.spoolW); for(const g of rod.guidesW) LP[n++].copy(g); LP[n++].copy(tip); for(let i=1;i<path.length&&n<LN;i++) LP[n++].copy(path[i]); }
   // A slack curve can touch a low branch even when its straight chord is clear.
-  let curveBlocked=false; for(let i=rod.guidesW.length+2;i<n;i++) if(PH.hit(LP[i-1],LP[i],.025)){curveBlocked=true;break;}
+  let curveBlocked=false; if(dist>=1.2&&(chordHit||sag>.05)) for(let i=rod.guidesW.length+2;i<n;i++) if(PH.hit(LP[i-1],LP[i],.025)){curveBlocked=true;break;}
   if(curveBlocked&&path.length===2&&!chordHit){const first=rod.guidesW.length+2, count=n-first;for(let i=0;i<count;i++)LP[first+i].copy(tip).lerp(end,(i+1)/count);}
   camera.getWorldPosition(camW);
   const pix=2*Math.tan(camera.fov*Math.PI/360)/Math.max(300,window.innerHeight);
