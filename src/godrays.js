@@ -33,7 +33,7 @@ function createGodRays({renderer:R,camera,U}){
   const m1=new T.Mesh(quadGeo,marchMat), m2=new T.Mesh(quadGeo,addMat); m1.frustumCulled=m2.frustumCulled=false; marchScene.add(m1); addScene.add(m2);
   let frame=0;
   function ensure(){ R.getDrawingBufferSize(size); const w=Math.max(16,Math.floor(size.x)), h=Math.max(16,Math.floor(size.y));
-    if(w!==cw||h!==ch){ cw=w; ch=h; if(copyTex) copyTex.dispose(); copyTex=new T.DataTexture(null,w,h,T.RGBAFormat); copyTex.minFilter=copyTex.magFilter=T.LinearFilter; copyTex.generateMipmaps=false;
+    if(w!==cw||h!==ch){ cw=w; ch=h; if(copyTex) copyTex.dispose(); copyTex=new T.DataTexture(null,w,h,(R.getContext().getContextAttributes()||{}).alpha===false?T.RGBFormat:T.RGBAFormat);   /* 畫布沒有透明通道時要用 RGB，否則複製會靜默失敗、整張黑 */ copyTex.minFilter=copyTex.magFilter=T.LinearFilter; copyTex.generateMipmaps=false;
       if(rt) rt.dispose(); rt=new T.WebGLRenderTarget(Math.max(8,w>>2),Math.max(8,h>>2),{minFilter:T.LinearFilter,magFilter:T.LinearFilter,depthBuffer:false}); } }
   /* 主畫面畫完之後呼叫。o.strength 0 就不畫 */
   function render(o){

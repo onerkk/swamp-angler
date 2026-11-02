@@ -1,4 +1,4 @@
-/*APPV:20261102201845*/
+/*APPV:20261102204616*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -928,7 +928,7 @@ function createGodRays({renderer:R,camera,U}){
   const m1=new T.Mesh(quadGeo,marchMat), m2=new T.Mesh(quadGeo,addMat); m1.frustumCulled=m2.frustumCulled=false; marchScene.add(m1); addScene.add(m2);
   let frame=0;
   function ensure(){ R.getDrawingBufferSize(size); const w=Math.max(16,Math.floor(size.x)), h=Math.max(16,Math.floor(size.y));
-    if(w!==cw||h!==ch){ cw=w; ch=h; if(copyTex) copyTex.dispose(); copyTex=new T.DataTexture(null,w,h,T.RGBAFormat); copyTex.minFilter=copyTex.magFilter=T.LinearFilter; copyTex.generateMipmaps=false;
+    if(w!==cw||h!==ch){ cw=w; ch=h; if(copyTex) copyTex.dispose(); copyTex=new T.DataTexture(null,w,h,(R.getContext().getContextAttributes()||{}).alpha===false?T.RGBFormat:T.RGBAFormat);   /* 畫布沒有透明通道時要用 RGB，否則複製會靜默失敗、整張黑 */ copyTex.minFilter=copyTex.magFilter=T.LinearFilter; copyTex.generateMipmaps=false;
       if(rt) rt.dispose(); rt=new T.WebGLRenderTarget(Math.max(8,w>>2),Math.max(8,h>>2),{minFilter:T.LinearFilter,magFilter:T.LinearFilter,depthBuffer:false}); } }
   /* 主畫面畫完之後呼叫。o.strength 0 就不畫 */
   function render(o){
@@ -949,7 +949,7 @@ function createGodRays({renderer:R,camera,U}){
     } finally { R.autoClear=ac; R.toneMapping=tone; R.outputEncoding=enc; R.setRenderTarget(prevRT); }
     return true; }
   function release(){ if(copyTex){ copyTex.dispose(); copyTex=null; } if(rt){ rt.dispose(); rt=null; } cw=ch=0; }
-  return {render,release};
+  return {render,release,debugRT:()=>rt};
 }
 if(typeof module!=='undefined'&&module.exports) module.exports={createGodRays};
 /* ===== 遊艇航行的水：船頭兩側往外散開的 V 形艏浪（克爾文尾跡角約 19.5°）、船尾螺旋槳翻起的白色航跡、高速時船頭甩出的水花 =====
@@ -2010,7 +2010,7 @@ const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
 const godRays=createGodRays({renderer,camera,U}), _grCol=new T.Color(), _grDir=new T.Vector3();
 /* 光束的強度：白天看太陽高度（晨昏最明顯、正午很淡）、雲量；夜裡改用月光，弱很多。只在高畫質畫 */
 function raysParams(){ if(materialQuality.tier!=='high'||window.__noRays) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
-  if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); return {dir:_grDir,color:_grCol,strength:Math.min(1.6,vis*(.4+.6*low)*2.4),thresh:.55}; }
+  if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); return {dir:_grDir,color:_grCol,strength:Math.min(1.6,vis*(.4+.6*low)*2.4),thresh:.5}; }
   const mk=U.uMoonK?U.uMoonK.value:0; if(mk>.05&&U.uMoonDir){ _grDir.copy(U.uMoonDir.value).normalize(); _grCol.setRGB(.62,.72,.95); return {dir:_grDir,color:_grCol,strength:mk*.45,thresh:.16}; }
   return null; }
 const radiance=createSceneRadiance(T,renderer,prepareScene),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
@@ -2028,7 +2028,7 @@ function render(){prepareScene(scene);const oldEnv=scene.environment;if(window._
 const passStats=window.__passStats={sub:{ms:0,calls:0,tris:0},refl:{ms:0,calls:0,tris:0},main:{ms:0,calls:0,tris:0,shadow:false,shadowSize:0}};
 function pass(name,fn){const info=renderer.info,c0=info.render.calls,t0=info.render.triangles,n0=performance.now();fn();const st=passStats[name];st.ms=+(performance.now()-n0).toFixed(2);st.calls=info.render.calls-c0;st.tris=info.render.triangles-t0;}
 
-function suspendEffects(){godRays.release();releaseSceneGPU(scene);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}lastShadow=-Infinity;reflRT.setSize(4,4);WU.uReflOn.value=0;submerged.target.setSize(4,4);WU.uSubmergedOn.value=0;radiance.release();}
+function suspendEffects(){if(typeof godRays!=='undefined')godRays.release();releaseSceneGPU(scene);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}lastShadow=-Infinity;reflRT.setSize(4,4);WU.uReflOn.value=0;submerged.target.setSize(4,4);WU.uSubmergedOn.value=0;radiance.release();}
 function resetGraphics(){suspendEffects();if(envRT){envRT.dispose();envRT=null;scene.environment=null;}envJobs.reset();invalidateEnvironment();}
 function setIce(on){water.visible=!on;seaGrid.visible=!on;}
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=water.visible; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
@@ -8080,7 +8080,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102201845'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102204616'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
