@@ -100,7 +100,7 @@ function playWin(w){ const b=w.b, idx=BOSS.indexOf(b)+1, el=document.createEleme
   // 點一下：還在寫字就直接寫完；寫完了就收起來
   el.addEventListener('click',()=>{ if(!el.querySelector('.ok.go')){ T0.forEach(t=>{ clearTimeout(t); clearInterval(t); }); el.classList.add('open'); box.textContent=txt; el.querySelector('.seal').classList.add('go'); el.querySelectorAll('.rw span').forEach(x=>x.classList.add('go')); el.querySelector('.ok').classList.add('go'); return; } close(); });
 }
-setInterval(()=>{ if(winQ.length&&!document.body.classList.contains('catching')&&!document.body.classList.contains('ending')&&!document.getElementById('ledger')) playWin(winQ.shift()); },500);
+setInterval(()=>{ if(winQ.length&&window.__whenFree){ const w=winQ.shift(); window.__whenFree(()=>playWin(w)); } },500);
 /* Boss 登場演出與光暈 */
 const T=THREE, bc=document.createElement('canvas'); bc.width=bc.height=128; { const x=bc.getContext('2d'), gr=x.createRadialGradient(64,64,4,64,64,64); gr.addColorStop(0,'rgba(255,230,140,.9)'); gr.addColorStop(.35,'rgba(255,150,60,.45)'); gr.addColorStop(1,'rgba(255,80,40,0)'); x.fillStyle=gr; x.fillRect(0,0,128,128); }
 const aura=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(bc),blending:T.AdditiveBlending,depthWrite:false,transparent:true})); aura.renderOrder=6;
@@ -133,7 +133,7 @@ const st=document.createElement('style'); st.textContent=`
 #bossBan{position:fixed;left:50%;top:30%;transform:translate(-50%,-50%) scale(.6);z-index:25;text-align:center;padding:14px 28px;border-radius:18px;background:linear-gradient(135deg,rgba(60,10,10,.92),rgba(120,40,10,.92));border:2px solid #ffd56a;box-shadow:0 0 40px rgba(255,150,60,.7);opacity:0;pointer-events:none;transition:transform .35s cubic-bezier(.2,1.6,.4,1),opacity .35s}
 #bossBan.in{opacity:1;transform:translate(-50%,-50%) scale(1)}#bossBan.out{opacity:0;transform:translate(-50%,-60%) scale(.9)}#bossBan.hidden{display:none}
 #bossBan b{display:block;font-size:30px;color:#ffe9a8;letter-spacing:2px;text-shadow:0 2px 12px rgba(255,120,40,.9)}#bossBan small{display:block;margin-top:4px;font-size:13px;color:#ffd0a0;font-weight:700}
-#bossFlash{position:fixed;inset:0;z-index:24;background:#fff;opacity:0;pointer-events:none}#bossFlash.go{animation:bfl .6s ease-out}@keyframes bfl{0%{opacity:.85}100%{opacity:0}}#talBox .lock{color:var(--fg-dim);font-size:12px}#talBox .on{color:#7ff0a8;font-weight:800}
+#bossFlash{position:fixed;inset:0;z-index:24;background:#fff;opacity:0;pointer-events:none}#bossFlash.go{animation:bfl .6s ease-out}@keyframes bfl{0%{opacity:.85}100%{opacity:0}}#talBox .lock{color:var(--fg-dim);font-size:12px}#talBox .nw{font-size:11px;padding:1px 6px;border-radius:6px;background:#e5483a;color:#fff;vertical-align:2px}#talBox .on{color:#7ff0a8;font-weight:800}
 #top3{position:fixed;left:12px;top:calc(var(--hud2,110px) + 6px);z-index:5;display:flex;gap:8px;align-items:stretch;max-width:calc(100vw - 24px)}
 #talBtn{font-size:14px;padding:7px 14px;border-color:rgba(255,213,106,.45)}#talBtn em{font-style:normal;margin-left:6px;min-width:20px;padding:1px 6px;border-radius:999px;background:#e5483a;color:#fff;font-size:12px}#talBtn.has{box-shadow:0 0 0 1px rgba(255,213,106,.5),0 0 10px rgba(255,190,80,.45)}
 #bossBtn{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;padding:5px 14px 5px 12px;border-radius:16px;border:1px solid rgba(255,213,106,.7);background:linear-gradient(135deg,rgba(92,58,8,.92),rgba(150,98,20,.9));color:#ffe9a8;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,.35);max-width:56vw;text-align:left}
@@ -175,7 +175,7 @@ function render(){ if(mode==='boss'){ box.firstChild.innerHTML=bossView(); retur
   let h=`<h3>⭐ 天賦<button class="sbtn" data-t="x">✕</button></h3>`;
   h+=`<div class="pt">${(S.lv||1)<5?'Lv 5 起每升一級得 1 點天賦':`可用天賦點：${p}（Lv ${S.lv}，已用 ${spent()}）`}</div>`;
   for(const k in TAL){ const r=rank(k), T=TAL[k], mx=talMax(k), lock=(S.lv||1)<(T.lv||0);
-    h+=row(`${T.i} ${T.n} <span class="pips">${'●'.repeat(r)}${'○'.repeat(mx-r)}</span>`,lock?`<span class="lock">Lv ${T.lv} 開放：${T.d(1)}（每級）</span>`:r?T.d(r):'尚未投入',lock?'🔒':r>=mx?'<span class="on">滿級</span>':`<button class="sbtn${p>0?' pri':''}" data-t="add" data-v="${k}">＋1</button>`); }
+    h+=row(`${T.i} ${T.n}${T.lv&&!lock&&!r?' <span class="nw">新</span>':''} <span class="pips">${'●'.repeat(r)}${'○'.repeat(mx-r)}</span>`,lock?`<span class="lock">Lv ${T.lv} 開放：${T.d(1)}（每級）</span>`:r?T.d(r):'尚未投入',lock?'🔒':r>=mx?'<span class="on">滿級</span>':`<button class="sbtn${p>0?' pri':''}" data-t="add" data-v="${k}">＋1</button>`); }
   if(spent()>0) h+=`<div style="text-align:right;margin-top:6px"><button class="sbtn danger" data-t="reset">重置天賦（🪙${TAL_RESET.toLocaleString()}）</button></div>`;
   h+=`<div class="sec"><button class="sbtn pri" data-t="mode" data-v="boss" style="width:100%">👑 大師挑戰（${BOSS.filter(x=>(S.lv||1)>=x.lv&&!S.boss[x.id]).length} 隻可挑戰）</button></div>`;
   if(window.__LVINFO){ const L=window.__LVINFO, lv=S.lv||1, need=L.xpNext(lv), up=[]; for(let k=lv+1;k<=lv+12&&up.length<4;k++){ const g=L.gains(k).filter(x=>x!=='天賦點 +1'); if(g.length) up.push(`<div class="tk"><b>Lv ${k}</b>　${g.join('、')}</div>`); }

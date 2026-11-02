@@ -1,6 +1,9 @@
 /* ===== 月鱗畫像：送霜汐回家後，她留下一片月鱗，鱗面映出她的樣子（使用者用 AI 產生的美人魚圖） =====
    每次隨機一張，優先給還沒收集到的；收集過的可以在霜汐的對話視窗裡「🖼 月鱗畫像」重看
    圖片放在 media/mergift/，新增圖片只要把檔名加進 MERGIFT 清單 */
+/* 獎勵畫面排隊：漁獲卡、結局演出、章節過場、任何面板、別的獎勵畫面都沒開著時才播放（漁獲簿翻頁、月鱗畫像共用） */
+window.__whenFree=window.__whenFree||(()=>{ const q=[]; const busy=()=>{ const b=document.body.classList; return b.contains('catching')||b.contains('ending')||b.contains('cine')||b.contains('sheetOn')||!!document.getElementById('ledger')||!!document.getElementById('mgBox'); };
+  setInterval(()=>{ if(q.length&&!busy()) q.shift()(); },400); return fn=>q.push(fn); })();
 const MERGIFT=['mg01.jpg','mg02.jpg','mg03.jpg','mg04.jpg','mg05.jpg','mg06.jpg','mg07.jpg','mg08.jpg'];
 (function(){
 'use strict';
