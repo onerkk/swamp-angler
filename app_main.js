@@ -1,4 +1,4 @@
-/*APPV:20261102185818*/
+/*APPV:20261102190944*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -6640,57 +6640,81 @@ function stats(){ const S=window.__SAVE||{}, SP=(window.__PROPS&&window.__PROPS.
   const log=(S.catchLog||[]).filter(r=>r&&r.w>0), big=log.slice().sort((a,b)=>b.w-a.w)[0], bigSp=big&&SP.find(s=>s.id===big.id);
   const mer=(S.merGift||[]).length, merN=window.__MERGIFT?window.__MERGIFT.count():8;
   const title=window.__TAL&&window.__TAL.curTitle?window.__TAL.curTitle():((S.titles||[]).slice(-1)[0]||'');
-  return {lv:S.lv||1, title, dex, dexN:fish.length, won, wonN:B.length, main, epi, total:S.total||log.length, big, bigSp, mer, merN, titles:(S.titles||[]).slice(-4).reverse(), coins:S.coins||0}; }
-function draw(){ const st=stats(), cv=document.createElement('canvas'); cv.width=W0; cv.height=H0; const g=cv.getContext('2d');
-  // 底：深夜湖色
-  const bg=g.createLinearGradient(0,0,0,H0); bg.addColorStop(0,'#0b1620'); bg.addColorStop(1,'#05090d'); g.fillStyle=bg; g.fillRect(0,0,W0,H0);
-  // 上半部：遊戲畫面（裁成 1080×760，往下漸暗接到資料區）
-  const shot=grabScene(), SH=640;
-  if(shot){ const sr=shot.width/shot.height, tr=W0/SH; let sw=shot.width, sh=shot.height, sx=0, sy=0; if(sr>tr){ sw=sh*tr; sx=(shot.width-sw)/2; } else { sh=sw/tr; sy=(shot.height-sh)*.35; } g.drawImage(shot,sx,sy,sw,sh,0,0,W0,SH); }
-  const fade=g.createLinearGradient(0,SH*.45,0,SH+40); fade.addColorStop(0,'rgba(5,9,13,0)'); fade.addColorStop(1,'rgba(5,9,13,1)'); g.fillStyle=fade; g.fillRect(0,0,W0,SH+40);
-  const top=g.createLinearGradient(0,0,0,220); top.addColorStop(0,'rgba(0,0,0,.55)'); top.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=top; g.fillRect(0,0,W0,220);
-  // 片名
-  g.textAlign='left'; g.textBaseline='alphabetic'; g.fillStyle='#f3e7c9'; g.shadowColor='rgba(0,0,0,.6)'; g.shadowBlur=18;
-  g.font=`900 104px ${SERIF}`; g.fillText('濕地垂釣',64,148); g.shadowBlur=0;
-  g.font=`500 30px ${SANS}`; g.fillStyle='rgba(243,231,201,.85)'; g.fillText('替老漁人，把四十年沒釣上岸的魚釣上來',68,198);
-  // 玩家條
-  let y=SH-112; g.fillStyle='rgba(12,20,26,.78)'; rr(g,48,y,W0-96,100,26); g.fill(); g.strokeStyle='rgba(255,213,106,.55)'; g.lineWidth=2; g.stroke();
-  g.fillStyle='#ffd56a'; g.font=`900 52px ${SANS}`; g.fillText('Lv '+st.lv,80,y+70);
-  g.fillStyle='#f3e7c9'; fitText(g,'「'+(st.title||'新手漁人')+'」',560,44,SERIF,800); g.fillText('「'+(st.title||'新手漁人')+'」',250,y+68);
-  g.textAlign='right'; g.fillStyle='#9fc2d8'; g.font=`600 28px ${SANS}`; g.fillText('累積漁獲 '+st.total.toLocaleString()+' 尾',W0-80,y+66); g.textAlign='left';
-  // 四格數據
-  y=SH+6; const tiles=[['📖','圖鑑',st.dex+' / '+st.dexN],['👑','大師挑戰',st.won+' / '+st.wonN],['📜','漁獲簿',st.won+' 頁'],['🌙','月鱗畫像',st.mer+' / '+st.merN]], tw=(W0-96-3*18)/4;
-  tiles.forEach((t,i)=>{ const x=48+i*(tw+18); g.fillStyle='rgba(255,255,255,.06)'; rr(g,x,y,tw,140,22); g.fill(); g.strokeStyle='rgba(255,255,255,.12)'; g.lineWidth=1.5; g.stroke();
-    g.textAlign='center'; g.font=`400 40px ${SANS}`; g.fillText(t[0],x+tw/2,y+48); g.fillStyle='#ffe9a8'; g.font=`900 36px ${SANS}`; g.fillText(t[2],x+tw/2,y+96); g.fillStyle='#9fb3c2'; g.font=`500 24px ${SANS}`; g.fillText(t[1],x+tw/2,y+128); g.fillStyle='#fff'; });
+  return {lv:S.lv||1, title, dex, dexN:fish.length, won, wonN:B.length, bosses:B.map(b=>({n:b.name,ok:!!(S.boss&&S.boss[b.id])})), main, epi, total:S.total||log.length, big, bigSp, mer, merN, titles:(S.titles||[]).length}; }
+/* 主角：最大漁獲的真實 3D 模型，單獨畫在透明底上（畫到離屏目標再讀回像素），疊在遊戲畫面上 */
+async function heroFish(sp){ const M=window.__MDL, W=window.__W, T=THREE; if(!M||!sp||!W) return null;
+  if(!M.fishReady(sp.id)){ if(M.want) M.want(sp.id); for(let i=0;i<40&&!M.fishReady(sp.id);i++) await new Promise(r=>setTimeout(r,100)); if(!M.fishReady(sp.id)) return null; }
+  let f=null; try{ f=M.fish(sp); }catch(e){ return null; } if(!f||!f.group) return null;
+  const g=f.group, scn=new T.Scene(); g.position.set(0,0,0); g.rotation.set(0,0,0); g.scale.setScalar(1); g.visible=true; scn.add(g); g.updateMatrixWorld(true);
+  let b=new T.Box3().setFromObject(g), sz=b.getSize(new T.Vector3()); if(sz.z>sz.x){ g.rotation.y=Math.PI/2; g.updateMatrixWorld(true); b=new T.Box3().setFromObject(g); sz=b.getSize(new T.Vector3()); }
+  g.rotation.z=.14; g.updateMatrixWorld(true); b=new T.Box3().setFromObject(g); sz=b.getSize(new T.Vector3()); const c=b.getCenter(new T.Vector3());
+  scn.add(new T.HemisphereLight(0xfff3e0,0x2a3a40,1.25)); const key=new T.DirectionalLight(0xffffff,1.6); key.position.set(-2,4,5); scn.add(key); const rim=new T.DirectionalLight(0x9fd0ff,1.1); rim.position.set(3,1,-4); scn.add(rim);
+  const Wd=1024, Hd=512, cam=new T.PerspectiveCamera(24,Wd/Hd,.01,100), fitW=sz.x*1.08/(2*Math.tan(12*Math.PI/180)*cam.aspect), fitH=sz.y*1.2/(2*Math.tan(12*Math.PI/180));
+  cam.position.set(c.x,c.y,c.z+Math.max(fitW,fitH)+sz.z/2); cam.lookAt(c);
+  const R=W.renderer, rt=new T.WebGLRenderTarget(Wd,Hd,{format:T.RGBAFormat}), old=R.getRenderTarget(), oc=R.getClearColor(new T.Color()), oa=R.getClearAlpha(), ot=R.toneMapping, oe=R.outputEncoding;
+  const px=new Uint8Array(Wd*Hd*4);
+  try{ R.setRenderTarget(rt); R.setClearColor(0,0); R.clear(); R.outputEncoding=T.LinearEncoding; R.render(scn,cam); R.readRenderTargetPixels(rt,0,0,Wd,Hd,px); }
+  finally{ R.setRenderTarget(old); R.setClearColor(oc,oa); R.toneMapping=ot; R.outputEncoding=oe; rt.dispose(); }
+  const cv=document.createElement('canvas'); cv.width=Wd; cv.height=Hd; const x=cv.getContext('2d'), id=x.createImageData(Wd,Hd);
+  // 讀回來的像素上下顛倒、是線性亮度：翻轉並轉回螢幕的 sRGB
+  const gm=new Uint8Array(256); for(let i=0;i<256;i++) gm[i]=Math.round(Math.pow(i/255,1/2.2)*255);
+  for(let yy=0;yy<Hd;yy++){ const si=(Hd-1-yy)*Wd*4, di=yy*Wd*4; for(let k=0;k<Wd*4;k+=4){ id.data[di+k]=gm[px[si+k]]; id.data[di+k+1]=gm[px[si+k+1]]; id.data[di+k+2]=gm[px[si+k+2]]; id.data[di+k+3]=px[si+k+3]; } }
+  x.putImageData(id,0,0); return cv; }
+function wkg(w){ return w>=1?(w>=100?Math.round(w).toLocaleString():w.toFixed(1))+' kg':Math.round(w*1000)+' g'; }
+/* 版面：上半部真實遊戲畫面＋最大漁獲的 3D 模型＋一句挑戰；下半部是老漁人《漁獲簿》的紙頁：玩家、數據、十四枚魚王印章、故事航線 */
+async function draw(){ const st=stats(), cv=document.createElement('canvas'); cv.width=W0; cv.height=H0; const g=cv.getContext('2d');
+  g.fillStyle='#05090d'; g.fillRect(0,0,W0,H0);
+  const shot=grabScene(), SH=720;
+  if(shot){ const sr=shot.width/shot.height, tr=W0/SH; let sw=shot.width, sh=shot.height, sx=0, sy=0; if(sr>tr){ sw=sh*tr; sx=(shot.width-sw)/2; } else { sh=sw/tr; sy=(shot.height-sh)*.3; } g.drawImage(shot,sx,sy,sw,sh,0,0,W0,SH); }
+  // 電影感調色：上下壓暗、四角暗角
+  let gr=g.createLinearGradient(0,0,0,SH); gr.addColorStop(0,'rgba(0,0,0,.55)'); gr.addColorStop(.28,'rgba(0,0,0,0)'); gr.addColorStop(.7,'rgba(0,0,0,.05)'); gr.addColorStop(1,'rgba(5,9,13,.92)'); g.fillStyle=gr; g.fillRect(0,0,W0,SH);
+  gr=g.createRadialGradient(W0/2,SH*.45,SH*.35,W0/2,SH*.45,SH*.95); gr.addColorStop(0,'rgba(0,0,0,0)'); gr.addColorStop(1,'rgba(0,0,0,.45)'); g.fillStyle=gr; g.fillRect(0,0,W0,SH);
+  // 片名：金色描邊的大字
+  g.textAlign='left'; g.textBaseline='alphabetic'; g.font=`900 118px ${SERIF}`; g.lineWidth=6; g.strokeStyle='rgba(60,36,8,.85)'; g.strokeText('濕地垂釣',58,150);
+  gr=g.createLinearGradient(0,40,0,160); gr.addColorStop(0,'#fff4d2'); gr.addColorStop(1,'#e6b85c'); g.fillStyle=gr; g.fillText('濕地垂釣',58,150);
+  g.font=`600 30px ${SANS}`; g.fillStyle='rgba(255,244,214,.92)'; g.shadowColor='rgba(0,0,0,.8)'; g.shadowBlur=10; g.fillText('真實湖景、海釣、冰湖、傳說中的美人魚',62,200); g.shadowBlur=0;
+  // 主角魚
+  const hero=st.bigSp?await heroFish(st.bigSp):null;
+  if(hero){ g.save(); g.shadowColor='rgba(0,0,0,.65)'; g.shadowBlur=40; g.shadowOffsetY=18; g.drawImage(hero,20,SH-470,1040,520); g.restore(); }
+  // 一句挑戰（用自己的最大漁獲當鉤子）
+  if(st.big&&st.bigSp){ const line1=`我拉起了 ${wkg(st.big.w)} 的${st.bigSp.name}`; g.textAlign='right'; g.font=`900 54px ${SERIF}`; g.lineWidth=8; g.strokeStyle='rgba(0,0,0,.75)'; g.strokeText(line1,W0-48,SH-62); g.fillStyle='#fff'; g.fillText(line1,W0-48,SH-62);
+    g.font=`800 34px ${SANS}`; g.fillStyle='#ffd56a'; g.strokeText('你呢？',W0-48,SH-16); g.fillText('你呢？',W0-48,SH-16); g.textAlign='left'; }
+  // 下半部：漁獲簿紙頁
+  const PY=SH+6, PH=H0-PY-150; g.save(); rr(g,30,PY,W0-60,PH,18); g.clip();
+  if(paper.complete&&paper.naturalWidth) g.drawImage(paper,30,PY,W0-60,PH); else { g.fillStyle='#e9dcbc'; g.fillRect(30,PY,W0-60,PH); }
+  gr=g.createLinearGradient(30,0,W0-30,0); gr.addColorStop(0,'rgba(90,60,25,.35)'); gr.addColorStop(.06,'rgba(90,60,25,0)'); gr.addColorStop(.94,'rgba(90,60,25,0)'); gr.addColorStop(1,'rgba(90,60,25,.3)'); g.fillStyle=gr; g.fillRect(30,PY,W0-60,PH); g.restore();
+  const INK='#2c1d0c', INK2='#6b5030';
+  let y=PY+64; g.fillStyle=INK; g.font=`900 44px ${SERIF}`; g.fillText(`Lv ${st.lv}`,66,y); g.font=`900 44px ${SERIF}`; g.fillText(`「${st.title||'新手漁人'}」`,220,y);
+  g.textAlign='right'; g.fillStyle=INK2; g.font=`600 26px ${SANS}`; g.fillText(`漁獲 ${st.total.toLocaleString()} 尾　圖鑑 ${st.dex}/${st.dexN}　稱號 ${st.titles}`,W0-66,y-4); g.textAlign='left';
+  g.strokeStyle='rgba(60,40,15,.35)'; g.lineWidth=2; g.beginPath(); g.moveTo(66,y+20); g.lineTo(W0-66,y+20); g.stroke();
+  // 十四枚魚王印章：擊敗的蓋紅印，沒擊敗的只有淡淡的墨線
+  y+=46; g.fillStyle=INK2; g.font=`700 26px ${SANS}`; g.fillText(`大師挑戰　${st.won}／${st.wonN}`,66,y+6);
+  const cols=7, cw=(W0-132)/cols, r=42; st.bosses.forEach((b,i)=>{ const cx=66+cw*(i%cols)+cw/2, cy=y+62+Math.floor(i/cols)*104;
+    g.save(); g.translate(cx,cy); g.rotate((i%3-1)*.08);
+    if(b.ok){ g.fillStyle='rgba(178,38,28,.86)'; rr(g,-r,-r,r*2,r*2,12); g.fill(); g.strokeStyle='rgba(255,230,210,.55)'; g.lineWidth=2; rr(g,-r+6,-r+6,r*2-12,r*2-12,8); g.stroke(); g.fillStyle='#fff3e6'; }
+    else { g.strokeStyle='rgba(60,40,15,.28)'; g.lineWidth=2; g.setLineDash([5,5]); rr(g,-r,-r,r*2,r*2,12); g.stroke(); g.setLineDash([]); g.fillStyle='rgba(60,40,15,.32)'; }
+    const n0=b.n.replace(/^巨型/,''), nm=n0.length>4?n0.slice(0,4):n0; g.textAlign='center'; g.font=`900 ${nm.length>3?22:26}px ${SERIF}`;
+    if(nm.length<=2) g.fillText(nm,0,9); else { g.fillText(nm.slice(0,2),0,-4); g.fillText(nm.slice(2),0,26); }
+    g.restore(); });
   g.textAlign='left';
-  // 故事進度：八章加後日談，走過的點亮
-  y+=180; g.fillStyle='#cfe0ea'; g.font=`700 28px ${SANS}`; g.fillText('故事進度',56,y);
-  const n=st.main.length, x0=70, x1=W0-70, step=(x1-x0)/(n-1), cy=y+52;
-  g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=6; g.beginPath(); g.moveTo(x0,cy); g.lineTo(x1,cy); g.stroke();
-  const last=st.main.map(m=>m.ok).lastIndexOf(true); if(last>=0){ g.strokeStyle='#ffd56a'; g.beginPath(); g.moveTo(x0,cy); g.lineTo(x0+step*last,cy); g.stroke(); }
-  st.main.forEach((m,i)=>{ const x=x0+step*i; g.beginPath(); g.arc(x,cy,m.ok?17:13,0,Math.PI*2); g.fillStyle=m.ok?'#ffd56a':'#26323b'; g.fill(); if(m.ok){ g.fillStyle='#2a1a00'; g.font=`900 20px ${SANS}`; g.textAlign='center'; g.fillText('✓',x,cy+7); }
-    g.textAlign='center'; g.fillStyle=m.ok?'#ffe9a8':'#6f8291'; g.font=`600 24px ${SANS}`; g.fillText(m.n,x,cy+52); });
-  g.textAlign='right'; g.fillStyle=st.epi?'#f6c1d4':'#6f8291'; g.font=`700 24px ${SANS}`; g.fillText(st.epi?`後日談 ${st.epi}/5`:'後日談 未開啟',W0-56,y); g.textAlign='left';
-  // 最大漁獲＋最近稱號
-  y=cy+84; const half=(W0-96-18)/2;
-  g.fillStyle='rgba(255,255,255,.06)'; rr(g,48,y,half,170,22); g.fill(); rr(g,48+half+18,y,half,170,22); g.fill();
-  g.fillStyle='#9fb3c2'; g.font=`600 24px ${SANS}`; g.fillText('🏆 最大漁獲',74,y+42); g.fillText('🎖️ 最近的稱號',48+half+44,y+42);
-  if(st.big&&st.bigSp){ g.fillStyle='#fff'; fitText(g,st.bigSp.name,half-52,46,SERIF,900); g.fillText(st.bigSp.name,74,y+102); g.fillStyle='#ffd56a'; g.font=`800 30px ${SANS}`; g.fillText((st.big.w>=1?st.big.w.toFixed(1)+' kg':Math.round(st.big.w*1000)+' g')+(st.big.L?'・'+Math.round(st.big.L*100)+' cm':''),74,y+146); }
-  else { g.fillStyle='#6f8291'; g.font=`600 28px ${SANS}`; g.fillText('第一尾還在等你',74,y+110); }
-  let tx=48+half+44, ty=y+70; g.font=`700 24px ${SANS}`;
-  (st.titles.length?st.titles:['還沒有稱號']).forEach(t=>{ const w=g.measureText(t).width+28; if(tx+w>W0-60){ tx=48+half+44; ty+=46; } if(ty>y+140) return; g.fillStyle='rgba(255,213,106,.14)'; rr(g,tx,ty,w,38,19); g.fill(); g.strokeStyle='rgba(255,213,106,.5)'; g.lineWidth=1.5; g.stroke(); g.fillStyle='#ffe9a8'; g.fillText(t,tx+14,ty+28); tx+=w+10; });
-  // 底部：網址、QR、邀請
-  y=H0-148; g.fillStyle='rgba(243,231,201,.96)'; rr(g,48,y,W0-96,124,26); g.fill();
-  if(qr.complete&&qr.naturalWidth) g.drawImage(qr,W0-48-14-104,y+10,104,104);
-  g.fillStyle='#2a1a08'; g.font=`900 36px ${SERIF}`; g.fillText('免下載・手機打開就能玩',80,y+52);
-  g.font=`600 26px ${SANS}`; g.fillStyle='#5a4220'; g.fillText('🎣 '+URL,80,y+96);
+  // 故事航線：八章，走過的實線、還沒走的虛線
+  y+=246; g.fillStyle=INK2; g.font=`700 26px ${SANS}`; g.fillText('故事',66,y); g.textAlign='right'; g.fillText(st.epi?`後日談 ${st.epi}/5`:`${st.main.filter(m=>m.ok).length}／8 章`,W0-66,y); g.textAlign='left';
+  const n=st.main.length, x0=96, x1=W0-96, step=(x1-x0)/(n-1), cy=y+38, last=st.main.map(m=>m.ok).lastIndexOf(true);
+  g.lineWidth=4; g.strokeStyle='rgba(60,40,15,.3)'; g.setLineDash([8,8]); g.beginPath(); g.moveTo(x0,cy); g.lineTo(x1,cy); g.stroke(); g.setLineDash([]);
+  if(last>0){ g.strokeStyle='#8a5a1c'; g.beginPath(); g.moveTo(x0,cy); g.lineTo(x0+step*last,cy); g.stroke(); }
+  st.main.forEach((m,i)=>{ const x=x0+step*i; g.beginPath(); g.arc(x,cy,m.ok?14:10,0,Math.PI*2); g.fillStyle=m.ok?'#8a5a1c':'rgba(60,40,15,.25)'; g.fill(); g.textAlign='center'; g.fillStyle=m.ok?INK:'rgba(60,40,15,.45)'; g.font=`700 24px ${SERIF}`; g.fillText(m.n,x,cy+40); });
+  g.textAlign='left';
+  // 底部邀請
+  y=H0-128; g.fillStyle='#ffd56a'; rr(g,30,y,W0-60,104,22); g.fill();
+  if(qr.complete&&qr.naturalWidth) g.drawImage(qr,W0-30-14-88,y+8,88,88);
+  g.fillStyle='#2a1a00'; g.font=`900 40px ${SERIF}`; g.fillText('免下載・手機打開就能玩',62,y+50); g.font=`700 26px ${SANS}`; g.fillText(URL,64,y+88);
   return cv; }
 /* 預覽視窗：分享（手機叫出分享選單，可以直接選 Threads）、儲存圖片 */
 const st=document.createElement('style'); st.textContent=`#poster{position:fixed;inset:0;z-index:62;background:rgba(0,0,0,.86);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:14px}
 #poster img{max-width:min(92vw,460px);max-height:72vh;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.6)}#poster .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 #poster button{padding:11px 18px;border-radius:999px;border:1px solid rgba(255,213,106,.6);background:#2a1f0e;color:#ffe9a8;font-size:15px;font-weight:800;font-family:inherit}#poster button.pri{background:#ffd56a;color:#2a1a00}#poster small{color:#9fb3c2;font-size:12px}`;
 document.head.appendChild(st);
-function open(){ const cv=draw(), url=cv.toDataURL('image/jpeg',.9), el=document.createElement('div'); el.id='poster';
+async function open(){ const cv=await draw(), url=cv.toDataURL('image/jpeg',.9), el=document.createElement('div'); el.id='poster';
   el.innerHTML=`<img src="${url}" alt="戰績海報"><div class="row"><button class="pri" data-k="share">📤 分享</button><button data-k="save">💾 儲存圖片</button><button data-k="x">關閉</button></div><small>分享時選 Threads 就能直接貼文</small>`;
   document.body.appendChild(el);
   el.addEventListener('click',async e=>{ const k=e.target.closest('[data-k]'); if(!k) return; const a=k.dataset.k;
@@ -7936,7 +7960,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102185818'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102190944'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
