@@ -71,4 +71,6 @@
   skip.onclick=()=>{ if(!st) return; if(st.phase==='video'){ try{ st.vid.pause(); }catch(_){} st.vid.style.opacity=0; card(); } else if(st.phase==='night'){ go.onclick(); } else { st.diveAt=-1e9; } };
   requestAnimationFrame(()=>box.classList.add('on')); st.raf=requestAnimationFrame(draw);
  };
+ // 預覽網址：?mermaid=1 直接播終幕回禮（只播放、不發獎勵、不改存檔）
+ if(typeof location!=='undefined'&&/[?&]mermaid=1(&|$)/.test(location.search)) setTimeout(()=>window.__mermaidReward({title:'海之友',xp:20000,coins:12000},null,false),2500);
 })();
