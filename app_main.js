@@ -1,4 +1,4 @@
-/*APPV:20261102174918*/
+/*APPV:20261102175719*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -5502,6 +5502,8 @@ const TAL={
   hunt:{n:'尋蹤',i:'🧭',max:4,lv:30,d:r=>`Boss 出現機率 +${r*5}%，連續 ${4-Math.floor(r/2)} 次咬餌內一定現身`}};
 const TAL_MAX=6, TAL_RESET=5000;
 const talMax=k=>TAL[k].max||TAL_MAX, talZero=()=>Object.fromEntries(Object.keys(TAL).map(k=>[k,0]));
+/* 第 n 級要花的點數：1～3 級 1 點、4～6 級 2 點、7～8 級 3 點。全部點滿共 77 點（Lv 81），Lv 60 只有 56 點，要自己取捨 */
+const talCost=n=>n<=3?1:n<=6?2:3, talSum=r=>{ let t=0; for(let i=1;i<=r;i++) t+=talCost(i); return t; };
 /* Boss 拉力以實際搏魚程式模擬校準：該等級買得到的裝備，熟練玩家一定拉得上來（大白鯊女王原本 1.6：任何裝備開場 1 秒內就斷線） */
 const BOSS=[
   {id:'gar',lv:15,name:'巨型鱷雀鱔',sp:'gar',loc:'lake',zone:'deep',per:['dusk','night'],size:1.5,pow:1.35,title:'鱷雀鱔獵人',hint:'深水中央・黃昏或夜晚',coins:15000,cry:2,
@@ -5539,7 +5541,10 @@ const PER_NAME={dawn:'清晨',day:'白天',dusk:'黃昏',night:'夜晚'};
 function createTalents(c){
 'use strict';
 const S=c.save; S.tal=Object.assign(talZero(),S.tal||{}); S.boss=S.boss||{}; S.titles=S.titles||[];
-const spent=()=>Object.values(S.tal).reduce((a,b)=>a+b,0), pts=()=>Math.max(0,(S.lv||1)-4)-spent(), rank=b=>S.tal[b]||0;
+const spent=()=>Object.keys(S.tal).reduce((a,k)=>a+talSum(S.tal[k]||0),0), pts=()=>Math.max(0,(S.lv||1)-4)-spent(), rank=b=>S.tal[b]||0;
+/* 天賦改成越高級越貴：照新算法點數超過的存檔（含之後從雲端載入的舊存檔），免費全部退回讓玩家重新分配 */
+function checkTal(){ if(pts()<0){ S.tal=talZero(); c.persist(); setTimeout(()=>c.toast('⭐ 天賦改版：越高級花越多點數，你的點數已全部免費退回，請重新分配','warn',6000),1500); } }
+checkTal();
 function apply(g){ g.rod.cast*=1+.04*rank('cast'); g.rod.tens*=1-.03*rank('power'); g.reel.spd*=1+.04*rank('reel'); return g; }
 
 /* Boss：指定釣點與時段，咬餌時 30% 機率出現，連續 4 次沒出現就保證出現 */
@@ -5643,7 +5648,7 @@ document.head.appendChild(st);
 const box=document.createElement('div'); box.id='talBox'; box.className='hidden'; box.innerHTML='<div class="tb"></div>'; document.body.appendChild(box);
 const row3=document.createElement('div'); row3.id='top3'; document.body.appendChild(row3);
 const btn=document.createElement('button'); btn.className='chip'; btn.id='talBtn'; btn.setAttribute('aria-label','天賦'); btn.innerHTML='⭐ 天賦'; row3.appendChild(btn);
-function dot(){ const p=pts(); btn.innerHTML=`⭐ 天賦${p>0?`<em>${p}</em>`:''}`; btn.classList.toggle('has',p>0); }
+function dot(){ checkTal(); const p=pts(); btn.innerHTML=`⭐ 天賦${p>0?`<em>${p}</em>`:''}`; btn.classList.toggle('has',p>0); }
 const row=(a,b,r)=>`<div class="row"><div class="nm"><b>${a}</b><small>${b}</small></div><div class="rt">${r}</div></div>`;
 let mode='tal';
 const spotIdx=z=>typeof SPOTS!=='undefined'?SPOTS.findIndex(q=>q.id===z):-1;
@@ -5667,7 +5672,7 @@ function render(){ if(mode==='boss'){ box.firstChild.innerHTML=bossView(); retur
   let h=`<h3>⭐ 天賦<button class="sbtn" data-t="x">✕</button></h3>`;
   h+=`<div class="pt">${(S.lv||1)<5?'Lv 5 起每升一級得 1 點天賦':`可用天賦點：${p}（Lv ${S.lv}，已用 ${spent()}）`}</div>`;
   for(const k in TAL){ const r=rank(k), T=TAL[k], mx=talMax(k), lock=(S.lv||1)<(T.lv||0);
-    h+=row(`${T.i} ${T.n}${T.lv&&!lock&&!r?' <span class="nw">新</span>':''} <span class="pips">${'●'.repeat(r)}${'○'.repeat(mx-r)}</span>`,lock?`<span class="lock">Lv ${T.lv} 開放：${T.d(1)}（每級）</span>`:r?T.d(r):'尚未投入',lock?'🔒':r>=mx?'<span class="on">滿級</span>':`<button class="sbtn${p>0?' pri':''}" data-t="add" data-v="${k}">＋1</button>`); }
+    h+=row(`${T.i} ${T.n}${T.lv&&!lock&&!r?' <span class="nw">新</span>':''} <span class="pips">${'●'.repeat(r)}${'○'.repeat(mx-r)}</span>`,lock?`<span class="lock">Lv ${T.lv} 開放：${T.d(1)}（每級）</span>`:r?T.d(r):'尚未投入',lock?'🔒':r>=mx?'<span class="on">滿級</span>':`<button class="sbtn${p>=talCost(r+1)?' pri':''}" data-t="add" data-v="${k}">＋1${talCost(r+1)>1?`（${talCost(r+1)} 點）`:''}</button>`); }
   if(spent()>0) h+=`<div style="text-align:right;margin-top:6px"><button class="sbtn danger" data-t="reset">重置天賦（🪙${TAL_RESET.toLocaleString()}）</button></div>`;
   h+=`<div class="sec"><button class="sbtn pri" data-t="mode" data-v="boss" style="width:100%">👑 大師挑戰（${BOSS.filter(x=>(S.lv||1)>=x.lv&&!S.boss[x.id]).length} 隻可挑戰）</button></div>`;
   if(window.__LVINFO){ const L=window.__LVINFO, lv=S.lv||1, need=L.xpNext(lv), up=[]; for(let k=lv+1;k<=lv+12&&up.length<4;k++){ const g=L.gains(k).filter(x=>x!=='天賦點 +1'); if(g.length) up.push(`<div class="tk"><b>Lv ${k}</b>　${g.join('、')}</div>`); }
@@ -5687,7 +5692,7 @@ box.addEventListener('click',e=>{ if(e.target===box){ box.classList.add('hidden'
   if(t==='mode'){ mode=v; render(); box.firstChild.scrollTop=0; return; }
   if(t==='go'){ const B=BOSS.find(x=>x.id===v), i=B?spotIdx(B.zone):-1; const why=window.__STORY&&window.__STORY.lock?window.__STORY.lock(i):null;
     if(i<0) return; if(why){ c.toast(why,'warn'); return; } box.classList.add('hidden'); if(window.__goSpot) window.__goSpot(i); return; }
-  if(t==='add'&&TAL[v]&&pts()>0&&rank(v)<talMax(v)&&(S.lv||1)>=(TAL[v].lv||0)){ S.tal[v]=rank(v)+1; c.Snd.coin(); }
+  if(t==='add'&&TAL[v]&&pts()>=talCost(rank(v)+1)&&rank(v)<talMax(v)&&(S.lv||1)>=(TAL[v].lv||0)){ S.tal[v]=rank(v)+1; c.Snd.coin(); }
   if(t==='reset'){ if(S.coins<TAL_RESET){ c.toast('金幣不夠','bad'); } else { S.coins-=TAL_RESET; S.tal=talZero(); c.setCoins(); } }
   if(t==='boss'){ S.bossOn=v; tries=0; const B=BOSS.find(x=>x.id===v); c.toast(`🐉 已接受挑戰：${B.name}（${B.hint}）`,'good',3000); }
   if(t==='quit') S.bossOn=null;
@@ -7826,7 +7831,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102174918'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102175719'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9767,7 +9772,7 @@ function lose(reason){ if(easy()&&G.fd&&G.f){ G.f.lostWhy=null; land(); return; 
 function startJump(){ const f=G.f; f.jumpT=f.jumpDur=.85+.25*Math.sqrt(G.fd.L); fishPos(tv,0); P.splash(tv.x,0,tv.z,30,1.2); W.addRipple(tv.x,tv.z,.9); Snd.splash(1);
   toast('魚躍出水面！先放手！','warn',1100); vib(30); G.fish.group.visible=true; }
 function liftAbove(g){ if(!g||!g.parent) return; g.parent.updateMatrixWorld(true); g.updateMatrixWorld(true);
-  const b=new THREE.Box3().setFromObject(g), w=W.swell?W.swell(g.getWorldPosition(tv4b).x,tv4b.z,G.t):0, need=w+.25-b.min.y;
+  const b=new THREE.Box3(), bb=new THREE.Box3(); g.traverse(o=>{ if(!o.isMesh||o.isSprite||!o.visible||!o.geometry) return; if(!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); b.union(bb); }); if(b.isEmpty()) return; const w=W.swell?W.swell(g.getWorldPosition(tv4b).x,tv4b.z,G.t):0, need=Math.min(w+.25-b.min.y,(G.fd&&G.fd.L||1)*1.2+.5);   /* 上限：最多抬約一個魚身，不會飛到天上 */
   if(need>0){ const inv=new THREE.Matrix4().copy(g.parent.matrixWorld).invert(), up=new THREE.Vector3(0,need,0).transformDirection(inv).multiplyScalar(need); g.position.add(up); } }
 function dispDist(){ return Math.max(.42,G.fd.L*(G.fd.sp.sh.snout?3:2.6))*(W.camera.aspect<1?1:.8); }   // 拿在手上的魚約佔畫面寬度七成，看得清楚又不會塞滿
 function land(){

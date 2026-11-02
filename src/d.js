@@ -404,7 +404,7 @@ function lose(reason){ if(easy()&&G.fd&&G.f){ G.f.lostWhy=null; land(); return; 
 function startJump(){ const f=G.f; f.jumpT=f.jumpDur=.85+.25*Math.sqrt(G.fd.L); fishPos(tv,0); P.splash(tv.x,0,tv.z,30,1.2); W.addRipple(tv.x,tv.z,.9); Snd.splash(1);
   toast('魚躍出水面！先放手！','warn',1100); vib(30); G.fish.group.visible=true; }
 function liftAbove(g){ if(!g||!g.parent) return; g.parent.updateMatrixWorld(true); g.updateMatrixWorld(true);
-  const b=new THREE.Box3().setFromObject(g), w=W.swell?W.swell(g.getWorldPosition(tv4b).x,tv4b.z,G.t):0, need=w+.25-b.min.y;
+  const b=new THREE.Box3(), bb=new THREE.Box3(); g.traverse(o=>{ if(!o.isMesh||o.isSprite||!o.visible||!o.geometry) return; if(!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); b.union(bb); }); if(b.isEmpty()) return; const w=W.swell?W.swell(g.getWorldPosition(tv4b).x,tv4b.z,G.t):0, need=Math.min(w+.25-b.min.y,(G.fd&&G.fd.L||1)*1.2+.5);   /* 上限：最多抬約一個魚身，不會飛到天上 */
   if(need>0){ const inv=new THREE.Matrix4().copy(g.parent.matrixWorld).invert(), up=new THREE.Vector3(0,need,0).transformDirection(inv).multiplyScalar(need); g.position.add(up); } }
 function dispDist(){ return Math.max(.42,G.fd.L*(G.fd.sp.sh.snout?3:2.6))*(W.camera.aspect<1?1:.8); }   // 拿在手上的魚約佔畫面寬度七成，看得清楚又不會塞滿
 function land(){

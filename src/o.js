@@ -10,6 +10,8 @@ const TAL={
   hunt:{n:'尋蹤',i:'🧭',max:4,lv:30,d:r=>`Boss 出現機率 +${r*5}%，連續 ${4-Math.floor(r/2)} 次咬餌內一定現身`}};
 const TAL_MAX=6, TAL_RESET=5000;
 const talMax=k=>TAL[k].max||TAL_MAX, talZero=()=>Object.fromEntries(Object.keys(TAL).map(k=>[k,0]));
+/* 第 n 級要花的點數：1～3 級 1 點、4～6 級 2 點、7～8 級 3 點。全部點滿共 77 點（Lv 81），Lv 60 只有 56 點，要自己取捨 */
+const talCost=n=>n<=3?1:n<=6?2:3, talSum=r=>{ let t=0; for(let i=1;i<=r;i++) t+=talCost(i); return t; };
 /* Boss 拉力以實際搏魚程式模擬校準：該等級買得到的裝備，熟練玩家一定拉得上來（大白鯊女王原本 1.6：任何裝備開場 1 秒內就斷線） */
 const BOSS=[
   {id:'gar',lv:15,name:'巨型鱷雀鱔',sp:'gar',loc:'lake',zone:'deep',per:['dusk','night'],size:1.5,pow:1.35,title:'鱷雀鱔獵人',hint:'深水中央・黃昏或夜晚',coins:15000,cry:2,
@@ -47,7 +49,10 @@ const PER_NAME={dawn:'清晨',day:'白天',dusk:'黃昏',night:'夜晚'};
 function createTalents(c){
 'use strict';
 const S=c.save; S.tal=Object.assign(talZero(),S.tal||{}); S.boss=S.boss||{}; S.titles=S.titles||[];
-const spent=()=>Object.values(S.tal).reduce((a,b)=>a+b,0), pts=()=>Math.max(0,(S.lv||1)-4)-spent(), rank=b=>S.tal[b]||0;
+const spent=()=>Object.keys(S.tal).reduce((a,k)=>a+talSum(S.tal[k]||0),0), pts=()=>Math.max(0,(S.lv||1)-4)-spent(), rank=b=>S.tal[b]||0;
+/* 天賦改成越高級越貴：照新算法點數超過的存檔（含之後從雲端載入的舊存檔），免費全部退回讓玩家重新分配 */
+function checkTal(){ if(pts()<0){ S.tal=talZero(); c.persist(); setTimeout(()=>c.toast('⭐ 天賦改版：越高級花越多點數，你的點數已全部免費退回，請重新分配','warn',6000),1500); } }
+checkTal();
 function apply(g){ g.rod.cast*=1+.04*rank('cast'); g.rod.tens*=1-.03*rank('power'); g.reel.spd*=1+.04*rank('reel'); return g; }
 
 /* Boss：指定釣點與時段，咬餌時 30% 機率出現，連續 4 次沒出現就保證出現 */
@@ -151,7 +156,7 @@ document.head.appendChild(st);
 const box=document.createElement('div'); box.id='talBox'; box.className='hidden'; box.innerHTML='<div class="tb"></div>'; document.body.appendChild(box);
 const row3=document.createElement('div'); row3.id='top3'; document.body.appendChild(row3);
 const btn=document.createElement('button'); btn.className='chip'; btn.id='talBtn'; btn.setAttribute('aria-label','天賦'); btn.innerHTML='⭐ 天賦'; row3.appendChild(btn);
-function dot(){ const p=pts(); btn.innerHTML=`⭐ 天賦${p>0?`<em>${p}</em>`:''}`; btn.classList.toggle('has',p>0); }
+function dot(){ checkTal(); const p=pts(); btn.innerHTML=`⭐ 天賦${p>0?`<em>${p}</em>`:''}`; btn.classList.toggle('has',p>0); }
 const row=(a,b,r)=>`<div class="row"><div class="nm"><b>${a}</b><small>${b}</small></div><div class="rt">${r}</div></div>`;
 let mode='tal';
 const spotIdx=z=>typeof SPOTS!=='undefined'?SPOTS.findIndex(q=>q.id===z):-1;
@@ -175,7 +180,7 @@ function render(){ if(mode==='boss'){ box.firstChild.innerHTML=bossView(); retur
   let h=`<h3>⭐ 天賦<button class="sbtn" data-t="x">✕</button></h3>`;
   h+=`<div class="pt">${(S.lv||1)<5?'Lv 5 起每升一級得 1 點天賦':`可用天賦點：${p}（Lv ${S.lv}，已用 ${spent()}）`}</div>`;
   for(const k in TAL){ const r=rank(k), T=TAL[k], mx=talMax(k), lock=(S.lv||1)<(T.lv||0);
-    h+=row(`${T.i} ${T.n}${T.lv&&!lock&&!r?' <span class="nw">新</span>':''} <span class="pips">${'●'.repeat(r)}${'○'.repeat(mx-r)}</span>`,lock?`<span class="lock">Lv ${T.lv} 開放：${T.d(1)}（每級）</span>`:r?T.d(r):'尚未投入',lock?'🔒':r>=mx?'<span class="on">滿級</span>':`<button class="sbtn${p>0?' pri':''}" data-t="add" data-v="${k}">＋1</button>`); }
+    h+=row(`${T.i} ${T.n}${T.lv&&!lock&&!r?' <span class="nw">新</span>':''} <span class="pips">${'●'.repeat(r)}${'○'.repeat(mx-r)}</span>`,lock?`<span class="lock">Lv ${T.lv} 開放：${T.d(1)}（每級）</span>`:r?T.d(r):'尚未投入',lock?'🔒':r>=mx?'<span class="on">滿級</span>':`<button class="sbtn${p>=talCost(r+1)?' pri':''}" data-t="add" data-v="${k}">＋1${talCost(r+1)>1?`（${talCost(r+1)} 點）`:''}</button>`); }
   if(spent()>0) h+=`<div style="text-align:right;margin-top:6px"><button class="sbtn danger" data-t="reset">重置天賦（🪙${TAL_RESET.toLocaleString()}）</button></div>`;
   h+=`<div class="sec"><button class="sbtn pri" data-t="mode" data-v="boss" style="width:100%">👑 大師挑戰（${BOSS.filter(x=>(S.lv||1)>=x.lv&&!S.boss[x.id]).length} 隻可挑戰）</button></div>`;
   if(window.__LVINFO){ const L=window.__LVINFO, lv=S.lv||1, need=L.xpNext(lv), up=[]; for(let k=lv+1;k<=lv+12&&up.length<4;k++){ const g=L.gains(k).filter(x=>x!=='天賦點 +1'); if(g.length) up.push(`<div class="tk"><b>Lv ${k}</b>　${g.join('、')}</div>`); }
@@ -195,7 +200,7 @@ box.addEventListener('click',e=>{ if(e.target===box){ box.classList.add('hidden'
   if(t==='mode'){ mode=v; render(); box.firstChild.scrollTop=0; return; }
   if(t==='go'){ const B=BOSS.find(x=>x.id===v), i=B?spotIdx(B.zone):-1; const why=window.__STORY&&window.__STORY.lock?window.__STORY.lock(i):null;
     if(i<0) return; if(why){ c.toast(why,'warn'); return; } box.classList.add('hidden'); if(window.__goSpot) window.__goSpot(i); return; }
-  if(t==='add'&&TAL[v]&&pts()>0&&rank(v)<talMax(v)&&(S.lv||1)>=(TAL[v].lv||0)){ S.tal[v]=rank(v)+1; c.Snd.coin(); }
+  if(t==='add'&&TAL[v]&&pts()>=talCost(rank(v)+1)&&rank(v)<talMax(v)&&(S.lv||1)>=(TAL[v].lv||0)){ S.tal[v]=rank(v)+1; c.Snd.coin(); }
   if(t==='reset'){ if(S.coins<TAL_RESET){ c.toast('金幣不夠','bad'); } else { S.coins-=TAL_RESET; S.tal=talZero(); c.setCoins(); } }
   if(t==='boss'){ S.bossOn=v; tries=0; const B=BOSS.find(x=>x.id===v); c.toast(`🐉 已接受挑戰：${B.name}（${B.hint}）`,'good',3000); }
   if(t==='quit') S.bossOn=null;
