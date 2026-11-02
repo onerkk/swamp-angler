@@ -93,3 +93,6 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 售價（2026-11-02）：c.js price 依真實市價重訂，目標 價值≈0.252×真實台幣價值（食用魚＝每公斤價×典型重量；觀賞魚＝一隻價）；公式 value=price×(w+.3)^.85×RAR.mult×.4，所以 price 已把稀有度倍率除掉；神話與傳說角色維持原價。計算腳本見 /tmp/price.py 的做法（REAL 每公斤、PIECE 一隻）
 - 難度：f.win 接進拉力 Tt 與磨線 f.abr（線組容錯：咬線、骨質嘴、鑽礁洞者低）；73 種依釣友經驗調 pow/spd/stam/jump/win；g.js SP_STY 補新魚種拉扯型態
 - 荷葉與浮萍毯 renderOrder 1（在水面之後畫，否則風浪浪頭會蓋過）；浮萍被船推開的範圍縮小、水道 20 秒合攏；划槳水紋減弱
+- 垃圾回收根因二：倒影 reflRT 與水下 submerged RT 改用 sRGB 編碼（與螢幕一致），水面著色器取樣後 pow 2.2 還原線性；否則每個材質每幀在兩種輸出編碼間切換，three.js 每幀重算程式鍵值。water.js sampleWaterInto／sampleWaterHeight 不配置物件（swell 用）
+- 水族箱甲殼類：w.js fishObj 對 sp.crust 直接用 MDL.fish 建新骨架（不能 clone），crustInTank 每幀 MDL.poseRig；aquarium.js 量體長略過 userData.crustPart（觸角不算體長）
+- 診斷：近 10 秒長停頓 >1 秒時判定為停頓造成，不再誤判 GPU 瓶頸

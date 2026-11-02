@@ -480,6 +480,8 @@ function buildTank(water,spec,x){
 
 // 把水族箱裡記錄的魚做成會游的模型（用遊戲同一個魚模型，按實際體長縮放）
 function fishObj(rec){ const sp=c.species(rec.id); if(!sp) return null;
+  // 龍蝦、泰國蝦：每隻用自己的骨架（腳、螯、觸角各有關節），不能用複製的靜態模型，否則腳不會動
+  if(sp.crust&&window.__MDL&&window.__MDL.fish){ const f=window.__MDL.fish(sp); if(f){ f.group.userData.uni=f.uni; f.group.userData.aquariumProcedural=true; f.group.userData.crustModel=true; crustInTank.add(f.group); return f.group; } }
   if(BENTHIC[rec.id]){if(!window.__TIDE||!window.__TIDE.makeModel)return null;const m=window.__TIDE.makeModel(rec.id);if(!m)return null;m.group.userData.uni=m.uni;m.group.userData.aquariumProcedural=true;return m.group;}
   const src=c.getFish(sp).group.clone(true); src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(1); src.visible=true;
   src.traverse(o=>{ o.frustumCulled=false; if(o.isMesh&&o.material){ const mats=Array.isArray(o.material)?o.material:[o.material];
@@ -564,7 +566,9 @@ function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.re
       o.position.x+=dx/dd*sp*dt; o.position.z+=dz/dd*sp*dt; if(u.uAmp){ u.uAmp.value=kind==='crab'?.18:kind==='worm'?.15:kind==='walk'?.13:.06; u.uSwim.value+=dt*(kind==='crab'?10:kind==='walk'?7:6); } } }
   let hop=0; if(kind==='skip'){ f.hp=(f.hp||0)-dt; if(f.hp<=0&&Math.random()<dt*.3){ f.hp=.5; } if(f.hp>0) hop=Math.sin((1-f.hp/.5)*Math.PI)*.04; }
   o.position.y=floorY(o.position.x,o.position.z)+hop; o.rotation.set(0,f.yaw,0); }   /* 貼著缸底，不浮在水中 */
-function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
+const crustInTank=new Set();
+function updTanks(dt){ if(typeof crustInTank!=='undefined') for(const g of crustInTank){ if(!g.parent){ crustInTank.delete(g); continue; } if(window.__MDL&&window.__MDL.poseRig) window.__MDL.poseRig(g,dt); }
+  for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
   tk.plants.forEach(p=>{ p.o.rotation.z=Math.sin(t*1.2+p.ph)*.06; p.o.rotation.x=Math.sin(t*.9+p.ph)*.04; });if(tk.flushPlants)tk.flushPlants();
   causList.forEach(c2=>{ c2.m.map.offset.set(t*.012,t*.009); c2.m.map.repeat.set(c2.s*1.6,1.2); });
   shaftList.forEach(q=>{ q.m.opacity=.05+.035*Math.sin(t*.35+q.ph); });

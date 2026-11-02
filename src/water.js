@@ -3,17 +3,21 @@ const WATER_WAVES={
  lake:[[4.8,.028,0,.3],[2.7,.016,.72,2.1],[1.45,.009,-.85,4.7],[.8,.004,1.4,1.4],[3.67,.011,-.39,3.6],[1.93,.006,.28,5.9],[.56,.002,-1.9,.9],[.35,.001,2.4,4.1]],
  sea:[[38,.26,0,1.7],[23,.17,.69,4.1],[15,.11,-.69,.6],[9,.065,1.22,2.8],[5.5,.036,.35,5.3],[3.2,.018,-1.05,3.7],[11.7,.038,-.23,4.6],[7.6,.024,.92,.2],[2.3,.009,-.35,2.3],[1.2,.004,.47,5.7],[.7,.0014,-1.8,1.1],[4.2,.028,1.9,2.4],[1.7,.010,-.65,3.2],[.9,.004,2.3,5.6]]
 };
-function sampleWater(x,z,t,wind,sea){
+// 水面高度每幀被呼叫上百次（浮標、船、魚、泡沫…）：用索引迴圈、不解構陣列，只要高度時也不回傳物件，避免製造垃圾
+function sampleWaterInto(x,z,t,wind,sea,out){
   const len=Math.hypot(wind.x,wind.y),wx=len>.001?wind.x/len:1,wz=len>.001?wind.y/len:0;
-  const strength=sea?.55+1.3*wind.z+1.5*Math.max(0,wind.z-.6):.45+1.8*wind.z;
+  const strength=sea?.55+1.3*wind.z+1.5*Math.max(0,wind.z-.6):.45+1.8*wind.z, W=WATER_WAVES[sea?'sea':'lake'];
   let height=0,dx=0,dz=0;
-  for(const [L,A,angle,offset] of WATER_WAVES[sea?'sea':'lake']){
+  for(let i=0;i<W.length;i++){ const w=W[i],L=w[0],A=w[1],angle=w[2],offset=w[3];
     const cs=Math.cos(angle),sn=Math.sin(angle),ux=wx*cs-wz*sn,uz=wx*sn+wz*cs,k=2*Math.PI/L;
     const phase=k*(ux*x+uz*z)-Math.sqrt(9.81*k)*t+offset,a=A*strength;
-    height+=a*Math.sin(phase);dx+=ux*k*a*Math.cos(phase);dz+=uz*k*a*Math.cos(phase);
+    height+=a*Math.sin(phase); if(out){ const c=Math.cos(phase); dx+=ux*k*a*c; dz+=uz*k*a*c; }
   }
-  return {height,dx,dz};
+  if(out){ out.height=height; out.dx=dx; out.dz=dz; }
+  return height;
 }
+function sampleWater(x,z,t,wind,sea){ const o={height:0,dx:0,dz:0}; sampleWaterInto(x,z,t,wind,sea,o); return o; }
+function sampleWaterHeight(x,z,t,wind,sea){ return sampleWaterInto(x,z,t,wind,sea,null); }
 function waterWaveGLSL(){
   const n=v=>Number(v).toFixed(9);
   const lines=sea=>WATER_WAVES[sea?'sea':'lake'].map(([L,A,angle,offset])=>`waterTerm(p,clock,vec2(wd.x*${n(Math.cos(angle))}-wd.y*${n(Math.sin(angle))},wd.x*${n(Math.sin(angle))}+wd.y*${n(Math.cos(angle))}),${n(L)},${n(A)}*strength,${n(offset)},s);`).join('\n');
@@ -33,4 +37,4 @@ function makeWaterGrid(T,radius=150,rings=112,segments=192){
   for(let r=1;r<rings;r++)for(let i=0;i<segments;i++){const j=(i+1)%segments,a=1+(r-1)*segments+i,b=1+(r-1)*segments+j,c=1+r*segments+i,d=1+r*segments+j;indices.push(a,b,c,b,d,c);}
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(points,3));g.setIndex(indices);return g;
 }
-if(typeof module!=='undefined'&&module.exports)module.exports={WATER_WAVES,sampleWater,waterWaveGLSL,makeWaterGrid};
+if(typeof module!=='undefined'&&module.exports)module.exports={sampleWaterHeight,sampleWaterInto,WATER_WAVES,sampleWater,waterWaveGLSL,makeWaterGrid};

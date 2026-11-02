@@ -45,7 +45,10 @@ function createDiag(W,c){
  function verdict(){const f=fps(),ps=window.__passStats||{sub:{},refl:{},main:{}},cpu=+Object.values(stages).reduce((a,b)=>a+(+b||0),0).toFixed(1),frameMs=f.avg?Math.round(1000/f.avg):0,cv=W.renderer.domElement,px=cv?cv.width*cv.height:0,rpx=(ps.refl.w||0)*(ps.refl.h||0),spx=(ps.sub.w||0)*(ps.sub.h||0),dist=frameDist(),lines=[];
   const load='像素負載 主畫面 '+Math.round(px/1e4)+'萬'+(ps.refl.on?'＋倒影 '+Math.round(rpx/1e4)+'萬':'')+(ps.sub.on?'＋水下 '+Math.round(spx/1e4)+'萬':'')+'｜陰影圖 '+(ps.main.shadowSize||'?')+'²（每秒 '+(window.__effectBudget?.shadowHz||'?')+' 次）｜繪製 主 '+(ps.main.calls||0)+'／倒影 '+(ps.refl.calls||0)+'／水下 '+(ps.sub.calls||0)+'｜提交ms 主 '+(ps.main.ms||0)+'／倒影 '+(ps.refl.ms||0)+'／水下 '+(ps.sub.ms||0);
   lines.push(load);
-  if(f.avg&&f.avg<50){if(cpu<frameMs*.55)lines.push('判定：GPU 瓶頸（CPU 每幀只用 '+cpu+'ms，幀長 '+frameMs+'ms）。GPU 吃不完像素：優先降主畫面解析度，其次倒影解析度，再來陰影圖');else{const top=Object.entries(stages).sort((a,b)=>b[1]-a[1])[0];lines.push('判定：CPU 瓶頸，最重階段 '+(top?top[0]+' '+top[1]+'ms':'?')+'（simulation=魚與物理，actors=角色動畫，render=繪製提交）');}}else lines.push(f.avg?'判定：幀率正常（'+f.avg+'）':'判定：尚無幀率資料，請在遊戲中停留 10 秒再按');
+  const stallMs=longs.filter(l=>Date.now()-l.at<10000).reduce((a,l)=>a+l.ms,0);
+  // 近 10 秒的長停頓加起來超過 1 秒時，低幀率主要是停頓造成（垃圾回收、載入），不是顯示卡畫不完
+  if(f.avg&&f.avg<50&&stallMs>1000) lines.push('判定：卡頓主要來自長停頓（近 10 秒共 '+Math.round(stallMs)+'ms），不是顯示卡；看下面「卡頓」那行的原因');
+  else if(f.avg&&f.avg<50){if(cpu<frameMs*.55)lines.push('判定：GPU 瓶頸（CPU 每幀只用 '+cpu+'ms，幀長 '+frameMs+'ms）。GPU 吃不完像素：優先降主畫面解析度，其次倒影解析度，再來陰影圖');else{const top=Object.entries(stages).sort((a,b)=>b[1]-a[1])[0];lines.push('判定：CPU 瓶頸，最重階段 '+(top?top[0]+' '+top[1]+'ms':'?')+'（simulation=魚與物理，actors=角色動畫，render=繪製提交）');}}else lines.push(f.avg?'判定：幀率正常（'+f.avg+'）':'判定：尚無幀率資料，請在遊戲中停留 10 秒再按');
   lines.push('卡頓：近 10 秒 '+dist.over33+' 幀超過 33ms、'+dist.over100+' 幀超過 100ms（p50 '+dist.p50+' / p95 '+dist.p95+'ms）；近 60 秒長任務 '+longs.filter(l=>Date.now()-l.at<60000).length+' 次'+(longs.length?'，最近：'+longs.slice(-3).map(l=>l.ms+'ms '+l.why).join('；'):''));
   lines.push('最重物件：'+heavy());
   // 場景切換前後的資源數量：切出去再切回來若一直往上長，就是沒釋放（越玩越卡、閃退的來源）

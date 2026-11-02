@@ -2,7 +2,8 @@
    shader transmits the underwater target, then applies its reflection on top. */
 function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
   const T=THREE,roots=new Set(),patched=new WeakSet(),pass={value:0};
-  const rt=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true});
+  // 跟螢幕一樣用 sRGB 編碼：倒影、水下、主畫面三個階段的輸出編碼一致，每個材質就不會每幀在兩種著色器設定之間來回切換（那會讓 three.js 每幀重算程式鍵值、製造大量垃圾）
+  const rt=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true,encoding:T.sRGBEncoding});
   let lightScanAt=-Infinity,lastPass=-Infinity,lastSize='';const cam=new T.PerspectiveCamera(),size=new T.Vector2();cam.layers.set(1);cam.matrixAutoUpdate=false;
   WU.uSubmerged={value:rt.texture};WU.uSubmergedSize={value:new T.Vector2(1,1)};WU.uSubmergedOn={value:0};
   function patch(mat){

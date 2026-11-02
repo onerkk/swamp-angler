@@ -24,7 +24,7 @@ function crustBandTex(T,kind,tip){
 // 一節：圓錐柱，從關節沿 +X 長出去
 // 顏色都是照片上的 sRGB 值，r128 不會自動轉換，要轉成線性色才不會畫出來發白
 function lin(T,c){ return new T.Color(c).convertSRGBToLinear(); }
-function crustSeg(T,len,r0,r1,mat,rad){ const g=new T.CylinderGeometry(r1,r0,len,rad||8,1); g.rotateZ(-Math.PI/2); g.translate(len/2,0,0); const m=new T.Mesh(g,mat); m.castShadow=true; m.frustumCulled=false; return m; }
+function crustSeg(T,len,r0,r1,mat,rad){ const g=new T.CylinderGeometry(r1,r0,len,rad||8,1); g.rotateZ(-Math.PI/2); g.translate(len/2,0,0); const m=new T.Mesh(g,mat); m.castShadow=true; m.frustumCulled=false; m.userData.crustPart=true; return m; }
 function crustJoint(T,parent,x,y,z){ const j=new T.Object3D(); j.position.set(x,y,z); parent.add(j); return j; }
 function crustMeasure(grp){ const M={wzC:0,yBotC:0,yTopC:0,wzA:0,yBotA:0};
  grp.traverse(m=>{ if(!m.isMesh) return; const P=m.geometry.attributes.position; for(let i=0;i<P.count;i++){ const x=P.getX(i), y=P.getY(i), z=Math.abs(P.getZ(i));
@@ -54,7 +54,7 @@ function buildCrust(T,r,kind){ const C=CRUST[kind], grp=r.grp, bones=r.bones, BX
  if(C.claw){ const K=C.claw, armMat=new T.MeshStandardMaterial({color:lin(T,0x2f58c8),roughness:.38,metalness:.05}), jointMat=new T.MeshStandardMaterial({color:lin(T,0xe08a30),roughness:.5}), fingMat=new T.MeshStandardMaterial({color:lin(T,0x1a2a64),roughness:.4});
    for(const s of [1,-1]){ const b=boneAt(bones,BX,K.x), sh=attachAt(T,b,grp,K.x,yA*.6,s*zA*.7); const yaw=crustJoint(T,sh,0,0,0); yaw.rotation.y=s*-K.yaw; const pit=crustJoint(T,yaw,0,0,0); pit.rotation.z=K.pitch;
      let par=pit; const js=[];
-     K.seg.forEach((L,n)=>{ const j=n===0?par:crustJoint(T,par,K.seg[n-1],0,0); if(n>0){ const knob=new T.Mesh(new T.SphereGeometry(K.r*1.15,8,6),jointMat); j.add(knob); j.rotation.y=s*-.08; } j.add(crustSeg(T,L,K.r*(n===2?1.25:1),K.r*(n===2?1.1:.9),armMat)); js.push(j); par=j; });
+     K.seg.forEach((L,n)=>{ const j=n===0?par:crustJoint(T,par,K.seg[n-1],0,0); if(n>0){ const knob=new T.Mesh(new T.SphereGeometry(K.r*1.15,8,6),jointMat); knob.userData.crustPart=true; j.add(knob); j.rotation.y=s*-.08; } j.add(crustSeg(T,L,K.r*(n===2?1.25:1),K.r*(n===2?1.1:.9),armMat)); js.push(j); par=j; });
      const tipJ=crustJoint(T,par,K.seg[2],0,0), f1=crustJoint(T,tipJ,0,0,0), f2=crustJoint(T,tipJ,0,0,0);
      f1.add(crustSeg(T,K.fing,K.r*.8,K.r*.15,fingMat)); f2.add(crustSeg(T,K.fing,K.r*.8,K.r*.15,fingMat));
      P.claws.push({s,yaw,pit,js,f1,f2,yaw0:yaw.rotation.y,pit0:K.pitch}); } }
@@ -65,7 +65,7 @@ function buildCrust(T,r,kind){ const C=CRUST[kind], grp=r.grp, bones=r.bones, BX
  // 游泳足：腹部下方一對對小葉片
  const swMat=new T.MeshStandardMaterial({color:lin(T,C.swimC),roughness:.6,transparent:true,opacity:.7,side:T.DoubleSide});
  C.swim.forEach((x,i)=>{ for(const s of [1,-1]){ const b=boneAt(bones,BX,x), j=attachAt(T,b,grp,x,M.yBotA*.9,s*Math.max(M.wzA*.45,.015)); const g=new T.PlaneGeometry(.045,.05); g.translate(0,-.024,0);
-   const m=new T.Mesh(g,swMat); m.frustumCulled=false; j.add(m); P.swim.push({i,j}); } });
+   const m=new T.Mesh(g,swMat); m.frustumCulled=false; m.userData.crustPart=true; j.add(m); P.swim.push({i,j}); } });
  return P; }
 // 每幀：依 uSwim（步態相位）與 uAmp（用力程度）擺動
 function poseCrust(r,dt){ const P=r.crust, u=r.uni.uSwim.value, a=r.uni.uAmp.value, amp=Math.min(1,.2+a*5), C=P.C;

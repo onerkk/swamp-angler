@@ -18,7 +18,7 @@ function aquariumCenterModel(T,model,includeHidden=false){
 }
 function aquariumModelBounds(T,root,includeHidden=false){
  root.updateMatrixWorld(true);const box=new T.Box3();root.traverse(o=>{
-  if(!o.isMesh||!o.geometry)return;if(!includeHidden)for(let p=o;p;p=p.parent)if(!p.visible)return;
+  if(!o.isMesh||!o.geometry||(o.userData&&o.userData.crustPart))return;if(!includeHidden)for(let p=o;p;p=p.parent)if(!p.visible)return;
   if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
  });return box;
 }

@@ -372,7 +372,7 @@ void main(){
     vec4 displaced=uReflMat*vec4(vW.x+N.x*reflectionReach,0.0,vW.z+N.z*reflectionReach,1.0);
     vec2 ruv=displaced.xy/max(displaced.w,.001);
     float inReflection=step(0.0,ruv.x)*step(ruv.x,1.0)*step(0.0,ruv.y)*step(ruv.y,1.0)*step(.001,rp.w);
-    vec4 rc = texture2D(uRefl, clamp(ruv, 0.002, 0.998));
+    vec4 rc = texture2D(uRefl, clamp(ruv, 0.002, 0.998)); rc.rgb = pow(max(rc.rgb, vec3(0.0)), vec3(2.2));
     refl = mix(refl, TM(rc.rgb)*0.92, clamp(rc.a, 0.0, 1.0)*inReflection*(1.0 - 0.35*uRain));
   }
   float sd = max(dot(R, uSunDir), 0.0);
@@ -449,7 +449,7 @@ void main(){
   }
   if(uSubmergedOn>.5){
     vec2 subUV=gl_FragCoord.xy/uSubmergedSize+N.xz*.002;
-    vec4 subColor=texture2D(uSubmerged,clamp(subUV,vec2(.001),vec2(.999)));
+    vec4 subColor=texture2D(uSubmerged,clamp(subUV,vec2(.001),vec2(.999))); subColor.rgb=pow(max(subColor.rgb,vec3(0.0)),vec3(2.2));
     if(subColor.a>.001)bodyD=mix(bodyD,TM(subColor.rgb/max(subColor.a,.001)),subColor.a*(1.0-dw));
   }
   float surfaceRough=clamp(.12+.3*uWind.z+.2*uRain,.12,.65);
@@ -638,7 +638,7 @@ function setTime(hour, force){
 const ripS = []; for(let i=0;i<12;i++) ripS.push({x:0,z:0,age:9,amp:0}); let ripI = 0;
 function addRipple(x, z, amp){ const r = ripS[ripI]; ripI = (ripI+1)%12; r.x=x; r.z=z; r.age=0; r.amp=amp; }
 function seaH(x,z,t){ return sampleWater(x,z,t,U.uWind.value,true).height; }
-function swell(x,z,t){return sampleWater(x,z,t,U.uWind.value,seaMode).height;}
+function swell(x,z,t){return sampleWaterHeight(x,z,t,U.uWind.value,seaMode);}
 
 // 環境光探針依畫質放慢更新頻率（不關閉），把每秒的工作量壓低
 let envAcc=0;function envTick(dt){envAcc+=dt;const hz=window.__effectBudget?.probeHz||15;if(envAcc<1/hz)return;envAcc=0;envJobs.update(dt);}
@@ -655,7 +655,7 @@ let pr = window.__resourcePolicy?.mobile?1:Math.min(window.devicePixelRatio || 1
 function resize(w, h){if(w===lw&&h===lh)return;lw = w; lh = h; camera.aspect = w/h; camera.fov = w < h ? FISHING_VIEW.fovPortrait : FISHING_VIEW.fovLandscape; camera.updateProjectionMatrix(); renderer.setSize(w, h); }
 function setPR(v){if(Math.abs(v-pr)<.001)return; pr = v; renderer.setPixelRatio(pr); }
 /* 水面倒影：鏡像相機只拍物體（不含天空、水面），水面依波紋扭曲取樣 */
-const reflRT=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true});
+const reflRT=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true,encoding:T.sRGBEncoding});
 const reflCam=new T.PerspectiveCamera(), reflTM=new T.Matrix4();
 WU.uRefl={value:reflRT.texture}; WU.uReflMat={value:reflTM}; WU.uReflOn={value:0};
 const _rp=new T.Vector3(), _cp=new T.Vector3(), _rm=new T.Matrix4(), _la=new T.Vector3(), _tg=new T.Vector3(), _n=new T.Vector3(0,1,0), _vw=new T.Vector3();

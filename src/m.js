@@ -72,7 +72,7 @@ function rigFish(grp,uni,K,mode){ const bones=BX.map(()=>new T.Bone()); bones[0]
     const mats=(Array.isArray(m.material)?m.material:[m.material]); mats.forEach(mm=>{ mm.onBeforeCompile=grp.userData.cutWhite?cutWhite:()=>{}; if(grp.userData.cutWhite){ mm.side=T.DoubleSide; mm.customProgramCacheKey=()=>'cutw'; mm.metalness=0; mm.roughness=.62; mm.envMapIntensity=.4; }   /* 甲殼與貝殼：霧面，不像金屬反光 */ mm.skinning=true; mm.needsUpdate=true; });
     const sm=new T.SkinnedMesh(g,m.material); sm.frustumCulled=false; grp.remove(m); grp.add(sm); grp.updateMatrixWorld(true); sm.bind(skel,new T.Matrix4()); });
   const crustK=mode==='lobster'||mode==='prawn';
-  const r={BX,grp,uni,K:crustK?0:mode==='mola'?K*.25:mode==='ray'?K*.35:mode==='crab'?K*.06:mode==='stiff'?K*.02:K,flat:mode==='flat'||mode==='ray',mode,bones,all,extra,idle:0}; if(crustK) r.crust=buildCrust(T,r,mode); FRIGS.add(r); return r; }
+  const r={BX,grp,uni,K:crustK?0:mode==='mola'?K*.25:mode==='ray'?K*.35:mode==='crab'?K*.06:mode==='stiff'?K*.02:K,flat:mode==='flat'||mode==='ray',mode,bones,all,extra,idle:0}; if(crustK) r.crust=buildCrust(T,r,mode); grp.userData.rig=r; FRIGS.add(r); return r; }
 function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.delete(r); return; } r.idle=0;
   const u=r.uni.uSwim.value, A=r.uni.uAmp.value*r.K, off=x=>{ const bx=Math.max(0,Math.min(1.6,.5-x)); return Math.sin(u-x*5.5)*bx*bx*A; };
   let prev=0; for(let i=0;i<r.bones.length;i++){ const x0=BX[i], x1=i<BX.length-1?BX[i+1]:BX[i]-.12, sl=Math.atan2(off(x1)-off(x0),x0-x1), a=sl-prev; prev=sl;
@@ -172,5 +172,7 @@ function update(dt){ for(const m of mixers) m.update(dt);
 function credits(){ return RCREDIT.map(r=>`${r[0]}：「${r[1]}」by ${r[2]}`).join('<br>'); }
 const want=id=>{ if(RFISH[id]) load(RFISH[id][0]); };   // 圖鑑詳細頁要看哪種魚，就只下載那一種
 function glowTick(){ const lt=W.info?W.info.light:1, k=Math.max(0,.6-lt); GLOW.forEach(n=>n.emissiveIntensity=.12+k*1.0); }
-return {glowTick,preload,want,fish,fishReady,attach,attachYacht,update,credits};
+// 水族箱在小屋裡沒有跑戶外的 update，自己逐隻驅動甲殼類的骨架
+const poseRig=(g,dt)=>{ let r=null; g.traverse(o=>{ if(!r&&o.userData&&o.userData.rig) r=o.userData.rig; }); if(r) poseFish(r,dt); };
+return {glowTick,preload,want,fish,fishReady,attach,attachYacht,update,credits,poseRig};
 }
