@@ -1,4 +1,4 @@
-/*APPV:20261102124313*/
+/*APPV:20261102132118*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -6094,7 +6094,32 @@ const CH=[
   intro:'遠洋深藍，海水深得發黑。這裡是滄淵的領域，也是老漁人一輩子沒能抵達的地方。',
   tasks:[{t:'catch',sp:'marlin',n:1,txt:'釣到一尾旗魚'},{t:'catch',sp:'sail',n:1,txt:'釣到一尾雨傘旗魚'},{t:'boss',id:'king',n:1,txt:'接受大師挑戰，擊敗滄淵（Lv 24，⭐ 面板）'}],
   page:'終章\n滄淵沉回深淵前，看了你很久。那天晚上，河口的堤防在大潮中自己裂開了一道縫，月光順著水流進湖裡。\n你回到碼頭，在手記最後一頁寫下：「月潮回來了。換我守著這片湖。」',
-  xp:30000,coins:15000,unlock:'全部完成：獲得稱號「守湖人」'}
+  xp:30000,coins:15000,unlock:'全部完成：獲得稱號「守湖人」'},
+ {id:'e1',spot:'tide',name:'後日談一　退潮的記號',open:{after:'c7'},
+  intro:'月潮回來後的第一個大退潮，蚵仔寮的泥灘上出現一排排用貝殼排成的記號，一路排向河口——像是有人刻意留給你的。',
+  tasks:[{t:'catch',zone:'tide',sp:'hardclam',n:5,txt:'退潮時到蚵仔寮挖到 5 個文蛤'},{t:'catch',zone:'tide',sp:'razor',n:2,txt:'在蚵仔寮挖到 2 支竹蟶'},{t:'catch',zone:'tide',sp:'hermit',n:1,txt:'抓到一隻寄居蟹（牠背的殼上有月光一樣的花紋）'}],
+  page:'手記・後日談（新寫的字）\n「寄居蟹背的那顆殼，內側刻著一行小字：『謝謝你替我們守住湖。冰湖底下有一條水道通往大海，我在那頭等你。——霜汐』」',
+  xp:8000,coins:3000,unlock:'後日談二：冰下的回聲'},
+ {id:'e2',spot:'ice',name:'後日談二　冰下的回聲',open:{after:'e1'},
+  intro:'把耳朵貼在冰面上，可以聽見冰層底下有歌聲，很遠，很輕。霜汐說的水道，就在冰湖底下。',
+  tasks:[{t:'catch',loc:'ice',sp:'char',n:1,txt:'在冰湖釣到一尾北極紅點鮭'},{t:'catch',loc:'ice',sp:'burbot',per:'night',n:1,txt:'夜裡在冰湖釣到一尾江鱈'},{t:'catch',loc:'ice',sp:'taimen',n:1,txt:'在冰湖釣到一尾哲羅鮭'}],
+  page:'手記・後日談\n「江鱈只在最冷的夜裡出來。牠的肚子裡有一片銀色的鱗，比我的手掌還大，在燈下會變顏色。那是霜汐的鱗。水道是真的。」',
+  xp:9000,coins:3500,unlock:'後日談三：泥灘上的燈'},
+ {id:'e3',spot:'tide',name:'後日談三　泥灘上的燈',open:{after:'e2'},
+  intro:'鱗片背面映出一幅模糊的圖：蚵仔寮的泥灘、三盞燈、和一個往海裡指的手勢。要把灘上的小傢伙們都找齊，霜汐才看得見你在哪裡。',
+  tasks:[{t:'catch',zone:'tide',sp:'gomphina',n:3,txt:'在蚵仔寮挖到 3 個赤嘴蛤'},{t:'catch',zone:'tide',sp:'mudskip',n:2,txt:'抓到 2 隻彈塗魚'},{t:'catch',zone:'tide',sp:'fiddler',n:2,txt:'抓到 2 隻招潮蟹'}],
+  page:'手記・後日談\n「泥灘上的燈亮了三次。最後一次，我看見河口外的浪頭上有一條粉紅色的尾巴，揮了一下，就沉下去了。」',
+  xp:10000,coins:4000,unlock:'後日談四：冰湖的月光'},
+ {id:'e4',spot:'ice',name:'後日談四　冰湖的月光',open:{after:'e3'},
+  intro:'霜汐透過冰層傳話：「水道還結著冰。釣起冰湖裡最古老的那些魚，牠們會把冰撞開。」',
+  tasks:[{t:'catch',loc:'ice',sp:'laketrout',n:2,txt:'在冰湖釣到 2 尾湖紅點鮭'},{t:'catch',loc:'ice',sp:'whitefish',n:3,txt:'在冰湖釣到 3 尾白鮭'},{t:'catch',loc:'ice',rar:2,n:3,txt:'在冰湖釣到 3 尾稀有以上的魚'}],
+  page:'手記・後日談\n「那天深夜，冰湖中央傳來一聲很長的裂響。第二天早上，冰面下多了一條發著淡藍光的水道，一路通向月光灣。」',
+  xp:12000,coins:5000,unlock:'終幕：霜汐的邀請'},
+ {id:'e5',spot:'moon',name:'終幕　霜汐的邀請',open:{after:'e4'},reward:'mermaid',title:'海之友',
+  intro:'水道通了。霜汐的聲音第一次這麼近：「月亮升起來的時候到月光灣來。我想讓你看看——我在水裡的樣子。」',
+  tasks:[{t:'catch',zone:'moon',per:'night',n:3,txt:'夜裡在月光灣釣到 3 尾魚'},{t:'catch',zone:'tide',n:5,txt:'到蚵仔寮再撿 5 個小東西，帶去給她當禮物'},{t:'catch',loc:'ice',per:'night',n:2,txt:'夜裡在冰湖釣到 2 尾魚，替她照亮水道'}],
+  page:'終幕　霜汐的回禮\n「她游得那麼自在，像整片海都是她的。游到玻璃一樣的水面前，她停下來，對我揮了揮手。\n我終於明白老漁人為什麼一輩子都在等月潮。」',
+  xp:20000,coins:12000,unlock:'稱號「海之友」；霜汐的回禮（可在手記裡重看）'}
 ];
 const SPOT_IDS=['dock','lily','wood','deep','moon','reef','blue','ice'];
 S.story=S.story||null;
@@ -6117,7 +6142,7 @@ function bump(match){ let changed=false;
   if(changed){ c.persist(); dot(); } }
 function finish(ch){ if(isDone(ch.id)) return; st.done.push(ch.id); c.addXP(ch.xp); S.coins+=ch.coins; if(ch.title){ S.titles=S.titles||[]; if(S.titles.indexOf(ch.title)<0) S.titles.push(ch.title); } if(ch.baits){ S.baits=S.baits||{}; for(const k in ch.baits) S.baits[k]=(S.baits[k]||0)+ch.baits[k]; } c.setCoins(); if(c.syncHUD) c.syncHUD(); c.persist(); dot();
   if(ch.id==='c7'){ S.titles=S.titles||[]; if(S.titles.indexOf('守湖人')<0) S.titles.push('守湖人'); }
-  setTimeout(()=>{ if(ch.id==='c7') showEnding(ch); else showPage(ch,true); c.Snd&&c.Snd.fanfare&&c.Snd.fanfare(2); c.vib&&c.vib([40,40,120]); },1800); }
+  setTimeout(()=>{ if(ch.id==='c7') showEnding(ch); else if(ch.reward==='mermaid'&&window.__mermaidReward) window.__mermaidReward(ch,()=>showPage(ch,true)); else showPage(ch,true); c.Snd&&c.Snd.fanfare&&c.Snd.fanfare(2); c.vib&&c.vib([40,40,120]); },1800); }
 /* 事件掛鉤 */
 function onCatch(fd,ctx){ if(!fd||!fd.sp) return; bump(t=>{ if(t.t!=='catch') return 0;
   if(t.sp&&fd.sp.id!==t.sp) return 0; if(t.zone&&ctx.zone!==t.zone) return 0; if(t.loc&&ctx.loc!==t.loc) return 0; if(t.per&&ctx.per!==t.per) return 0; if(t.rain&&!ctx.rain) return 0; if(t.rar&&fd.sp.rar<t.rar) return 0; return 1; }); }
@@ -6173,7 +6198,7 @@ const css=document.createElement('style'); css.textContent=`#storyBtn{position:r
 #storyBox .page{white-space:pre-line;font-size:15px;line-height:1.85;padding:14px;border-radius:12px;background:#efe2c4;color:#3a2b14;font-family:serif;box-shadow:inset 0 0 30px rgba(120,80,30,.25)}#storyBox .rw{margin-top:10px;font-size:13px;color:#ffe3a3}`;
 document.head.appendChild(css);
 function render(){ const act=active(); let h='<div class="pn"><button class="x" data-s="close">✕</button><h3>📜 老漁人的手記</h3>';
-  if(!act.length&&isDone('c7')) h+='<div class="intro">所有章節都完成了。月潮回到了湖裡，你成了守湖人。</div>';
+  if(!act.length&&isDone('e5')) h+='<div class="intro">所有章節和後日談都完成了。霜汐常常在月光灣的水道口等你。</div>'; else if(!act.length&&isDone('c7')) h+='<div class="intro">所有章節都完成了。月潮回到了湖裡，你成了守湖人。</div>';
   for(const ch of act){ const p=prog(ch); h+=`<div class="sec">${ch.side?'支線':ch.hidden?'隱藏章節':'目前章節'}</div><h3 style="font-size:17px">${ch.name}</h3><div class="intro">${ch.intro}</div>`;
     h+=ch.tasks.map((t,i)=>`<div class="tk${p[i]>=t.n?' ok':''}">${p[i]>=t.n?'✅':'▫️'} ${t.txt}<b>${Math.min(p[i],t.n)}/${t.n}</b></div>`).join('');
     h+=`<div class="rw">完成獎勵：經驗 ${ch.xp.toLocaleString()}、金幣 ${ch.coins.toLocaleString()}，開放 ${ch.unlock}</div>`; }
@@ -6198,13 +6223,87 @@ ed.addEventListener('click',e=>{ if(e.target.closest('[data-e=ok]')) ed.classLis
 function showPage(ch,isNew){ box.innerHTML=`<div class="pn"><button class="x" data-s="back">✕</button><h3>${isNew?'📖 找回了一頁手記':'📖 '+ch.name}</h3><div class="page">${ch.page}</div>${isNew?`<div class="rw">獲得經驗 ${ch.xp.toLocaleString()}、金幣 ${ch.coins.toLocaleString()}<br>開放：${ch.unlock}</div>`:''}</div>`;
   box.classList.remove('hidden'); if(st.read.indexOf(ch.id)<0){ st.read.push(ch.id); c.persist(); } dot(); }
 box.addEventListener('click',e=>{ const b=e.target.closest('[data-s]'); if(!b){ if(e.target===box) box.classList.add('hidden'); return; }
-  const a=b.dataset.s; if(a==='close') box.classList.add('hidden'); else if(a==='back') render(); else if(a==='read'){ const ch=byId(b.dataset.v); if(ch.id==='c7'){ box.classList.add('hidden'); showEnding(ch); } else showPage(ch,false); } });
+  const a=b.dataset.s; if(a==='close') box.classList.add('hidden'); else if(a==='back') render(); else if(a==='read'){ const ch=byId(b.dataset.v); if(ch.id==='c7'){ box.classList.add('hidden'); showEnding(ch); } else if(ch.reward==='mermaid'&&window.__mermaidReward){ box.classList.add('hidden'); window.__mermaidReward(ch,null,true); } else showPage(ch,false); } });
 btn.addEventListener('click',()=>{ render(); box.classList.remove('hidden'); });
 function dot(){ btn.classList.toggle('dot',st.done.some(id=>st.read.indexOf(id)<0)||active().some(ch=>!st.prog[ch.id])); }
 dot();
 function freePage(t,h){ box.innerHTML=`<div class="pn"><button class="x" data-s="close">✕</button><h3>📖 ${t}</h3><div class="page">${h}</div></div>`; box.classList.remove('hidden'); }
 return {progOf:id=>{ const ch=byId(id); return ch?prog(ch).slice():null; },isActive:id=>active().some(ch=>ch.id===id),page:freePage,intro:showIntro,needs,boost,onMeet,wants:id=>active().some(ch=>ch.tasks.some((t,i)=>t.t==='item'&&t.id===id&&prog(ch)[i]<t.n)),showEnding:()=>showEnding(byId('c7')),lock,onCatch,onPerfect,onItem,onScene,onBoss,tick,done:isDone};
 }
+/* 終幕「霜汐的邀請」完成後的回禮：月光灣滿月的夜景動畫（月亮升起、水面月光、遠處霜汐的尾巴在月光下揮一下）
+   → 玩家按下「跟著霜汐潛入水中」→ 畫面沉入水裡（水面往上退、光束、氣泡）→ 接上真人美人魚的影片 → 回禮卡。
+   影片是玩家提供的真人美人魚表演，轉成 720p H.264（media/mermaid_reward.mp4，約 7MB），要看的時候才下載。 */
+(function(){
+ const LINES=['滿月的夜晚，月光灣的水面亮了起來。','遠處的水面，輕輕動了一下。','一條粉色的尾巴在月光下揮了一下，又沉了下去。','「你替我們守住了這片湖。」','「跟我來——讓你看看我在水裡的樣子。」'];
+ const css=`#mrBox{position:fixed;inset:0;z-index:320;background:#000;color:#f2ecdf;font-family:inherit;overflow:hidden;opacity:0;transition:opacity 1.2s}
+#mrBox.on{opacity:1}#mrBox canvas{position:absolute;inset:0;width:100%;height:100%}
+#mrLine{position:absolute;left:8%;right:8%;bottom:22%;text-align:center;font-size:20px;line-height:1.7;letter-spacing:.06em;text-shadow:0 2px 12px #000;opacity:0;transition:opacity 1.1s}
+#mrBox button{position:absolute;left:50%;transform:translateX(-50%);border:1px solid #f0d7a8;background:rgba(20,30,50,.55);color:#f6ead2;border-radius:24px;padding:12px 22px;font-size:17px;letter-spacing:.08em}
+#mrGo{bottom:9%;opacity:0;transition:opacity 1s;white-space:nowrap}#mrSkip{top:calc(env(safe-area-inset-top,0px) + 14px);right:14px;left:auto!important;transform:none!important;padding:6px 14px!important;font-size:14px!important;opacity:.7}
+#mrVid{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;opacity:0;transition:opacity 1.4s}
+#mrTip{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);text-align:center;font-size:13px;opacity:.6}
+#mrCard{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 10%;background:radial-gradient(ellipse at 50% 40%,#1c2c4a,#04070f);opacity:0;transition:opacity 1.2s}
+#mrCard h2{font-size:24px;letter-spacing:.12em;margin:0;color:#f6d9e4}#mrCard p{margin:0;line-height:1.8;opacity:.9}
+#mrCard button{position:static!important;transform:none!important;margin-top:10px}`;
+ let st=null;
+ function el(tag,attrs,parent){ const e=document.createElement(tag); Object.assign(e,attrs||{}); if(parent) parent.appendChild(e); return e; }
+ function close(){ if(!st) return; const s=st; st=null; cancelAnimationFrame(s.raf); try{ s.vid&&s.vid.pause(); }catch(_){} try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(_){}
+  s.box.classList.remove('on'); setTimeout(()=>{ s.box.remove(); if(s.after) s.after(); },900); }
+ function card(){ const s=st; if(!s||s.carded) return; s.carded=true; const ch=s.ch, c=el('div',{id:'mrCard'},s.box);
+  c.innerHTML=`<h2>🧜‍♀️ 霜汐的回禮</h2><p>她游得那麼自在，像整片海都是她的。<br>游到水面前，她停下來，對你揮了揮手。</p>`+(s.replay?'':`<p>🏆 獲得稱號「${ch.title||'海之友'}」<br><small>經驗 ${(ch.xp||0).toLocaleString()}・金幣 ${(ch.coins||0).toLocaleString()}</small></p>`)+`<p><small style="opacity:.7">想再看一次：📖 手記 →「終幕」→ 閱讀</small></p><button>回到遊戲</button>`;
+  c.querySelector('button').onclick=close; requestAnimationFrame(()=>c.style.opacity=1); }
+ function playVideo(){ const s=st; if(!s) return; s.phase='video';
+  // 兩種格式：瀏覽器自己挑能播的那個（H.264 MP4 給大多數手機，WebM 給不支援 H.264 的瀏覽器）
+  const v=s.vid=el('video',{id:'mrVid',poster:'media/mermaid_reward_poster.jpg',playsInline:true,preload:'auto'},s.box); v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline','');
+  for(const [src,type] of [['media/mermaid_reward.mp4','video/mp4; codecs="avc1.640028, mp4a.40.2"'],['media/mermaid_reward.webm','video/webm; codecs="vp9, opus"']]){ const so=document.createElement('source'); so.src=src; so.type=type; v.appendChild(so); }
+  const tip=el('div',{id:'mrTip',textContent:'橫放手機看得更清楚'},s.box);
+  v.onended=()=>{ v.style.opacity=0; tip.remove(); setTimeout(card,800); };
+  const fail=()=>{ tip.textContent='影片載入失敗，請稍後在手記裡重看'; setTimeout(card,1600); }; v.onerror=fail; v.lastChild.addEventListener('error',fail);
+  requestAnimationFrame(()=>v.style.opacity=1);
+  const p=v.play(); if(p&&p.catch) p.catch(()=>{ v.muted=true; v.play().catch(()=>{}); });
+  try{ const r=s.box.requestFullscreen&&s.box.requestFullscreen(); if(r&&r.then) r.then(()=>{ try{ screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{}); }catch(_){} }).catch(()=>{}); }catch(_){} }
+ // 夜景與潛水的畫布動畫
+ function draw(now){ const s=st; if(!s) return; s.raf=requestAnimationFrame(draw); const t=(now-s.t0)/1000, cv=s.cv, x=s.ctx, W=cv.width, H=cv.height, m=Math.min(W,H);
+  const dive=s.phase==='dive'?Math.min(1,(now-s.diveAt)/2400):s.phase==='video'?1:0;
+  // 天空與星星
+  const y0=H*(.56-dive*.72);
+  let g=x.createLinearGradient(0,0,0,Math.max(1,y0)); g.addColorStop(0,'#03060f'); g.addColorStop(1,'#16274a'); x.fillStyle=g; x.fillRect(0,0,W,Math.max(0,y0));
+  for(const sp of s.stars){ const a=.35+.65*Math.abs(Math.sin(t*sp.f+sp.p)); x.fillStyle=`rgba(255,248,230,${a*sp.b})`; x.fillRect(sp.x*W,sp.y*y0,1.6,1.6); }
+  // 月亮：慢慢升起，帶光暈
+  const mr=m*.065, mx=W*.68, my=H*(.44-.22*Math.min(1,t/7))-dive*H*.7;
+  let gl=x.createRadialGradient(mx,my,mr*.6,mx,my,mr*5); gl.addColorStop(0,'rgba(255,240,205,.45)'); gl.addColorStop(1,'rgba(255,240,205,0)'); x.fillStyle=gl; x.fillRect(mx-mr*5,my-mr*5,mr*10,mr*10);
+  x.fillStyle='#fdf3d8'; x.beginPath(); x.arc(mx,my,mr,0,6.283); x.fill();
+  // 水面
+  g=x.createLinearGradient(0,y0,0,H); g.addColorStop(0,dive>0?'#123a66':'#0c1d36'); g.addColorStop(1,dive>0?'#061a36':'#02060f'); x.fillStyle=g; x.fillRect(0,y0,W,H-y0);
+  // 月光倒影：越近越寬、碎成一條條晃動的亮紋
+  if(dive<.6){ x.globalCompositeOperation='lighter'; for(let i=0;i<110;i++){ const k=i/110, yy=y0+(H-y0)*Math.pow(k,1.7), wd=(3+k*k*W*.16)*(.3+.7*Math.abs(Math.sin(i*7.3+t*1.7))), off=Math.sin(i*3.1+t*1.3)*k*W*.05+Math.sin(i*11.7)*k*W*.03;
+    x.fillStyle=`rgba(255,214,150,${Math.max(0,(.42-k*.22)*(.35+.65*Math.sin(i*5.7+t*2.3)))*(1-dive*1.6)})`; x.fillRect(mx-wd/2+off,yy,wd,1+k*2); } x.globalCompositeOperation='source-over'; }
+  // 遠處的霜汐：水紋一圈圈擴散，尾巴在月光下揮一下
+  const tt=t-6.6; if(tt>0&&tt<6&&dive===0){ const cx=W*.32, cy=y0+(H-y0)*.18;
+   for(let r=0;r<3;r++){ const rr=(tt-r*.6)*m*.05; if(rr<=0) continue; x.strokeStyle=`rgba(220,230,255,${Math.max(0,.5-rr/(m*.25))})`; x.lineWidth=1.4; x.beginPath(); x.ellipse(cx,cy,rr,rr*.22,0,0,6.283); x.stroke(); }
+   if(tt<1.8){ const up=Math.sin(Math.min(1,tt/1.8)*Math.PI), h=m*.09*up, sw=Math.sin(tt*4)*.25;
+    x.save(); x.translate(cx,cy); x.rotate(sw); x.fillStyle='rgba(240,150,190,.9)'; x.beginPath(); x.moveTo(-m*.008,0); x.quadraticCurveTo(-m*.012,-h*.6,-m*.035,-h); x.quadraticCurveTo(0,-h*.82,m*.035,-h); x.quadraticCurveTo(m*.012,-h*.6,m*.008,0); x.closePath(); x.fill();
+    x.strokeStyle='rgba(255,235,245,.8)'; x.lineWidth=1; x.stroke(); x.restore(); } }
+  // 潛入水中：光束與氣泡
+  if(dive>0){ for(let i=0;i<6;i++){ const bx=W*(.15+i*.15)+Math.sin(t*.4+i)*W*.03; x.fillStyle=`rgba(160,210,255,${.06*dive})`; x.beginPath(); x.moveTo(bx-W*.03,Math.max(0,y0)); x.lineTo(bx+W*.03,Math.max(0,y0)); x.lineTo(bx+W*.12,H); x.lineTo(bx-W*.06,H); x.fill(); }
+   for(const b of s.bub){ b.y-=b.v*(1/60); if(b.y<-.05){ b.y=1.05; b.x=Math.random(); } x.strokeStyle='rgba(220,240,255,.55)'; x.lineWidth=1; x.beginPath(); x.arc(b.x*W+Math.sin(t*2+b.p)*6,b.y*H,b.r*m,0,6.283); x.stroke(); }
+   if(s.phase==='dive'&&dive>=1) playVideo(); }
+  // 旁白
+  if(s.phase==='night'){ const i=Math.floor((t-.8)/3); if(i>=0&&i<LINES.length&&i!==s.li){ s.li=i; s.line.style.opacity=0; setTimeout(()=>{ if(!st) return; s.line.textContent=LINES[i]; s.line.style.opacity=1; },500); }
+   if(t>.8+LINES.length*3&&s.go.style.opacity!=='1'){ s.go.style.opacity=1; } } }
+ window.__mermaidReward=function(ch,after,replay){ if(st) return;
+  if(!document.getElementById('mrCss')){ const sc=el('style',{id:'mrCss',textContent:css}); document.head.appendChild(sc); }
+  const box=el('div',{id:'mrBox'},document.body), cv=el('canvas',{},box), line=el('div',{id:'mrLine'},box), go=el('button',{id:'mrGo',textContent:'▶ 跟著霜汐潛入水中'},box), skip=el('button',{id:'mrSkip',textContent:'跳過'},box);
+  const fit=()=>{ const d=Math.min(2,window.devicePixelRatio||1); cv.width=Math.round(innerWidth*d); cv.height=Math.round(innerHeight*d); }; fit(); addEventListener('resize',fit);
+  st={ch,after,replay,box,cv,ctx:cv.getContext('2d'),line,go,phase:'night',li:-1,t0:performance.now(),
+   stars:Array.from({length:140},()=>({x:Math.random(),y:Math.random()*.95,b:.4+Math.random()*.6,f:.5+Math.random()*2,p:Math.random()*6})),
+   bub:Array.from({length:46},()=>({x:Math.random(),y:Math.random()*1.1,r:.003+Math.random()*.01,v:.12+Math.random()*.3,p:Math.random()*6}))};
+  // 按鈕是玩家的手勢，之後播放影片才能帶聲音
+  go.onclick=()=>{ if(!st||st.phase!=='night') return; st.phase='dive'; st.diveAt=performance.now(); go.style.opacity=0; line.style.opacity=0; const pre=document.createElement('link'); pre.rel='preload'; pre.as='video'; pre.href=document.createElement('video').canPlayType('video/mp4; codecs="avc1.640028"')?'media/mermaid_reward.mp4':'media/mermaid_reward.webm'; document.head.appendChild(pre); };
+  skip.onclick=()=>{ if(!st) return; if(st.phase==='video'){ try{ st.vid.pause(); }catch(_){} st.vid.style.opacity=0; card(); } else if(st.phase==='night'){ go.onclick(); } else { st.diveAt=-1e9; } };
+  requestAnimationFrame(()=>box.classList.add('on')); st.raf=requestAnimationFrame(draw);
+ };
+})();
 /* ===== 老漁人的小屋：水族箱與標本牆（資料與規則） ===== */
 function createHome(c){
 'use strict';
@@ -7431,7 +7530,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102124313'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102132118'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9542,7 +9641,7 @@ const TIDE=createTide(W,{species:id=>SPECIES.find(q=>q.id===id),hour:()=>G.hour,
   sellNow:v=>{ save.coins+=v; setCoins(); persist(); Snd.coin&&Snd.coin(); },
   toCooler:(id,L)=>{ save.cooler=save.cooler||[]; if(save.cooler.length>=5) return false; save.cooler.push({id,L,w:+(L*L*L*600).toFixed(3),d:Date.now()}); persist(); return true; },
   keepTank:(id,L)=>{ const sp=SPECIES.find(q=>q.id===id); if(!sp||!window.__HOME) return '小屋還沒開放'; const fd={sp,L,w:+(L*L*L*600).toFixed(3)}; const r=window.__HOME.check(fd); if(!r.ok) return r.why||'放不進去'; window.__HOME.keep(fd,'潮間帶'); return true; },
-  dex:(id,L)=>{ const r=save.dex[id]; save.dex[id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,L),bl:Math.max(r?r.bl||0:0,L),md:r?r.md||0:0,f:r?r.f:Date.now()}; persist(); }}); window.__TIDE=TIDE;
+  dex:(id,L)=>{ try{ const sp=SPECIES.find(s=>s.id===id); if(sp&&window.__STORY) window.__STORY.onCatch({sp},{zone:'tide',loc:'tide',per:period(G.hour)}); }catch(_){}  const r=save.dex[id]; save.dex[id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,L),bl:Math.max(r?r.bl||0:0,L),md:r?r.md||0:0,f:r?r.f:Date.now()}; persist(); }}); window.__TIDE=TIDE;
 window.__P_splash=(x,y,z)=>{ try{ P.splash(x,.02,z,8,.25); }catch(e){} };
 function goTide(){ if(G.state!=='idle'){ toast('先收線再下灘','warn'); return; } MDL.preload('tide'); G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ if(TIDE.enter()) G.state='tide'; else G.state='idle'; fadeOutWhenReady(); },650); }

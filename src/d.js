@@ -633,7 +633,7 @@ const TIDE=createTide(W,{species:id=>SPECIES.find(q=>q.id===id),hour:()=>G.hour,
   sellNow:v=>{ save.coins+=v; setCoins(); persist(); Snd.coin&&Snd.coin(); },
   toCooler:(id,L)=>{ save.cooler=save.cooler||[]; if(save.cooler.length>=5) return false; save.cooler.push({id,L,w:+(L*L*L*600).toFixed(3),d:Date.now()}); persist(); return true; },
   keepTank:(id,L)=>{ const sp=SPECIES.find(q=>q.id===id); if(!sp||!window.__HOME) return '小屋還沒開放'; const fd={sp,L,w:+(L*L*L*600).toFixed(3)}; const r=window.__HOME.check(fd); if(!r.ok) return r.why||'放不進去'; window.__HOME.keep(fd,'潮間帶'); return true; },
-  dex:(id,L)=>{ const r=save.dex[id]; save.dex[id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,L),bl:Math.max(r?r.bl||0:0,L),md:r?r.md||0:0,f:r?r.f:Date.now()}; persist(); }}); window.__TIDE=TIDE;
+  dex:(id,L)=>{ try{ const sp=SPECIES.find(s=>s.id===id); if(sp&&window.__STORY) window.__STORY.onCatch({sp},{zone:'tide',loc:'tide',per:period(G.hour)}); }catch(_){}  const r=save.dex[id]; save.dex[id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,L),bl:Math.max(r?r.bl||0:0,L),md:r?r.md||0:0,f:r?r.f:Date.now()}; persist(); }}); window.__TIDE=TIDE;
 window.__P_splash=(x,y,z)=>{ try{ P.splash(x,.02,z,8,.25); }catch(e){} };
 function goTide(){ if(G.state!=='idle'){ toast('先收線再下灘','warn'); return; } MDL.preload('tide'); G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ if(TIDE.enter()) G.state='tide'; else G.state='idle'; fadeOutWhenReady(); },650); }

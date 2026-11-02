@@ -48,7 +48,32 @@ const CH=[
   intro:'遠洋深藍，海水深得發黑。這裡是滄淵的領域，也是老漁人一輩子沒能抵達的地方。',
   tasks:[{t:'catch',sp:'marlin',n:1,txt:'釣到一尾旗魚'},{t:'catch',sp:'sail',n:1,txt:'釣到一尾雨傘旗魚'},{t:'boss',id:'king',n:1,txt:'接受大師挑戰，擊敗滄淵（Lv 24，⭐ 面板）'}],
   page:'終章\n滄淵沉回深淵前，看了你很久。那天晚上，河口的堤防在大潮中自己裂開了一道縫，月光順著水流進湖裡。\n你回到碼頭，在手記最後一頁寫下：「月潮回來了。換我守著這片湖。」',
-  xp:30000,coins:15000,unlock:'全部完成：獲得稱號「守湖人」'}
+  xp:30000,coins:15000,unlock:'全部完成：獲得稱號「守湖人」'},
+ {id:'e1',spot:'tide',name:'後日談一　退潮的記號',open:{after:'c7'},
+  intro:'月潮回來後的第一個大退潮，蚵仔寮的泥灘上出現一排排用貝殼排成的記號，一路排向河口——像是有人刻意留給你的。',
+  tasks:[{t:'catch',zone:'tide',sp:'hardclam',n:5,txt:'退潮時到蚵仔寮挖到 5 個文蛤'},{t:'catch',zone:'tide',sp:'razor',n:2,txt:'在蚵仔寮挖到 2 支竹蟶'},{t:'catch',zone:'tide',sp:'hermit',n:1,txt:'抓到一隻寄居蟹（牠背的殼上有月光一樣的花紋）'}],
+  page:'手記・後日談（新寫的字）\n「寄居蟹背的那顆殼，內側刻著一行小字：『謝謝你替我們守住湖。冰湖底下有一條水道通往大海，我在那頭等你。——霜汐』」',
+  xp:8000,coins:3000,unlock:'後日談二：冰下的回聲'},
+ {id:'e2',spot:'ice',name:'後日談二　冰下的回聲',open:{after:'e1'},
+  intro:'把耳朵貼在冰面上，可以聽見冰層底下有歌聲，很遠，很輕。霜汐說的水道，就在冰湖底下。',
+  tasks:[{t:'catch',loc:'ice',sp:'char',n:1,txt:'在冰湖釣到一尾北極紅點鮭'},{t:'catch',loc:'ice',sp:'burbot',per:'night',n:1,txt:'夜裡在冰湖釣到一尾江鱈'},{t:'catch',loc:'ice',sp:'taimen',n:1,txt:'在冰湖釣到一尾哲羅鮭'}],
+  page:'手記・後日談\n「江鱈只在最冷的夜裡出來。牠的肚子裡有一片銀色的鱗，比我的手掌還大，在燈下會變顏色。那是霜汐的鱗。水道是真的。」',
+  xp:9000,coins:3500,unlock:'後日談三：泥灘上的燈'},
+ {id:'e3',spot:'tide',name:'後日談三　泥灘上的燈',open:{after:'e2'},
+  intro:'鱗片背面映出一幅模糊的圖：蚵仔寮的泥灘、三盞燈、和一個往海裡指的手勢。要把灘上的小傢伙們都找齊，霜汐才看得見你在哪裡。',
+  tasks:[{t:'catch',zone:'tide',sp:'gomphina',n:3,txt:'在蚵仔寮挖到 3 個赤嘴蛤'},{t:'catch',zone:'tide',sp:'mudskip',n:2,txt:'抓到 2 隻彈塗魚'},{t:'catch',zone:'tide',sp:'fiddler',n:2,txt:'抓到 2 隻招潮蟹'}],
+  page:'手記・後日談\n「泥灘上的燈亮了三次。最後一次，我看見河口外的浪頭上有一條粉紅色的尾巴，揮了一下，就沉下去了。」',
+  xp:10000,coins:4000,unlock:'後日談四：冰湖的月光'},
+ {id:'e4',spot:'ice',name:'後日談四　冰湖的月光',open:{after:'e3'},
+  intro:'霜汐透過冰層傳話：「水道還結著冰。釣起冰湖裡最古老的那些魚，牠們會把冰撞開。」',
+  tasks:[{t:'catch',loc:'ice',sp:'laketrout',n:2,txt:'在冰湖釣到 2 尾湖紅點鮭'},{t:'catch',loc:'ice',sp:'whitefish',n:3,txt:'在冰湖釣到 3 尾白鮭'},{t:'catch',loc:'ice',rar:2,n:3,txt:'在冰湖釣到 3 尾稀有以上的魚'}],
+  page:'手記・後日談\n「那天深夜，冰湖中央傳來一聲很長的裂響。第二天早上，冰面下多了一條發著淡藍光的水道，一路通向月光灣。」',
+  xp:12000,coins:5000,unlock:'終幕：霜汐的邀請'},
+ {id:'e5',spot:'moon',name:'終幕　霜汐的邀請',open:{after:'e4'},reward:'mermaid',title:'海之友',
+  intro:'水道通了。霜汐的聲音第一次這麼近：「月亮升起來的時候到月光灣來。我想讓你看看——我在水裡的樣子。」',
+  tasks:[{t:'catch',zone:'moon',per:'night',n:3,txt:'夜裡在月光灣釣到 3 尾魚'},{t:'catch',zone:'tide',n:5,txt:'到蚵仔寮再撿 5 個小東西，帶去給她當禮物'},{t:'catch',loc:'ice',per:'night',n:2,txt:'夜裡在冰湖釣到 2 尾魚，替她照亮水道'}],
+  page:'終幕　霜汐的回禮\n「她游得那麼自在，像整片海都是她的。游到玻璃一樣的水面前，她停下來，對我揮了揮手。\n我終於明白老漁人為什麼一輩子都在等月潮。」',
+  xp:20000,coins:12000,unlock:'稱號「海之友」；霜汐的回禮（可在手記裡重看）'}
 ];
 const SPOT_IDS=['dock','lily','wood','deep','moon','reef','blue','ice'];
 S.story=S.story||null;
@@ -71,7 +96,7 @@ function bump(match){ let changed=false;
   if(changed){ c.persist(); dot(); } }
 function finish(ch){ if(isDone(ch.id)) return; st.done.push(ch.id); c.addXP(ch.xp); S.coins+=ch.coins; if(ch.title){ S.titles=S.titles||[]; if(S.titles.indexOf(ch.title)<0) S.titles.push(ch.title); } if(ch.baits){ S.baits=S.baits||{}; for(const k in ch.baits) S.baits[k]=(S.baits[k]||0)+ch.baits[k]; } c.setCoins(); if(c.syncHUD) c.syncHUD(); c.persist(); dot();
   if(ch.id==='c7'){ S.titles=S.titles||[]; if(S.titles.indexOf('守湖人')<0) S.titles.push('守湖人'); }
-  setTimeout(()=>{ if(ch.id==='c7') showEnding(ch); else showPage(ch,true); c.Snd&&c.Snd.fanfare&&c.Snd.fanfare(2); c.vib&&c.vib([40,40,120]); },1800); }
+  setTimeout(()=>{ if(ch.id==='c7') showEnding(ch); else if(ch.reward==='mermaid'&&window.__mermaidReward) window.__mermaidReward(ch,()=>showPage(ch,true)); else showPage(ch,true); c.Snd&&c.Snd.fanfare&&c.Snd.fanfare(2); c.vib&&c.vib([40,40,120]); },1800); }
 /* 事件掛鉤 */
 function onCatch(fd,ctx){ if(!fd||!fd.sp) return; bump(t=>{ if(t.t!=='catch') return 0;
   if(t.sp&&fd.sp.id!==t.sp) return 0; if(t.zone&&ctx.zone!==t.zone) return 0; if(t.loc&&ctx.loc!==t.loc) return 0; if(t.per&&ctx.per!==t.per) return 0; if(t.rain&&!ctx.rain) return 0; if(t.rar&&fd.sp.rar<t.rar) return 0; return 1; }); }
@@ -127,7 +152,7 @@ const css=document.createElement('style'); css.textContent=`#storyBtn{position:r
 #storyBox .page{white-space:pre-line;font-size:15px;line-height:1.85;padding:14px;border-radius:12px;background:#efe2c4;color:#3a2b14;font-family:serif;box-shadow:inset 0 0 30px rgba(120,80,30,.25)}#storyBox .rw{margin-top:10px;font-size:13px;color:#ffe3a3}`;
 document.head.appendChild(css);
 function render(){ const act=active(); let h='<div class="pn"><button class="x" data-s="close">✕</button><h3>📜 老漁人的手記</h3>';
-  if(!act.length&&isDone('c7')) h+='<div class="intro">所有章節都完成了。月潮回到了湖裡，你成了守湖人。</div>';
+  if(!act.length&&isDone('e5')) h+='<div class="intro">所有章節和後日談都完成了。霜汐常常在月光灣的水道口等你。</div>'; else if(!act.length&&isDone('c7')) h+='<div class="intro">所有章節都完成了。月潮回到了湖裡，你成了守湖人。</div>';
   for(const ch of act){ const p=prog(ch); h+=`<div class="sec">${ch.side?'支線':ch.hidden?'隱藏章節':'目前章節'}</div><h3 style="font-size:17px">${ch.name}</h3><div class="intro">${ch.intro}</div>`;
     h+=ch.tasks.map((t,i)=>`<div class="tk${p[i]>=t.n?' ok':''}">${p[i]>=t.n?'✅':'▫️'} ${t.txt}<b>${Math.min(p[i],t.n)}/${t.n}</b></div>`).join('');
     h+=`<div class="rw">完成獎勵：經驗 ${ch.xp.toLocaleString()}、金幣 ${ch.coins.toLocaleString()}，開放 ${ch.unlock}</div>`; }
@@ -152,7 +177,7 @@ ed.addEventListener('click',e=>{ if(e.target.closest('[data-e=ok]')) ed.classLis
 function showPage(ch,isNew){ box.innerHTML=`<div class="pn"><button class="x" data-s="back">✕</button><h3>${isNew?'📖 找回了一頁手記':'📖 '+ch.name}</h3><div class="page">${ch.page}</div>${isNew?`<div class="rw">獲得經驗 ${ch.xp.toLocaleString()}、金幣 ${ch.coins.toLocaleString()}<br>開放：${ch.unlock}</div>`:''}</div>`;
   box.classList.remove('hidden'); if(st.read.indexOf(ch.id)<0){ st.read.push(ch.id); c.persist(); } dot(); }
 box.addEventListener('click',e=>{ const b=e.target.closest('[data-s]'); if(!b){ if(e.target===box) box.classList.add('hidden'); return; }
-  const a=b.dataset.s; if(a==='close') box.classList.add('hidden'); else if(a==='back') render(); else if(a==='read'){ const ch=byId(b.dataset.v); if(ch.id==='c7'){ box.classList.add('hidden'); showEnding(ch); } else showPage(ch,false); } });
+  const a=b.dataset.s; if(a==='close') box.classList.add('hidden'); else if(a==='back') render(); else if(a==='read'){ const ch=byId(b.dataset.v); if(ch.id==='c7'){ box.classList.add('hidden'); showEnding(ch); } else if(ch.reward==='mermaid'&&window.__mermaidReward){ box.classList.add('hidden'); window.__mermaidReward(ch,null,true); } else showPage(ch,false); } });
 btn.addEventListener('click',()=>{ render(); box.classList.remove('hidden'); });
 function dot(){ btn.classList.toggle('dot',st.done.some(id=>st.read.indexOf(id)<0)||active().some(ch=>!st.prog[ch.id])); }
 dot();
