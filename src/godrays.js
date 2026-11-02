@@ -23,7 +23,7 @@ function createGodRays({renderer:R,camera,U}){
       for(int i=0;i<40;i++){ p+=st; vec3 c=texture2D(tSrc,clamp(p,.001,.999)).rgb; float l=dot(c,vec3(.299,.587,.114));
         float open=smoothstep(uThresh,uThresh+.18,l);
         float off=length((p-uSun)*vec2(uAspect,1.0));
-        sum+=open*exp(-off*6.0)*w; w*=.97; }
+        sum+=open*exp(-off*4.0)*w; w*=.975; }
       gl_FragColor=vec4(vec3(sum/40.0),1.0); }`});
   // 第二步：以加色疊回畫面，顏色是當下太陽／月亮的光色
   const addMat=new T.ShaderMaterial({uniforms:u,vertexShader:VS,depthTest:false,depthWrite:false,transparent:true,blending:T.AdditiveBlending,fragmentShader:`
