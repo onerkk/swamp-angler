@@ -1,4 +1,4 @@
-/*APPV:20261102080947*/
+/*APPV:20261102082814*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -2286,7 +2286,8 @@ const pU={uScale:{value:800}, uCol:{value:new T.Color(1,1,1)}};
 const pts3=new T.Points(pgeo,new T.ShaderMaterial({uniforms:pU, vertexShader:SH.ptsVS, fragmentShader:SH.ptsFS, transparent:true, depthWrite:false}));
 pts3.frustumCulled=false; scene.add(pts3);
 let pCur=0;
-function splash(x,y,z,n,pw){ n=Math.ceil(n*(window.__effectBudget?.particleScale??1)); for(let k=0;k<n;k++){ const i=pCur; pCur=(pCur+1)%MAXP; const a=Math.random()*6.283, sp=(.25+Math.random())*pw;
+// dx,dz（可省略）：甩尾的方向，水花順著那個方向噴成一道弧，而不是原地往上一團
+function splash(x,y,z,n,pw,dx,dz){ n=Math.ceil(n*(window.__effectBudget?.particleScale??1)); const dl=dx||dz?Math.hypot(dx,dz):0; for(let k=0;k<n;k++){ const i=pCur; pCur=(pCur+1)%MAXP; const a=dl?Math.atan2(dz,dx)+(Math.random()-.5)*1.1:Math.random()*6.283, sp=(.25+Math.random())*pw*(dl?2.1:1);
   pPos[i*3]=x+Math.cos(a)*.05; pPos[i*3+1]=y+.01; pPos[i*3+2]=z+Math.sin(a)*.05;
   pVel[i*3]=Math.cos(a)*sp*.9; pVel[i*3+1]=(1.2+Math.random()*2.6)*pw; pVel[i*3+2]=Math.sin(a)*sp*.9;
   pMax[i]=.45+Math.random()*.7; pLife[i]=1; pSize[i]=.01+Math.random()*.028*Math.min(pw,1.6); } }
@@ -7284,7 +7285,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102080947'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102082814'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9230,7 +9231,7 @@ function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收�
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; if(then){ fadeEl.classList.remove('on'); then(); } else if(G.spot!==0){ fadeEl.classList.remove('on'); goSpot(0); } else fadeOutWhenReady(); },650); }
-window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__goSpot=i=>goSpot(i); window.__PROPS=P;
+window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__goSpot=i=>goSpot(i); window.__PROPS=P; window.__testFight=(x,z)=>{ G.to.set(x,0,z); G.castDist=Math.hypot(x-(G.angler||G.base).x,z-(G.angler||G.base).z); bob.position.set(x,0,z); G.state='wait'; bite(); hook(true); };
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
@@ -9637,6 +9638,13 @@ function updateFight(dt){
   // 魚影
   const sh=P.shadow; sh.position.set(tv.x-Math.sin(az)*.4,.012,tv.z-Math.cos(az)*.4); sh.rotation.y=az+(f.latDir<0?-Math.PI/2:Math.PI/2); sh.scale.setScalar(fd.L*1.15);
   sh.material.opacity=f.jumpT>0?0:.4*(1-sstep(3,10,f.d));
+  // 水面下看得到掙扎的魚：離船 14 公尺內就把魚本體放在水面下，透過水面的折射與吸收看到魚身左右甩、翻身；甩頭時尾巴拍水，水花朝甩的方向噴出一道弧
+  if(!(f.jumpT>0)){ const vis=!fd.item&&G.loc!=='ice'&&f.d<14&&fd.sp.special!=='mermaid'; g.visible=vis;
+    if(vis){ const L=fd.L||.5, dep=Math.max(0,-(f.pos.y||0)), thr=(f.run||shake)?1:.35, yaw=az+(f.latDir<0?Math.PI:0)+Math.PI/2+Math.sin(G.t*3.1)*.28*thr;
+      g.position.set(tv.x,-(.2+.18*L)-dep*.6,tv.z); te.set(Math.sin(G.t*9.5)*.38*thr,yaw,0,'YXZ'); g.quaternion.setFromEuler(te); te.order='YZX'; G.fish.uni.uAmp.value=.08+.16*thr; G.fish.uni.uSwim.value+=dt*(6+16*thr);
+      f.slapT=(f.slapT||0)-dt; if(f.slapT<=0&&thr>.9&&dep<1.2){ f.slapT=rand(.45,1.2); const s=Math.random()<.5?1:-1, tx=Math.cos(yaw)*s, tz=-Math.sin(yaw)*s; P.splash(tv.x,.02,tv.z,Math.round(8+10*L),.35+.3*Math.min(1.5,L),tx,tz); W.addRipple(tv.x,tv.z,.25+.2*L); if(P.foam) P.foam(tv.x+tx*.3*L,tv.z+tz*.3*L,.45+.4*L,1.6,.9); }
+      // 衝刺時貼著水面劃出 V 形尾浪：沿著游的方向往後兩側各留一串小漣漪
+      f.wakeT=(f.wakeT||0)-dt; if(f.run&&dep<.8&&f.wakeT<=0){ f.wakeT=.12; const bx=Math.sin(az), bz=Math.cos(az), px=-bz, pz=bx; for(const sd of [-1,1]) W.addRipple(tv.x+bx*.3*L+px*sd*.35*L,tv.z+bz*.3*L+pz*sd*.35*L,.08+.05*L); } } }
   // 浮標與釣竿
   { const pull=clamp(f.T*1.1+(f.run?.15:0),0,1);   // 浮標被拖進水裡、朝釣竿方向傾斜
     { const rt=rod.tipW, k=Math.min(.35,1.2/Math.max(2,f.d)); bob.position.set(tv.x+(rt.x-tv.x)*k,W.swell(tv.x,tv.z,G.t)-.03-.28*pull+Math.sin(G.t*9)*.012*(f.run?1:.4),tv.z+(rt.z-tv.z)*k); const q=PH.move(tv,bob.position,.065); setPoint(bob.position,q.pos); }   // 浮標沿魚線移動並避開實體

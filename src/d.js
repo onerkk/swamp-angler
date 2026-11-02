@@ -468,7 +468,7 @@ function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收�
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; if(then){ fadeEl.classList.remove('on'); then(); } else if(G.spot!==0){ fadeEl.classList.remove('on'); goSpot(0); } else fadeOutWhenReady(); },650); }
-window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__goSpot=i=>goSpot(i); window.__PROPS=P;
+window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__goSpot=i=>goSpot(i); window.__PROPS=P; window.__testFight=(x,z)=>{ G.to.set(x,0,z); G.castDist=Math.hypot(x-(G.angler||G.base).x,z-(G.angler||G.base).z); bob.position.set(x,0,z); G.state='wait'; bite(); hook(true); };
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
@@ -875,6 +875,13 @@ function updateFight(dt){
   // 魚影
   const sh=P.shadow; sh.position.set(tv.x-Math.sin(az)*.4,.012,tv.z-Math.cos(az)*.4); sh.rotation.y=az+(f.latDir<0?-Math.PI/2:Math.PI/2); sh.scale.setScalar(fd.L*1.15);
   sh.material.opacity=f.jumpT>0?0:.4*(1-sstep(3,10,f.d));
+  // 水面下看得到掙扎的魚：離船 14 公尺內就把魚本體放在水面下，透過水面的折射與吸收看到魚身左右甩、翻身；甩頭時尾巴拍水，水花朝甩的方向噴出一道弧
+  if(!(f.jumpT>0)){ const vis=!fd.item&&G.loc!=='ice'&&f.d<14&&fd.sp.special!=='mermaid'; g.visible=vis;
+    if(vis){ const L=fd.L||.5, dep=Math.max(0,-(f.pos.y||0)), thr=(f.run||shake)?1:.35, yaw=az+(f.latDir<0?Math.PI:0)+Math.PI/2+Math.sin(G.t*3.1)*.28*thr;
+      g.position.set(tv.x,-(.2+.18*L)-dep*.6,tv.z); te.set(Math.sin(G.t*9.5)*.38*thr,yaw,0,'YXZ'); g.quaternion.setFromEuler(te); te.order='YZX'; G.fish.uni.uAmp.value=.08+.16*thr; G.fish.uni.uSwim.value+=dt*(6+16*thr);
+      f.slapT=(f.slapT||0)-dt; if(f.slapT<=0&&thr>.9&&dep<1.2){ f.slapT=rand(.45,1.2); const s=Math.random()<.5?1:-1, tx=Math.cos(yaw)*s, tz=-Math.sin(yaw)*s; P.splash(tv.x,.02,tv.z,Math.round(8+10*L),.35+.3*Math.min(1.5,L),tx,tz); W.addRipple(tv.x,tv.z,.25+.2*L); if(P.foam) P.foam(tv.x+tx*.3*L,tv.z+tz*.3*L,.45+.4*L,1.6,.9); }
+      // 衝刺時貼著水面劃出 V 形尾浪：沿著游的方向往後兩側各留一串小漣漪
+      f.wakeT=(f.wakeT||0)-dt; if(f.run&&dep<.8&&f.wakeT<=0){ f.wakeT=.12; const bx=Math.sin(az), bz=Math.cos(az), px=-bz, pz=bx; for(const sd of [-1,1]) W.addRipple(tv.x+bx*.3*L+px*sd*.35*L,tv.z+bz*.3*L+pz*sd*.35*L,.08+.05*L); } } }
   // 浮標與釣竿
   { const pull=clamp(f.T*1.1+(f.run?.15:0),0,1);   // 浮標被拖進水裡、朝釣竿方向傾斜
     { const rt=rod.tipW, k=Math.min(.35,1.2/Math.max(2,f.d)); bob.position.set(tv.x+(rt.x-tv.x)*k,W.swell(tv.x,tv.z,G.t)-.03-.28*pull+Math.sin(G.t*9)*.012*(f.run?1:.4),tv.z+(rt.z-tv.z)*k); const q=PH.move(tv,bob.position,.065); setPoint(bob.position,q.pos); }   // 浮標沿魚線移動並避開實體
