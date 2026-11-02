@@ -177,7 +177,7 @@ const spotIdx=z=>typeof SPOTS!=='undefined'?SPOTS.findIndex(q=>q.id===z):-1;
 /* 挑戰的狀態：在不在對的釣點、對的時段 */
 function bossState(b){ const here=c.loc()===b.loc&&c.zoneId()===b.zone, timeOk=b.per.indexOf(c.period())>=0; return {here,timeOk,ready:here&&timeOk}; }
 function bossView(){
-  let h=`<h3>👑 大師挑戰<button class="sbtn" data-t="x">✕</button></h3><div class="pt">老漁人的《漁獲簿》：他四十年來沒釣上岸的魚。接受挑戰後，到指定的釣點與時段，牠就會來咬餌。</div>`;
+  let h=`<h3>👑 大師挑戰<span><button class="sbtn pri" data-t="poster">📤 分享戰績</button> <button class="sbtn" data-t="x">✕</button></span></h3><div class="pt">老漁人的《漁獲簿》：他四十年來沒釣上岸的魚。接受挑戰後，到指定的釣點與時段，牠就會來咬餌。</div>`;
   h+=`<div class="bcards">`;
   for(const b of BOSS){ const done=S.boss[b.id]||0, on=S.bossOn===b.id, lock=(S.lv||1)<b.lv, st=bossState(b);
     const cls=lock?'lock':on?'on':done?'done':'open';
@@ -191,7 +191,7 @@ function bossView(){
       ${done&&b.page?`<div class="bp">📖 ${b.page}</div>`:''}<div class="ba">${act}</div></div>`; }
   return h+'</div>'; }
 function render(){ if(mode==='boss'){ box.firstChild.innerHTML=bossView(); return; } const p=pts();
-  let h=`<h3>⭐ 天賦<button class="sbtn" data-t="x">✕</button></h3>`;
+  let h=`<h3>⭐ 天賦<span><button class="sbtn pri" data-t="poster">📤 分享戰績</button> <button class="sbtn" data-t="x">✕</button></span></h3>`;
   h+=`<div class="pt">${(S.lv||1)<5?'Lv 5 起每升一級得 1 點天賦':`可用天賦點：${p}（Lv ${S.lv}，已用 ${spent()}）`}</div>`;
   for(const k in TAL){ const r=rank(k), T=TAL[k], mx=talMax(k), lock=(S.lv||1)<(T.lv||0);
     h+=row(`${T.i} ${T.n}${T.lv&&!lock&&!r?' <span class="nw">新</span>':''} <span class="pips">${'●'.repeat(r)}${'○'.repeat(mx-r)}</span>`,lock?`<span class="lock">Lv ${T.lv} 開放：${T.d(1)}（每級）</span>`:r?T.d(r):'尚未投入',lock?'🔒':r>=mx?'<span class="on">滿級</span>':`<button class="sbtn${p>=talCost(r+1)?' pri':''}" data-t="add" data-v="${k}">＋1${talCost(r+1)>1?`（${talCost(r+1)} 點）`:''}</button>`); }
@@ -215,6 +215,7 @@ bb2.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); mode='boss'; render
 box.addEventListener('click',e=>{ if(e.target===box){ box.classList.add('hidden'); return; } const b=e.target.closest('[data-t]'); if(!b) return; const t=b.dataset.t, v=b.dataset.v;
   if(t==='x'){ box.classList.add('hidden'); return; }
   if(t==='mode'){ mode=v; render(); box.firstChild.scrollTop=0; return; }
+  if(t==='poster'){ box.classList.add('hidden'); setTimeout(()=>{ if(window.__POSTER) window.__POSTER.open(); },350); return; }   /* 面板收起後再截遊戲畫面 */
   if(t==='go'){ const B=BOSS.find(x=>x.id===v), i=B?spotIdx(B.zone):-1; const why=window.__STORY&&window.__STORY.lock?window.__STORY.lock(i):null;
     if(i<0) return; if(why){ c.toast(why,'warn'); return; } box.classList.add('hidden'); if(window.__goSpot) window.__goSpot(i); return; }
   if(t==='add'&&TAL[v]&&pts()>=talCost(rank(v)+1)&&rank(v)<talMax(v)&&(S.lv||1)>=(TAL[v].lv||0)){ S.tal[v]=rank(v)+1; c.Snd.coin(); }
