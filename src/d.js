@@ -468,7 +468,7 @@ function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收�
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; if(then){ fadeEl.classList.remove('on'); then(); } else if(G.spot!==0){ fadeEl.classList.remove('on'); goSpot(0); } else fadeOutWhenReady(); },650); }
-window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__goSpot=i=>goSpot(i);
+window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__goSpot=i=>goSpot(i); window.__PROPS=P;
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
@@ -859,6 +859,10 @@ function updateFight(dt){
   else if(f.run&&f.T>.3){ f.clickA+=dt*28; while(f.clickA>=1){ Snd.click(4500); f.clickA-=1; } }
   f.vibT-=dt; if(f.vibT<=0){ if(f.T>.85){ vib(14); f.vibT=.22; } else if(f.run){ vib(Math.round(5+8*f.T)); f.vibT=.32; } else f.vibT=.2; }
   fishPos(tv,0);
+  // 搏魚翻白：魚在水面附近掙扎就攪出白沫，衝刺、甩頭越用力越大片，游過的地方留下慢慢散開的泡沫尾跡；魚往深處鑽時水面只剩零星泡沫
+  if(P.foam&&G.loc!=='ice'&&!(f.jumpT>0)){ const depth=Math.max(0,-((f.pos&&f.pos.y)||0)), nearS=clamp(1-depth/2.6,.12,1), I=clamp((.22+.55*f.T+(f.run?.45:0)+(shake?.35:0))*nearS,0,1.5), L=fd.L||.5;
+    f.foamT=(f.foamT||0)-dt; while(f.foamT<=0){ f.foamT+=1/(4+22*I); const j=.22*L+.08; P.foam(tv.x+(Math.random()-.5)*j,tv.z+(Math.random()-.5)*j,(.32+.55*L)*(.7+.6*Math.random())*(.6+.5*I),1.3+1.9*Math.random(),Math.min(1,.4+.5*I)); }
+    f.sprayT=(f.sprayT||0)-dt; if(f.sprayT<=0){ f.sprayT=rand(.3,1)/Math.max(.35,I); if(I>.5) P.splash(tv.x,.02,tv.z,Math.round(4+10*I),.22+.35*I); } }
   f.ripT-=dt; if(f.ripT<=0){ f.ripT=f.run?rand(.12,.3):rand(.4,.8); W.addRipple(tv.x,tv.z,.15+.35*f.T+(f.run?.12:0)); if(f.run) P.splash(tv.x,0,tv.z,Math.round(3+8*f.T),.25+.35*f.T); }
   // 跳水
   const g=G.fish.group;
@@ -866,7 +870,7 @@ function updateFight(dt){
     f.jumpT-=dt; const s=1-f.jumpT/f.jumpDur, h=.5+.45*Math.sqrt(fd.L), y=4*h*s*(1-s)-.15*fd.L;
     { const q=PH.move(f.pos,{x:tv.x,y,z:tv.z},Math.max(.12,fd.L*.22)); g.position.set(q.pos.x,q.pos.y,q.pos.z); } te.set(0,az+(f.latDir<0?Math.PI:0)+Math.PI/2,clamp(4*h*(1-2*s)/(1.2*fd.L+.5),-1.2,1.2)); g.quaternion.setFromEuler(te);
     G.fish.uni.uAmp.value=.14; G.fish.uni.uSwim.value+=dt*18;
-    if(f.jumpT<=0){ g.visible=false; P.splash(tv.x,0,tv.z,30,1.1); W.addRipple(tv.x,tv.z,.9); Snd.splash(1); }
+    if(f.jumpT<=0){ g.visible=false; P.splash(tv.x,0,tv.z,30,1.1); W.addRipple(tv.x,tv.z,.9); Snd.splash(1); if(P.foamBurst) P.foamBurst(tv.x,tv.z,12,.5+.5*(fd.L||.5)); }
   } else if(f.run&&fs.jump>0&&fd.sp.special!=='mermaid'&&f.stam>20&&f.d>4&&G.loc!=='ice'&&Math.random()<fs.jump*.3*dt) startJump();
   // 魚影
   const sh=P.shadow; sh.position.set(tv.x-Math.sin(az)*.4,.012,tv.z-Math.cos(az)*.4); sh.rotation.y=az+(f.latDir<0?-Math.PI/2:Math.PI/2); sh.scale.setScalar(fd.L*1.15);
@@ -1073,7 +1077,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
         // 吊著的魚：不是一直細碎抖動，而是一陣一陣用力彎成 C 字甩動，甩完短暫垂著喘氣
         G.hf=(G.hf||0)-dt; if(G.hf<=0){ G.hf=rand(.7,1.5); G.hfT=.5; } const fl=G.hfT>0?(G.hfT-=dt,Math.sin((.5-G.hfT)/.5*Math.PI)):0;
         G.fish.uni.uAmp.value=.05+.42*fl; G.fish.uni.uSwim.value+=dt*(3+fl*16); G.swing.v+=fl*dt*(Math.random()<.5?-6:6);
-        if(t<T1&&g.position.y>-.1&&!G.liftSplash){ G.liftSplash=true; P.splash(g.position.x,0,g.position.z,46,1.4); W.addRipple(g.position.x,g.position.z,1.1); Snd.splash(1.3); vib([20,30,60]); }
+        if(t<T1&&g.position.y>-.1&&!G.liftSplash){ G.liftSplash=true; P.splash(g.position.x,0,g.position.z,46,1.4); W.addRipple(g.position.x,g.position.z,1.1); if(P.foamBurst) P.foamBurst(g.position.x,g.position.z,10,.45+.4*(G.fd&&G.fd.L||.5)); Snd.splash(1.3); vib([20,30,60]); }
         if(Math.random()<dt*14) P.splash(g.position.x,g.position.y-L*.45,g.position.z,1,.12);   // 身上滴水
       } else { const s=sstep(T2,T3,t); W.head.localToWorld(tv.set(0,.14*D,-D)); g.position.lerp(tv,s); g.quaternion.slerp(tq,s); G.fish.uni.uAmp.value=.1; G.fish.uni.uSwim.value+=dt*12; }
       if(t>=T3){ G.swing=null; G.liftSplash=false; W.head.attach(g); g.position.set(0,.14*D,-D); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }

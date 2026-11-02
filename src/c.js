@@ -138,6 +138,48 @@ function updatePads(dt,t,bx,bz,head,speed){
   updatePads.lastN=n; if(flowersDirty){ flowerInst.forEach(im=>{ im.instanceMatrix.needsUpdate=true; }); flowersDirty=false; } }
 window.__PADS={update:updatePads,state:padS,shreds};
 
+/* ---------- 搏魚的水面泡沫（翻白）：魚在水面附近掙扎時攪出一團白沫，邊游邊在身後留下慢慢散開、碎成蕾絲狀的泡沫尾跡 ----------
+   一張程式畫的泡沫紋理（細胞狀的泡沫邊＋大小氣泡），用實例化的方片貼在水面；每片泡沫的生命週期在著色器裡算：先長大，再從中間破開成網狀，最後消失。
+   CPU 只在產生新泡沫時寫一筆資料，一次繪製畫完全部。 */
+const FOAM_MAX=180;
+const foamTex=(()=>{ const N=256, cv=document.createElement('canvas'); cv.width=cv.height=N; const x=cv.getContext('2d'), img=x.createImageData(N,N), R=rng(91);
+  const G=8, pts=[]; for(let j=0;j<G;j++) for(let i=0;i<G;i++) pts.push([(i+R())*N/G,(j+R())*N/G]);
+  const near=(px,py)=>{ let f1=1e9,f2=1e9; const ci=Math.floor(px/(N/G)), cj=Math.floor(py/(N/G));
+    for(let dj=-1;dj<=1;dj++) for(let di=-1;di<=1;di++){ const ii=(ci+di+G)%G, jj=(cj+dj+G)%G, p=pts[jj*G+ii]; let dx=p[0]-px, dy=p[1]-py; if(dx>N/2)dx-=N; if(dx<-N/2)dx+=N; if(dy>N/2)dy-=N; if(dy<-N/2)dy+=N; const d=Math.hypot(dx,dy); if(d<f1){f2=f1;f1=d;} else if(d<f2) f2=d; } return [f1,f2]; };
+  for(let y=0;y<N;y++) for(let xx=0;xx<N;xx++){ const [f1,f2]=near(xx,y), d=f2-f1, line=1-Math.min(1,d/3.2), n=fbm(xx*.04,y*.04,4), blob=Math.max(0,Math.min(1,(n-.56)/.14)), a=Math.max(0,Math.min(1,line*line*(.55+.6*n)+blob*.7+(f1<4.5?.25:0))); const k=(y*N+xx)*4; img.data[k]=img.data[k+1]=img.data[k+2]=255; img.data[k+3]=Math.round(a*255); }
+  x.putImageData(img,0,0);
+  for(let i=0;i<260;i++){ const r=.6+R()*2.4, px=R()*N, py=R()*N; x.strokeStyle='rgba(255,255,255,'+(.35+R()*.5)+')'; x.lineWidth=.6; x.beginPath(); x.arc(px,py,r,0,6.283); x.stroke(); }
+  const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; return t; })();
+const fg=new T.InstancedBufferGeometry(), fpl=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
+fg.index=fpl.index; fg.setAttribute('position',fpl.attributes.position);
+const fP=new T.InstancedBufferAttribute(new Float32Array(FOAM_MAX*4),4), fB=new T.InstancedBufferAttribute(new Float32Array(FOAM_MAX*4).fill(-1e9),4);
+fP.setUsage(T.DynamicDrawUsage); fB.setUsage(T.DynamicDrawUsage); fg.setAttribute('aP',fP); fg.setAttribute('aB',fB); fg.instanceCount=FOAM_MAX;
+const foamMat=new T.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{uTex:{value:foamTex},uTime:U.uTime,uSea:U.uSea,uWind:U.uWind,uLight:U.uLightK,uBoat:U.uBoat},
+ vertexShader:`attribute vec4 aP; attribute vec4 aB; uniform float uTime; uniform float uSea; uniform vec3 uWind;
+  varying vec2 vUv; varying float vAge; varying float vSeed; varying float vStr; varying vec2 vW;
+  float seaH(vec2 p){ vec2 wd=normalize(uWind.xy+vec2(1e-4)); float s=.45+1.1*uWind.z; vec2 D[4]; D[0]=wd; D[1]=vec2(wd.x*.77-wd.y*.64,wd.y*.77+wd.x*.64); D[2]=vec2(wd.x*.77+wd.y*.64,wd.y*.77-wd.x*.64); D[3]=vec2(wd.x*.34-wd.y*.94,wd.y*.34+wd.x*.94);
+    float L[4]; L[0]=38.0; L[1]=23.0; L[2]=15.0; L[3]=9.0; float A[4]; A[0]=.42; A[1]=.28; A[2]=.18; A[3]=.11; float h=0.0; for(int i=0;i<4;i++){ float k=6.2831853/L[i]; h+=A[i]*s*sin(k*dot(D[i],p)-sqrt(9.81*k)*uTime); } return h; }
+  void main(){ float age=(uTime-aB.x)/max(aB.y,.01); vAge=age; vSeed=aB.z; vStr=aB.w; float alive=step(0.0,age)*step(age,1.0);
+    float sz=aP.w*(.7+.75*sqrt(clamp(age,0.0,1.0)))*alive; float c=cos(aP.z), s=sin(aP.z); vec2 q=vec2(position.x*c-position.z*s, position.x*s+position.z*c)*sz;
+    vec2 p=aP.xy+q; vW=p; float y=uSea>.5?seaH(p)+.035:.017; vUv=position.xz+.5; gl_Position=projectionMatrix*viewMatrix*vec4(p.x,y,p.y,1.0); }`,
+ fragmentShader:`uniform sampler2D uTex; uniform float uTime; uniform float uLight; uniform vec4 uBoat;
+  varying vec2 vUv; varying float vAge; varying float vSeed; varying float vStr; varying vec2 vW;
+  void main(){ if(vAge<0.0||vAge>1.0) discard;
+    if(uBoat.w>.5){ vec2 d=vW-uBoat.xy; float c=cos(uBoat.z), s=sin(uBoat.z); vec2 l=vec2(d.x*c-d.y*s, d.x*s+d.y*c+.35); if((l.x*l.x)/.3025+(l.y*l.y)/5.29<1.0) discard; }
+    float r=length(vUv-.5)*2.0; float mask=1.0-smoothstep(.45,1.0,r);
+    float t1=texture2D(uTex,vUv*1.05+vSeed*7.13+vec2(uTime*.03,0.0)).a, t2=texture2D(uTex,vUv*2.1+vSeed*3.71-vec2(0.0,uTime*.045)).a;
+    float foam=t1*.6+t2*.45+.3*mask*(1.0-vAge)*(1.0-vAge);
+    float th=mix(.3,.92,vAge);
+    float a=smoothstep(th,th+.2,foam*mask)*mask*vStr*(1.0-smoothstep(.8,1.0,vAge))*(.45+.55*t1);
+    if(a<.012) discard;
+    // 泡沫是半透明的：氣泡薄的地方透出底下的水色，厚的地方才接近白色
+    vec3 col=mix(vec3(.24,.29,.33),vec3(.95,.97,1.0),clamp(uLight,0.0,1.0))*(.82+.18*t2);
+    gl_FragColor=vec4(col,min(.82,a)); }`});
+const foamMesh=new T.Mesh(fg,foamMat); foamMesh.frustumCulled=false; foamMesh.renderOrder=2; foamMesh.userData.flatOnWater=true; scene.add(foamMesh);
+let foamI=0;
+function foam(x,z,size,life,strength){ const i=foamI; foamI=(foamI+1)%FOAM_MAX; fP.setXYZW(i,x,z,Math.random()*6.283,size); fB.setXYZW(i,U.uTime.value,life,Math.random(),strength); fP.needsUpdate=true; fB.needsUpdate=true; }
+function foamBurst(x,z,n,size){ for(let k=0;k<n;k++){ const a=Math.random()*6.283, r=Math.random()*size*.6; foam(x+Math.cos(a)*r,z+Math.sin(a)*r,size*(.5+Math.random()*.7),1.6+Math.random()*2.2,.75+Math.random()*.25); } }
+
 /* ---------- 浮萍（真實做法）：一張畫了上千片細小葉片的貼圖，鋪在不規則的浮萍毯網格上 ----------
    真的浮萍是 3～5 公釐的小圓葉擠成一片綠毯，邊緣碎成一團一團。不用雜訊硬算，貼圖細節在手機解析度下也看得出是葉子。 */
 const dwTex=(()=>{ const N=512, cv=document.createElement('canvas'); cv.width=cv.height=N; const x=cv.getContext('2d'); x.clearRect(0,0,N,N); const R=rng(23);
@@ -886,5 +928,5 @@ const previewFinish=createTacklePreview(W,(kind,id)=>{
  const body=root.children[0],texture=paintFloat(body.material,colors[0],colors[1],id);let i=0;root.traverse(o=>{if(o.userData.floatAntenna){o.material.color.setHex(i++%2?colors[1]:colors[0]).convertSRGBToLinear();o.material.metalness=id==='gold'?.8:0;}});root.rotation.z=-.2;return{root,focus:new T.Vector3(0,.035,0),dispose:()=>texture.dispose()};
 });
 
-return { dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook,setFloatLook,previewFinish,rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
+return { foam, foamBurst, dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook,setFloatLook,previewFinish,rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
 }

@@ -81,3 +81,4 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 小屋輕音樂（d.js Snd musicStart/musicStop）：即時合成分解和弦 + 低音 + 房間殘響，setIndoor 進出時淡入淡出，跟遊戲音效開關
 - 浮萍灣效能：荷葉與浮萍毯 renderOrder -1 先畫、寫深度，蓋住的水面像素不跑水面著色器；浮萍水道 24 點迴圈只在船 14m 內才算
 - 垃圾回收卡頓根因：physics.js hit/inside/clear/resolve/refresh 原本每次呼叫都配置物件與陣列（每幀上萬次），改成不配置；c.js setLine 繞路結果快取（兩端移動 <5cm 或 0.25 秒內沿用），短線不繞路；釣線碰撞忽略「船體」箱。headless 量測每分鐘配置 518MB → 161MB
+- 搏魚翻白（c.js foam/foamBurst，d.js updateFight 呼叫）：程式畫的泡沫紋理（細胞泡沫邊＋氣泡），180 片實例化水面方片，壽命在著色器裡算（長大→碎成蕾絲→消失），強度依張力、衝刺、甩頭、魚的深度；跳水落水與起魚時一團爆開。測試掛鉤 window.__PROPS

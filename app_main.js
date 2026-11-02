@@ -1,4 +1,4 @@
-/*APPV:20261102075002*/
+/*APPV:20261102080947*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -2047,6 +2047,48 @@ function updatePads(dt,t,bx,bz,head,speed){
   updatePads.lastN=n; if(flowersDirty){ flowerInst.forEach(im=>{ im.instanceMatrix.needsUpdate=true; }); flowersDirty=false; } }
 window.__PADS={update:updatePads,state:padS,shreds};
 
+/* ---------- 搏魚的水面泡沫（翻白）：魚在水面附近掙扎時攪出一團白沫，邊游邊在身後留下慢慢散開、碎成蕾絲狀的泡沫尾跡 ----------
+   一張程式畫的泡沫紋理（細胞狀的泡沫邊＋大小氣泡），用實例化的方片貼在水面；每片泡沫的生命週期在著色器裡算：先長大，再從中間破開成網狀，最後消失。
+   CPU 只在產生新泡沫時寫一筆資料，一次繪製畫完全部。 */
+const FOAM_MAX=180;
+const foamTex=(()=>{ const N=256, cv=document.createElement('canvas'); cv.width=cv.height=N; const x=cv.getContext('2d'), img=x.createImageData(N,N), R=rng(91);
+  const G=8, pts=[]; for(let j=0;j<G;j++) for(let i=0;i<G;i++) pts.push([(i+R())*N/G,(j+R())*N/G]);
+  const near=(px,py)=>{ let f1=1e9,f2=1e9; const ci=Math.floor(px/(N/G)), cj=Math.floor(py/(N/G));
+    for(let dj=-1;dj<=1;dj++) for(let di=-1;di<=1;di++){ const ii=(ci+di+G)%G, jj=(cj+dj+G)%G, p=pts[jj*G+ii]; let dx=p[0]-px, dy=p[1]-py; if(dx>N/2)dx-=N; if(dx<-N/2)dx+=N; if(dy>N/2)dy-=N; if(dy<-N/2)dy+=N; const d=Math.hypot(dx,dy); if(d<f1){f2=f1;f1=d;} else if(d<f2) f2=d; } return [f1,f2]; };
+  for(let y=0;y<N;y++) for(let xx=0;xx<N;xx++){ const [f1,f2]=near(xx,y), d=f2-f1, line=1-Math.min(1,d/3.2), n=fbm(xx*.04,y*.04,4), blob=Math.max(0,Math.min(1,(n-.56)/.14)), a=Math.max(0,Math.min(1,line*line*(.55+.6*n)+blob*.7+(f1<4.5?.25:0))); const k=(y*N+xx)*4; img.data[k]=img.data[k+1]=img.data[k+2]=255; img.data[k+3]=Math.round(a*255); }
+  x.putImageData(img,0,0);
+  for(let i=0;i<260;i++){ const r=.6+R()*2.4, px=R()*N, py=R()*N; x.strokeStyle='rgba(255,255,255,'+(.35+R()*.5)+')'; x.lineWidth=.6; x.beginPath(); x.arc(px,py,r,0,6.283); x.stroke(); }
+  const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; return t; })();
+const fg=new T.InstancedBufferGeometry(), fpl=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
+fg.index=fpl.index; fg.setAttribute('position',fpl.attributes.position);
+const fP=new T.InstancedBufferAttribute(new Float32Array(FOAM_MAX*4),4), fB=new T.InstancedBufferAttribute(new Float32Array(FOAM_MAX*4).fill(-1e9),4);
+fP.setUsage(T.DynamicDrawUsage); fB.setUsage(T.DynamicDrawUsage); fg.setAttribute('aP',fP); fg.setAttribute('aB',fB); fg.instanceCount=FOAM_MAX;
+const foamMat=new T.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{uTex:{value:foamTex},uTime:U.uTime,uSea:U.uSea,uWind:U.uWind,uLight:U.uLightK,uBoat:U.uBoat},
+ vertexShader:`attribute vec4 aP; attribute vec4 aB; uniform float uTime; uniform float uSea; uniform vec3 uWind;
+  varying vec2 vUv; varying float vAge; varying float vSeed; varying float vStr; varying vec2 vW;
+  float seaH(vec2 p){ vec2 wd=normalize(uWind.xy+vec2(1e-4)); float s=.45+1.1*uWind.z; vec2 D[4]; D[0]=wd; D[1]=vec2(wd.x*.77-wd.y*.64,wd.y*.77+wd.x*.64); D[2]=vec2(wd.x*.77+wd.y*.64,wd.y*.77-wd.x*.64); D[3]=vec2(wd.x*.34-wd.y*.94,wd.y*.34+wd.x*.94);
+    float L[4]; L[0]=38.0; L[1]=23.0; L[2]=15.0; L[3]=9.0; float A[4]; A[0]=.42; A[1]=.28; A[2]=.18; A[3]=.11; float h=0.0; for(int i=0;i<4;i++){ float k=6.2831853/L[i]; h+=A[i]*s*sin(k*dot(D[i],p)-sqrt(9.81*k)*uTime); } return h; }
+  void main(){ float age=(uTime-aB.x)/max(aB.y,.01); vAge=age; vSeed=aB.z; vStr=aB.w; float alive=step(0.0,age)*step(age,1.0);
+    float sz=aP.w*(.7+.75*sqrt(clamp(age,0.0,1.0)))*alive; float c=cos(aP.z), s=sin(aP.z); vec2 q=vec2(position.x*c-position.z*s, position.x*s+position.z*c)*sz;
+    vec2 p=aP.xy+q; vW=p; float y=uSea>.5?seaH(p)+.035:.017; vUv=position.xz+.5; gl_Position=projectionMatrix*viewMatrix*vec4(p.x,y,p.y,1.0); }`,
+ fragmentShader:`uniform sampler2D uTex; uniform float uTime; uniform float uLight; uniform vec4 uBoat;
+  varying vec2 vUv; varying float vAge; varying float vSeed; varying float vStr; varying vec2 vW;
+  void main(){ if(vAge<0.0||vAge>1.0) discard;
+    if(uBoat.w>.5){ vec2 d=vW-uBoat.xy; float c=cos(uBoat.z), s=sin(uBoat.z); vec2 l=vec2(d.x*c-d.y*s, d.x*s+d.y*c+.35); if((l.x*l.x)/.3025+(l.y*l.y)/5.29<1.0) discard; }
+    float r=length(vUv-.5)*2.0; float mask=1.0-smoothstep(.45,1.0,r);
+    float t1=texture2D(uTex,vUv*1.05+vSeed*7.13+vec2(uTime*.03,0.0)).a, t2=texture2D(uTex,vUv*2.1+vSeed*3.71-vec2(0.0,uTime*.045)).a;
+    float foam=t1*.6+t2*.45+.3*mask*(1.0-vAge)*(1.0-vAge);
+    float th=mix(.3,.92,vAge);
+    float a=smoothstep(th,th+.2,foam*mask)*mask*vStr*(1.0-smoothstep(.8,1.0,vAge))*(.45+.55*t1);
+    if(a<.012) discard;
+    // 泡沫是半透明的：氣泡薄的地方透出底下的水色，厚的地方才接近白色
+    vec3 col=mix(vec3(.24,.29,.33),vec3(.95,.97,1.0),clamp(uLight,0.0,1.0))*(.82+.18*t2);
+    gl_FragColor=vec4(col,min(.82,a)); }`});
+const foamMesh=new T.Mesh(fg,foamMat); foamMesh.frustumCulled=false; foamMesh.renderOrder=2; foamMesh.userData.flatOnWater=true; scene.add(foamMesh);
+let foamI=0;
+function foam(x,z,size,life,strength){ const i=foamI; foamI=(foamI+1)%FOAM_MAX; fP.setXYZW(i,x,z,Math.random()*6.283,size); fB.setXYZW(i,U.uTime.value,life,Math.random(),strength); fP.needsUpdate=true; fB.needsUpdate=true; }
+function foamBurst(x,z,n,size){ for(let k=0;k<n;k++){ const a=Math.random()*6.283, r=Math.random()*size*.6; foam(x+Math.cos(a)*r,z+Math.sin(a)*r,size*(.5+Math.random()*.7),1.6+Math.random()*2.2,.75+Math.random()*.25); } }
+
 /* ---------- 浮萍（真實做法）：一張畫了上千片細小葉片的貼圖，鋪在不規則的浮萍毯網格上 ----------
    真的浮萍是 3～5 公釐的小圓葉擠成一片綠毯，邊緣碎成一團一團。不用雜訊硬算，貼圖細節在手機解析度下也看得出是葉子。 */
 const dwTex=(()=>{ const N=512, cv=document.createElement('canvas'); cv.width=cv.height=N; const x=cv.getContext('2d'); x.clearRect(0,0,N,N); const R=rng(23);
@@ -2795,7 +2837,7 @@ const previewFinish=createTacklePreview(W,(kind,id)=>{
  const body=root.children[0],texture=paintFloat(body.material,colors[0],colors[1],id);let i=0;root.traverse(o=>{if(o.userData.floatAntenna){o.material.color.setHex(i++%2?colors[1]:colors[0]).convertSRGBToLinear();o.material.metalness=id==='gold'?.8:0;}});root.rotation.z=-.2;return{root,focus:new T.Vector3(0,.035,0),dispose:()=>texture.dispose()};
 });
 
-return { dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook,setFloatLook,previewFinish,rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
+return { foam, foamBurst, dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook,setFloatLook,previewFinish,rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
 }
 /* ===== 第 2 段 · 水下鏡頭、釣具店、等級與任務 ===== */
 const SH2 = {};
@@ -7242,7 +7284,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102075002'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102080947'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9188,7 +9230,7 @@ function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收�
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; if(then){ fadeEl.classList.remove('on'); then(); } else if(G.spot!==0){ fadeEl.classList.remove('on'); goSpot(0); } else fadeOutWhenReady(); },650); }
-window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__goSpot=i=>goSpot(i);
+window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__goSpot=i=>goSpot(i); window.__PROPS=P;
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
@@ -9579,6 +9621,10 @@ function updateFight(dt){
   else if(f.run&&f.T>.3){ f.clickA+=dt*28; while(f.clickA>=1){ Snd.click(4500); f.clickA-=1; } }
   f.vibT-=dt; if(f.vibT<=0){ if(f.T>.85){ vib(14); f.vibT=.22; } else if(f.run){ vib(Math.round(5+8*f.T)); f.vibT=.32; } else f.vibT=.2; }
   fishPos(tv,0);
+  // 搏魚翻白：魚在水面附近掙扎就攪出白沫，衝刺、甩頭越用力越大片，游過的地方留下慢慢散開的泡沫尾跡；魚往深處鑽時水面只剩零星泡沫
+  if(P.foam&&G.loc!=='ice'&&!(f.jumpT>0)){ const depth=Math.max(0,-((f.pos&&f.pos.y)||0)), nearS=clamp(1-depth/2.6,.12,1), I=clamp((.22+.55*f.T+(f.run?.45:0)+(shake?.35:0))*nearS,0,1.5), L=fd.L||.5;
+    f.foamT=(f.foamT||0)-dt; while(f.foamT<=0){ f.foamT+=1/(4+22*I); const j=.22*L+.08; P.foam(tv.x+(Math.random()-.5)*j,tv.z+(Math.random()-.5)*j,(.32+.55*L)*(.7+.6*Math.random())*(.6+.5*I),1.3+1.9*Math.random(),Math.min(1,.4+.5*I)); }
+    f.sprayT=(f.sprayT||0)-dt; if(f.sprayT<=0){ f.sprayT=rand(.3,1)/Math.max(.35,I); if(I>.5) P.splash(tv.x,.02,tv.z,Math.round(4+10*I),.22+.35*I); } }
   f.ripT-=dt; if(f.ripT<=0){ f.ripT=f.run?rand(.12,.3):rand(.4,.8); W.addRipple(tv.x,tv.z,.15+.35*f.T+(f.run?.12:0)); if(f.run) P.splash(tv.x,0,tv.z,Math.round(3+8*f.T),.25+.35*f.T); }
   // 跳水
   const g=G.fish.group;
@@ -9586,7 +9632,7 @@ function updateFight(dt){
     f.jumpT-=dt; const s=1-f.jumpT/f.jumpDur, h=.5+.45*Math.sqrt(fd.L), y=4*h*s*(1-s)-.15*fd.L;
     { const q=PH.move(f.pos,{x:tv.x,y,z:tv.z},Math.max(.12,fd.L*.22)); g.position.set(q.pos.x,q.pos.y,q.pos.z); } te.set(0,az+(f.latDir<0?Math.PI:0)+Math.PI/2,clamp(4*h*(1-2*s)/(1.2*fd.L+.5),-1.2,1.2)); g.quaternion.setFromEuler(te);
     G.fish.uni.uAmp.value=.14; G.fish.uni.uSwim.value+=dt*18;
-    if(f.jumpT<=0){ g.visible=false; P.splash(tv.x,0,tv.z,30,1.1); W.addRipple(tv.x,tv.z,.9); Snd.splash(1); }
+    if(f.jumpT<=0){ g.visible=false; P.splash(tv.x,0,tv.z,30,1.1); W.addRipple(tv.x,tv.z,.9); Snd.splash(1); if(P.foamBurst) P.foamBurst(tv.x,tv.z,12,.5+.5*(fd.L||.5)); }
   } else if(f.run&&fs.jump>0&&fd.sp.special!=='mermaid'&&f.stam>20&&f.d>4&&G.loc!=='ice'&&Math.random()<fs.jump*.3*dt) startJump();
   // 魚影
   const sh=P.shadow; sh.position.set(tv.x-Math.sin(az)*.4,.012,tv.z-Math.cos(az)*.4); sh.rotation.y=az+(f.latDir<0?-Math.PI/2:Math.PI/2); sh.scale.setScalar(fd.L*1.15);
@@ -9793,7 +9839,7 @@ if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bit
         // 吊著的魚：不是一直細碎抖動，而是一陣一陣用力彎成 C 字甩動，甩完短暫垂著喘氣
         G.hf=(G.hf||0)-dt; if(G.hf<=0){ G.hf=rand(.7,1.5); G.hfT=.5; } const fl=G.hfT>0?(G.hfT-=dt,Math.sin((.5-G.hfT)/.5*Math.PI)):0;
         G.fish.uni.uAmp.value=.05+.42*fl; G.fish.uni.uSwim.value+=dt*(3+fl*16); G.swing.v+=fl*dt*(Math.random()<.5?-6:6);
-        if(t<T1&&g.position.y>-.1&&!G.liftSplash){ G.liftSplash=true; P.splash(g.position.x,0,g.position.z,46,1.4); W.addRipple(g.position.x,g.position.z,1.1); Snd.splash(1.3); vib([20,30,60]); }
+        if(t<T1&&g.position.y>-.1&&!G.liftSplash){ G.liftSplash=true; P.splash(g.position.x,0,g.position.z,46,1.4); W.addRipple(g.position.x,g.position.z,1.1); if(P.foamBurst) P.foamBurst(g.position.x,g.position.z,10,.45+.4*(G.fd&&G.fd.L||.5)); Snd.splash(1.3); vib([20,30,60]); }
         if(Math.random()<dt*14) P.splash(g.position.x,g.position.y-L*.45,g.position.z,1,.12);   // 身上滴水
       } else { const s=sstep(T2,T3,t); W.head.localToWorld(tv.set(0,.14*D,-D)); g.position.lerp(tv,s); g.quaternion.slerp(tq,s); G.fish.uni.uAmp.value=.1; G.fish.uni.uSwim.value+=dt*12; }
       if(t>=T3){ G.swing=null; G.liftSplash=false; W.head.attach(g); g.position.set(0,.14*D,-D); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }
