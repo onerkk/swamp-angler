@@ -451,7 +451,7 @@ function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收�
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; if(then){ fadeEl.classList.remove('on'); then(); } else if(G.spot!==0){ fadeEl.classList.remove('on'); goSpot(0); } else fadeOutWhenReady(); },650); }
-window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__HOMEOK=()=>HOME.unlocked();
+window.__goHome=goHome; window.__startRetrieve=startRetrieve;
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
@@ -737,6 +737,12 @@ function updateKayak(dt){
   if(spd>.25&&KY.wake<=0){ KY.wake=.4; AT.ring(G.base.x-fx*1.9,G.base.z-fz*1.9,.6+spd*.5); AT.ring(G.base.x+fx*1.8,G.base.z+fz*1.8,.3+spd*.3); if(spd>.9) P.splash(G.base.x+fx*1.9,0,G.base.z+fz*1.9,3,.3); }
 }
 const fadeEl=$('fade'), uwTag=$('uwTag');
+// 診斷：替幾個可能很重的動作計時，長任務就能指名是誰（存檔、換釣點、場景釋放、避障路徑、小屋進出）
+if(window.__DIAG&&window.__DIAG.timed){ const D=window.__DIAG; persist=D.timed('存檔',persist); startRetrieve=D.timed('收線路徑',startRetrieve); goSpot=D.timed('換釣點',goSpot);
+  for(const [o,k,n] of [[WL,'setSpot','載入釣點場景'],[WL,'setZone','載入水域'],[W,'suspendEffects','釋放場景顯示資源'],[PH,'route','避障路徑'],[HOME3D,'enter','進小屋'],[HOME3D,'exit','離開小屋']]) if(o&&typeof o[k]==='function') o[k]=D.timed(n,o[k]); }
+// 切到背景：把湖區的幾何、貼圖、倒影、陰影從顯示卡釋放，背景時佔的記憶體小很多，比較不會被手機系統直接結束；回來時黑幕下重新上傳
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ if(['idle','wait','bite','lure','retrieve'].includes(G.state)&&W.suspendEffects){ try{ W.suspendEffects(); G.bgReleased=true; window.__DIAG?.event('bg-release'); }catch(_){} } }
+  else if(G.bgReleased){ G.bgReleased=false; fadeEl.classList.add('on'); fadeOutWhenReady(); } }); window.__HOMEOK=()=>HOME.unlocked();
 let uwBusy=false;
 function enterUW(){ if(UW.active()||uwBusy||(G.uwBlock&&G.t<G.uwBlock)) return; uwBusy=true; fadeEl.classList.add('on');
   setTimeout(()=>{ if(G.fd&&(G.state==='wait'||G.state==='bite')){ UW.start(G.fd); document.body.classList.add('underwater'); if(G.state==='bite') UW.bite(); const r=RAR[G.fd.sp.rar];

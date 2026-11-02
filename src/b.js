@@ -656,6 +656,9 @@ const _rp=new T.Vector3(), _cp=new T.Vector3(), _rm=new T.Matrix4(), _la=new T.V
 const _pl=new T.Plane(), _cpl=new T.Vector4(), _q=new T.Vector4(), _sz=new T.Vector2(); let reflScale=.35, reflEnabled=true, reflHide=[];
 function setRefl(on,scale){ reflEnabled=on; if(scale) reflScale=scale; WU.uReflOn.value=0; }
 let lastRefl=-Infinity, reflCamKey='';
+// 倒影只畫水面以上的東西：整個在水面以下或平貼水面的物件（荷葉、碎葉、沉在水裡的東西、魚）在倒影裡看不到，卻佔掉大量繪製；每 1.5 秒重新整理一次名單
+let lowList=[], lowScan=-1e9; const _lowBS=new T.Sphere();
+function lowReflObjects(){ const now=performance.now(); if(now-lowScan>1500){ lowScan=now; lowList=[]; scene.traverse(o=>{ if(!o.isMesh||!o.visible||o===water||o===seaGrid||o===sky) return; if(o.userData.flatOnWater){ lowList.push(o); return; } if(o.isInstancedMesh||o.isSkinnedMesh||!o.geometry) return; const g=o.geometry; if(!g.boundingSphere) g.computeBoundingSphere(); if(!g.boundingSphere) return; _lowBS.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); if(_lowBS.center.y+_lowBS.radius<.1) lowList.push(o); }); } return lowList; }
 function renderRefl(){
   camera.updateMatrixWorld(); _cp.setFromMatrixPosition(camera.matrixWorld);
   if(_cp.y<.05){ WU.uReflOn.value=0; lastRefl=-Infinity; return; }
@@ -675,7 +678,7 @@ function renderRefl(){
   const pm=reflCam.projectionMatrix;
   _q.x=(Math.sign(_cpl.x)+pm.elements[8])/pm.elements[0]; _q.y=(Math.sign(_cpl.y)+pm.elements[9])/pm.elements[5]; _q.z=-1; _q.w=(1+pm.elements[10])/pm.elements[14];
   _cpl.multiplyScalar(2/_cpl.dot(_q)); pm.elements[2]=_cpl.x; pm.elements[6]=_cpl.y; pm.elements[10]=_cpl.z+1-.003; pm.elements[14]=_cpl.w;
-  const hid=[water,seaGrid,sky,...reflHide].filter(o=>o&&o.visible); hid.forEach(o=>o.visible=false);
+  const hid=[water,seaGrid,sky,...reflHide,...lowReflObjects()].filter(o=>o&&o.visible); hid.forEach(o=>o.visible=false);
   const requestedShadow=renderer.shadowMap.needsUpdate;renderer.shadowMap.needsUpdate=false;
   const oc=renderer.getClearColor(new T.Color()), oa=renderer.getClearAlpha(), ort=renderer.getRenderTarget(), bg=scene.background, sh=renderer.shadowMap.autoUpdate, tone=renderer.toneMapping, encoding=renderer.outputEncoding;
   scene.background=null; renderer.shadowMap.autoUpdate=false;

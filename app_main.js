@@ -1,4 +1,4 @@
-/*APPV:20261102062350*/
+/*APPV:20261102064540*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -1661,6 +1661,9 @@ const _rp=new T.Vector3(), _cp=new T.Vector3(), _rm=new T.Matrix4(), _la=new T.V
 const _pl=new T.Plane(), _cpl=new T.Vector4(), _q=new T.Vector4(), _sz=new T.Vector2(); let reflScale=.35, reflEnabled=true, reflHide=[];
 function setRefl(on,scale){ reflEnabled=on; if(scale) reflScale=scale; WU.uReflOn.value=0; }
 let lastRefl=-Infinity, reflCamKey='';
+// 倒影只畫水面以上的東西：整個在水面以下或平貼水面的物件（荷葉、碎葉、沉在水裡的東西、魚）在倒影裡看不到，卻佔掉大量繪製；每 1.5 秒重新整理一次名單
+let lowList=[], lowScan=-1e9; const _lowBS=new T.Sphere();
+function lowReflObjects(){ const now=performance.now(); if(now-lowScan>1500){ lowScan=now; lowList=[]; scene.traverse(o=>{ if(!o.isMesh||!o.visible||o===water||o===seaGrid||o===sky) return; if(o.userData.flatOnWater){ lowList.push(o); return; } if(o.isInstancedMesh||o.isSkinnedMesh||!o.geometry) return; const g=o.geometry; if(!g.boundingSphere) g.computeBoundingSphere(); if(!g.boundingSphere) return; _lowBS.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); if(_lowBS.center.y+_lowBS.radius<.1) lowList.push(o); }); } return lowList; }
 function renderRefl(){
   camera.updateMatrixWorld(); _cp.setFromMatrixPosition(camera.matrixWorld);
   if(_cp.y<.05){ WU.uReflOn.value=0; lastRefl=-Infinity; return; }
@@ -1680,7 +1683,7 @@ function renderRefl(){
   const pm=reflCam.projectionMatrix;
   _q.x=(Math.sign(_cpl.x)+pm.elements[8])/pm.elements[0]; _q.y=(Math.sign(_cpl.y)+pm.elements[9])/pm.elements[5]; _q.z=-1; _q.w=(1+pm.elements[10])/pm.elements[14];
   _cpl.multiplyScalar(2/_cpl.dot(_q)); pm.elements[2]=_cpl.x; pm.elements[6]=_cpl.y; pm.elements[10]=_cpl.z+1-.003; pm.elements[14]=_cpl.w;
-  const hid=[water,seaGrid,sky,...reflHide].filter(o=>o&&o.visible); hid.forEach(o=>o.visible=false);
+  const hid=[water,seaGrid,sky,...reflHide,...lowReflObjects()].filter(o=>o&&o.visible); hid.forEach(o=>o.visible=false);
   const requestedShadow=renderer.shadowMap.needsUpdate;renderer.shadowMap.needsUpdate=false;
   const oc=renderer.getClearColor(new T.Color()), oa=renderer.getClearAlpha(), ort=renderer.getRenderTarget(), bg=scene.background, sh=renderer.shadowMap.autoUpdate, tone=renderer.toneMapping, encoding=renderer.outputEncoding;
   scene.background=null; renderer.shadowMap.autoUpdate=false;
@@ -1967,7 +1970,7 @@ const PAD_N=padPos.length, SHRED_MAX=48, pads=new T.InstancedMesh(padGeo,padMat,
 padPos.forEach((p,i)=>{ q4.setFromEuler(eu.set(0,p[3],0)); pv.set(p[0],.013+i*.00003,p[1]); sv.set(p[2],1,p[2]); m4.compose(pv,q4,sv); pads.setMatrixAt(i,m4);
   PH.addBox({x:p[0]-p[2],y:-.03,z:p[1]-p[2]},{x:p[0]+p[2],y:.025,z:p[1]+p[2]},()=>pads.visible,"睡蓮葉");
   const c=.85+((i*7919)%100)/100*.3; pads.setColorAt(i,new T.Color(c,c,c*.9)); });
-pads.userData.lake=true; scene.add(pads);
+pads.userData.lake=true; pads.userData.flatOnWater=true; scene.add(pads);
 const petalMat=new T.MeshStandardMaterial({color:0xf3dfe4, roughness:.5, emissive:0x1a0a0c});
 const coreMat=new T.MeshStandardMaterial({color:0xe8c040, roughness:.6});
 const petalGeo=new T.SphereGeometry(1,10,8);
@@ -1976,7 +1979,7 @@ const FLOWER_PADS=[3,12,25,40,57,70].map(k=>k%padPos.length), flowerInst=[];
   for(let i=0;i<10;i++){ const m=new T.Mesh(petalGeo,petalMat); const a=i/10*6.283; m.scale.set(.05,.014,.022); m.position.set(Math.cos(a)*.04,.02,Math.sin(a)*.04); m.rotation.set(0,-a,.55); g.add(m); flowerParts.push(m); }
   const cm=new T.Mesh(new T.SphereGeometry(.022,10,8),coreMat); cm.position.y=.025; g.add(cm); flowerParts.push(cm);
   // 一朵花（花瓣、花心各一個網格）做成實例，六朵跟著各自的荷葉一起被推開、傾斜
-  for(const part of mergeMeshesByMaterial(T,flowerParts,g)){ const im=new T.InstancedMesh(part.geometry,part.material,FLOWER_PADS.length); im.frustumCulled=false; im.userData.lake=true; im.castShadow=false; scene.add(im); flowerInst.push(im); } }
+  for(const part of mergeMeshesByMaterial(T,flowerParts,g)){ const im=new T.InstancedMesh(part.geometry,part.material,FLOWER_PADS.length); im.frustumCulled=false; im.userData.lake=true; im.userData.flatOnWater=true; im.castShadow=false; scene.add(im); flowerInst.push(im); } }
 
 /* ---------- 荷葉被船推開、沖破 ----------
    荷葉是長在水底的，船撞上去會被擠到一邊、邊緣被壓進水裡傾斜翹起；船夠快時葉子會被沖破成幾片碎葉，碎葉漂著、慢慢沉下去；
@@ -5791,7 +5794,7 @@ function auditResources(roots,uniforms={}){const textures=new Set(),buffers=new 
  for(const root of roots.filter(Boolean))root.traverse(o=>{if(o.geometry){for(const a of Object.values(o.geometry.attributes||{})){if(a.array)buffers.add(a.array);else if(a.data?.array)buffers.add(a.data.array);}if(o.geometry.index?.array)buffers.add(o.geometry.index.array);}for(const m of(o.material?(Array.isArray(o.material)?o.material:[o.material]):[])){for(const v of Object.values(m))texture(v);for(const u of Object.values(m.uniforms||{}))texture(u.value);}if(o.skeleton?.boneTexture)texture(o.skeleton.boneTexture);});for(const u of Object.values(uniforms))texture(u.value);for(const b of buffers)bytes+=b.byteLength;large.sort((a,b)=>b.MiB-a.MiB);return{estimatedSourceMiB:+(bytes/1048576).toFixed(1),textures:textures.size,largest:large.slice(0,12),note:'來源資源估算，非系統實測 VRAM/RAM'};}
 function createDiag(W,c){
  'use strict';
- const KEY='swampAngler.log',SESSION='swampAngler.diagSession',startedAt=new Date(),previous=readDiagnosticJournal(),session=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6),listeners=[];let log=[],current=[],history=[],lastScene='',lastBeat=0,lastCheckpoint=0,operation=null,events=[],stages={},frameAt=0,stageAt=0,snapshot={},clean=false,started=false,visible=true,stalls=0,observer=null,gpuLost=0,prevCounts=null,longs=[],trend=[];
+ const KEY='swampAngler.log',SESSION='swampAngler.diagSession',startedAt=new Date(),previous=readDiagnosticJournal(),session=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6),listeners=[];let log=[],current=[],history=[],lastScene='',lastBeat=0,lastCheckpoint=0,operation=null,events=[],stages={},frameAt=0,stageAt=0,snapshot={},clean=false,started=false,visible=true,stalls=0,observer=null,gpuLost=0,prevCounts=null,longs=[],trend=[],heavyCalls=[];
  try{log=JSON.parse(localStorage.getItem(KEY)||'[]');if(!Array.isArray(log))log=[];}catch(_){}history=log.slice();
  const nav=performance.getEntriesByType?.('navigation')?.[0];const navigation={type:nav?.type||'unknown',wasDiscarded:typeof document!=='undefined'?document.wasDiscarded:undefined};
  const short=(v,n=180)=>diagnosticValue(v).slice(0,n);
@@ -5799,6 +5802,8 @@ function createDiag(W,c){
  function checkpoint(force=false){const now=performance.now();if(!force&&now-lastCheckpoint<5000)return;lastCheckpoint=now;try{localStorage.setItem(SESSION,JSON.stringify({schema:3,session,version:window.__APP_VER,at:Date.now(),started,clean,visible,recovery:!!window.__resourcePolicy?.recovery,navigation,operation,state:snapshot,events:events.slice(-16),errors:current.slice(-4)}));}catch(_){} }
  function event(name,data=''){events.push({at:Date.now(),name,data:short(data,160)});if(events.length>24)events.shift();}
  function action(name,phase='begin',detail=''){operation={name,phase,at:Date.now(),detail:short(detail,140)};event(name+':'+phase,detail);snapshot=state();checkpoint(true);}
+ // 量一段函式花了多久；超過 8ms 的記下來，長任務發生時就能說出是哪個函式（存檔、換釣點、載入場景…）
+ function timed(name,fn){return function(...args){const n=performance.now();try{return fn.apply(this,args);}finally{const ms=performance.now()-n;if(ms>8){heavyCalls.push({name,ms,at:n});if(heavyCalls.length>60)heavyCalls.shift();}}};}
  function scene(name,phase){const key=name+':'+phase;if(key===lastScene)return;lastScene=key;const info=W.renderer.info;trend.push({at:Date.now(),key,g:info.memory?.geometries||0,t:info.memory?.textures||0,p:info.programs?.length||0,heap:performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576):0});if(trend.length>12)trend.shift();event('scene',key);if(phase!=='ready'){action(name,phase);}try{localStorage.setItem('swampAngler.scene',JSON.stringify({scene:name,phase,version:window.__APP_VER,at:Date.now()}));}catch(_){} }
  function add(kind,msg){const t=new Date(),entry=`${t.getMonth()+1}/${t.getDate()} ${t.toTimeString().slice(0,8)} [${kind}] ${short(msg,1000)}`;current.push(entry);if(current.length>20)current.shift();log.push(entry);if(log.length>30)log.shift();try{localStorage.setItem(KEY,JSON.stringify(log));}catch(_){}event(kind,msg);checkpoint(true);}
  function listen(target,name,fn,capture){if(target?.addEventListener){target.addEventListener(name,fn,capture);listeners.push([target,name,fn,capture]);}}
@@ -5810,7 +5815,8 @@ function createDiag(W,c){
  if(typeof document!=='undefined')listen(document,'visibilitychange',()=>{visible=!document.hidden;event('visibility',visible?'visible':'hidden');snapshot=state();checkpoint(true);if(!visible&&c.persist)c.persist();});
  try{if(typeof PerformanceObserver!=='undefined'){observer=new PerformanceObserver(list=>{for(const e of list.getEntries()){stalls++;const info=W.renderer.info,d=prevCounts?{p:(info.programs?.length||0)-prevCounts.p,t:(info.memory?.textures||0)-prevCounts.t,g:(info.memory?.geometries||0)-prevCounts.g}:null;
    // 長任務發生時，看這段期間新增了幾個著色器程式、貼圖、幾何：新增的就是卡頓來源（編譯／上傳）
-   const why=d?(d.p>0?'著色器編譯+'+d.p+' ':'')+(d.t>0?'貼圖上傳+'+d.t+' ':'')+(d.g>0?'幾何上傳+'+d.g+' ':''):'';const rec={at:Date.now(),ms:Math.round(e.duration),why:why.trim()||'純 JS（存檔／垃圾回收／場景切換）',op:operation?.name||'',scene:snapshot.scene||''};longs.push(rec);if(longs.length>40)longs.shift();event('longtask',rec.ms+'ms '+rec.why);}});observer.observe({type:'longtask',buffered:true});}}catch(_){observer=null;}
+   const t0=e.startTime,t1=e.startTime+e.duration,calls=heavyCalls.filter(h=>h.at+h.ms>=t0-5&&h.at<=t1+5).map(h=>h.name+' '+Math.round(h.ms)+'ms');
+   const why=(calls.length?calls.join('、')+' ':'')+(d?(d.p>0?'著色器編譯+'+d.p+' ':'')+(d.t>0?'貼圖上傳+'+d.t+' ':'')+(d.g>0?'幾何上傳+'+d.g+' ':''):'');const rec={at:Date.now(),ms:Math.round(e.duration),why:why.trim()||'未歸因的 JS（多半是垃圾回收）',op:operation?.name||'',scene:snapshot.scene||''};longs.push(rec);if(longs.length>40)longs.shift();event('longtask',rec.ms+'ms '+rec.why);}});observer.observe({type:'longtask',buffered:true});}}catch(_){observer=null;}
  try{const cv=W.renderer.domElement;listen(cv,'webglcontextlost',e=>{gpuLost++;add('gpu','WebGL 顯示環境中斷（context lost）：通常是顯示記憶體不足或系統回收，畫面會黑掉或閃退');checkpoint(true);});listen(cv,'webglcontextrestored',()=>add('gpu','WebGL 顯示環境已恢復'));}catch(_){}
  const fr=[];
  function frame(seconds){const n=performance.now(),dt=seconds*1000;if(dt>0&&dt<2000&&Number.isFinite(dt))fr.push([n,dt]);while(fr.length&&(n-fr[0][0]>10000||fr.length>1500))fr.shift();if(n-lastBeat>=5000){lastBeat=n;snapshot=state();checkpoint();}}
@@ -5837,7 +5843,7 @@ function createDiag(W,c){
  function download(){const blob=new Blob([report()],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='swamp-diagnostic-'+session+'.txt';a.target='_blank';a.rel='noopener';a.click();setTimeout(()=>URL.revokeObjectURL(url),15000);}
  function clear(){current=[];history=[];log=[];try{localStorage.removeItem(KEY);}catch(_){} }
  snapshot=state();event('boot',navigation);checkpoint(true);
- return{scene,frame,beginFrame,stage,action,event,report,compact,copy,download,clear,add,previous,start(){started=true;clean=false;action('game','done');},count:()=>current.length};
+ return{timed,scene,frame,beginFrame,stage,action,event,report,compact,copy,download,clear,add,previous,start(){started=true;clean=false;action('game','done');},count:()=>current.length};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={readDiagnosticJournal,diagnosticValue,auditResources,createDiag};
 /* ===== 主線故事「老漁人的手記」：章節、任務、地圖開放、手記面板 ===== */
@@ -7223,7 +7229,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102062350'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102064540'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9152,7 +9158,7 @@ function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收�
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
   setTimeout(()=>{ HOME3D.exit();Snd.setIndoor?.(false); document.body.classList.remove('athome'); G.state='idle'; if(then){ fadeEl.classList.remove('on'); then(); } else if(G.spot!==0){ fadeEl.classList.remove('on'); goSpot(0); } else fadeOutWhenReady(); },650); }
-window.__goHome=goHome; window.__startRetrieve=startRetrieve; window.__HOMEOK=()=>HOME.unlocked();
+window.__goHome=goHome; window.__startRetrieve=startRetrieve;
 $('bOut').addEventListener('click',()=>leaveHome());
 $('bGrillH').addEventListener('click',()=>{ if(window.__GRILL) window.__GRILL(); });
 $('bTankM').addEventListener('click',()=>{ if(window.__openSheet) window.__openSheet('home'); });
@@ -9438,6 +9444,12 @@ function updateKayak(dt){
   if(spd>.25&&KY.wake<=0){ KY.wake=.4; AT.ring(G.base.x-fx*1.9,G.base.z-fz*1.9,.6+spd*.5); AT.ring(G.base.x+fx*1.8,G.base.z+fz*1.8,.3+spd*.3); if(spd>.9) P.splash(G.base.x+fx*1.9,0,G.base.z+fz*1.9,3,.3); }
 }
 const fadeEl=$('fade'), uwTag=$('uwTag');
+// 診斷：替幾個可能很重的動作計時，長任務就能指名是誰（存檔、換釣點、場景釋放、避障路徑、小屋進出）
+if(window.__DIAG&&window.__DIAG.timed){ const D=window.__DIAG; persist=D.timed('存檔',persist); startRetrieve=D.timed('收線路徑',startRetrieve); goSpot=D.timed('換釣點',goSpot);
+  for(const [o,k,n] of [[WL,'setSpot','載入釣點場景'],[WL,'setZone','載入水域'],[W,'suspendEffects','釋放場景顯示資源'],[PH,'route','避障路徑'],[HOME3D,'enter','進小屋'],[HOME3D,'exit','離開小屋']]) if(o&&typeof o[k]==='function') o[k]=D.timed(n,o[k]); }
+// 切到背景：把湖區的幾何、貼圖、倒影、陰影從顯示卡釋放，背景時佔的記憶體小很多，比較不會被手機系統直接結束；回來時黑幕下重新上傳
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ if(['idle','wait','bite','lure','retrieve'].includes(G.state)&&W.suspendEffects){ try{ W.suspendEffects(); G.bgReleased=true; window.__DIAG?.event('bg-release'); }catch(_){} } }
+  else if(G.bgReleased){ G.bgReleased=false; fadeEl.classList.add('on'); fadeOutWhenReady(); } }); window.__HOMEOK=()=>HOME.unlocked();
 let uwBusy=false;
 function enterUW(){ if(UW.active()||uwBusy||(G.uwBlock&&G.t<G.uwBlock)) return; uwBusy=true; fadeEl.classList.add('on');
   setTimeout(()=>{ if(G.fd&&(G.state==='wait'||G.state==='bite')){ UW.start(G.fd); document.body.classList.add('underwater'); if(G.state==='bite') UW.bite(); const r=RAR[G.fd.sp.rar];

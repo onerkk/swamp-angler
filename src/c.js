@@ -69,7 +69,7 @@ const PAD_N=padPos.length, SHRED_MAX=48, pads=new T.InstancedMesh(padGeo,padMat,
 padPos.forEach((p,i)=>{ q4.setFromEuler(eu.set(0,p[3],0)); pv.set(p[0],.013+i*.00003,p[1]); sv.set(p[2],1,p[2]); m4.compose(pv,q4,sv); pads.setMatrixAt(i,m4);
   PH.addBox({x:p[0]-p[2],y:-.03,z:p[1]-p[2]},{x:p[0]+p[2],y:.025,z:p[1]+p[2]},()=>pads.visible,"睡蓮葉");
   const c=.85+((i*7919)%100)/100*.3; pads.setColorAt(i,new T.Color(c,c,c*.9)); });
-pads.userData.lake=true; scene.add(pads);
+pads.userData.lake=true; pads.userData.flatOnWater=true; scene.add(pads);
 const petalMat=new T.MeshStandardMaterial({color:0xf3dfe4, roughness:.5, emissive:0x1a0a0c});
 const coreMat=new T.MeshStandardMaterial({color:0xe8c040, roughness:.6});
 const petalGeo=new T.SphereGeometry(1,10,8);
@@ -78,7 +78,7 @@ const FLOWER_PADS=[3,12,25,40,57,70].map(k=>k%padPos.length), flowerInst=[];
   for(let i=0;i<10;i++){ const m=new T.Mesh(petalGeo,petalMat); const a=i/10*6.283; m.scale.set(.05,.014,.022); m.position.set(Math.cos(a)*.04,.02,Math.sin(a)*.04); m.rotation.set(0,-a,.55); g.add(m); flowerParts.push(m); }
   const cm=new T.Mesh(new T.SphereGeometry(.022,10,8),coreMat); cm.position.y=.025; g.add(cm); flowerParts.push(cm);
   // 一朵花（花瓣、花心各一個網格）做成實例，六朵跟著各自的荷葉一起被推開、傾斜
-  for(const part of mergeMeshesByMaterial(T,flowerParts,g)){ const im=new T.InstancedMesh(part.geometry,part.material,FLOWER_PADS.length); im.frustumCulled=false; im.userData.lake=true; im.castShadow=false; scene.add(im); flowerInst.push(im); } }
+  for(const part of mergeMeshesByMaterial(T,flowerParts,g)){ const im=new T.InstancedMesh(part.geometry,part.material,FLOWER_PADS.length); im.frustumCulled=false; im.userData.lake=true; im.userData.flatOnWater=true; im.castShadow=false; scene.add(im); flowerInst.push(im); } }
 
 /* ---------- 荷葉被船推開、沖破 ----------
    荷葉是長在水底的，船撞上去會被擠到一邊、邊緣被壓進水裡傾斜翹起；船夠快時葉子會被沖破成幾片碎葉，碎葉漂著、慢慢沉下去；

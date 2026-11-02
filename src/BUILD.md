@@ -74,3 +74,6 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 雨圈與雨滴著色器（k.js）用 uBoat 橢圓 discard，不再畫進船艙。組裝後一定檢查 rc 與 version.json
 - 場景切換卡頓：fadeOutWhenReady()（d.js）讓黑幕多撐 3 個畫面，新場景第一次繪製的幾何／貼圖上傳發生在黑幕後；載入完成時連平常隱藏的物件（魚、鱷魚、船、特效；燈光除外）一起 compile，避免第一次出現才編譯（每次 100～200ms）
 - 收線（d.js startRetrieve）：浮標先沿水面拖回竿尖前方約 0.9m（跟著水面起伏、往拉的方向傾斜、拖出水紋），最後一段才離水提到竿尖；retrieveLift 是離水的路徑點。測試用 window.__startRetrieve
+- 切背景時（idle/wait/bite/lure/retrieve）呼叫 W.suspendEffects 釋放湖區顯示資源，回來黑幕下重新上傳，降低被系統結束的機率
+- 倒影自動跳過水面以下或平貼水面的物件（b.js lowReflObjects，每 1.5 秒重算；userData.flatOnWater 強制跳過）
+- 診斷 timed()：存檔、換釣點、載入釣點／水域、釋放場景、避障路徑、進出小屋超過 8ms 會記錄，長任務直接標出函式名
