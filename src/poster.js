@@ -15,10 +15,13 @@ function stats(){ const S=window.__SAVE||{}, SP=(window.__PROPS&&window.__PROPS.
   const fish=SP.filter(s=>s.loc!=='tide'&&!s.item), dex=fish.filter(s=>S.dex&&S.dex[s.id]).length;
   const B=typeof BOSS!=='undefined'?BOSS:[], won=B.filter(b=>S.boss&&S.boss[b.id]).length;
   const done=(S.story&&S.story.done)||[], main=MAIN.map(([id,n])=>({n,ok:done.indexOf(id)>=0})), epi=EPI.filter(id=>done.indexOf(id)>=0).length;
-  const log=(S.catchLog||[]).filter(r=>r&&r.w>0), big=log.slice().sort((a,b)=>b.w-a.w)[0], bigSp=big&&SP.find(s=>s.id===big.id);
+  const here=(window.__G&&window.__G.loc)||'lake', locOf=sp=>sp?(sp.loc||'lake'):'', fits=sp=>sp&&!sp.item&&(locOf(sp)===here||locOf(sp)==='both');
+  const log=(S.catchLog||[]).filter(r=>r&&r.w>0).sort((a,b)=>b.w-a.w), big=log[0], bigSp=big&&SP.find(s=>s.id===big.id);
+  // 主角魚：要跟現在所在的水域一致（湖上不會出現大白鯊），沒有就不放
+  const heroRec=log.find(r=>fits(SP.find(s=>s.id===r.id))), heroSp=heroRec&&SP.find(s=>s.id===heroRec.id);
   const mer=(S.merGift||[]).length, merN=window.__MERGIFT?window.__MERGIFT.count():8;
   const title=window.__TAL&&window.__TAL.curTitle?window.__TAL.curTitle():((S.titles||[]).slice(-1)[0]||'');
-  return {lv:S.lv||1, title, dex, dexN:fish.length, won, wonN:B.length, bosses:B.map(b=>({n:b.name,ok:!!(S.boss&&S.boss[b.id])})), main, epi, total:S.total||log.length, big, bigSp, mer, merN, titles:(S.titles||[]).length}; }
+  return {lv:S.lv||1, title, dex, dexN:fish.length, won, wonN:B.length, bosses:B.map(b=>({n:b.name,ok:!!(S.boss&&S.boss[b.id])})), main, epi, total:S.total||log.length, big, bigSp, heroRec, heroSp, mer, merN, titles:(S.titles||[]).length}; }
 /* 主角：最大漁獲的真實 3D 模型，單獨畫在透明底上（畫到離屏目標再讀回像素），疊在遊戲畫面上 */
 async function heroFish(sp){ const M=window.__MDL, W=window.__W, T=THREE; if(!M||!sp||!W) return null;
   if(!M.fishReady(sp.id)){ if(M.want) M.want(sp.id); for(let i=0;i<40&&!M.fishReady(sp.id);i++) await new Promise(r=>setTimeout(r,100)); if(!M.fishReady(sp.id)) return null; }
@@ -39,6 +42,28 @@ async function heroFish(sp){ const M=window.__MDL, W=window.__W, T=THREE; if(!M|
   for(let yy=0;yy<Hd;yy++){ const si=(Hd-1-yy)*Wd*4, di=yy*Wd*4; for(let k=0;k<Wd*4;k+=4){ id.data[di+k]=gm[px[si+k]]; id.data[di+k+1]=gm[px[si+k+1]]; id.data[di+k+2]=gm[px[si+k+2]]; id.data[di+k+3]=px[si+k+3]; } }
   x.putImageData(id,0,0); return cv; }
 function wkg(w){ return w>=1?(w>=100?Math.round(w).toLocaleString():w.toFixed(1))+' kg':Math.round(w*1000)+' g'; }
+/* 主角鏡頭：魚放進真正的遊戲場景裡（同一套燈光、水面、倒影、水下層），在鏡頭前方躍出水面，
+   身體一半還在水裡、濺起水花與水圈；鏡頭貼近水面往上拍。以前是把魚另外畫好再貼上去，光線對不上、像浮在畫面上 */
+async function heroShot(sp,rec){ const W=window.__W, M=window.__MDL, P=window.__PROPS, G=window.__G, T=THREE; if(!W||!M||!sp) return null;
+  if(!M.fishReady(sp.id)){ if(M.want) M.want(sp.id); for(let i=0;i<50&&!M.fishReady(sp.id);i++) await new Promise(r=>setTimeout(r,100)); if(!M.fishReady(sp.id)) return null; }
+  let f=null; try{ f=M.fish(sp); }catch(e){ return null; } if(!f||!f.group) return null;
+  const g=f.group, L=Math.max(.3,rec.L||sp.len[1]/100); g.scale.setScalar(L); g.visible=true; W.scene.add(g); if(window.__seeThrough) window.__seeThrough(g);
+  const cam=W.camera, base=new T.Vector3(); cam.getWorldPosition(base); const fwd=new T.Vector3(); cam.getWorldDirection(fwd); fwd.y=0; if(fwd.lengthSq()<1e-4) fwd.set(0,0,-1); fwd.normalize();
+  const dist=L*1.9+2.5, fx=base.x+fwd.x*dist, fz=base.z+fwd.z*dist, wy=W.swell?W.swell(fx,fz,G?G.t:0):0;
+  g.rotation.order='YXZ'; g.rotation.set(0,Math.atan2(fwd.x,fwd.z),.42); g.position.set(fx,wy+L*.12,fz);
+  if(P&&P.splash){ P.splash(fx,wy,fz,90,2.2+L*.4); P.splash(fx-fwd.z*L*.35,wy,fz+fwd.x*L*.35,50,1.6+L*.3); } if(W.addRipple){ W.addRipple(fx,fz,1.2+L*.3); W.addRipple(fx+fwd.z*L*.3,fz-fwd.x*L*.3,.8+L*.2); }
+  await new Promise(r=>setTimeout(r,420));   /* 讓水花噴起來 */
+  // 低角度機位：在玩家與魚之間、離水面不到一公尺，略往上看
+  const pl=W.player, hd=W.head, sp0=pl.position.clone(), sq=pl.quaternion.clone(), hr=hd.rotation.clone(), cp=cam.position.clone(), cr=cam.rotation.clone();
+  let out=null;
+  try{ const camPos=new T.Vector3(base.x+fwd.x*dist*.18,wy+Math.max(.6,L*.22),base.z+fwd.z*dist*.18), look=new T.Vector3(fx,wy+L*.35,fz);
+    hd.rotation.set(0,0,0); cam.position.set(0,0,0); cam.rotation.set(0,0,0); pl.position.copy(camPos); const m=new T.Matrix4().lookAt(camPos,look,new T.Vector3(0,1,0)); pl.quaternion.setFromRotationMatrix(m);
+    pl.updateMatrixWorld(true); if(W.U&&W.U.uEye) cam.getWorldPosition(W.U.uEye.value);
+    if(W.render) W.render(); else W.renderer.render(W.scene,cam);
+    const src=W.renderer.domElement; out=document.createElement('canvas'); out.width=src.width; out.height=src.height; out.getContext('2d').drawImage(src,0,0); }
+  catch(e){ out=null; }
+  finally{ pl.position.copy(sp0); pl.quaternion.copy(sq); hd.rotation.copy(hr); cam.position.copy(cp); cam.rotation.copy(cr); pl.updateMatrixWorld(true); W.scene.remove(g); if(W.submerged&&W.submerged.remove) W.submerged.remove(g); }
+  return out; }
 /* 版面：上半部真實遊戲畫面＋最大漁獲的 3D 模型＋一句挑戰；下半部是老漁人《漁獲簿》的紙頁：玩家、數據、十四枚魚王印章、故事航線 */
 async function draw(){ const st=stats(), cv=document.createElement('canvas'); cv.width=W0; cv.height=H0; const g=cv.getContext('2d');
   g.fillStyle='#05090d'; g.fillRect(0,0,W0,H0);
@@ -52,10 +77,16 @@ async function draw(){ const st=stats(), cv=document.createElement('canvas'); cv
   gr=g.createLinearGradient(0,40,0,160); gr.addColorStop(0,'#fff4d2'); gr.addColorStop(1,'#e6b85c'); g.fillStyle=gr; g.fillText('濕地垂釣',58,150);
   g.font=`600 30px ${SANS}`; g.fillStyle='rgba(255,244,214,.92)'; g.shadowColor='rgba(0,0,0,.8)'; g.shadowBlur=10; g.fillText('真實湖景、海釣、冰湖、傳說中的美人魚',62,200); g.shadowBlur=0;
   // 主角魚
-  const hero=st.bigSp?await heroFish(st.bigSp):null;
-  if(hero){ g.save(); g.shadowColor='rgba(0,0,0,.65)'; g.shadowBlur=40; g.shadowOffsetY=18; g.drawImage(hero,20,SH-470,1040,520); g.restore(); }
+  const hero=st.heroSp?await heroFish(st.heroSp):null;
+  if(hero){ const hc=document.createElement('canvas'); hc.width=hero.width; hc.height=hero.height; const hx=hc.getContext('2d'); hx.drawImage(hero,0,0);
+    // 下面約四分之一沒在水裡：用漸層把魚的下緣淡掉，看起來是從水裡躍出來，不是浮在畫面上
+    hx.globalCompositeOperation='destination-out'; const m=hx.createLinearGradient(0,hc.height*.62,0,hc.height*.9); m.addColorStop(0,'rgba(0,0,0,0)'); m.addColorStop(1,'rgba(0,0,0,1)'); hx.fillStyle=m; hx.fillRect(0,0,hc.width,hc.height);
+    // 依場景的光線壓暗（夜裡、黃昏不會是一隻打著棚燈的魚）
+    const lt=Math.max(.35,Math.min(1,(window.__W&&window.__W.info&&window.__W.info.light)||1)); if(lt<1){ hx.globalCompositeOperation='source-atop'; hx.fillStyle=`rgba(8,14,22,${(1-lt)*.75})`; hx.fillRect(0,0,hc.width,hc.height); }
+    g.drawImage(hc,20,SH-430,1040,520);
+  }
   // 一句挑戰（用自己的最大漁獲當鉤子）
-  if(st.big&&st.bigSp){ const line1=`我拉起了 ${wkg(st.big.w)} 的${st.bigSp.name}`; g.textAlign='right'; g.font=`900 54px ${SERIF}`; g.lineWidth=8; g.strokeStyle='rgba(0,0,0,.75)'; g.strokeText(line1,W0-48,SH-62); g.fillStyle='#fff'; g.fillText(line1,W0-48,SH-62);
+  if(st.heroRec&&st.heroSp){ const line1=`我拉起了 ${wkg(st.heroRec.w)} 的${st.heroSp.name}`; g.textAlign='right'; g.font=`900 54px ${SERIF}`; g.lineWidth=8; g.strokeStyle='rgba(0,0,0,.75)'; g.strokeText(line1,W0-48,SH-62); g.fillStyle='#fff'; g.fillText(line1,W0-48,SH-62);
     g.font=`800 34px ${SANS}`; g.fillStyle='#ffd56a'; g.strokeText('你呢？',W0-48,SH-16); g.fillText('你呢？',W0-48,SH-16); g.textAlign='left'; }
   // 下半部：漁獲簿紙頁
   const PY=SH+6, PH=H0-PY-150; g.save(); rr(g,30,PY,W0-60,PH,18); g.clip();
