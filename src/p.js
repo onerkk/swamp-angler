@@ -82,6 +82,7 @@ const unlocked=()=>MS.done?7:MS.met?Math.min(6,MS.sc):0;
 function render(){ const n=unlocked(), sc=Math.min(7,MS.sc);
   const pips='🌙'.repeat(sc)+'○'.repeat(7-sc);
   let h=`<h3>霜汐<button class="sbtn" data-m="x">✕</button></h3><div class="pg">月鱗 ${sc}/7　${pips}</div>`;
+  if(window.__MERGIFT&&window.__MERGIFT.count()) h+=`<div style="margin:8px 0"><button class="sbtn pri" data-m="album">🖼 月鱗畫像（${((window.__SAVE&&window.__SAVE.merGift)||[]).length}/${window.__MERGIFT.count()}）</button></div>`;   /* 送她回家時留下的畫像 */
   if(!MS.done){ const next=MS.sc>=6?'最後一片在<em>月神鯉</em>的肚子裡。在月光灣的深夜釣起牠。':'在<em>月光灣</em>的<em>深夜（約 19:48～04:48）</em>釣魚，每釣到一條魚有 45% 機率從魚肚裡找到一片月鱗。';
     h+=`<div class="ch tip"><b>🧭 怎麼找月鱗</b>${next}<br><small>找到後回來找霜汐，就會解鎖下一段故事。</small></div>`; }
   for(let i=n;i>=0;i--) h+=`<div class="ch"><b>${MOON_STORY[i].t}</b>${MOON_STORY[i].b}</div>`;
@@ -90,7 +91,7 @@ function render(){ const n=unlocked(), sc=Math.min(7,MS.sc);
   box.firstChild.innerHTML=h; }
 tb.addEventListener('click',()=>{ if(!MS.met){ MS.met=true; c.toast('🌙 任務：在月夜的月光灣釣魚，找回 7 片月鱗','good',3200); }
   MS.read=unlocked(); c.persist(); render(); box.classList.remove('hidden'); tb.classList.remove('dot'); });
-box.addEventListener('click',e=>{ if(e.target===box||e.target.closest('[data-m=x]')) box.classList.add('hidden'); });
+box.addEventListener('click',e=>{ if(e.target===box||e.target.closest('[data-m=x]')) box.classList.add('hidden'); if(e.target.closest('[data-m=album]')){ box.classList.add('hidden'); if(window.__MERGIFT) window.__MERGIFT.album(); } });
 
 let act=0;
 const active=()=>c.zoneId()==='moon'&&c.period()==='night'&&(G.loc||'lake')!=='sea';

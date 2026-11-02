@@ -1,4 +1,4 @@
-/*APPV:20261102171224*/
+/*APPV:20261102172010*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -5780,6 +5780,7 @@ const unlocked=()=>MS.done?7:MS.met?Math.min(6,MS.sc):0;
 function render(){ const n=unlocked(), sc=Math.min(7,MS.sc);
   const pips='🌙'.repeat(sc)+'○'.repeat(7-sc);
   let h=`<h3>霜汐<button class="sbtn" data-m="x">✕</button></h3><div class="pg">月鱗 ${sc}/7　${pips}</div>`;
+  if(window.__MERGIFT&&window.__MERGIFT.count()) h+=`<div style="margin:8px 0"><button class="sbtn pri" data-m="album">🖼 月鱗畫像（${((window.__SAVE&&window.__SAVE.merGift)||[]).length}/${window.__MERGIFT.count()}）</button></div>`;   /* 送她回家時留下的畫像 */
   if(!MS.done){ const next=MS.sc>=6?'最後一片在<em>月神鯉</em>的肚子裡。在月光灣的深夜釣起牠。':'在<em>月光灣</em>的<em>深夜（約 19:48～04:48）</em>釣魚，每釣到一條魚有 45% 機率從魚肚裡找到一片月鱗。';
     h+=`<div class="ch tip"><b>🧭 怎麼找月鱗</b>${next}<br><small>找到後回來找霜汐，就會解鎖下一段故事。</small></div>`; }
   for(let i=n;i>=0;i--) h+=`<div class="ch"><b>${MOON_STORY[i].t}</b>${MOON_STORY[i].b}</div>`;
@@ -5788,7 +5789,7 @@ function render(){ const n=unlocked(), sc=Math.min(7,MS.sc);
   box.firstChild.innerHTML=h; }
 tb.addEventListener('click',()=>{ if(!MS.met){ MS.met=true; c.toast('🌙 任務：在月夜的月光灣釣魚，找回 7 片月鱗','good',3200); }
   MS.read=unlocked(); c.persist(); render(); box.classList.remove('hidden'); tb.classList.remove('dot'); });
-box.addEventListener('click',e=>{ if(e.target===box||e.target.closest('[data-m=x]')) box.classList.add('hidden'); });
+box.addEventListener('click',e=>{ if(e.target===box||e.target.closest('[data-m=x]')) box.classList.add('hidden'); if(e.target.closest('[data-m=album]')){ box.classList.add('hidden'); if(window.__MERGIFT) window.__MERGIFT.album(); } });
 
 let act=0;
 const active=()=>c.zoneId()==='moon'&&c.period()==='night'&&(G.loc||'lake')!=='sea';
@@ -6558,6 +6559,40 @@ return {progOf:id=>{ const ch=byId(id); return ch?prog(ch).slice():null; },isAct
  };
  // 預覽網址：?mermaid=1 直接播終幕回禮（只播放、不發獎勵、不改存檔）
  if(typeof location!=='undefined'&&/[?&]mermaid=1(&|$)/.test(location.search)){ const wait=()=>{ if(window.__REALDONE&&window.__playMermaidInvite) setTimeout(()=>window.__mermaidReward({title:'海之友',xp:20000,coins:12000},null,false),800); else setTimeout(wait,500); }; setTimeout(wait,1500); }
+})();
+/* ===== 月鱗畫像：送霜汐回家後，她留下一片月鱗，鱗面映出她的樣子（使用者用 AI 產生的美人魚圖） =====
+   每次隨機一張，優先給還沒收集到的；收集過的可以在霜汐的對話視窗裡「🖼 月鱗畫像」重看
+   圖片放在 media/mergift/，新增圖片只要把檔名加進 MERGIFT 清單 */
+const MERGIFT=[];
+(function(){
+'use strict';
+const st=document.createElement('style'); st.textContent=`
+#mgBox{position:fixed;inset:0;z-index:58;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:radial-gradient(ellipse at 50% 40%,rgba(30,50,90,.75),rgba(2,6,14,.94));opacity:0;transition:opacity .5s;padding:16px;font-family:inherit}
+#mgBox.on{opacity:1}#mgBox .t{color:#cfe6ff;font-size:13px;letter-spacing:.4em}#mgBox .n{color:#f6d9e4;font-size:20px;letter-spacing:.2em}
+#mgBox .fr{position:relative;max-width:min(92vw,520px);max-height:66vh;border-radius:14px;overflow:hidden;box-shadow:0 0 0 1px rgba(200,225,255,.35),0 0 40px rgba(140,190,255,.35);transform:scale(.92);transition:transform .9s cubic-bezier(.2,1.1,.3,1)}
+#mgBox.on .fr{transform:none}#mgBox img{display:block;max-width:min(92vw,520px);max-height:66vh;object-fit:contain;background:#000}
+#mgBox .fr::after{content:'';position:absolute;inset:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%);transform:translateX(-120%);animation:mgShine 2.4s ease .6s 1 forwards}
+@keyframes mgShine{to{transform:translateX(120%)}}
+#mgBox .row{display:flex;gap:10px}#mgBox button{padding:10px 18px;border-radius:999px;border:1px solid rgba(200,225,255,.45);background:rgba(20,40,70,.85);color:#e6f0ff;font-size:14px;font-family:inherit}
+#mgBox .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(92vw,520px);max-height:66vh;overflow:auto}#mgBox .grid img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px}#mgBox .grid .lk{aspect-ratio:3/4;border-radius:8px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;color:#8aa4c4;font-size:22px}`;
+document.head.appendChild(st);
+const save=()=>window.__SAVE||null;
+function got(){ const s=save(); if(!s) return []; s.merGift=s.merGift||[]; return s.merGift; }
+function box(html){ const old=document.getElementById('mgBox'); if(old) old.remove(); const el=document.createElement('div'); el.id='mgBox'; el.innerHTML=html; document.body.appendChild(el); requestAnimationFrame(()=>el.classList.add('on')); return el; }
+function close(el){ el.classList.remove('on'); setTimeout(()=>el.remove(),500); }
+/* 送她回家後呼叫：隨機一張，沒收集過的優先 */
+function give(){ if(!MERGIFT.length) return false; const have=got(), fresh=MERGIFT.filter(f=>have.indexOf(f)<0), pool=fresh.length?fresh:MERGIFT, f=pool[Math.floor(Math.random()*pool.length)];
+  const isNew=have.indexOf(f)<0; if(isNew){ have.push(f); if(window.__saveNow) window.__saveNow(); }
+  const el=box(`<div class="t">霜汐留下的月鱗</div><div class="n">${isNew?'新的畫像':'月鱗畫像'}（${have.length}/${MERGIFT.length}）</div><div class="fr"><img src="media/mergift/${f}" alt="霜汐"></div><div class="row"><button data-k="all">🖼 全部畫像</button><button data-k="x">收下</button></div>`);
+  el.querySelector('img').addEventListener('error',()=>close(el));
+  el.addEventListener('click',e=>{ const k=e.target.closest('[data-k]'); if(!k) return; if(k.dataset.k==='all'){ close(el); setTimeout(album,350); } else close(el); });
+  return true; }
+/* 相簿：收集到的可以點開看大圖，沒收集到的顯示鎖 */
+function album(){ const have=got();
+  const el=box(`<div class="t">月鱗畫像</div><div class="n">${have.length}/${MERGIFT.length}</div><div class="grid">${MERGIFT.map(f=>have.indexOf(f)>=0?`<img src="media/mergift/${f}" data-f="${f}" alt="">`:'<div class="lk">🔒</div>').join('')}</div><div class="row"><button data-k="x">關閉</button></div>`);
+  el.addEventListener('click',e=>{ const im=e.target.closest('img[data-f]'); if(im){ const f=im.dataset.f; close(el); setTimeout(()=>{ const v=box(`<div class="fr"><img src="media/mergift/${f}" alt=""></div><div class="row"><button data-k="back">返回</button></div>`); v.addEventListener('click',ev=>{ if(ev.target.closest('[data-k]')){ close(v); setTimeout(album,350); } }); },350); return; }
+    if(e.target.closest('[data-k]')) close(el); }); }
+window.__MERGIFT={give,album,count:()=>MERGIFT.length};
 })();
 /* ===== 老漁人的小屋：水族箱與標本牆（資料與規則） ===== */
 function createHome(c){
@@ -7788,7 +7823,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102171224'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102172010'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9819,7 +9854,7 @@ function finishCatch(sell){
   if(G.fd.item) FUN.itemEffect(G.fd.item);
   if(sell){ const v=Math.round(G.fd.value*(1+(save.mer&&save.mer.n>=15?.2:save.mer&&save.mer.n>=8?.1:0))); save.coins+=v; persist(); Snd.coin(); coinFly(v); }
   else if(keep){ Snd.coin(); }
-  else { META.onRelease(); if(G.fd.sp.special==='mermaid'){ if(G.merShow){ G.merShow.leave=.01; G.merShow.ctl.wave(); G.merShow.ctl.smile(3); } const v=G.fd.value; save.coins+=v; persist(); Snd.coin(); coinFly(v); G.luck=.25; FUN.merMeet(); } else { G.luck=Math.min(.25,G.luck+.08); toast('放生了，下一竿稀有魚機率提高','good',1800); } }
+  else { META.onRelease(); if(G.fd.sp.special==='mermaid'){ if(G.merShow){ G.merShow.leave=.01; G.merShow.ctl.wave(); G.merShow.ctl.smile(3); } const v=G.fd.value; save.coins+=v; persist(); Snd.coin(); coinFly(v); G.luck=.25; FUN.merMeet(); setTimeout(()=>{ if(window.__MERGIFT) window.__MERGIFT.give(); },1200); }   /* 送她回家：她留下一片月鱗畫像 */ else { G.luck=Math.min(.25,G.luck+.08); toast('放生了，下一竿稀有魚機率提高','good',1800); } }
   W.scene.attach(g); G.state='post'; G.stT=0; G.postSell=sell||keep; G.from.copy(g.position);
 }
 function coinFly(v){ const el=document.createElement('div'); el.className='fly'; el.textContent='+'+v.toLocaleString()+' 🪙';
@@ -9902,7 +9937,7 @@ const END=createEnding(W,{rig:()=>[P.rodGroup,bob],soundOn:()=>save.sound!==fals
   begin:()=>{ ENDSV.hour=G.hour; ENDSV.wx=save.wxMode; ENDSV.loc=G.loc||'lake'; ENDSV.base=G.base.clone(); G.state='ending'; save.wxMode='clear'; G.base.set(0,0,0); if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(.5); },
   end:()=>{ G.state='idle'; W.player.rotation.set(0,0,0); save.wxMode=ENDSV.wx; if(ENDSV.wx===undefined) delete save.wxMode; G.base.copy(ENDSV.base); G.hour=ENDSV.hour; W.setTime(G.hour,true); if(window.__MOONPH&&window.__MOONPH.fix) window.__MOONPH.fix(null); if((G.loc||'lake')!==ENDSV.loc) SEA.setLoc(ENDSV.loc); if(window.__applyGfx) window.__applyGfx(save.gfx||'high'); }});
 window.__END=END;
-const SCH=createSchools(W,P,{loc:()=>G.loc||'lake',period:()=>period(G.hour),ok:()=>(G.loc==='lake'||G.loc==='sea'||!G.loc)&&G.state!=='home'&&!END.on()&&!UW.active()}); window.__saveNow=()=>persist(); window.__ENDON=()=>END.on();
+const SCH=createSchools(W,P,{loc:()=>G.loc||'lake',period:()=>period(G.hour),ok:()=>(G.loc==='lake'||G.loc==='sea'||!G.loc)&&G.state!=='home'&&!END.on()&&!UW.active()}); window.__saveNow=()=>persist(); window.__SAVE=save; window.__ENDON=()=>END.on();
 // 結局之後的湖：碼頭盡頭的紀念與滿月夜的月潮
 const AFTER=createEndingWorld(W,{done:()=>!!(save.story&&save.story.ending),lake:()=>(G.loc||'lake')==='lake'&&G.state!=='home',ending:()=>END.on(),hour:()=>G.hour});
 window.__playEnding=done=>{ if(G.state==='home'){ leaveHome(()=>window.__playEnding(done)); return; } END.play(endingShots(END,{save,W,P,G}),done); };
