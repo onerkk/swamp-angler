@@ -1,4 +1,4 @@
-/*APPV:20261102162708*/
+/*APPV:20261102164409*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -926,15 +926,28 @@ const mat=new T.ShaderMaterial({uniforms:U,vertexShader:VS,fragmentShader:FS,tra
 // 左右艏浪：散開速度依克爾文角；船尾航跡：散得慢、寬、留得久
 const arms=[trail(150,11,1,1.1,.32,1),trail(150,11,1,1.1,.32,1)], wash=trail(170,16,.12,1.8,.6,.95);
 const all=[...arms,wash];
-/* 船頭水花：點粒子，丟出去後受重力落回水面 */
-const NP=1100, sp=new Float32Array(NP*3), sv=new Float32Array(NP*3), sl=new Float32Array(NP), ssz=new Float32Array(NP); sl.fill(-1);
-const pg=new T.BufferGeometry(); pg.setAttribute('position',new T.BufferAttribute(sp,3)); pg.setAttribute('aL',new T.BufferAttribute(sl,1)); pg.setAttribute('aS',new T.BufferAttribute(ssz,1)); pg.boundingSphere=new T.Sphere(new T.Vector3(),1e5);
+/* 船頭水花：點粒子，丟出去後受重力落回水面。每顆是一團不規則的白水（程式畫的水團貼圖、隨機旋轉），
+   大小用真實公尺換算成螢幕像素（依畫面高度與視角），不再是固定的小圓點 */
+const NP=1600, sp=new Float32Array(NP*3), sv=new Float32Array(NP*3), sl=new Float32Array(NP), ssz=new Float32Array(NP), srot=new Float32Array(NP); sl.fill(-1);
+const pg=new T.BufferGeometry(); pg.setAttribute('position',new T.BufferAttribute(sp,3)); pg.setAttribute('aL',new T.BufferAttribute(sl,1)); pg.setAttribute('aS',new T.BufferAttribute(ssz,1)); pg.setAttribute('aR',new T.BufferAttribute(srot,1)); pg.boundingSphere=new T.Sphere(new T.Vector3(),1e5);
+const clumpTex=(()=>{ const N=128, cv=document.createElement('canvas'); cv.width=cv.height=N; const g=cv.getContext('2d');
+  // 一團水：十幾顆大小不一的柔邊水珠疊在一起，邊緣再撒細水霧
+  for(let i=0;i<16;i++){ const a=Math.random()*6.28, r=Math.random()*N*.24, x=N/2+Math.cos(a)*r, y=N/2+Math.sin(a)*r, rr=N*(.08+Math.random()*.16), gr=g.createRadialGradient(x,y,0,x,y,rr);
+    gr.addColorStop(0,'rgba(255,255,255,.95)'); gr.addColorStop(.55,'rgba(255,255,255,.55)'); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(0,0,N,N); }
+  for(let i=0;i<260;i++){ const a=Math.random()*6.28, r=N*(.15+Math.random()*.33), x=N/2+Math.cos(a)*r, y=N/2+Math.sin(a)*r; g.fillStyle=`rgba(255,255,255,${.2+Math.random()*.5})`; g.beginPath(); g.arc(x,y,.6+Math.random()*1.6,0,6.28); g.fill(); }
+  const t=new T.CanvasTexture(cv); return t; })();
+U.uSprite={value:clumpTex}; U.uPx={value:800};
 const pm=new T.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,
-  vertexShader:`attribute float aL; attribute float aS; varying float vL; void main(){ vL=aL; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=aL<0.0?0.0:min(aS*520.0/max(-mv.z,.5),180.0); gl_Position=projectionMatrix*mv; }`,
-  fragmentShader:`uniform float uLight; varying float vL; void main(){ if(vL<0.0) discard; vec2 q=gl_PointCoord-.5; float r=dot(q,q); if(r>.25) discard; float a=(1.0-r*4.0)*(1.0-r*4.0)*.6*clamp(vL*2.0,0.0,1.0); gl_FragColor=vec4(vec3(.9,.95,1.0)*(.2+.8*uLight),a); }`});
+  vertexShader:`attribute float aL; attribute float aS; attribute float aR; uniform float uPx; varying float vL; varying float vR; void main(){ vL=aL; vR=aR; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=aL<0.0?0.0:clamp(aS*uPx/max(-mv.z,.4),1.0,220.0); gl_Position=projectionMatrix*mv; }`,
+  fragmentShader:`uniform float uLight; uniform sampler2D uSprite; varying float vL; varying float vR; void main(){ if(vL<0.0) discard; vec2 q=gl_PointCoord-.5; float c=cos(vR), s=sin(vR); q=vec2(c*q.x-s*q.y,s*q.x+c*q.y)+.5;
+    vec4 tx=texture2D(uSprite,q); float a=tx.a*.9*clamp(vL*1.6,0.0,1.0); if(a<.02) discard;
+    gl_FragColor=vec4(vec3(.93,.97,1.0)*(.28+.85*uLight),a); }`});
 const pts=new T.Points(pg,pm); pts.frustumCulled=false; pts.renderOrder=4; pts.userData.flatOnWater=true; pts.visible=false; S.add(pts);
-let pHead=0, emitAcc=0, sampleT=0, wasOn=false;
-function emit(x,y,z,vx,vy,vz,life,size){ const i=pHead; pHead=(pHead+1)%NP; sp[i*3]=x; sp[i*3+1]=y; sp[i*3+2]=z; sv[i*3]=vx; sv[i*3+1]=vy; sv[i*3+2]=vz; sl[i]=life; ssz[i]=size; }
+const _px=new T.Vector2();
+let pHead=0, curtainAcc=0, emitAcc=0, sampleT=0, wasOn=false;
+// 船殼在水線的半寬：船頭尖、往後 8 公尺內漸寬到最寬
+const hullHalf=(o,lz)=>o.beam*Math.min(1,.35+(lz-o.bow)/8);
+function emit(x,y,z,vx,vy,vz,life,size){ const i=pHead; pHead=(pHead+1)%NP; sp[i*3]=x; sp[i*3+1]=y; sp[i*3+2]=z; sv[i*3]=vx; sv[i*3+1]=vy; sv[i*3+2]=vz; sl[i]=life; ssz[i]=size; srot[i]=Math.random()*6.28; }
 function clear(){ all.forEach(r=>{ r.pts.length=0; r.m.visible=false; }); sl.fill(-1); pts.visible=false; }
 function build(r,t){ const n=Math.min(r.pts.length,r.n); if(n<2){ r.m.visible=false; return; }
   for(let k=0;k<n;k++){ const p=r.pts[r.pts.length-1-k], a=t-p.t0, fade=Math.exp(-a/(r.life*.45))*Math.min(1,a*4+.25);
@@ -947,6 +960,7 @@ function build(r,t){ const n=Math.min(r.pts.length,r.n); if(n<2){ r.m.visible=fa
   r.g.attributes.position.needsUpdate=true; r.g.attributes.aUv.needsUpdate=true; r.g.attributes.aA.needsUpdate=true; r.m.visible=true; }
 /* o：{on, x, z, head（船頭朝向，前方 = (-sin, -cos)）, speed（公尺/秒）, bow, stern（船首、船尾離原點的前後距離，船首為負）, beam（半寬）, water（吃水線高度）} */
 function update(dt,t,o){
+  { const cam=W.camera, h=W.renderer.getDrawingBufferSize(_px).y; U.uPx.value=h/(2*Math.tan((cam.fov||60)*Math.PI/360)); }
   U.uTime.value=t; U.uLight.value=Math.max(.06,Math.min(1,W.info?W.info.light:1)); W.camera.getWorldPosition(U.uCam.value);
   if(!o||!o.on){ if(wasOn) clear(); wasOn=false; return; } wasOn=true;
   const fx=-Math.sin(o.head), fz=-Math.cos(o.head), rx=-fz, rz=fx, s=Math.max(0,o.speed);
@@ -960,23 +974,30 @@ function update(dt,t,o){
   all.forEach(r=>{ while(r.pts.length&&t-r.pts[0].t0>r.life) r.pts.shift(); build(r,t); });
   // 船頭水花：時速超過約 9 節開始被船頭劈開往兩側上方甩
   if(s>4.5){ const k=Math.min(1,(s-4.5)/14); emitAcc+=dt*(40+260*k*k); const sh=o.bow+Math.min(2.6,(o.stern-o.bow)*.1);
-    while(emitAcc>=1){ emitAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random(), [x,z]=at(sg*o.beam*(.22+.3*along),sh+along*3.5), out=1.5+Math.random()*2.5+s*.12*(1-along*.5), up=(.8+Math.random()*1.4)*(1+2.2*k)*(1-along*.5), fwd=s*(.04+Math.random()*.1);
+    while(emitAcc>=1){ emitAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random(), [x,z]=at(sg*(hullHalf(o,sh+along*3.5)+.1),sh+along*3.5), out=1.5+Math.random()*2.5+s*.12*(1-along*.5), up=(.8+Math.random()*1.4)*(1+2.2*k)*(1-along*.5), fwd=s*(.04+Math.random()*.1);
       // 大顆的是被劈開往外翻的水團，小顆的是被風吹散的細霧
       const big=Math.random()<.35; emit(x,o.water+.2,z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,(big?.8:1.4)+Math.random()*.6,big?.28+Math.random()*.3:.08+Math.random()*.12); } }
+  // 船頭兩側的白水幕：時速約 18 節以上，船頭把海水劈成兩片往外上方翻起，高過船頭欄杆，
+  // 水幾乎留在原地、船衝過去，從駕駛座看是兩片白水沿著船舷兩側往後飛過
+  if(s>9){ curtainAcc+=dt*(s-9)*48;
+    while(curtainAcc>=1){ curtainAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random(), [x,z]=at(sg*(hullHalf(o,o.bow+1.2+along*4)+.15),o.bow+1.2+along*4), out=2.2+Math.random()*2.6, up=5+Math.random()*3+(s-9)*.16, fwd=s*(.18+Math.random()*.22);
+      emit(x,o.water+.3,z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,1.3+Math.random()*.9,.3+Math.random()*.6); } }
   // 破浪：船頭撞進浪裡的瞬間，整片白水被往上掀到甲板以上；水本身幾乎留在原地，船以二十幾公尺的秒速衝過去，
   // 所以從駕駛座看是一片水花越過船頭往你迎面打來，落在甲板上就散掉
   if(o.slam>0&&s>7){ const n=Math.round((50+90*o.slam)*Math.min(1,(s-7)/10));
-    for(let i=0;i<n;i++){ const sg=Math.random()<.5?-1:1, lx=sg*Math.random()*o.beam*.35, [x,z]=at(lx,o.bow+.5+Math.random()*2.5), up=(4.5+Math.random()*4.5)*(.7+.5*o.slam), fwd=s*(.3+Math.random()*.32), side=sg*(.4+Math.random()*1.8);
-      emit(x,o.water+.4+Math.random()*.6,z,fx*fwd+rx*side,up,fz*fwd+rz*side,1.6+Math.random()*1.1,Math.random()<.45?.35+Math.random()*.4:.1+Math.random()*.15); } }
+    for(let i=0;i<n;i++){ const sg=Math.random()<.5?-1:1, lz0=o.bow+.5+Math.random()*2.5, lx=sg*(hullHalf(o,lz0)+.1), [x,z]=at(lx,lz0), up=(4.5+Math.random()*4.5)*(.7+.5*o.slam), fwd=s*(.3+Math.random()*.32), side=sg*(.4+Math.random()*1.8);
+      emit(x,o.water+.4+Math.random()*.6,z,fx*fwd+rx*side,up,fz*fwd+rz*side,1.6+Math.random()*1.1,Math.random()<.45?.6+Math.random()*.7:.18+Math.random()*.25); } }
   let live=0;
+  const halfAt=lz=>o.beam*Math.min(1,.35+(lz-o.bow)/8);
   const deckAt=lz=>(lz<o.bow+9?(o.deckBow||2.6):(o.deckMain||2.0))+(o.y||0);
   for(let i=0;i<NP;i++){ if(sl[i]<0) continue; sl[i]-=dt; sv[i*3+1]-=9.8*dt; sv[i*3]*=1-dt*.35; sv[i*3+2]*=1-dt*.35; sp[i*3]+=sv[i*3]*dt; sp[i*3+1]+=sv[i*3+1]*dt; sp[i*3+2]+=sv[i*3+2]*dt;
     // 落到船身範圍內、低於甲板：打在甲板上散掉（不會穿過船身）
     const dx=sp[i*3]-o.x, dz=sp[i*3+2]-o.z, lz=-(dx*fx+dz*fz), lx=dx*rx+dz*rz;
-    const onDeck=lz>o.bow&&lz<o.stern&&Math.abs(lx)<o.beam*Math.min(1,.35+(lz-o.bow)/8)&&sp[i*3+1]<deckAt(lz);
+    // 只有往下掉、剛好落到甲板高度的才算打在甲板上（從船邊水面剛甩起來、還在往上飛的不算，否則一出生就被消掉）
+    const onDeck=sv[i*3+1]<0&&lz>o.bow&&lz<o.stern&&Math.abs(lx)<halfAt(lz)&&sp[i*3+1]<deckAt(lz)&&sp[i*3+1]>deckAt(lz)-1.2;
     if(sl[i]<=0||onDeck||sp[i*3+1]<W.swell(sp[i*3],sp[i*3+2],t)-.05) sl[i]=-1; else live++; }
-  pts.visible=live>0; if(live){ pg.attributes.position.needsUpdate=true; pg.attributes.aL.needsUpdate=true; pg.attributes.aS.needsUpdate=true; } }
-return {update,clear,stats:()=>all.map(r=>({n:r.pts.length,vis:r.m.visible,a0:r.al[0],p0:[r.pos[0],r.pos[1],r.pos[2]]}))};
+  pts.visible=live>0; if(live){ pg.attributes.position.needsUpdate=true; pg.attributes.aL.needsUpdate=true; pg.attributes.aS.needsUpdate=true; pg.attributes.aR.needsUpdate=true; } }
+return {update,clear,stats:()=>({ribbons:all.map(r=>({n:r.pts.length,vis:r.m.visible})),spray:sl.reduce((n,v)=>n+(v>=0?1:0),0),px:U.uPx.value,ptsVis:pts.visible})};
 }
 if(typeof module!=='undefined'&&module.exports) module.exports={createBoatWake};
 /* Resident fish remain visible from the normal fishing view, including before casting. */
@@ -7672,7 +7693,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102162708'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102164409'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
