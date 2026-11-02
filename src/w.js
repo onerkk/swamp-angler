@@ -276,21 +276,27 @@ function settle(o,x,y,z,height){
   if(height){o.scale.multiplyScalar(height/Math.max(.001,b.max.y-b.min.y));o.updateMatrixWorld(true);b.setFromObject(o);}
   const center=b.getCenter(new T.Vector3());o.position.add(new T.Vector3(x-center.x,y-b.min.y,z-center.z));o.updateMatrixWorld(true);addObs(o);return new T.Box3().setFromObject(o);
 }
+/* 放在另一件家具上：從上往下打到那件家具真正的表面（不是外框最高點），打不到就放地上。
+   拱形頂的櫃子外框最高點只在中間，以前用外框頂端放東西，靠邊的小物就浮在半空中 */
+function settleOn(o,base,x,z,height){
+  base.updateMatrixWorld(true); const bb=new T.Box3().setFromObject(base);
+  const ray=new T.Raycaster(new T.Vector3(x,bb.max.y+1,z),new T.Vector3(0,-1,0)); const hit=ray.intersectObject(base,true).find(h=>h.face&&h.face.normal.clone().transformDirection(h.object.matrixWorld).y>.7);
+  return settle(o,x,hit?hit.point.y:0,z,height); }
 put('coffee_table_round_01',LV.x+.5,0,LV.z,0,.85,o=>{
   const table=settle(o,LV.x+.5,0,LV.z,.46);
-  put('book_encyclopedia_set_01',0,0,0,.3,.8,k=>{settle(k,LV.x+.72,table.max.y,LV.z+.12,.18);k.userData.furn='shelf';});
-  put('vintage_oil_lamp',0,0,0,0,.8,k=>settle(k,LV.x+.2,table.max.y,LV.z-.2,.3));
+  put('book_encyclopedia_set_01',0,0,0,.3,.8,k=>{settleOn(k,o,LV.x+.72,LV.z+.12,.18);k.userData.furn='shelf';});
+  put('vintage_oil_lamp',0,0,0,0,.8,k=>settleOn(k,o,LV.x+.2,LV.z-.2,.3));
 });
 // Permanent storage and everyday objects keep the room lived in at every upgrade tier.
 put('vintage_cabinet_01',0,0,0,Math.PI,1,o=>{
   const b=settle(o,2.92,0,ROOM.zf-.44,.88);
-  put('potted_plant_01',0,0,0,0,1,k=>settle(k,3.3,b.max.y,ROOM.zf-.42,.46));
-  put('wooden_lantern_01',0,0,0,.2,1,k=>settle(k,2.55,b.max.y,ROOM.zf-.42,.26));
+  put('potted_plant_01',0,0,0,0,1,k=>settle(k,b.min.x-.3,0,ROOM.zf-.38,.62));   /* 盆栽改放櫃子旁的地上 */
+  put('wooden_lantern_01',0,0,0,.2,1,k=>settleOn(k,o,(b.min.x+b.max.x)/2-.12,(b.min.z+b.max.z)/2,.26));
 });
 put('wicker_basket_01',0,0,0,-.2,1,o=>{dropObs(o);homeFitFurniture(T,o,{x:1.65,z:ROOM.zf-.4,w:.4,h:.38,d:.4});addObs(o);});
 put('wooden_crate_01',0,0,0,.16,1,o=>{
   const b=settle(o,-2.75,0,ROOM.zf-.43,.3);
-  put('pot_enamel_01',0,0,0,.2,1,k=>settle(k,-2.75,b.max.y,ROOM.zf-.43,.18));
+  put('pot_enamel_01',0,0,0,.2,1,k=>settleOn(k,o,-2.75,ROOM.zf-.43,.18));
 });
 // A compact rod rack with reels and individual line guides.
 {

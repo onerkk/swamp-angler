@@ -1,4 +1,4 @@
-/*APPV:20261102180924*/
+/*APPV:20261102183927*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -6880,21 +6880,27 @@ function settle(o,x,y,z,height){
   if(height){o.scale.multiplyScalar(height/Math.max(.001,b.max.y-b.min.y));o.updateMatrixWorld(true);b.setFromObject(o);}
   const center=b.getCenter(new T.Vector3());o.position.add(new T.Vector3(x-center.x,y-b.min.y,z-center.z));o.updateMatrixWorld(true);addObs(o);return new T.Box3().setFromObject(o);
 }
+/* 放在另一件家具上：從上往下打到那件家具真正的表面（不是外框最高點），打不到就放地上。
+   拱形頂的櫃子外框最高點只在中間，以前用外框頂端放東西，靠邊的小物就浮在半空中 */
+function settleOn(o,base,x,z,height){
+  base.updateMatrixWorld(true); const bb=new T.Box3().setFromObject(base);
+  const ray=new T.Raycaster(new T.Vector3(x,bb.max.y+1,z),new T.Vector3(0,-1,0)); const hit=ray.intersectObject(base,true).find(h=>h.face&&h.face.normal.clone().transformDirection(h.object.matrixWorld).y>.7);
+  return settle(o,x,hit?hit.point.y:0,z,height); }
 put('coffee_table_round_01',LV.x+.5,0,LV.z,0,.85,o=>{
   const table=settle(o,LV.x+.5,0,LV.z,.46);
-  put('book_encyclopedia_set_01',0,0,0,.3,.8,k=>{settle(k,LV.x+.72,table.max.y,LV.z+.12,.18);k.userData.furn='shelf';});
-  put('vintage_oil_lamp',0,0,0,0,.8,k=>settle(k,LV.x+.2,table.max.y,LV.z-.2,.3));
+  put('book_encyclopedia_set_01',0,0,0,.3,.8,k=>{settleOn(k,o,LV.x+.72,LV.z+.12,.18);k.userData.furn='shelf';});
+  put('vintage_oil_lamp',0,0,0,0,.8,k=>settleOn(k,o,LV.x+.2,LV.z-.2,.3));
 });
 // Permanent storage and everyday objects keep the room lived in at every upgrade tier.
 put('vintage_cabinet_01',0,0,0,Math.PI,1,o=>{
   const b=settle(o,2.92,0,ROOM.zf-.44,.88);
-  put('potted_plant_01',0,0,0,0,1,k=>settle(k,3.3,b.max.y,ROOM.zf-.42,.46));
-  put('wooden_lantern_01',0,0,0,.2,1,k=>settle(k,2.55,b.max.y,ROOM.zf-.42,.26));
+  put('potted_plant_01',0,0,0,0,1,k=>settle(k,b.min.x-.3,0,ROOM.zf-.38,.62));   /* 盆栽改放櫃子旁的地上 */
+  put('wooden_lantern_01',0,0,0,.2,1,k=>settleOn(k,o,(b.min.x+b.max.x)/2-.12,(b.min.z+b.max.z)/2,.26));
 });
 put('wicker_basket_01',0,0,0,-.2,1,o=>{dropObs(o);homeFitFurniture(T,o,{x:1.65,z:ROOM.zf-.4,w:.4,h:.38,d:.4});addObs(o);});
 put('wooden_crate_01',0,0,0,.16,1,o=>{
   const b=settle(o,-2.75,0,ROOM.zf-.43,.3);
-  put('pot_enamel_01',0,0,0,.2,1,k=>settle(k,-2.75,b.max.y,ROOM.zf-.43,.18));
+  put('pot_enamel_01',0,0,0,.2,1,k=>settleOn(k,o,-2.75,ROOM.zf-.43,.18));
 });
 // A compact rod rack with reels and individual line guides.
 {
@@ -7831,7 +7837,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102180924'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102183927'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9779,6 +9785,8 @@ function fishLowest(g){ const b=new THREE.Box3(), bb=new THREE.Box3(); g.updateM
   g.traverse(o=>{ if(!o.isMesh||o.isSprite||!o.visible||!o.geometry) return; if(!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); b.union(bb); });
   return b.isEmpty()?null:b.min.y; }
 function liftAbove(g){ if(!g||!g.parent) return; g.parent.updateMatrixWorld(true);
+  // 每一幀都從這次起魚的原始展示位置重算（不是在上一幀的結果上再拉）：視角還在往上抬的那幾幀拉近的量，等視角抬好就自動還原
+  if(g.userData.f0fd!==G.fd){ g.userData.f0=g.position.clone(); g.userData.f0fd=G.fd; } g.position.copy(g.userData.f0); g.updateMatrixWorld(true);
   const w=(W.swell?W.swell(g.getWorldPosition(tv4b).x,tv4b.z,G.t):0)+.25, low=fishLowest(g); if(low==null||low>=w) return;
   const p0=g.position.clone(); let lo=.55, hi=1;
   for(let k=0;k<8;k++){ const m=(lo+hi)/2; g.position.copy(p0).multiplyScalar(m); const y=fishLowest(g); if(y!=null&&y>=w) lo=m; else hi=m; }
@@ -10525,7 +10533,11 @@ function update(dt){
   if(G.state!=='idle'&&G.state!=='wait') G.pitchT=0; if(G.look) G.pitchT=G.look.pitch; if(G.netting&&G.state==='land') G.pitchT=(G.stT||0)<1.3?-.12:0;   /* 抄網時低頭看船邊的魚 */ G.pitch=(G.pitch||0)+((G.pitchT||0)-(G.pitch||0))*Math.min(1,dt*5);   // 蓄力、拉魚時視角自動回正
   if(G.scareT>0) G.scareT-=dt; if(G.gShake>0) G.gShake=Math.max(0,G.gShake-dt*.7);
   { const f=G.state==='fight'?G.f:null, want=(f?((f.run?.45:0)+(f.ev&&f.ev.k==='shake'?.6:0)+(f.T>.85?.35:0)):0)+(G.gShake||0); G.shk=(G.shk||0)+(want-(G.shk||0))*Math.min(1,dt*6);
-    const viewPitch=fishingViewPitch(G.state,G.state==='fight'&&G.f?G.f.d:G.castDist,W.player.position.y,G.loc==='sea');
+    let viewPitch=fishingViewPitch(G.state,G.state==='fight'&&G.f?G.f.d:G.castDist,W.player.position.y,G.loc==='sea');
+    // 起魚展示：魚拿在視線正前方略高處。眼睛低（獨木舟、岸邊）又低頭時，大魚會落到水面下。
+    // 把視角抬到剛好讓整條魚在水面上（像把魚舉起來看），魚在畫面上的大小與位置不變
+    if((G.state==='catch'||G.state==='post')&&G.fd&&G.fish){ const D=dispDist(), eye=W.camera.getWorldPosition(tv4b).y, r=(.3+(G.fd.L||.5)*.32-eye)/D, k=Math.hypot(1,.14);
+      if(r>-k){ const need=Math.asin(Math.max(-1,Math.min(1,r/k)))-Math.atan(.14); if(need>viewPitch) viewPitch=Math.min(.35,need); } }
     G.viewPitch=(G.viewPitch??viewPitch)+(viewPitch-(G.viewPitch??viewPitch))*(1-Math.exp(-dt*3));
     W.head.rotation.z=0;W.head.rotation.x=G.viewPitch+(G.pitch||0)+Math.sin(G.t*.5)*.004+Math.sin(G.t*29)*.005*G.shk; W.camera.rotation.z=0; }
   showLightSet(showing);

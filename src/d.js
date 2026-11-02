@@ -411,6 +411,8 @@ function fishLowest(g){ const b=new THREE.Box3(), bb=new THREE.Box3(); g.updateM
   g.traverse(o=>{ if(!o.isMesh||o.isSprite||!o.visible||!o.geometry) return; if(!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); b.union(bb); });
   return b.isEmpty()?null:b.min.y; }
 function liftAbove(g){ if(!g||!g.parent) return; g.parent.updateMatrixWorld(true);
+  // 每一幀都從這次起魚的原始展示位置重算（不是在上一幀的結果上再拉）：視角還在往上抬的那幾幀拉近的量，等視角抬好就自動還原
+  if(g.userData.f0fd!==G.fd){ g.userData.f0=g.position.clone(); g.userData.f0fd=G.fd; } g.position.copy(g.userData.f0); g.updateMatrixWorld(true);
   const w=(W.swell?W.swell(g.getWorldPosition(tv4b).x,tv4b.z,G.t):0)+.25, low=fishLowest(g); if(low==null||low>=w) return;
   const p0=g.position.clone(); let lo=.55, hi=1;
   for(let k=0;k<8;k++){ const m=(lo+hi)/2; g.position.copy(p0).multiplyScalar(m); const y=fishLowest(g); if(y!=null&&y>=w) lo=m; else hi=m; }
@@ -1157,7 +1159,11 @@ function update(dt){
   if(G.state!=='idle'&&G.state!=='wait') G.pitchT=0; if(G.look) G.pitchT=G.look.pitch; if(G.netting&&G.state==='land') G.pitchT=(G.stT||0)<1.3?-.12:0;   /* 抄網時低頭看船邊的魚 */ G.pitch=(G.pitch||0)+((G.pitchT||0)-(G.pitch||0))*Math.min(1,dt*5);   // 蓄力、拉魚時視角自動回正
   if(G.scareT>0) G.scareT-=dt; if(G.gShake>0) G.gShake=Math.max(0,G.gShake-dt*.7);
   { const f=G.state==='fight'?G.f:null, want=(f?((f.run?.45:0)+(f.ev&&f.ev.k==='shake'?.6:0)+(f.T>.85?.35:0)):0)+(G.gShake||0); G.shk=(G.shk||0)+(want-(G.shk||0))*Math.min(1,dt*6);
-    const viewPitch=fishingViewPitch(G.state,G.state==='fight'&&G.f?G.f.d:G.castDist,W.player.position.y,G.loc==='sea');
+    let viewPitch=fishingViewPitch(G.state,G.state==='fight'&&G.f?G.f.d:G.castDist,W.player.position.y,G.loc==='sea');
+    // 起魚展示：魚拿在視線正前方略高處。眼睛低（獨木舟、岸邊）又低頭時，大魚會落到水面下。
+    // 把視角抬到剛好讓整條魚在水面上（像把魚舉起來看），魚在畫面上的大小與位置不變
+    if((G.state==='catch'||G.state==='post')&&G.fd&&G.fish){ const D=dispDist(), eye=W.camera.getWorldPosition(tv4b).y, r=(.3+(G.fd.L||.5)*.32-eye)/D, k=Math.hypot(1,.14);
+      if(r>-k){ const need=Math.asin(Math.max(-1,Math.min(1,r/k)))-Math.atan(.14); if(need>viewPitch) viewPitch=Math.min(.35,need); } }
     G.viewPitch=(G.viewPitch??viewPitch)+(viewPitch-(G.viewPitch??viewPitch))*(1-Math.exp(-dt*3));
     W.head.rotation.z=0;W.head.rotation.x=G.viewPitch+(G.pitch||0)+Math.sin(G.t*.5)*.004+Math.sin(G.t*29)*.005*G.shk; W.camera.rotation.z=0; }
   showLightSet(showing);
