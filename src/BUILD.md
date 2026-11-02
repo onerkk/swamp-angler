@@ -96,3 +96,4 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 垃圾回收根因二：倒影 reflRT 與水下 submerged RT 改用 sRGB 編碼（與螢幕一致），水面著色器取樣後 pow 2.2 還原線性；否則每個材質每幀在兩種輸出編碼間切換，three.js 每幀重算程式鍵值。water.js sampleWaterInto／sampleWaterHeight 不配置物件（swell 用）
 - 水族箱甲殼類：w.js fishObj 對 sp.crust 直接用 MDL.fish 建新骨架（不能 clone），crustInTank 每幀 MDL.poseRig；aquarium.js 量體長略過 userData.crustPart（觸角不算體長）
 - 診斷：近 10 秒長停頓 >1 秒時判定為停頓造成，不再誤判 GPU 瓶頸
+- 泰國蝦咬餌（d.js wait 分支）：計時到時若是 prawn，先進 G.prawnDrag 2.5～5 秒拖餌（G.to 以 0.16m/s 橫移、小水紋），結束才 bite()；拖餌中揚竿＝太早，收線提示

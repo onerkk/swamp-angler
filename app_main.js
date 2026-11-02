@@ -1,4 +1,4 @@
-/*APPV:20261102123410*/
+/*APPV:20261102124313*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -7431,7 +7431,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102123410'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102124313'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9129,7 +9129,7 @@ function landBobber(){
   const landingHit=G.castHit; G.castHit=null;
   if(landingHit){ G.state='wait'; G.to.set(bob.position.x,0,bob.position.z); G.bottom=false; tackleSnag(landingHit,G.from); return; }
   if(G.baitUsed&&G.baitUsed.lure){ G.state='lure'; P.splash(G.to.x,0,G.to.z,10,.4); W.addRipple(G.to.x,G.to.z,.4); Snd.plop(); G.sp=null; G.fd=null; FUN.castTag(G.castDist); LURE.start(G.to,G.baitUsed,(G.angler||G.base)); return; }
-  G.state='wait'; P.splash(G.to.x,0,G.to.z,16,.7); W.addRipple(G.to.x,G.to.z,.55); Snd.plop();
+  G.state='wait'; G.prawnDrag=0; G.prawnDone=false; P.splash(G.to.x,0,G.to.z,16,.7); W.addRipple(G.to.x,G.to.z,.55); Snd.plop();
   // 沉底釣：釣棚調到「深棚」又不是路亞時，鉛墜帶著餌沉到底，不看浮標、改看竿尖；結構區會有掛底風險
   G.bottom=save.depth===2&&!(G.baitUsed&&G.baitUsed.lure)&&G.loc!=='ice'; setTimeout(()=>{ if(G.state==='wait'&&!G.snag) ambStart(); },400); G.snag=false; G.snagMv=0; G.snagFlip=0; G.snagOnce=false;
   if(G.bottom&&!save.bottomTip){ save.bottomTip=1; persist(); setTimeout(()=>toast('🎣 沉底釣：沒有浮標，看竿尖——輕抖是試咬，竿尖被拉彎才揚竿','',3600),600); }
@@ -9420,7 +9420,7 @@ function actDown(){
     case 'lure': LURE.press(); break;
     case 'fight': if(G.f&&G.f.netOn){ G.f.netGo=true;G.held=false;ui.act.classList.remove('held'); } break;
     case 'wait': if(G.snag){ break; }
-      startRetrieve(G.dip>0?'太早了：剛剛只是魚在試咬，要等浮標整個沉下去再揚竿':'收線','warn'); break;
+      startRetrieve(G.prawnDrag>0?'太早了：蝦還抱著餌在走，等浮標停下來、輕輕往下沉再揚竿':G.dip>0?'太早了：剛剛只是魚在試咬，要等浮標整個沉下去再揚竿':'收線','warn'); break;
     case 'bite': { const r=FUN.hookPress(); if(r==='miss') missBite(); else hook(r==='perfect'); } break;
   }
 }
@@ -9900,7 +9900,9 @@ function update(dt){
     if(st==='wait'){
       G.timer-=dt; if(G.dip>0) G.dip-=dt;
       if(G.noBait) G.timer=99;
-if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else bite(); }
+      // 泰國蝦咬餌：先用螯抱住餌拖著走（浮標橫向慢慢移動），停下來開始吃才真正咬住；拖著走的時候揚竿只會拉到空鉤
+      if(G.prawnDrag>0){ G.prawnDrag-=dt; const k=.16*dt; G.to.x+=G.dragDir.x*k; G.to.z+=G.dragDir.z*k; G.dragRip=(G.dragRip||0)-dt; if(G.dragRip<=0){ G.dragRip=.45; W.addRipple(G.to.x,G.to.z,.08); } if(G.prawnDrag<=0){ G.prawnDrag=0; bite(); } }
+      else if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else { if(!G.fd) prepFish(); if(G.fd&&G.fd.sp.id==='prawn'&&!G.prawnDone){ G.prawnDone=true; G.prawnDrag=rand(2.5,5); G.timer=99; const a=Math.random()*6.283; G.dragDir={x:Math.cos(a),z:Math.sin(a)}; W.addRipple(G.to.x,G.to.z,.15); Snd.nibble(); vib(10); } else bite(); } }
       if(G.state==='wait'&&G.nib===0&&G.timer<3&&!G.fd){ prepFish(); if(!G.fd.item&&(save.uw!==false||G.fd.sp.special==='mermaid')) enterUW(); }
       if(UW.active()&&G.state==='wait') UW.setProgress(1-G.timer/3);
       if(G.fd&&G.state==='wait'){ G.bubT=(G.bubT||0)-dt; if(G.bubT<=0){ G.bubT=rand(.25,.7); W.addRipple(G.to.x+rand(-.3,.3),G.to.z+rand(-.3,.3),.05); P.splash(G.to.x+rand(-.25,.25),0,G.to.z+rand(-.25,.25),1,.15); } }
