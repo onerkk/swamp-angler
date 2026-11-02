@@ -1,4 +1,4 @@
-/*APPV:20261102204635*/
+/*APPV:20261102232636*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -903,11 +903,11 @@ function createGodRays({renderer:R,camera,U}){
   const T=THREE, size=new T.Vector2(), sun=new T.Vector3(), ndc=new T.Vector3(), fwd=new T.Vector3();
   let copyTex=null, rt=null, cw=0, ch=0;
   const quadGeo=new T.PlaneGeometry(2,2), oc=new T.OrthographicCamera(-1,1,1,-1,0,1);
-  const u={tSrc:{value:null},tRays:{value:null},uSun:{value:new T.Vector2(.5,.5)},uAspect:{value:1},uStrength:{value:0},uCol:{value:new T.Color(1,.9,.7)},uThresh:{value:.72},uDither:{value:0}};
+  const u={tSrc:{value:null},tRays:{value:null},uSun:{value:new T.Vector2(.5,.5)},uAspect:{value:1},uStrength:{value:0},uCol:{value:new T.Color(1,.9,.7)},uThresh:{value:.72},uDither:{value:0},uHorizon:{value:-1}};
   const VS='varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0); }';
   // 第一步：沿著往光源的方向取樣，累加亮天空（亮度超過門檻的部分）
   const marchMat=new T.ShaderMaterial({uniforms:u,vertexShader:VS,depthTest:false,depthWrite:false,fragmentShader:`
-    uniform sampler2D tSrc; uniform vec2 uSun; uniform float uAspect, uThresh, uDither; varying vec2 vUv;
+    uniform sampler2D tSrc; uniform vec2 uSun; uniform float uAspect, uThresh, uDither, uHorizon; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
     void main(){
       vec2 toSun=uSun-vUv; float span=length(toSun*vec2(uAspect,1.0));
@@ -916,14 +916,14 @@ function createGodRays({renderer:R,camera,U}){
       vec2 p=vUv+st*fract(h(gl_FragCoord.xy)+uDither);
       float sum=0.0, w=1.0;
       for(int i=0;i<40;i++){ p+=st; vec3 c=texture2D(tSrc,clamp(p,.001,.999)).rgb; float l=dot(c,vec3(.299,.587,.114));
-        float open=smoothstep(uThresh,uThresh+.18,l);
+        float open=smoothstep(uThresh,uThresh+.18,l)*smoothstep(uHorizon,uHorizon+.03,p.y);
         float off=length((p-uSun)*vec2(uAspect,1.0));
-        sum+=open*exp(-off*4.0)*w; w*=.975; }
+        sum+=open*exp(-off*5.0)*w; w*=.97; }
       gl_FragColor=vec4(vec3(sum/40.0),1.0); }`});
   // 第二步：以加色疊回畫面，顏色是當下太陽／月亮的光色
   const addMat=new T.ShaderMaterial({uniforms:u,vertexShader:VS,depthTest:false,depthWrite:false,transparent:true,blending:T.AdditiveBlending,fragmentShader:`
     uniform sampler2D tRays; uniform float uStrength; uniform vec3 uCol; varying vec2 vUv;
-    void main(){ float r=texture2D(tRays,vUv).r; gl_FragColor=vec4(uCol*r*uStrength,1.0); }`});
+    void main(){ float r=texture2D(tRays,vUv).r; gl_FragColor=vec4(uCol*min(r*uStrength,.3),1.0); }`});
   const marchScene=new T.Scene(), addScene=new T.Scene();
   const m1=new T.Mesh(quadGeo,marchMat), m2=new T.Mesh(quadGeo,addMat); m1.frustumCulled=m2.frustumCulled=false; marchScene.add(m1); addScene.add(m2);
   let frame=0;
@@ -932,16 +932,17 @@ function createGodRays({renderer:R,camera,U}){
       if(rt) rt.dispose(); rt=new T.WebGLRenderTarget(Math.max(8,w>>2),Math.max(8,h>>2),{minFilter:T.LinearFilter,magFilter:T.LinearFilter,depthBuffer:false}); } }
   /* 主畫面畫完之後呼叫。o.strength 0 就不畫 */
   function render(o){
-    const strength=o&&o.strength||0; if(strength<=.002) return false;
-    // 光源在螢幕上的位置；在身後或離畫面太遠就淡掉
-    camera.getWorldPosition(sun); camera.getWorldDirection(fwd); const dir=o.dir; if(fwd.dot(dir)<.05) return false;
-    ndc.copy(sun).addScaledVector(dir,1000).project(camera); const sx=ndc.x*.5+.5, sy=ndc.y*.5+.5;
+    const strength=o&&o.strength||0; if(strength<=.002) return false; const cam=o.camera||camera;
+    // 光源在螢幕上的位置：太陽月亮用方向（無限遠），小屋窗戶用位置；在身後或離畫面太遠就淡掉
+    cam.getWorldPosition(sun); cam.getWorldDirection(fwd); const dir=o.point?ndc.copy(o.point).sub(sun).normalize().clone():o.dir; if(fwd.dot(dir)<.05) return false;
+    if(o.point) ndc.copy(o.point).project(cam); else ndc.copy(sun).addScaledVector(dir,1000).project(cam); const sx=ndc.x*.5+.5, sy=ndc.y*.5+.5;
     const edge=Math.max(Math.abs(ndc.x),Math.abs(ndc.y)), fade=1-Math.min(1,Math.max(0,(edge-1.1)/.9));
     if(fade<=0) return false;
     ensure(); R.getDrawingBufferSize(size);
     const prevRT=R.getRenderTarget(), ac=R.autoClear, tone=R.toneMapping, enc=R.outputEncoding;
     try{
       R.copyFramebufferToTexture(new T.Vector2(0,0),copyTex);
+      if(o.point) u.uHorizon.value=-1; else { const hz=ndc.clone(); fwd.y=0; if(fwd.lengthSq()>1e-6){ fwd.normalize(); hz.copy(sun).addScaledVector(fwd,2000).project(cam); u.uHorizon.value=hz.y*.5+.5; } else u.uHorizon.value=-1; }
       u.tSrc.value=copyTex; u.uSun.value.set(sx,sy); u.uAspect.value=size.x/size.y; u.uThresh.value=o.thresh||.72; u.uDither.value=(frame++%8)/8;
       R.toneMapping=T.NoToneMapping; R.outputEncoding=T.LinearEncoding;
       R.setRenderTarget(rt); R.autoClear=true; R.render(marchScene,oc);
@@ -2009,8 +2010,9 @@ const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
 const godRays=createGodRays({renderer,camera,U}), _grCol=new T.Color(), _grDir=new T.Vector3();
 /* 光束的強度：白天看太陽高度（晨昏最明顯、正午很淡）、雲量；夜裡改用月光，弱很多。只在高畫質畫 */
-function raysParams(){ if(materialQuality.tier!=='high'||window.__noRays) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
-  if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); return {dir:_grDir,color:_grCol,strength:Math.min(1.6,vis*(.4+.6*low)*2.4),thresh:.5}; }
+function raysOn(){ return materialQuality.tier==='high'&&!window.__noRays; }
+function raysParams(){ if(!raysOn()) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
+  if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); return {dir:_grDir,color:_grCol,strength:Math.min(1.1,vis*(.12+.88*low*low)*1.4),thresh:.55}; }
   const mk=U.uMoonK?U.uMoonK.value:0; if(mk>.05&&U.uMoonDir){ _grDir.copy(U.uMoonDir.value).normalize(); _grCol.setRGB(.62,.72,.95); return {dir:_grDir,color:_grCol,strength:mk*.45,thresh:.16}; }
   return null; }
 const radiance=createSceneRadiance(T,renderer,prepareScene),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
@@ -2041,7 +2043,7 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { setEffects,prepareScene,updateEnvironment,resetGraphics,suspendEffects,invalidateEnvironment,interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { godRays,raysOn,setEffects,prepareScene,updateEnvironment,resetGraphics,suspendEffects,invalidateEnvironment,interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
 /* ===== 美人魚的骨架與表情（依新設定圖生成的模型，載入後在執行時自動加骨架）=====
    骨架：臀→腰→胸→頸→頭；左右肩→上臂→前臂→手；尾巴 6 節＋尾鰭；頭髮 3 節
@@ -6962,7 +6964,7 @@ for(const x of [-ROOM.x+.08,ROOM.x-.08]) for(const z of [ROOM.zb+.08,ROOM.zf-.08
 const trimM=new T.MeshStandardMaterial({color:0x5a3e28,roughness:.7});
 box(RW,.12,.03,trimM,0,.06,ROOM.zb+.015); box(.03,.12,RD,trimM,-ROOM.x+.015,.06,cz); box(.03,.12,RD,trimM,ROOM.x-.015,.06,cz);
 // 窗戶（左牆）：窗外是真實湖景全景，依時段換成白天／黃昏／夜晚
-const WIN={w:1.6,h:1.1,y:1.55,z:.5}, WINROT=+(new URLSearchParams(location.search).get('winrot')||1.2), winTex={}; ['day','dawn','night'].forEach(k=>{ const x=TL.load('env_'+k+'_band.jpg'); x.encoding=T.sRGBEncoding; winTex[k]=x; });
+const WIN={w:1.6,h:1.1,y:1.55,z:.5}, winPt=new T.Vector3(-ROOM.x,1.55,.5), winRayCol=new T.Color(1,.88,.68), WINROT=+(new URLSearchParams(location.search).get('winrot')||1.2), winTex={}; ['day','dawn','night'].forEach(k=>{ const x=TL.load('env_'+k+'_band.jpg'); x.encoding=T.sRGBEncoding; winTex[k]=x; });
 const viewM=new T.MeshBasicMaterial({map:winTex.day,side:T.BackSide,fog:false});
 // 窗外：把湖景全景貼在房子外面一圈 60 公尺遠的大圓筒內側（比例與實景一致、遠近有視差），原本是一張貼在窗後 60 公分的平面照片，又近又被壓扁
 const rainGlass=(()=>{ const cv=document.createElement('canvas'); cv.width=256; cv.height=192; const g=cv.getContext('2d'), tex=new T.CanvasTexture(cv), drops=[];
@@ -7755,6 +7757,8 @@ function render(dt){t+=dt;if(W.prepareScene)W.prepareScene(scene);if(window.__ef
   try{
     R.shadowMap.autoUpdate=false;R.shadowMap.needsUpdate=t-lastHomeShadow>=1/(window.__effectBudget?.shadowHz||20)||!sun.shadow.map;if(R.shadowMap.needsUpdate)lastHomeShadow=t;R.toneMappingExposure=.88;R.shadowMap.enabled=true;R.shadowMap.type=T.PCFSoftShadowMap;
     R.setRenderTarget(null);W.radiance.render(scene,cam);
+    // 白天陽光從左牆窗戶斜射進來：畫面裡看得到窗戶時，從窗口拉出光柱（跟著時段變亮變暗；關燈時更明顯）
+    if(W.godRays&&W.raysOn&&W.raysOn()){ const dl=daylight(); if(dl>.05){ try{ W.godRays.render({camera:cam,point:winPt,color:winRayCol,strength:dl*(lightsOff()?.9:.6),thresh:.45}); }catch(e){ window.__noRays=true; } } }
   }finally{R.toneMappingExposure=exposure;R.shadowMap.enabled=shadows;R.shadowMap.type=shadowType;R.shadowMap.autoUpdate=shadowAuto;R.shadowMap.needsUpdate=shadowRequest;}
 }
 window.addEventListener('resize',()=>{ if(on) resize(); });
@@ -8080,7 +8084,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102204635'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102232636'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

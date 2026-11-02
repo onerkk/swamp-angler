@@ -138,7 +138,7 @@ for(const x of [-ROOM.x+.08,ROOM.x-.08]) for(const z of [ROOM.zb+.08,ROOM.zf-.08
 const trimM=new T.MeshStandardMaterial({color:0x5a3e28,roughness:.7});
 box(RW,.12,.03,trimM,0,.06,ROOM.zb+.015); box(.03,.12,RD,trimM,-ROOM.x+.015,.06,cz); box(.03,.12,RD,trimM,ROOM.x-.015,.06,cz);
 // 窗戶（左牆）：窗外是真實湖景全景，依時段換成白天／黃昏／夜晚
-const WIN={w:1.6,h:1.1,y:1.55,z:.5}, WINROT=+(new URLSearchParams(location.search).get('winrot')||1.2), winTex={}; ['day','dawn','night'].forEach(k=>{ const x=TL.load('env_'+k+'_band.jpg'); x.encoding=T.sRGBEncoding; winTex[k]=x; });
+const WIN={w:1.6,h:1.1,y:1.55,z:.5}, winPt=new T.Vector3(-ROOM.x,1.55,.5), winRayCol=new T.Color(1,.88,.68), WINROT=+(new URLSearchParams(location.search).get('winrot')||1.2), winTex={}; ['day','dawn','night'].forEach(k=>{ const x=TL.load('env_'+k+'_band.jpg'); x.encoding=T.sRGBEncoding; winTex[k]=x; });
 const viewM=new T.MeshBasicMaterial({map:winTex.day,side:T.BackSide,fog:false});
 // 窗外：把湖景全景貼在房子外面一圈 60 公尺遠的大圓筒內側（比例與實景一致、遠近有視差），原本是一張貼在窗後 60 公分的平面照片，又近又被壓扁
 const rainGlass=(()=>{ const cv=document.createElement('canvas'); cv.width=256; cv.height=192; const g=cv.getContext('2d'), tex=new T.CanvasTexture(cv), drops=[];
@@ -931,6 +931,8 @@ function render(dt){t+=dt;if(W.prepareScene)W.prepareScene(scene);if(window.__ef
   try{
     R.shadowMap.autoUpdate=false;R.shadowMap.needsUpdate=t-lastHomeShadow>=1/(window.__effectBudget?.shadowHz||20)||!sun.shadow.map;if(R.shadowMap.needsUpdate)lastHomeShadow=t;R.toneMappingExposure=.88;R.shadowMap.enabled=true;R.shadowMap.type=T.PCFSoftShadowMap;
     R.setRenderTarget(null);W.radiance.render(scene,cam);
+    // 白天陽光從左牆窗戶斜射進來：畫面裡看得到窗戶時，從窗口拉出光柱（跟著時段變亮變暗；關燈時更明顯）
+    if(W.godRays&&W.raysOn&&W.raysOn()){ const dl=daylight(); if(dl>.05){ try{ W.godRays.render({camera:cam,point:winPt,color:winRayCol,strength:dl*(lightsOff()?.9:.6),thresh:.45}); }catch(e){ window.__noRays=true; } } }
   }finally{R.toneMappingExposure=exposure;R.shadowMap.enabled=shadows;R.shadowMap.type=shadowType;R.shadowMap.autoUpdate=shadowAuto;R.shadowMap.needsUpdate=shadowRequest;}
 }
 window.addEventListener('resize',()=>{ if(on) resize(); });

@@ -716,8 +716,9 @@ const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
 const godRays=createGodRays({renderer,camera,U}), _grCol=new T.Color(), _grDir=new T.Vector3();
 /* 光束的強度：白天看太陽高度（晨昏最明顯、正午很淡）、雲量；夜裡改用月光，弱很多。只在高畫質畫 */
-function raysParams(){ if(materialQuality.tier!=='high'||window.__noRays) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
-  if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); return {dir:_grDir,color:_grCol,strength:Math.min(1.6,vis*(.4+.6*low)*2.4),thresh:.5}; }
+function raysOn(){ return materialQuality.tier==='high'&&!window.__noRays; }
+function raysParams(){ if(!raysOn()) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
+  if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); return {dir:_grDir,color:_grCol,strength:Math.min(1.1,vis*(.12+.88*low*low)*1.4),thresh:.55}; }
   const mk=U.uMoonK?U.uMoonK.value:0; if(mk>.05&&U.uMoonDir){ _grDir.copy(U.uMoonDir.value).normalize(); _grCol.setRGB(.62,.72,.95); return {dir:_grDir,color:_grCol,strength:mk*.45,thresh:.16}; }
   return null; }
 const radiance=createSceneRadiance(T,renderer,prepareScene),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
@@ -748,5 +749,5 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { setEffects,prepareScene,updateEnvironment,resetGraphics,suspendEffects,invalidateEnvironment,interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { godRays,raysOn,setEffects,prepareScene,updateEnvironment,resetGraphics,suspendEffects,invalidateEnvironment,interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
 }
