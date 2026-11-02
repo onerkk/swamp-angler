@@ -714,6 +714,12 @@ function renderRefl(){
 
 const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
+const godRays=createGodRays({renderer,camera,U}), _grCol=new T.Color(), _grDir=new T.Vector3();
+/* 光束的強度：白天看太陽高度（晨昏最明顯、正午很淡）、雲量；夜裡改用月光，弱很多。只在高畫質畫 */
+function raysParams(){ if(materialQuality.tier!=='high'||window.__noRays) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
+  if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); return {dir:_grDir,color:_grCol,strength:vis*(.25+.75*low)*.95,thresh:.7}; }
+  const mk=U.uMoonK?U.uMoonK.value:0; if(mk>.05&&U.uMoonDir){ _grDir.copy(U.uMoonDir.value).normalize(); _grCol.setRGB(.62,.72,.95); return {dir:_grDir,color:_grCol,strength:mk*.45,thresh:.16}; }
+  return null; }
 const radiance=createSceneRadiance(T,renderer,prepareScene),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
 function render(){prepareScene(scene);const oldEnv=scene.environment;if(window.__effectBudget?.environment===false)scene.environment=null;const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
  try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz||20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz;if(renderer.shadowMap.needsUpdate)lastShadow=now;
@@ -721,6 +727,7 @@ function render(){prepareScene(scene);const oldEnv=scene.environment;if(window._
   pass('sub',()=>submerged.render());
   if(reflEnabled){try{pass('refl',renderRefl);}catch(e){reflEnabled=false;WU.uReflOn.value=0;console.warn('refl off',e);}}
   pass('main',()=>radiance.render(scene,camera));
+  { const rp=raysParams(); if(rp){ try{ godRays.render(rp); }catch(e){ window.__noRays=true; console.warn('rays off',e); } } }
   passStats.main.shadow=shadowNow;passStats.main.shadowSize=sunLight.shadow.mapSize.x;passStats.refl.w=reflRT.width;passStats.refl.h=reflRT.height;passStats.sub.w=submerged.target.width;passStats.sub.h=submerged.target.height;passStats.sub.on=WU.uSubmergedOn.value>0;passStats.refl.on=WU.uReflOn.value>0;
  }finally{scene.environment=oldEnv;renderer.shadowMap.autoUpdate=auto;renderer.shadowMap.needsUpdate=request;}
 }
@@ -728,7 +735,7 @@ function render(){prepareScene(scene);const oldEnv=scene.environment;if(window._
 const passStats=window.__passStats={sub:{ms:0,calls:0,tris:0},refl:{ms:0,calls:0,tris:0},main:{ms:0,calls:0,tris:0,shadow:false,shadowSize:0}};
 function pass(name,fn){const info=renderer.info,c0=info.render.calls,t0=info.render.triangles,n0=performance.now();fn();const st=passStats[name];st.ms=+(performance.now()-n0).toFixed(2);st.calls=info.render.calls-c0;st.tris=info.render.triangles-t0;}
 
-function suspendEffects(){releaseSceneGPU(scene);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}lastShadow=-Infinity;reflRT.setSize(4,4);WU.uReflOn.value=0;submerged.target.setSize(4,4);WU.uSubmergedOn.value=0;radiance.release();}
+function suspendEffects(){godRays.release();releaseSceneGPU(scene);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}lastShadow=-Infinity;reflRT.setSize(4,4);WU.uReflOn.value=0;submerged.target.setSize(4,4);WU.uSubmergedOn.value=0;radiance.release();}
 function resetGraphics(){suspendEffects();if(envRT){envRT.dispose();envRT=null;scene.environment=null;}envJobs.reset();invalidateEnvironment();}
 function setIce(on){water.visible=!on;seaGrid.visible=!on;}
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=water.visible; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }
