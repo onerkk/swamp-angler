@@ -549,7 +549,7 @@ function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.i
     }catch(err){ console.error('mount',rec&&rec.id,err); } }); }   // 單一個標本出錯就跳過，不影響其他東西
 const tv=new T.Vector3();
 // 底棲生物：貝類躺在沙上不動（偶爾微微張殼）、竹蟶半埋直立、螃蟹在缸底橫著走、沙蠶在沙上爬、彈塗魚趴著偶爾一跳——不會像魚一樣在水中游
-const BENTHIC={hardclam:'shell',gomphina:'shell',tellin:'shell',razor:'razor',ghostcrab:'crab',fiddler:'crab',hermit:'crab',ragworm:'worm',mudskip:'skip'};
+const BENTHIC={hardclam:'shell',gomphina:'shell',tellin:'shell',razor:'razor',ghostcrab:'crab',fiddler:'crab',hermit:'crab',ragworm:'worm',mudskip:'skip',lobster:'walk',prawn:'walk'};
 function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.rec.L), u=f.uni||{}; f.t=(f.t||0)+dt;
   const floorY=(x,z)=>tk.y+tk.hAt(x,z)-f.body.min.y+.012;
   if(kind==='shell'){ o.position.y=floorY(o.position.x,o.position.z); o.rotation.set(0,f.yaw,0); if(u.uAmp){ u.uAmp.value=Math.max(0,Math.sin(f.t*.25+f.ph))*.12; u.uSwim.value+=dt*.5; } return; }
@@ -558,10 +558,10 @@ function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.re
   f.bt=(f.bt||0)-dt;if(f.bt<=0||!f.path||!f.path.length){tk.motion.plan(f);f.bt=6+Math.random()*6;f.wait=0;}
   const walk=tk.motion.steer(f,tk.motion.direction(f));f.bT=o.position.clone().add(walk);
   if(f.wait>0){ f.wait-=dt; if(u.uAmp) u.uAmp.value=.02; }
-  else { const dx=f.bT.x-o.position.x, dz=f.bT.z-o.position.z, dd=Math.hypot(dx,dz); if(dd>.02){ const sp=(kind==='crab'?.05:kind==='worm'?.015:.03)*Math.min(1,dd*4);
+  else { const dx=f.bT.x-o.position.x, dz=f.bT.z-o.position.z, dd=Math.hypot(dx,dz); if(dd>.02){ const sp=(kind==='crab'?.05:kind==='worm'?.015:kind==='walk'?.035:.03)*Math.min(1,dd*4);
       const head=Math.atan2(-dz,dx); if(kind==='crab'){ const want=head+Math.PI/2; let dy=want-f.yaw; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2; f.yaw+=dy*Math.min(1,dt*1.5); }   // 螃蟹橫著走：身體側面朝前進方向
       else { let dy=head-f.yaw; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2; f.yaw+=dy*Math.min(1,dt*2); }
-      o.position.x+=dx/dd*sp*dt; o.position.z+=dz/dd*sp*dt; if(u.uAmp){ u.uAmp.value=kind==='crab'?.18:kind==='worm'?.15:.06; u.uSwim.value+=dt*(kind==='crab'?10:6); } } }
+      o.position.x+=dx/dd*sp*dt; o.position.z+=dz/dd*sp*dt; if(u.uAmp){ u.uAmp.value=kind==='crab'?.18:kind==='worm'?.15:kind==='walk'?.13:.06; u.uSwim.value+=dt*(kind==='crab'?10:kind==='walk'?7:6); } } }
   let hop=0; if(kind==='skip'){ f.hp=(f.hp||0)-dt; if(f.hp<=0&&Math.random()<dt*.3){ f.hp=.5; } if(f.hp>0) hop=Math.sin((1-f.hp/.5)*Math.PI)*.04; }
   o.position.y=floorY(o.position.x,o.position.z)+hop; o.rotation.set(0,f.yaw,0); }   /* 貼著缸底，不浮在水中 */
 function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;

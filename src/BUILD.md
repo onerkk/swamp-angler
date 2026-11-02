@@ -86,3 +86,5 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 近海礁岩淺海（b.js uReef 分支）：海底深度依雜訊 1.8～8m 變化（沙洲碧綠、溝槽轉藍），白沙細沙紋，晴天光紋加強 1.45 倍，散射色依深度從碧綠到藍
 - 水族箱水草（aquarium-display.js setDetail）：房間看用 lod 中間版（fern 71%、grass 46%、nettle 35%），tankview 近看換回原檔；lod.js variant(geo,'mid'|'far'|'full')，LOD 掃描排除 InstancedMesh。搏魚時收線且魚沒衝刺，魚頭慢慢轉向船（f.headY）
 - 2026-11-02 新魚種：海雞母 maori、河豚 puffer（noSell）在近海礁岩；變身苦 scat、大眼海鰱 tarpon、星點臭肚 rabbit 在月光灣潟湖（water:'sea'）。模型 bake_planar 側面＋俯視流程，prep 腳本 src/fish6/sea2/prep.py
+- 甲殼類骨架 crust.js：龍蝦 lobster、泰國蝦 prawn（m.js SWIMK 模式），身體 models/crust_*.glb 掛在脊椎骨；步足三節（髖轉向、髖抬、膝、踝）、蝦螯三節＋兩指開合、分節觸角、游泳足；poseCrust 依 uSwim（步態）與 uAmp（用力）擺動，用力時每 1～2.4 秒腹部猛捲彈尾。顏色用 lin() 轉線性色。水族箱 BENTHIC 'walk' 沿缸底走
+- 飛扁＝棘鰆 wahoo（遠洋深藍）；龍蝦（礁岩夜間）、泰國蝦（木碼頭、倒木區）

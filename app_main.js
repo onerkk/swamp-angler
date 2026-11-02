@@ -1,4 +1,4 @@
-/*APPV:20261102105251*/
+/*APPV:20261102112734*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -93,6 +93,92 @@ function instanceCopies(T,template,matrices){
  return out;
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={mergeMeshesByMaterial,instanceCopies};
+/* 龍蝦與泰國蝦的骨架零件
+   身體由 AI 依玩家設定圖生成（頭在 +X、身長 1、背朝 +Y、左側 +Z），腳、螯、觸角、游泳足用程式做成分節零件，
+   每一節都掛在自己的關節上，關節再掛在脊椎骨上，所以身體彎、腳也跟著動。
+   動作依真實習性：
+   - 龍蝦：五對步足波浪式交替走路；粗觸角緩慢掃動探路；受驚或被釣住時腹部猛力往內捲，整隻往後彈射（龍蝦的招牌逃跑方式）
+   - 泰國蝦：細步足走路、長螯往前伸著探路並開合；腹部下方的游泳足持續划水；受驚時尾巴一彈往後退 */
+const CRUST={
+ lobster:{legs:5,leg:[.16,.17,.1],legR:.018,legX:[.4,.33,.26,.19,.12],claw:null,
+   ant:{n:10,len:1.25,r0:.019,r1:.003,yaw:.38,pitch:.28,c0:[200,92,70],c1:[70,36,26],x:.46,z:.36},
+   antl:{n:6,len:.42,r0:.007,r1:.0025,yaw:.14,pitch:.22,band:true,x:.47,z:.12},
+   swim:[-.12,-.2,-.28,-.35],swimC:'#d8c8a0',flip:.36},
+ prawn:{legs:4,leg:[.12,.13,.07],legR:.009,legX:[.33,.27,.21,.15],
+   claw:{x:.4,seg:[.24,.22,.22],fing:.15,r:.015,yaw:.22,pitch:-.08},
+   ant:{n:12,len:1.5,r0:.005,r1:.0012,yaw:.42,pitch:.2,c0:[220,150,60],c1:[200,120,40],x:.47,z:.18},
+   antl:{n:8,len:.75,r0:.004,r1:.0012,yaw:.18,pitch:.24,c0:[120,150,200],c1:[200,170,120],x:.48,z:.06},
+   swim:[-.06,-.13,-.2,-.27,-.34],swimC:'#c8d4d8',flip:.3}};
+function crustBandTex(T,kind,tip){
+ const cv=document.createElement('canvas'); cv.width=8; cv.height=128; const x=cv.getContext('2d');
+ if(kind==='lobster'){ x.fillStyle='#efe3bf'; x.fillRect(0,0,8,128); x.fillStyle='#1c1a18'; for(const y of [14,58,100]) x.fillRect(0,y,8,22); }
+ else { const g=x.createLinearGradient(0,0,0,128); g.addColorStop(0,'#c9d6e6'); g.addColorStop(.5,'#e4ecf2'); g.addColorStop(1,'#9fb6d6'); x.fillStyle=g; x.fillRect(0,0,8,128); x.fillStyle='rgba(90,130,190,.55)'; x.fillRect(0,0,8,10); x.fillRect(0,118,8,10); }
+ if(tip){ const g=x.createLinearGradient(0,0,0,128); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(.45,'rgba(232,140,40,.4)'); g.addColorStop(1,'rgba(232,140,40,1)'); x.fillStyle=g; x.fillRect(0,0,8,128); }
+ const t=new T.CanvasTexture(cv); t.encoding=T.sRGBEncoding; return t;
+}
+// 一節：圓錐柱，從關節沿 +X 長出去
+// 顏色都是照片上的 sRGB 值，r128 不會自動轉換，要轉成線性色才不會畫出來發白
+function lin(T,c){ return new T.Color(c).convertSRGBToLinear(); }
+function crustSeg(T,len,r0,r1,mat,rad){ const g=new T.CylinderGeometry(r1,r0,len,rad||8,1); g.rotateZ(-Math.PI/2); g.translate(len/2,0,0); const m=new T.Mesh(g,mat); m.castShadow=true; m.frustumCulled=false; return m; }
+function crustJoint(T,parent,x,y,z){ const j=new T.Object3D(); j.position.set(x,y,z); parent.add(j); return j; }
+function crustMeasure(grp){ const M={wzC:0,yBotC:0,yTopC:0,wzA:0,yBotA:0};
+ grp.traverse(m=>{ if(!m.isMesh) return; const P=m.geometry.attributes.position; for(let i=0;i<P.count;i++){ const x=P.getX(i), y=P.getY(i), z=Math.abs(P.getZ(i));
+   if(x>.1&&x<.42){ M.wzC=Math.max(M.wzC,z); M.yBotC=Math.min(M.yBotC,y); M.yTopC=Math.max(M.yTopC,y); }
+   if(x<-.04&&x>-.4){ M.wzA=Math.max(M.wzA,z); M.yBotA=Math.min(M.yBotA,y); } } });
+ return M; }
+function boneAt(bones,BX,x){ let k=0; while(k<BX.length-1&&x<BX[k+1]) k++; return bones[k]; }
+function attachAt(T,bone,grp,x,y,z){ grp.updateMatrixWorld(true); const v=new T.Vector3(x,y,z); grp.localToWorld(v); bone.worldToLocal(v); return crustJoint(T,bone,v.x,v.y,v.z); }
+// 一條分節的觸角：每節一個關節，可以整條彎、末端擺得比根部大
+function crustAntenna(T,base,cfg,side,tex){ const segs=[]; let par=base; const L=cfg.len/cfg.n;
+ for(let i=0;i<cfg.n;i++){ const f=i/cfg.n, r0=cfg.r0+(cfg.r1-cfg.r0)*f, r1=cfg.r0+(cfg.r1-cfg.r0)*(i+1)/cfg.n;
+   const col=cfg.c0?lin(T,`rgb(${Math.round(cfg.c0[0]+(cfg.c1[0]-cfg.c0[0])*f)},${Math.round(cfg.c0[1]+(cfg.c1[1]-cfg.c0[1])*f)},${Math.round(cfg.c0[2]+(cfg.c1[2]-cfg.c0[2])*f)})`):new T.Color(1,1,1);
+   const mat=new T.MeshStandardMaterial({color:col,map:cfg.band?tex:null,roughness:.55,metalness:0});
+   const j=i===0?par:crustJoint(T,par,L,0,0); j.add(crustSeg(T,L,r0,r1,mat,6)); segs.push(j); par=j; }
+ return segs; }
+function buildCrust(T,r,kind){ const C=CRUST[kind], grp=r.grp, bones=r.bones, BX=r.BX, M=crustMeasure(grp), P={kind,legs:[],claws:[],ant:[],swim:[],flip:{t:9,next:2+Math.random()*3},C};
+ const legTex=crustBandTex(T,kind,false), tipTex=crustBandTex(T,kind,true);
+ const legMat=new T.MeshStandardMaterial({map:legTex,roughness:.5,metalness:0}), tipMat=new T.MeshStandardMaterial({map:tipTex,roughness:.5,metalness:0});
+ const zA=Math.max(M.wzC*.82,.03), yA=M.yBotC*.55;
+ // 步足：三節（大腿、小腿、腳尖），前面的腳往前張、後面的往後張
+ C.legX.forEach((x,i)=>{ for(const s of [1,-1]){ const b=boneAt(bones,BX,x), hip=attachAt(T,b,grp,x,yA,s*zA), fan=(.55-i/(C.legs-1||1)*1.1);
+   const yaw=crustJoint(T,hip,0,0,0); yaw.rotation.y=s>0?-Math.PI/2+fan:Math.PI/2-fan; const pit=crustJoint(T,yaw,0,0,0); pit.rotation.z=.4;
+   pit.add(crustSeg(T,C.leg[0],C.legR,C.legR*.85,legMat)); const knee=crustJoint(T,pit,C.leg[0],0,0); knee.rotation.z=-1.3;
+   knee.add(crustSeg(T,C.leg[1],C.legR*.85,C.legR*.6,legMat)); const ank=crustJoint(T,knee,C.leg[1],0,0); ank.rotation.z=-.35;
+   ank.add(crustSeg(T,C.leg[2],C.legR*.6,C.legR*.15,tipMat)); P.legs.push({i,s,yaw,pit,knee,ank,yaw0:yaw.rotation.y,pit0:.4,knee0:-1.3}); } });
+ // 泰國蝦的長螯：三節藍色帶刺的螯臂，末端兩根可以開合的指
+ if(C.claw){ const K=C.claw, armMat=new T.MeshStandardMaterial({color:lin(T,0x2f58c8),roughness:.38,metalness:.05}), jointMat=new T.MeshStandardMaterial({color:lin(T,0xe08a30),roughness:.5}), fingMat=new T.MeshStandardMaterial({color:lin(T,0x1a2a64),roughness:.4});
+   for(const s of [1,-1]){ const b=boneAt(bones,BX,K.x), sh=attachAt(T,b,grp,K.x,yA*.6,s*zA*.7); const yaw=crustJoint(T,sh,0,0,0); yaw.rotation.y=s*-K.yaw; const pit=crustJoint(T,yaw,0,0,0); pit.rotation.z=K.pitch;
+     let par=pit; const js=[];
+     K.seg.forEach((L,n)=>{ const j=n===0?par:crustJoint(T,par,K.seg[n-1],0,0); if(n>0){ const knob=new T.Mesh(new T.SphereGeometry(K.r*1.15,8,6),jointMat); j.add(knob); j.rotation.y=s*-.08; } j.add(crustSeg(T,L,K.r*(n===2?1.25:1),K.r*(n===2?1.1:.9),armMat)); js.push(j); par=j; });
+     const tipJ=crustJoint(T,par,K.seg[2],0,0), f1=crustJoint(T,tipJ,0,0,0), f2=crustJoint(T,tipJ,0,0,0);
+     f1.add(crustSeg(T,K.fing,K.r*.8,K.r*.15,fingMat)); f2.add(crustSeg(T,K.fing,K.r*.8,K.r*.15,fingMat));
+     P.claws.push({s,yaw,pit,js,f1,f2,yaw0:yaw.rotation.y,pit0:K.pitch}); } }
+ // 觸角：粗觸角（龍蝦）／長觸角（蝦），加上一對細的小觸角
+ for(const cfg of [C.ant,C.antl]){ for(const s of [1,-1]){ const b=bones[0], base=attachAt(T,b,grp,cfg.x,M.yTopC*.25,s*Math.max(M.wzC*cfg.z,.01));
+   const yaw=crustJoint(T,base,0,0,0); yaw.rotation.y=s*-cfg.yaw; const pit=crustJoint(T,yaw,0,0,0); pit.rotation.z=cfg.pitch;
+   const segs=crustAntenna(T,pit,cfg,s,legTex); P.ant.push({s,yaw,segs,yaw0:yaw.rotation.y,thick:cfg===C.ant,big:kind==='lobster'&&cfg===C.ant}); } }
+ // 游泳足：腹部下方一對對小葉片
+ const swMat=new T.MeshStandardMaterial({color:lin(T,C.swimC),roughness:.6,transparent:true,opacity:.7,side:T.DoubleSide});
+ C.swim.forEach((x,i)=>{ for(const s of [1,-1]){ const b=boneAt(bones,BX,x), j=attachAt(T,b,grp,x,M.yBotA*.9,s*Math.max(M.wzA*.45,.015)); const g=new T.PlaneGeometry(.045,.05); g.translate(0,-.024,0);
+   const m=new T.Mesh(g,swMat); m.frustumCulled=false; j.add(m); P.swim.push({i,j}); } });
+ return P; }
+// 每幀：依 uSwim（步態相位）與 uAmp（用力程度）擺動
+function poseCrust(r,dt){ const P=r.crust, u=r.uni.uSwim.value, a=r.uni.uAmp.value, amp=Math.min(1,.2+a*5), C=P.C;
+ const w=u*1.25;
+ for(const L of P.legs){ const ph=w-L.i*.95+(L.s>0?0:Math.PI), sw=Math.sin(ph), lift=Math.max(0,Math.cos(ph));
+   L.yaw.rotation.y=L.yaw0+L.s*sw*.3*amp; L.pit.rotation.z=L.pit0+lift*.32*amp; L.knee.rotation.z=L.knee0-lift*.25*amp; }
+ // 尾巴彈射：用力時每隔一兩秒猛力捲一次腹部，平常偶爾小彈一下
+ const F=P.flip; F.t+=dt; F.next-=dt;
+ if(F.next<=0){ F.t=0; F.big=a>.17; F.next=F.big?1+Math.random()*1.4:9+Math.random()*12; }
+ const t=F.t, curl=t<.11?t/.11:t<.5?1-(t-.11)/.39:0, flex=curl*(F.big?C.flip:C.flip*.4);
+ for(let i=2;i<r.bones.length;i++) r.bones[i].rotation.z+=flex*(i===2?.5:1);
+ for(const A of P.ant){ const sway=Math.sin(u*.22+A.s*1.3)*(A.big?.16:.1)+Math.sin(u*.9+A.s)*.05*amp-curl*.35;
+   A.yaw.rotation.y=A.yaw0+sway*A.s; A.segs.forEach((j,n)=>{ if(n===0) return; j.rotation.z=-.03-(A.big?.015:.03)*Math.sin(u*.6+n*.5); j.rotation.y=Math.sin(u*.8+n*.6+A.s)*.035*(1+amp); }); }
+ for(const K of P.claws){ const reach=Math.sin(u*.35+K.s)*.12, open=.12+Math.max(0,Math.sin(u*.7+K.s))*.35*amp;
+   K.yaw.rotation.y=K.yaw0+K.s*reach*.5; K.pit.rotation.z=K.pit0+Math.sin(u*.5)*.08*amp+curl*.4; K.f1.rotation.z=open; K.f2.rotation.z=-open*.6; }
+ const paddle=C===CRUST.prawn?.4+a*4:a*3;
+ for(const S of P.swim){ S.j.rotation.z=Math.sin(u*2.6-S.i*.9)*Math.min(.7,.15+paddle*.5); } }
+if(typeof module!=='undefined'&&module.exports) module.exports={CRUST,buildCrust,poseCrust,crustMeasure};
 /* Effect costs are controlled independently from framebuffer resolution. */
 /* 畫質分兩層：tier（高／中／低）決定材質用哪些貼圖與光澤，整段遊戲固定不變，避免著色器重新編譯造成卡頓；
    level（0～7）只調數量、更新頻率與解析度，所有特效在每一級都保留，只是用較省的版本。 */
@@ -2337,6 +2423,10 @@ const SPECIES=[
   sh:{H:.3,W:.07,prof:1.2,eyeT:.84,eye:.034,tail:.2,fork:.2,dorsal:[[-.3,0],[-.25,.14],[.12,.12],[.2,0]],anal:[[-.3,0],[-.25,.1],[-.1,0]]},
   col:{back:'#1a3ad8',flank:'#2a5aff',belly:'#8aa8ff',fin:'#f0d020',eye:'#202020'},pat:{t:'band',k:.8},scale:1,metal:.3,
   f:{pow:.9,spd:1.3,agi:1.3,jump:.05,stam:1,win:1},time:{dawn:.6,day:.15,dusk:.9,night:2},desc:'寶藍色魚身、黑色花紋、黃色尾鰭。尾柄有一對像刀片的硬棘，拿的時候要小心。'},
+ {id:'prawn',spots:['dock','wood'],name:'泰國蝦',sci:'Macrobrachium rosenbergii（羅氏沼蝦）',rar:2,lvl:[10, 40],len:[12, 30],k:24,price:60,crust:true,
+  sh:{H:.12,W:.08,prof:1.3,eyeT:.86,eye:.03,tail:.2,fork:.3,dorsal:[[-.3,0],[-.25,.05],[.15,.05],[.2,0]],anal:[[-.3,0],[-.25,.04],[-.05,0]]},
+  col:{back:'#6a8090',flank:'#9ab0c0',belly:'#e8eef0',fin:'#2f58c8',eye:'#202020'},pat:{t:'band',k:.5},scale:1,metal:.2,
+  f:{pow:.55,spd:.55,agi:1.1,jump:0,stam:.7,win:.85},time:{dawn:1,day:.5,dusk:1.4,night:1.8},desc:'泰國蝦（羅氏沼蝦），兩隻細長的藍色大螯比身體還長。咬餌不會一口吞：先用螯抱住餌慢慢拖走，浮標會一點一點橫移，等牠停下來開始吃才揚竿。太早拉會只抓到空鉤，太晚又被牠吐掉，釣蝦場的老手都在比這個時機。'},
  {id:'scat',spots:['moon'],name:'變身苦',sci:'Scatophagus argus',rar:1,lvl:[14, 36],len:[15, 35],k:24,price:22,tide:true,water:'sea',
   sh:{H:.2,W:.08,prof:1.3,eyeT:.86,eye:.03,tail:.2,fork:.3,dorsal:[[-.3,0],[-.25,.1],[.15,.09],[.2,0]],anal:[[-.3,0],[-.25,.07],[-.05,0]]},
   col:{back:'#6a7040',flank:'#b8b888',belly:'#e8e4d0',fin:'#c8c098',eye:'#c8a030'},pat:{t:'spots',n:30,d:.7,r:.16,k:.85,c:'#2a2418'},scale:1,metal:.3,
@@ -2475,6 +2565,10 @@ const SPECIES=[
   sh:{H:.16,W:.09,prof:1.4,eyeT:.86,eye:.026,tail:.24,fork:.6,dorsal:[[-.15,0],[-.1,.08],[.15,.07],[.2,0]],anal:[[-.3,0],[-.25,.06],[-.05,0]]},
   col:{back:'#3e5250',flank:'#b9c4c4',belly:'#eef2f2',fin:'#5a6464',eye:'#c8a040'},pat:{t:'band',k:.2},scale:1,metal:.3,
   f:{pow:2.0,spd:2.4,agi:1.6,jump:.35,stam:1.6,win:.85},time:{dawn:1.1,day:1.2,dusk:1.3,night:.6},desc:'銀色魚雷般的身體，下顎突出、滿口尖牙。爆發力驚人，咬餌後會猛然衝刺。'},
+ {id:'lobster',loc:'sea',spots:['reef'],name:'龍蝦',sci:'Panulirus ornatus（錦繡龍蝦）',rar:3,lvl:[40, 70],len:[20, 50],k:28,price:280,crust:true,
+  sh:{H:.12,W:.08,prof:1.3,eyeT:.86,eye:.03,tail:.2,fork:.3,dorsal:[[-.3,0],[-.25,.05],[.15,.05],[.2,0]],anal:[[-.3,0],[-.25,.04],[-.05,0]]},
+  col:{back:'#3a7a70',flank:'#5a9a80',belly:'#efe0c0',fin:'#e09040',eye:'#202020'},pat:{t:'spots',n:40,d:.6,r:.1,k:.7,c:'#e08a30'},scale:1,metal:.2,
+  f:{pow:1.7,spd:.5,agi:.8,jump:0,stam:1.5,win:.78},time:{dawn:.6,day:.08,dusk:.9,night:2.2},desc:'錦繡龍蝦，藍綠色的甲殼布滿橘點，腳是黑白相間的條紋，一對粗大帶刺的觸角比身體還長。白天躲在礁洞裡，入夜才出來覓食。上鉤後會用腳死命抓住礁石往洞裡縮，還會突然猛捲尾巴往後彈，一不小心就斷線。'},
  {id:'maori',loc:'sea',spots:['reef'],name:'海雞母',sci:'Lutjanus rivulatus',rar:3,lvl:[42, 68],len:[30, 80],k:17,price:130,
   sh:{H:.2,W:.08,prof:1.3,eyeT:.86,eye:.03,tail:.2,fork:.3,dorsal:[[-.3,0],[-.25,.1],[.15,.09],[.2,0]],anal:[[-.3,0],[-.25,.07],[-.05,0]]},
   col:{back:'#8a5a28',flank:'#c89850',belly:'#e8d8b0',fin:'#e0b020',eye:'#c09020'},pat:{t:'spots',n:40,d:.6,r:.12,k:.7,c:'#3aa0e0'},scale:1,metal:.3,
@@ -2487,6 +2581,10 @@ const SPECIES=[
   sh:{H:.16,W:.09,prof:1.4,eyeT:.86,eye:.026,tail:.24,fork:.6,dorsal:[[-.15,0],[-.1,.08],[.15,.07],[.2,0]],anal:[[-.3,0],[-.25,.06],[-.05,0]]},
   col:{back:'#5a4e38',flank:'#a89a74',belly:'#d8ceb0',fin:'#b08a30',eye:'#806020'},pat:{t:'band',k:.2},scale:1,metal:.3,
   f:{pow:3.0,spd:1.1,agi:.8,jump:0,stam:2.8,win:.8},time:{dawn:1,day:.8,dusk:1.1,night:1.4},desc:'礁岩深處的巨無霸，大嘴一張能吞下整條魚。上鉤後會死命往洞裡鑽，力氣大得嚇人。'},
+ {id:'wahoo',loc:'sea',spots:['blue'],name:'飛扁',sci:'Acanthocybium solandri（棘鰆）',rar:3,lvl:[48, 75],len:[90, 200],k:6,price:28,
+  sh:{H:.12,W:.08,prof:1.3,eyeT:.86,eye:.03,tail:.2,fork:.3,dorsal:[[-.3,0],[-.25,.05],[.15,.05],[.2,0]],anal:[[-.3,0],[-.25,.04],[-.05,0]]},
+  col:{back:'#1a3aa8',flank:'#c8d0dc',belly:'#eef2f6',fin:'#5a6a90',eye:'#202020'},pat:{t:'bars',n:24,k:.7,c:'#2a50d0'},scale:1,metal:.6,
+  f:{pow:2.3,spd:3.1,agi:1.4,jump:.15,stam:1.5,win:.68},time:{dawn:1.4,day:1.1,dusk:1.3,night:.4},desc:'棘鰆，台灣俗稱沙午、竹午。海裡最快的魚之一，中魚的第一波衝刺快得讓捲線器尖叫。嘴裡一排剃刀般的牙齒，常常一口咬斷子線，所以大物釣友都會換鋼絲前導線。'},
  {id:'bigeye',loc:'sea',spots:['blue'],name:'大眼鮪',sci:'Thunnus obesus',rar:3,lvl:[48, 72],len:[100, 230],k:17,price:66,
   sh:{H:.16,W:.09,prof:1.4,eyeT:.86,eye:.026,tail:.24,fork:.6,dorsal:[[-.15,0],[-.1,.08],[.15,.07],[.2,0]],anal:[[-.3,0],[-.25,.06],[-.05,0]]},
   col:{back:'#1a2a5a',flank:'#8090b0',belly:'#eef0f4',fin:'#d0b030',eye:'#202020'},pat:{t:'band',k:.2},scale:1,metal:.3,
@@ -3126,12 +3224,12 @@ const GEAR={
  reel:[{name:'2000 型紡車輪',price:0,lv:1,spd:1.9,drag:1},{name:'3000 型紡車輪',price:1200,lv:3,spd:2.2,drag:.85},
        {name:'4000 型高速輪',price:5000,lv:5,spd:2.6,drag:.7},{name:'碳纖旗艦輪',price:16000,lv:9,spd:3.0,drag:.55}]};
 const BAITS=[
- {id:'worm',name:'蚯蚓',icon:'🪱',price:0,pack:0,lv:1,desc:'什麼魚都吃一點，用不完',aff:{},rare:0,wait:1},
+ {id:'worm',name:'蚯蚓',icon:'🪱',price:0,pack:0,lv:1,desc:'什麼魚都吃一點，用不完',aff:{prawn:1.5},rare:0,wait:1},
  {id:'corn',name:'甜玉米',icon:'🌽',price:60,pack:10,lv:1,desc:'鯉魚、草魚、鯽魚、印度鯪愛吃，咬口快',aff:{reba:2.2,bluegill:1.6,crappie:1.3,crucian:2.2,tilapia:1.8,carp:2.5,grasscarp:2.2,silvercarp:1.2,clarias:.5,mekong:1.5,yperch:.8,whitefish:.8,rabbit:1.8,scat:1.4},rare:-.2,wait:.75},
- {id:'ragworm',name:'沙蠶',icon:'🪱',price:0,pack:0,lv:1,shop:false,desc:'潮間帶挖來的沙蠶，海釣的萬用餌：黑鯛、真鯛、石斑、沙梭都愛',aff:{porgy:2.2,redbream:2,grouper:1.6,grouper2:1.4,knifejaw:1.8,emperor:1.6,wrasse:2,flathead:1.3,cobia:1.2,amber:1.2,maori:1.5,puffer:2.2,scat:1.6,rabbit:.8}},
- {id:'shrimp',name:'活蝦',icon:'🦐',price:180,pack:10,lv:2,desc:'鱖魚、鯰魚、黑鯛、真鯛、江鱈的最愛',aff:{perch:2.2,channel:2,flathead:1.4,clarias:1.8,blackcarp:2,carp:1.2,porgy:2.2,redbream:2,emperor:1.8,burbot:1.8,wrasse:1.2,yperch:1.8,whitefish:1.6,eel:1.6,laketrout:1.2,clownfish:1.6,copperband:1.6,bluetang:1.2,seahorse:1.8,blenny:1.4,angelfish:1.2,maori:2.2,puffer:1.6,scat:1.3,tarpon:1.4},rare:.35,wait:1},
+ {id:'ragworm',name:'沙蠶',icon:'🪱',price:0,pack:0,lv:1,shop:false,desc:'潮間帶挖來的沙蠶，海釣的萬用餌：黑鯛、真鯛、石斑、沙梭都愛',aff:{porgy:2.2,redbream:2,grouper:1.6,grouper2:1.4,knifejaw:1.8,emperor:1.6,wrasse:2,flathead:1.3,cobia:1.2,amber:1.2,maori:1.5,puffer:2.2,scat:1.6,rabbit:.8,lobster:1.6}},
+ {id:'shrimp',name:'活蝦',icon:'🦐',price:180,pack:10,lv:2,desc:'鱖魚、鯰魚、黑鯛、真鯛、江鱈的最愛',aff:{perch:2.2,channel:2,flathead:1.4,clarias:1.8,blackcarp:2,carp:1.2,porgy:2.2,redbream:2,emperor:1.8,burbot:1.8,wrasse:1.2,yperch:1.8,whitefish:1.6,eel:1.6,laketrout:1.2,clownfish:1.6,copperband:1.6,bluetang:1.2,seahorse:1.8,blenny:1.4,angelfish:1.2,maori:2.2,puffer:1.6,scat:1.3,tarpon:1.4,lobster:1.8,prawn:1.4},rare:.35,wait:1},
  {id:'soft',name:'軟蟲路亞',icon:'🐛',price:240,pack:10,lv:3,desc:'專攻黑鱸和弓鰭魚',aff:{lmbass:2.6,smbass:2.6,bowfin:1.5,snakehead:1.8,peacock:1.5,tarpon:2.2},rare:.4,wait:1.05},
- {id:'live',name:'活魚餌',icon:'🐟',price:600,pack:5,lv:5,desc:'小魚幾乎不碰，大型掠食魚才會咬',aff:{flathead:3,gar:3,bowfin:2,channel:1.6,snakehead:2.2,peacock:2.4,arapaima:3,spgar:2,clarias:.6,cobia:2,yellowfin:1.5,sawara:1.5,emperor:1.2,char:1.6,burbot:1.5,bluegill:.2,crappie:.2,reba:.2,crucian:.2,tilapia:.3,eel:2.5,taimen:2.5,laketrout:2,gt:2.2,swordfish:1.8,mekong:.3,yperch:.3,whitefish:.3,threadfin:2},rare:1.0,wait:1.4},
+ {id:'live',name:'活魚餌',icon:'🐟',price:600,pack:5,lv:5,desc:'小魚幾乎不碰，大型掠食魚才會咬',aff:{wahoo:2.4,flathead:3,gar:3,bowfin:2,channel:1.6,snakehead:2.2,peacock:2.4,arapaima:3,spgar:2,clarias:.6,cobia:2,yellowfin:1.5,sawara:1.5,emperor:1.2,char:1.6,burbot:1.5,bluegill:.2,crappie:.2,reba:.2,crucian:.2,tilapia:.3,eel:2.5,taimen:2.5,laketrout:2,gt:2.2,swordfish:1.8,mekong:.3,yperch:.3,whitefish:.3,threadfin:2},rare:1.0,wait:1.4},
  {id:'spoon',lure:'spoon',name:'金屬亮片',icon:'🥄',price:900,pack:15,lv:4,desc:'中速穩定收線，閃光吸引掠食魚（路亞：自己收線操作）',aff:{perch:2,lmbass:1.8,smbass:1.8,amber:1.6,ribbon:2,peacock:1.8,snakehead:1.2,spgar:1.2,sawara:2.2,skipjack:2,yellowfin:1.2,char:1.4,laketrout:1.8,taimen:1.6,yperch:1.2,gt:1.2,threadfin:1.4},rare:.4,wait:1},
  {id:'crank',lure:'crank',name:'曲柄硬餌',icon:'🐠',price:1400,pack:15,lv:6,desc:'快速收線會下潛，黑鱸、金目鱸最愛（需要好捲線器）',aff:{lmbass:2.5,smbass:2.2,barra:2,gar:1.5,grouper:1.5,mahi:1.4,peacock:2.2,spgar:1.2,arapaima:1.2,emperor:1.2,cobia:1.4,gt:1.6,taimen:1.4},rare:.5,wait:1},
  {id:'minnow',lure:'minnow',name:'米諾',icon:'🐟',price:1800,pack:15,lv:8,desc:'抽一下、停一下，模仿受傷小魚，大型掠食魚無法抗拒',aff:{smbass:2.2,barra:2.2,lmbass:1.6,tuna:1.6,mahi:1.8,marlin:1.4,peacock:2.6,snakehead:1.6,spgar:1.6,arapaima:1.5,yellowfin:1.8,sawara:1.6,skipjack:1.4,cobia:1.5,gt:2.4,taimen:2,laketrout:1.6,swordfish:1.2,threadfin:1.6},rare:.6,wait:1},
@@ -4926,19 +5024,19 @@ const RFISH={bluegill:['bluegill','+x'],crappie:['crappie','+z'],lmbass:['lmbass
   clarias:['fish_clarias','+z'],spgar:['fish_spgar','+z'],carp:['fish_carp','+z'],silvercarp:['fish_silvercarp','+z'],grasscarp:['fish_grasscarp','+z'],blackcarp:['fish_blackcarp','+z'],arapaima:['fish_arapaima','+z'],
   char:['fish_char','+z'],burbot:['fish_burbot','+z'],porgy:['fish_porgy','+z'],parrot:['fish_parrot','+z'],redbream:['fish_redbream','+z'],emperor:['fish_emperor','+z'],cobia:['fish_cobia','+z'],hardclam:['fish_hardclam','+z'],gomphina:['fish_gomphina','+z'],tellin:['fish_tellin','+z'],razor:['fish_razor','+z'],ghostcrab:['fish_ghostcrab','+z'],fiddler:['fish_fiddler','+z'],mudskip:['fish_mudskip','+z'],ragworm:['fish_ragworm','+z'],hermit:['fish_hermit','+z'],barracuda:['fish_barracuda','+z'],grouper2:['fish_grouper2','+z'],bigeye:['fish_bigeye','+z'],stingray:['fish_stingray','+z'],amberjack:['fish_amberjack','+z'],knifejaw:['fish_knifejaw','+z'],halibut:['fish_halibut','+z'],sunfish:['fish_sunfish','+z'],wrasse:['fish_wrasse','+z'],skipjack:['fish_skipjack','+z'],sawara:['fish_sawara','+z'],yellowfin:['fish_yellowfin','+z'],
   eel:['fish_eel','+z'],mekong:['fish_mekong','+z'],yperch:['fish_yperch','+z'],whitefish:['fish_whitefish','+z'],laketrout:['fish_laketrout','+z'],taimen:['fish_taimen','+z'],gt:['fish_gt','+z'],swordfish:['fish_swordfish','+z'],
-  clownfish:['fish_clownfish','+z'],bluetang:['fish_bluetang','+z'],blenny:['fish_blenny','+z'],angelfish:['fish_angelfish','+z'],copperband:['fish_copperband','+z'],threadfin:['fish_threadfin','+z'],seabeast:['fish_seabeast','+z'],seahorse:['fish_seahorse','up',{upYaw:Math.PI/2}],
+  clownfish:['fish_clownfish','+z'],bluetang:['fish_bluetang','+z'],blenny:['fish_blenny','+z'],angelfish:['fish_angelfish','+z'],copperband:['fish_copperband','+z'],threadfin:['fish_threadfin','+z'],seabeast:['fish_seabeast','+z'],seahorse:['fish_seahorse','up',{upYaw:Math.PI/2}],lobster:['crust_lobster','+z'],prawn:['crust_prawn','+z'],wahoo:['fish_wahoo','+z'],
   scat:['fish_scat','+z'],tarpon:['fish_tarpon','+z'],maori:['fish_maori','+z'],puffer:['fish_puffer','+z'],rabbit:['fish_rabbit','+z']};
 const RHEAD={gwhite:'+z',tigershark:'+z',dolphin:'+z',whale:'+z',gator:'+x',eagle:'+z',gull:'-x',yacht:'-z',flyfish:'-x'};
 const RSETS={lake:['mermaid_v2','fish_bowfin','fish_reba','fish_mandarin','bluegill','crappie','lmbass','smbass','channel','flathead','gar','barra','koi','gator','eagle'],
   ice:['trout','pike','bluegill','crappie'],
   tide:['fish_hardclam','fish_gomphina','fish_tellin','fish_razor','fish_ghostcrab','fish_fiddler','fish_mudskip','fish_ragworm','fish_hermit'],
-  sea:['mermaid_v2','fish_maori','fish_puffer','fish_amber','fish_barracuda','fish_grouper2','fish_bigeye','fish_stingray','fish_amberjack','fish_knifejaw','fish_halibut','fish_sunfish','fish_mahi','fish_sail','yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','king_v2']};
+  sea:['mermaid_v2','crust_lobster','fish_wahoo','fish_maori','fish_puffer','fish_amber','fish_barracuda','fish_grouper2','fish_bigeye','fish_stingray','fish_amberjack','fish_knifejaw','fish_halibut','fish_sunfish','fish_mahi','fish_sail','yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','king_v2']};
 const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger Shark','ra_in_coat'],['海豚','Bottlenose Dolphin','popcornbag'],['座頭鯨','Humpback Whale','ostapblendercg'],
   ['鱷魚','American Alligator','JeremyGrayson'],['白頭海鵰','Bald Eagle','ucdavisterc'],['海鷗','Seagull','Dayvable'],['遊艇',"Frickie's yacht",'dannzjs'],
   ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
   ['斑點叉尾鮰','Channel catfish','faerbogdan99'],['扁頭鯰','Flathead Catfish','faerbogdan99'],['鱷雀鱔','Alligator Gar','Jay_Tano'],['錦鯉','Koi Fish','7plus'],
   ['石斑','lowpoly freshwater grouper','Arrangemonk9'],['黑鮪魚','Bluefin Tuna','voltairevill'],['旗魚','Blue Marlin','Gotta_go_evi'],['飛魚','Exocoetidae','victorberdug'],
-  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚・弓鰭魚・鯽魚・吳郭魚・線鱧・孔雀鱸・塘蝨・斑點雀鱔・鯉魚・鰱魚・草魚・青魚・巨骨舌魚・北極紅點鮭・江鱈・黑鯛・鸚哥魚・真鯛・青嘴龍占・海鱺・曲紋唇魚・正鰹・土魠・黃鰭鮪・鱸鰻・湄公河巨鯰・黃金鱸・白鮭・湖紅點鮭・哲羅鮭・浪人鰺・劍旗魚・公子小丑魚・擬刺尾鯛・鬚鳚・神仙魚・長吻蝴蝶魚・絲鰺・海馬・神話海馬獸・原木獨木舟・變身苦・大眼海鰱・海雞母・河豚・星點臭肚','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['霜汐（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['滄淵','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
+  ['金目鱸','Barramundi fish','ryan_saputra'],['白帶魚','hairtail fish','lingsound'],['第一人稱雙手','First Person arms','bumstrum'],['虹鱒','Rainbow Trout','ucdavisterc'],['白斑狗魚','Northern Pike','Nullifiedit'],['曲柄硬餌','Fishing lure Chubby 38','Zverev'],['亮片・米諾','Fishing Lures / Fishing Lures #2','xeofox'],['印度鯪・鱖魚・紅甘・鬼頭刀・雨傘旗魚・弓鰭魚・鯽魚・吳郭魚・線鱧・孔雀鱸・塘蝨・斑點雀鱔・鯉魚・鰱魚・草魚・青魚・巨骨舌魚・北極紅點鮭・江鱈・黑鯛・鸚哥魚・真鯛・青嘴龍占・海鱺・曲紋唇魚・正鰹・土魠・黃鰭鮪・鱸鰻・湄公河巨鯰・黃金鱸・白鮭・湖紅點鮭・哲羅鮭・浪人鰺・劍旗魚・公子小丑魚・擬刺尾鯛・鬚鳚・神仙魚・長吻蝴蝶魚・絲鰺・海馬・神話海馬獸・原木獨木舟・變身苦・大眼海鰱・海雞母・河豚・星點臭肚・飛扁（棘鰆）・龍蝦・泰國蝦','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['霜汐（美人魚）','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent'],['滄淵','依玩家設定圖以 Hunyuan3D-2mv 生成（Apache 2.0）','Tencent']];
 
 const GLOW=[];
 const BAKED=new Set(['fish_clownfish','fish_bluetang','fish_blenny','fish_angelfish','fish_copperband','fish_threadfin','fish_seabeast','fish_seahorse','fish_eel','fish_mekong','fish_yperch','fish_whitefish','fish_laketrout','fish_taimen','fish_gt','fish_swordfish','fish_char','fish_burbot','fish_porgy','fish_parrot','fish_redbream','fish_emperor','fish_cobia','fish_wrasse','fish_skipjack','fish_sawara','fish_yellowfin','fish_clarias','fish_spgar','fish_carp','fish_silvercarp','fish_grasscarp','fish_blackcarp','fish_arapaima','fish_crucian','fish_tilapia','fish_snakehead','fish_peacock','fish_reba','fish_mandarin','fish_amber','fish_mahi','fish_sail','fish_bowfin','mermaid_v2','seaking','king_v2']);   // 依設定圖烘焙貼圖的模型
@@ -4960,7 +5058,7 @@ function bendify(m,uni,K){ K=K||1; m.onBeforeCompile=s=>{ s.uniforms.uSwim=uni.u
    每格依 uSwim、uAmp 算出身體波形，換成每節骨頭的轉角。一般魚左右擺尾，扁平的魚（魟、比目魚）上下波動 */
 const FLAT=new Set(['halibut']), FRIGS=new Set();
 // 特殊游法：魟（左右胸鰭像翅膀上下拍動）、翻車魚（上下兩片大鰭左右划水，身體幾乎不擺）
-const SWIMK={stingray:'ray',sunfish:'mola',ghostcrab:'crab',fiddler:'crab',hermit:'crab',hardclam:'stiff',gomphina:'stiff',tellin:'stiff',razor:'stiff'};   // 螃蟹：兩側的腳一起划動；貝類：殼不彎
+const SWIMK={lobster:'lobster',prawn:'prawn',stingray:'ray',sunfish:'mola',ghostcrab:'crab',fiddler:'crab',hermit:'crab',hardclam:'stiff',gomphina:'stiff',tellin:'stiff',razor:'stiff'};   // 螃蟹：兩側的腳一起划動；貝類：殼不彎
 const BX=[.46,.28,.1,-.08,-.25,-.4];
 // 螃蟹、寄居蟹、海瓜子的貼圖在細腳、殼緣會投影到原圖的白色背景：把接近純白的部分挖掉，不再出現一塊塊白色
 const CUTWHITE=new Set(['ghostcrab','fiddler','hermit','tellin','gomphina','hardclam']);
@@ -4989,7 +5087,8 @@ function rigFish(grp,uni,K,mode){ const bones=BX.map(()=>new T.Bone()); bones[0]
     g.setAttribute('skinIndex',new T.Uint16BufferAttribute(si,4)); g.setAttribute('skinWeight',new T.Float32BufferAttribute(sw,4));
     const mats=(Array.isArray(m.material)?m.material:[m.material]); mats.forEach(mm=>{ mm.onBeforeCompile=grp.userData.cutWhite?cutWhite:()=>{}; if(grp.userData.cutWhite){ mm.side=T.DoubleSide; mm.customProgramCacheKey=()=>'cutw'; mm.metalness=0; mm.roughness=.62; mm.envMapIntensity=.4; }   /* 甲殼與貝殼：霧面，不像金屬反光 */ mm.skinning=true; mm.needsUpdate=true; });
     const sm=new T.SkinnedMesh(g,m.material); sm.frustumCulled=false; grp.remove(m); grp.add(sm); grp.updateMatrixWorld(true); sm.bind(skel,new T.Matrix4()); });
-  const r={grp,uni,K:mode==='mola'?K*.25:mode==='ray'?K*.35:mode==='crab'?K*.06:mode==='stiff'?K*.02:K,flat:mode==='flat'||mode==='ray',mode,bones,all,extra,idle:0}; FRIGS.add(r); return r; }
+  const crustK=mode==='lobster'||mode==='prawn';
+  const r={BX,grp,uni,K:crustK?0:mode==='mola'?K*.25:mode==='ray'?K*.35:mode==='crab'?K*.06:mode==='stiff'?K*.02:K,flat:mode==='flat'||mode==='ray',mode,bones,all,extra,idle:0}; if(crustK) r.crust=buildCrust(T,r,mode); FRIGS.add(r); return r; }
 function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.delete(r); return; } r.idle=0;
   const u=r.uni.uSwim.value, A=r.uni.uAmp.value*r.K, off=x=>{ const bx=Math.max(0,Math.min(1.6,.5-x)); return Math.sin(u-x*5.5)*bx*bx*A; };
   let prev=0; for(let i=0;i<r.bones.length;i++){ const x0=BX[i], x1=i<BX.length-1?BX[i+1]:BX[i]-.12, sl=Math.atan2(off(x1)-off(x0),x0-x1), a=sl-prev; prev=sl;
@@ -5002,10 +5101,11 @@ function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.dele
     else { r.all[e.L[0]].rotation.set(a0,0,0); r.all[e.L[1]].rotation.set(a1,0,0); r.all[e.R[0]].rotation.set(-a0,0,0); r.all[e.R[1]].rotation.set(-a1,0,0); } }
   if(e.C!=null){ const wv=(Math.sin(u*.9)>.55)?Math.sin(u*6)*.5:0; r.all[e.C].rotation.set(e.clawSide*wv*.3,0,Math.max(0,wv)*.6); }   // 招潮蟹一陣一陣舉起大螯揮動
   if(r.mode==='stiff'&&e.H!=null){ const gape=Math.max(0,Math.sin(u*.35))*(.05+.25*Math.min(1,r.uni.uAmp.value*4)); r.all[e.H].rotation.set(0,0,gape); }   // 殼慢慢張開一條縫再合上，被挖出來掙扎時開合更大
-  if(r.mode==='mola'){ const a=Math.sin(u*.8)*.55*amp; r.all[e.D].rotation.set(a,0,0); r.all[e.A].rotation.set(a,0,0); } }
+  if(r.mode==='mola'){ const a=Math.sin(u*.8)*.55*amp; r.all[e.D].rotation.set(a,0,0); r.all[e.A].rotation.set(a,0,0); }
+  if(r.crust) poseCrust(r,dt); }
 // 有骨架的魚被複製時（水族箱、標本、烤魚、圖鑑…），複製成不帶骨架的普通網格：直接複製骨架網格會指向原本那副骨頭，畫不出來
-function cloneSafe(grp){ grp.clone=function(){ const g=new T.Group(); this.traverse(ch=>{ if(!ch.isMesh) return; const mats=(Array.isArray(ch.material)?ch.material:[ch.material]).map(m=>{ const k=m.clone(); k.skinning=false; k.onBeforeCompile=()=>{}; k.needsUpdate=true; return k; });
-    const m=new T.Mesh(ch.geometry,Array.isArray(ch.material)?mats:mats[0]); m.frustumCulled=false; g.add(m); }); g.position.copy(this.position); g.quaternion.copy(this.quaternion); g.scale.copy(this.scale); g.visible=this.visible; return g; }; }
+function cloneSafe(grp){ grp.clone=function(){ const g=new T.Group(), inv=new T.Matrix4(); this.updateMatrixWorld(true); inv.copy(this.matrixWorld).invert(); this.traverse(ch=>{ if(!ch.isMesh) return; const mats=(Array.isArray(ch.material)?ch.material:[ch.material]).map(m=>{ const k=m.clone(); k.skinning=false; k.onBeforeCompile=()=>{}; k.needsUpdate=true; return k; });
+    const m=new T.Mesh(ch.geometry,Array.isArray(ch.material)?mats:mats[0]); m.frustumCulled=false; if(!ch.isSkinnedMesh){ m.matrixAutoUpdate=true; new T.Matrix4().multiplyMatrices(inv,ch.matrixWorld).decompose(m.position,m.quaternion,m.scale); } g.add(m); }); g.position.copy(this.position); g.quaternion.copy(this.quaternion); g.scale.copy(this.scale); g.visible=this.visible; return g; }; }
 const fishReady=id=>!!(RFISH[id]&&ready(RFISH[id][0]));
 function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0]); if(!g) return null; const opt=c[2]||{};
   const sc=g.scene; sc.updateMatrixWorld(true); let ms=[]; sc.traverse(o=>{ if(o.isMesh) ms.push(o); });
@@ -6646,7 +6746,7 @@ function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.i
     }catch(err){ console.error('mount',rec&&rec.id,err); } }); }   // 單一個標本出錯就跳過，不影響其他東西
 const tv=new T.Vector3();
 // 底棲生物：貝類躺在沙上不動（偶爾微微張殼）、竹蟶半埋直立、螃蟹在缸底橫著走、沙蠶在沙上爬、彈塗魚趴著偶爾一跳——不會像魚一樣在水中游
-const BENTHIC={hardclam:'shell',gomphina:'shell',tellin:'shell',razor:'razor',ghostcrab:'crab',fiddler:'crab',hermit:'crab',ragworm:'worm',mudskip:'skip'};
+const BENTHIC={hardclam:'shell',gomphina:'shell',tellin:'shell',razor:'razor',ghostcrab:'crab',fiddler:'crab',hermit:'crab',ragworm:'worm',mudskip:'skip',lobster:'walk',prawn:'walk'};
 function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.rec.L), u=f.uni||{}; f.t=(f.t||0)+dt;
   const floorY=(x,z)=>tk.y+tk.hAt(x,z)-f.body.min.y+.012;
   if(kind==='shell'){ o.position.y=floorY(o.position.x,o.position.z); o.rotation.set(0,f.yaw,0); if(u.uAmp){ u.uAmp.value=Math.max(0,Math.sin(f.t*.25+f.ph))*.12; u.uSwim.value+=dt*.5; } return; }
@@ -6655,10 +6755,10 @@ function benthic(f,tk,dt){ const o=f.o, kind=BENTHIC[f.rec.id], b=bounds(tk,f.re
   f.bt=(f.bt||0)-dt;if(f.bt<=0||!f.path||!f.path.length){tk.motion.plan(f);f.bt=6+Math.random()*6;f.wait=0;}
   const walk=tk.motion.steer(f,tk.motion.direction(f));f.bT=o.position.clone().add(walk);
   if(f.wait>0){ f.wait-=dt; if(u.uAmp) u.uAmp.value=.02; }
-  else { const dx=f.bT.x-o.position.x, dz=f.bT.z-o.position.z, dd=Math.hypot(dx,dz); if(dd>.02){ const sp=(kind==='crab'?.05:kind==='worm'?.015:.03)*Math.min(1,dd*4);
+  else { const dx=f.bT.x-o.position.x, dz=f.bT.z-o.position.z, dd=Math.hypot(dx,dz); if(dd>.02){ const sp=(kind==='crab'?.05:kind==='worm'?.015:kind==='walk'?.035:.03)*Math.min(1,dd*4);
       const head=Math.atan2(-dz,dx); if(kind==='crab'){ const want=head+Math.PI/2; let dy=want-f.yaw; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2; f.yaw+=dy*Math.min(1,dt*1.5); }   // 螃蟹橫著走：身體側面朝前進方向
       else { let dy=head-f.yaw; while(dy>Math.PI) dy-=Math.PI*2; while(dy<-Math.PI) dy+=Math.PI*2; f.yaw+=dy*Math.min(1,dt*2); }
-      o.position.x+=dx/dd*sp*dt; o.position.z+=dz/dd*sp*dt; if(u.uAmp){ u.uAmp.value=kind==='crab'?.18:kind==='worm'?.15:.06; u.uSwim.value+=dt*(kind==='crab'?10:6); } } }
+      o.position.x+=dx/dd*sp*dt; o.position.z+=dz/dd*sp*dt; if(u.uAmp){ u.uAmp.value=kind==='crab'?.18:kind==='worm'?.15:kind==='walk'?.13:.06; u.uSwim.value+=dt*(kind==='crab'?10:kind==='walk'?7:6); } } }
   let hop=0; if(kind==='skip'){ f.hp=(f.hp||0)-dt; if(f.hp<=0&&Math.random()<dt*.3){ f.hp=.5; } if(f.hp>0) hop=Math.sin((1-f.hp/.5)*Math.PI)*.04; }
   o.position.y=floorY(o.position.x,o.position.z)+hop; o.rotation.set(0,f.yaw,0); }   /* 貼著缸底，不浮在水中 */
 function updTanks(dt){ for(const w of ['fresh','sea']){ const tk=tanks[w]; if(!tk) continue;
@@ -7317,7 +7417,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102105251'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102112734'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -8961,8 +9061,8 @@ function depNow(k){ const e=DEPL[k]; return e?Math.max(0,e.v-(performance.now()-
 function depAdd(k,n){ const v=depNow(k)+n, w=v>=2&&DEPL[k]&&DEPL[k].warned; DEPL[k]={v,t:performance.now(),warned:w}; if(v>=4&&!w){ DEPL[k].warned=true; setTimeout(()=>toast('這一帶的魚變警覺了，轉個方向或換釣點吧','warn',2600),1800); } }
 const reachK=()=>G.loc==='ice'?.78:clamp((G.castDist-4)/(24*(1-.05*TR('cast'))),0,1);
 // 釣棚：浮標調淺、中、深（觸底）；每種魚有偏好水層，水層對了比較容易咬，差太多就很少咬（路亞、冰釣不受影響）
-const LAYER_B=new Set(['maori','puffer','channel','flathead','clarias','mekong','eel','carp','crucian','blackcarp','grasscarp','arapaima','reba','burbot','grouper','grouper2','halibut','stingray','emperor','porgy','knifejaw','redbream','wrasse','laketrout','taimen','ghost','moonkoi','golden']);
-const LAYER_S=new Set(['tarpon','bluegill','crappie','tilapia','silvercarp','gar','spgar','mahi','sail','marlin','swordfish','skipjack','yellowfin','tuna','bigeye','flyfish','ribbon','amberjack','barracuda','sunfish','threadfin','sawara','amber','peacock']);
+const LAYER_B=new Set(['lobster','prawn','maori','puffer','channel','flathead','clarias','mekong','eel','carp','crucian','blackcarp','grasscarp','arapaima','reba','burbot','grouper','grouper2','halibut','stingray','emperor','porgy','knifejaw','redbream','wrasse','laketrout','taimen','ghost','moonkoi','golden']);
+const LAYER_S=new Set(['wahoo','tarpon','bluegill','crappie','tilapia','silvercarp','gar','spgar','mahi','sail','marlin','swordfish','skipjack','yellowfin','tuna','bigeye','flyfish','ribbon','amberjack','barracuda','sunfish','threadfin','sawara','amber','peacock']);
 const layerOf=sp=>LAYER_B.has(sp.id)?2:LAYER_S.has(sp.id)?0:1, LAYER_N=['淺棚・水面','中層','深棚・觸底'];
 window.__layerOf=layerOf; window.__LAYER_N=LAYER_N;
 function layerK(sp){ const bt=G.baitUsed||BAITS[0]; if(bt.lure||G.loc==='ice'||sp.special) return 1; const d=Math.abs((save.depth==null?1:save.depth)-layerOf(sp)); return d===0?1.6:d===1?.9:.35; }
