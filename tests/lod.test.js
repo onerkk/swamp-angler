@@ -14,3 +14,12 @@ test('loader patch pairs geometry and swaps by camera distance with hysteresis',
  cam.position.set(0,0,15);scene.updateMatrixWorld(true);L.update(scene,cam,1/60,'low');assert.notEqual(mesh.geometry,fullGeo);
 });
 test('a failed simplified file still delivers the original model',async()=>{const full=model(2);function Loader(){}Loader.prototype.load=function(url,onLoad,p,onErr){setTimeout(()=>url.includes('_lod1')?onErr(new Error('404')):onLoad({scene:full}),0);};const L=createGeometryLOD();L.install({GLTFLoader:Loader});const got=await new Promise(r=>new Loader().load('tree_stump_01.glb',r));assert.equal(got.scene,full);assert.equal(L.stats.paired,0);});
+test('mid and low tiers use the 35% version up close while high keeps the original',async()=>{
+ const full=model(8),mid=model(3),far=model(1);function Loader(){}Loader.prototype.load=function(url,onLoad){setTimeout(()=>onLoad({scene:url.includes('_lod1')?far:url.includes('_lod0')?mid:full}),0);};
+ const L=createGeometryLOD();L.install({GLTFLoader:Loader});await new Promise(r=>new Loader().load('tree_stump_02.glb',r));
+ const scene=new T.Scene(),inst=full.clone(true);scene.add(inst);const mesh=inst.children[0],fullGeo=mesh.geometry,midGeo=mid.children[0].geometry,farGeo=far.children[0].geometry,cam=new T.PerspectiveCamera();scene.add(cam);
+ cam.position.set(0,0,3);scene.updateMatrixWorld(true);L.update(scene,cam,3,'high');assert.equal(mesh.geometry,fullGeo);
+ L.update(scene,cam,1/60,'mid');assert.equal(mesh.geometry,midGeo);
+ cam.position.set(0,0,40);scene.updateMatrixWorld(true);L.update(scene,cam,1/60,'mid');assert.equal(mesh.geometry,farGeo);
+ cam.position.set(0,0,3);scene.updateMatrixWorld(true);L.update(scene,cam,1/60,'high');assert.equal(mesh.geometry,fullGeo);
+});
