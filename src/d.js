@@ -816,7 +816,8 @@ function updateFight(dt){
   const F=fs.pow*(.8+.25*Math.pow(fd.w,.45))*(1+.22*sp.rar)*(fd.boss?fd.boss.pow:1)*stamF*(f.run?ST.mul:1)*(dive?1.35:1);
   const good=-f.latDir*G.rodSide, steerMul=1-.28*clamp(good,0,1)+.15*clamp(-good,0,1);
   // Contact and line wear are evaluated after the swept fish motion below.
-  let Tt=(F*(G.held?1:.35)+(G.held?.5:0))/(META.gear().line.s*DF.line)*steerMul*META.gear().rod.tens;
+  // 魚種的線組容錯（f.win）：牙齒會咬線、嘴巴骨質硬容易脫鉤、會往礁洞鑽磨線的魚，同樣的拉力下線更容易斷
+  let Tt=(F*(G.held?1:.35)+(G.held?.5:0))/(META.gear().line.s*DF.line*(fs.win||1))*steerMul*META.gear().rod.tens;
   if(f.jumpT>0&&G.held) Tt+=.45;
   if(shake) Tt+=G.held?.38:.12;
   Tt+=(Math.sin(G.t*13.1)+Math.sin(G.t*7.3))*.015*(f.run?2:1)*DF.jit;
@@ -845,7 +846,7 @@ function updateFight(dt){
     const lineHit=PH.hit(rod.tipW,f.pos,.025,box=>!(landing.near&&box.label==='船體')); f.cover=lineHit?1:0;
     if(moved.contact){ f.latDir=G.rodSide>.05?-1:G.rodSide<-.05?1:-f.latDir||1; f.theta+=f.latDir*dt*.3; }
     if(lineHit){
-      f.abr+=dt*(.025+.22*f.T)*(G.held?1.7:.35)/((.7+.3*META.gear().line.s)*DF.line);
+      f.abr+=dt*(.025+.22*f.T)*(G.held?1.7:.35)/((.7+.3*META.gear().line.s)*DF.line*((G.fd&&G.fd.sp.f.win)||1));
       if(!f.rubW){f.rubW=1;toast('魚線碰到'+lineHit.box.label+'！放手降低張力，左右控竿尋找能把魚帶出的角度','warn',2800);}
       // Reeling against a bend cannot pull the fish through the object.
       if(G.held){ f.T=Math.min(1.2,f.T+dt*.3); f.brk+=dt*.14*f.T; }

@@ -248,7 +248,7 @@ function paddle(dt,k,ringFn){
   if(k>.05){ const prev=Math.sin(padPh); padPh+=dt*(4.5+k*2.5); const sn=Math.sin(padPh);
     padG.rotation.z=sn*.4; padG.rotation.y=Math.cos(padPh)*.3; padG.position.y=PAD_Y-low+.04-Math.abs(sn)*.05; paddleTilt.z=sn*.025*k; paddleTilt.x=-.01*k;
     if(padOn>.6&&((prev<.85&&sn>=.85)||(prev>-.85&&sn<=-.85))){ bladeW.set(sn>0?-1.25:1.25,-.25,0); padG.localToWorld(bladeW);
-      P.splash(bladeW.x,0,bladeW.z,10,.6); if(ringFn) ringFn(bladeW.x,bladeW.z,.5); Snd.paddle(); } }
+      P.splash(bladeW.x,0,bladeW.z,6,.45); if(ringFn) ringFn(bladeW.x,bladeW.z,.2); Snd.paddle(); } }
   else { padG.rotation.z*=.9; padG.rotation.y*=.9; padG.position.y+=(PAD_Y-low-padG.position.y)*.15; paddleTilt.z*=.9; paddleTilt.x*=.9; }
 }
 const padGrip=(side,out)=>padG?padG.localToWorld(out.set(side==='L'?-.28:.28,0,0)):out;   // 兩手握在槳桿中段左右
