@@ -2,7 +2,7 @@
    遠處改用預先簡化的幾何（約 12% 面數，models/lod/），材質、貼圖完全不變，切換時不會重新編譯著色器；近處仍是原檔。
    切換距離依材質等級：高 18 公尺、中 11 公尺、低 7 公尺，並留 15% 緩衝避免在邊界來回閃。
    中、低畫質的近處改用中間版本（約 35% 面數，_lod0），高畫質近處一律原檔。 */
-const LOD_MODELS=['dead_tree_trunk_02.glb','tree_stump_01.glb','tree_stump_02.glb','rock_moss_set_01.glb'];
+const LOD_MODELS=['dead_tree_trunk_02.glb','tree_stump_01.glb','tree_stump_02.glb','rock_moss_set_01.glb','fern_02.glb','grass_medium_01.glb','nettle_plant.glb'];
 function lodFileFor(url,level=1){const name=String(url).split('?')[0].split('/').pop();return LOD_MODELS.includes(name)?'models/lod/'+name.replace(/\.glb$/,'_lod'+level+'.glb'):null;}
 function lodDistance(tier){return tier==='high'?18:tier==='mid'?11:7;}
 function pairLODMeshes(full,lod,lodOf,fullOf,slot='far'){
@@ -31,7 +31,7 @@ function createGeometryLOD(){
  }
  function update(scene,camera,dt,tier){
   if(!scene||!camera)return;if(!cam){cam=new camera.position.constructor();pos=new camera.position.constructor();}
-  const now=typeof performance!=='undefined'?performance.now()/1000:scanT+dt;if(now>=scanT){scanT=now+2;list=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&lodOf.has(fullOf.get(o.geometry)||o.geometry))list.push(o);});}
+  const now=typeof performance!=='undefined'?performance.now()/1000:scanT+dt;if(now>=scanT){scanT=now+2;list=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&!o.isInstancedMesh&&lodOf.has(fullOf.get(o.geometry)||o.geometry))list.push(o);});}
   camera.getWorldPosition(cam);const d=lodDistance(tier),near2=d*d,far2=(d*1.15)*(d*1.15);let n=0,f=0;
   // 高畫質：7 公尺內原檔、7～18 公尺中間版、更遠簡化版（一根 8 萬面的枯木在 10 公尺外用 35% 面數已看不出差別）；中低畫質近處就用中間版
   const fullD=tier==='high'?7:0;
@@ -42,6 +42,8 @@ function createGeometryLOD(){
    m.geometry=want;if(m.geometry===lod)f++;else n++;}
   stats.near=n;stats.far=f;
  }
- return{install,update,stats};
+ // 取某個幾何的簡化版本（mid＝35%、far＝12%），沒有就回傳原檔；水族箱水草這類實例化物件自己決定什麼時候用哪一版
+ function variant(geo,which){const full=fullOf.get(geo)||geo,e=lodOf.get(full);return which==='full'?full:(e&&e[which])||full;}
+ return{install,update,variant,stats};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={LOD_MODELS,lodFileFor,lodDistance,pairLODMeshes,createGeometryLOD};

@@ -1,4 +1,4 @@
-/*APPV:20261102084804*/
+/*APPV:20261102090520*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -17,7 +17,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={deviceResourcePol
    遠處改用預先簡化的幾何（約 12% 面數，models/lod/），材質、貼圖完全不變，切換時不會重新編譯著色器；近處仍是原檔。
    切換距離依材質等級：高 18 公尺、中 11 公尺、低 7 公尺，並留 15% 緩衝避免在邊界來回閃。
    中、低畫質的近處改用中間版本（約 35% 面數，_lod0），高畫質近處一律原檔。 */
-const LOD_MODELS=['dead_tree_trunk_02.glb','tree_stump_01.glb','tree_stump_02.glb','rock_moss_set_01.glb'];
+const LOD_MODELS=['dead_tree_trunk_02.glb','tree_stump_01.glb','tree_stump_02.glb','rock_moss_set_01.glb','fern_02.glb','grass_medium_01.glb','nettle_plant.glb'];
 function lodFileFor(url,level=1){const name=String(url).split('?')[0].split('/').pop();return LOD_MODELS.includes(name)?'models/lod/'+name.replace(/\.glb$/,'_lod'+level+'.glb'):null;}
 function lodDistance(tier){return tier==='high'?18:tier==='mid'?11:7;}
 function pairLODMeshes(full,lod,lodOf,fullOf,slot='far'){
@@ -46,7 +46,7 @@ function createGeometryLOD(){
  }
  function update(scene,camera,dt,tier){
   if(!scene||!camera)return;if(!cam){cam=new camera.position.constructor();pos=new camera.position.constructor();}
-  const now=typeof performance!=='undefined'?performance.now()/1000:scanT+dt;if(now>=scanT){scanT=now+2;list=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&lodOf.has(fullOf.get(o.geometry)||o.geometry))list.push(o);});}
+  const now=typeof performance!=='undefined'?performance.now()/1000:scanT+dt;if(now>=scanT){scanT=now+2;list=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&!o.isInstancedMesh&&lodOf.has(fullOf.get(o.geometry)||o.geometry))list.push(o);});}
   camera.getWorldPosition(cam);const d=lodDistance(tier),near2=d*d,far2=(d*1.15)*(d*1.15);let n=0,f=0;
   // 高畫質：7 公尺內原檔、7～18 公尺中間版、更遠簡化版（一根 8 萬面的枯木在 10 公尺外用 35% 面數已看不出差別）；中低畫質近處就用中間版
   const fullD=tier==='high'?7:0;
@@ -57,7 +57,9 @@ function createGeometryLOD(){
    m.geometry=want;if(m.geometry===lod)f++;else n++;}
   stats.near=n;stats.far=f;
  }
- return{install,update,stats};
+ // 取某個幾何的簡化版本（mid＝35%、far＝12%），沒有就回傳原檔；水族箱水草這類實例化物件自己決定什麼時候用哪一版
+ function variant(geo,which){const full=fullOf.get(geo)||geo,e=lodOf.get(full);return which==='full'?full:(e&&e[which])||full;}
+ return{install,update,variant,stats};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={LOD_MODELS,lodFileFor,lodDistance,pairLODMeshes,createGeometryLOD};
 /* 合併繪製：同一種材質的小零件（睡蓮花瓣、水黽的腳）合成一個網格，岸邊植物改用實例化；外觀、數量不變，只是 GPU 一次畫完。
@@ -144,10 +146,13 @@ function createAquariumPlantBatch(T,parent,plants){
    const mats=Array.isArray(m.material)?m.material:[m.material],key=m.geometry.uuid+':'+mats.map(x=>x.uuid).join(',');if(!groups.has(key))groups.set(key,{geometry:m.geometry,material:m.material,items:[]});
    groups.get(key).items.push({root:p.o,local:new T.Matrix4().multiplyMatrices(inv,m.matrixWorld)});
   });p.o.visible=false;}
-  for(const g of groups.values()){const mesh=new T.InstancedMesh(g.geometry,g.material,g.items.length);mesh.frustumCulled=false;mesh.receiveShadow=true;mesh.castShadow=false;mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);parent.add(mesh);batches.push({mesh,items:g.items});}
+  for(const g of groups.values()){const mesh=new T.InstancedMesh(g.geometry,g.material,g.items.length);mesh.frustumCulled=false;mesh.receiveShadow=true;mesh.castShadow=false;mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);parent.add(mesh);batches.push({mesh,items:g.items,geometry:g.geometry});}detail='';
   entries=plants.map(p=>p.o);update();
  }
- function update(){if(disposed)return;for(const root of entries)root.updateMatrix();for(const b of batches){b.items.forEach((item,i)=>{matrix.multiplyMatrices(item.root.matrix,item.local);b.mesh.setMatrixAt(i,matrix);});b.mesh.instanceMatrix.needsUpdate=true;}}
+ // 從房間看水族箱時水草用 35% 面數的版本（每組水草 12～14 份，原檔加起來幾十萬面），進到缸內近看才換回原檔
+ let detail='';
+ function setDetail(){const want=typeof document!=='undefined'&&document.body&&document.body.classList.contains('tankview')?'full':'mid';const L=typeof window!=='undefined'&&window.__GEOLOD;if(want===detail||!L||!L.variant)return;detail=want;for(const b of batches)b.mesh.geometry=L.variant(b.geometry,want);}
+ function update(){if(disposed)return;setDetail();for(const root of entries)root.updateMatrix();for(const b of batches){b.items.forEach((item,i)=>{matrix.multiplyMatrices(item.root.matrix,item.local);b.mesh.setMatrixAt(i,matrix);});b.mesh.instanceMatrix.needsUpdate=true;}}
  function dispose(){for(const b of batches){parent.remove(b.mesh);if(b.mesh.dispose)b.mesh.dispose();}batches.length=0;disposed=true;}
  return{rebuild,update,dispose,batches};
 }
@@ -7291,7 +7296,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102084804'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102090520'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9646,7 +9651,10 @@ function updateFight(dt){
   sh.material.opacity=f.jumpT>0?0:.4*(1-sstep(3,10,f.d));
   // 水面下看得到掙扎的魚：離船 14 公尺內就把魚本體放在水面下，透過水面的折射與吸收看到魚身左右甩、翻身；甩頭時尾巴拍水，水花朝甩的方向噴出一道弧
   if(!(f.jumpT>0)){ const vis=!fd.item&&G.loc!=='ice'&&f.d<14&&fd.sp.special!=='mermaid'; g.visible=vis;
-    if(vis){ const L=fd.L||.5, dep=Math.max(0,-(f.pos.y||0)), thr=(f.run||shake)?1:.35, yaw=az+(f.latDir<0?Math.PI:0)+Math.PI/2+Math.sin(G.t*3.1)*.28*thr;
+    if(vis){ const L=fd.L||.5, dep=Math.max(0,-(f.pos.y||0)), thr=(f.run||shake)?1:.35;
+      // 魚頭朝向：衝刺時朝外跑；你收線、魚沒在衝時，魚被線拉著頭轉向船（魚嘴掛著線）；轉向是慢慢轉過去的
+      const tgtY=(G.held&&!f.run)?az+Math.PI*1.5:az+(f.latDir<0?Math.PI:0)+Math.PI/2; if(f.headY===undefined) f.headY=tgtY;
+      const dY=((tgtY-f.headY)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI; f.headY+=dY*Math.min(1,dt*3); const yaw=f.headY+Math.sin(G.t*3.1)*.28*thr;
       g.position.set(tv.x,-(.2+.18*L)-dep*.6,tv.z); te.set(Math.sin(G.t*9.5)*.38*thr,yaw,0,'YXZ'); g.quaternion.setFromEuler(te); te.order='YZX'; G.fish.uni.uAmp.value=.08+.16*thr; G.fish.uni.uSwim.value+=dt*(6+16*thr);
       f.slapT=(f.slapT||0)-dt; if(f.slapT<=0&&thr>.9&&dep<1.2){ f.slapT=rand(.45,1.2); const s=Math.random()<.5?1:-1, tx=Math.cos(yaw)*s, tz=-Math.sin(yaw)*s; P.splash(tv.x,.02,tv.z,Math.round(8+10*L),.35+.3*Math.min(1.5,L),tx,tz); W.addRipple(tv.x,tv.z,.25+.2*L); if(P.foam) P.foam(tv.x+tx*.3*L,tv.z+tz*.3*L,.45+.4*L,1.6,.9); }
       // 衝刺時貼著水面劃出 V 形尾浪：沿著游的方向往後兩側各留一串小漣漪

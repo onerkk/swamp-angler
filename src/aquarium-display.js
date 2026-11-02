@@ -12,10 +12,13 @@ function createAquariumPlantBatch(T,parent,plants){
    const mats=Array.isArray(m.material)?m.material:[m.material],key=m.geometry.uuid+':'+mats.map(x=>x.uuid).join(',');if(!groups.has(key))groups.set(key,{geometry:m.geometry,material:m.material,items:[]});
    groups.get(key).items.push({root:p.o,local:new T.Matrix4().multiplyMatrices(inv,m.matrixWorld)});
   });p.o.visible=false;}
-  for(const g of groups.values()){const mesh=new T.InstancedMesh(g.geometry,g.material,g.items.length);mesh.frustumCulled=false;mesh.receiveShadow=true;mesh.castShadow=false;mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);parent.add(mesh);batches.push({mesh,items:g.items});}
+  for(const g of groups.values()){const mesh=new T.InstancedMesh(g.geometry,g.material,g.items.length);mesh.frustumCulled=false;mesh.receiveShadow=true;mesh.castShadow=false;mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);parent.add(mesh);batches.push({mesh,items:g.items,geometry:g.geometry});}detail='';
   entries=plants.map(p=>p.o);update();
  }
- function update(){if(disposed)return;for(const root of entries)root.updateMatrix();for(const b of batches){b.items.forEach((item,i)=>{matrix.multiplyMatrices(item.root.matrix,item.local);b.mesh.setMatrixAt(i,matrix);});b.mesh.instanceMatrix.needsUpdate=true;}}
+ // 從房間看水族箱時水草用 35% 面數的版本（每組水草 12～14 份，原檔加起來幾十萬面），進到缸內近看才換回原檔
+ let detail='';
+ function setDetail(){const want=typeof document!=='undefined'&&document.body&&document.body.classList.contains('tankview')?'full':'mid';const L=typeof window!=='undefined'&&window.__GEOLOD;if(want===detail||!L||!L.variant)return;detail=want;for(const b of batches)b.mesh.geometry=L.variant(b.geometry,want);}
+ function update(){if(disposed)return;setDetail();for(const root of entries)root.updateMatrix();for(const b of batches){b.items.forEach((item,i)=>{matrix.multiplyMatrices(item.root.matrix,item.local);b.mesh.setMatrixAt(i,matrix);});b.mesh.instanceMatrix.needsUpdate=true;}}
  function dispose(){for(const b of batches){parent.remove(b.mesh);if(b.mesh.dispose)b.mesh.dispose();}batches.length=0;disposed=true;}
  return{rebuild,update,dispose,batches};
 }

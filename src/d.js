@@ -877,7 +877,10 @@ function updateFight(dt){
   sh.material.opacity=f.jumpT>0?0:.4*(1-sstep(3,10,f.d));
   // 水面下看得到掙扎的魚：離船 14 公尺內就把魚本體放在水面下，透過水面的折射與吸收看到魚身左右甩、翻身；甩頭時尾巴拍水，水花朝甩的方向噴出一道弧
   if(!(f.jumpT>0)){ const vis=!fd.item&&G.loc!=='ice'&&f.d<14&&fd.sp.special!=='mermaid'; g.visible=vis;
-    if(vis){ const L=fd.L||.5, dep=Math.max(0,-(f.pos.y||0)), thr=(f.run||shake)?1:.35, yaw=az+(f.latDir<0?Math.PI:0)+Math.PI/2+Math.sin(G.t*3.1)*.28*thr;
+    if(vis){ const L=fd.L||.5, dep=Math.max(0,-(f.pos.y||0)), thr=(f.run||shake)?1:.35;
+      // 魚頭朝向：衝刺時朝外跑；你收線、魚沒在衝時，魚被線拉著頭轉向船（魚嘴掛著線）；轉向是慢慢轉過去的
+      const tgtY=(G.held&&!f.run)?az+Math.PI*1.5:az+(f.latDir<0?Math.PI:0)+Math.PI/2; if(f.headY===undefined) f.headY=tgtY;
+      const dY=((tgtY-f.headY)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI; f.headY+=dY*Math.min(1,dt*3); const yaw=f.headY+Math.sin(G.t*3.1)*.28*thr;
       g.position.set(tv.x,-(.2+.18*L)-dep*.6,tv.z); te.set(Math.sin(G.t*9.5)*.38*thr,yaw,0,'YXZ'); g.quaternion.setFromEuler(te); te.order='YZX'; G.fish.uni.uAmp.value=.08+.16*thr; G.fish.uni.uSwim.value+=dt*(6+16*thr);
       f.slapT=(f.slapT||0)-dt; if(f.slapT<=0&&thr>.9&&dep<1.2){ f.slapT=rand(.45,1.2); const s=Math.random()<.5?1:-1, tx=Math.cos(yaw)*s, tz=-Math.sin(yaw)*s; P.splash(tv.x,.02,tv.z,Math.round(8+10*L),.35+.3*Math.min(1.5,L),tx,tz); W.addRipple(tv.x,tv.z,.25+.2*L); if(P.foam) P.foam(tv.x+tx*.3*L,tv.z+tz*.3*L,.45+.4*L,1.6,.9); }
       // 衝刺時貼著水面劃出 V 形尾浪：沿著游的方向往後兩側各留一串小漣漪
