@@ -54,6 +54,6 @@ function createGodRays({renderer:R,camera,U}){
     } finally { R.autoClear=ac; R.toneMapping=tone; R.outputEncoding=enc; R.setRenderTarget(prevRT); }
     return true; }
   function release(){ if(copyTex){ copyTex.dispose(); copyTex=null; } if(rt){ rt.dispose(); rt=null; } cw=ch=0; }
-  return {render,release};
+  return {render,release,debugRT:()=>rt};
 }
 if(typeof module!=='undefined'&&module.exports) module.exports={createGodRays};
