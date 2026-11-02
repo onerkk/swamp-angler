@@ -70,3 +70,5 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 船艙水線遮罩（f.js hullCap）：只寫深度的橢圓蓋在船艙水線，renderOrder -1，船體 -2；任何貼在水面的東西（水、浮萍、睡蓮、雨圈）都不會畫進船裡
 - 浮萍被船推開（c.js dwMat.onBeforeCompile）：船身橢圓內不畫，uTrail 24 點水道 28 秒合攏；f.js 每前進 0.45m 記一點
 - LOD 高畫質三級：7m 內原檔、7～18m 中間版、以外簡化版
+- 荷葉物理（c.js window.__PADS）：荷葉被船殼橢圓推開（往最近出口推、船頭帶側向滑開）、邊緣壓下傾斜、慢慢漂回；船速 >1.15 m/s 且撞在前半段會沖破成 3 片碎葉（pads 實例預留 48 格），碎葉約 22 秒沉沒消失；花是實例，跟荷葉一起動。f.js 每幀以船位移算速度呼叫 update
+- 雨圈與雨滴著色器（k.js）用 uBoat 橢圓 discard，不再畫進船艙。組裝後一定檢查 rc 與 version.json

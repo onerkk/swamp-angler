@@ -258,6 +258,7 @@ function update(dt,t){
   const s=sp(), bx=s.pos[0], bz=s.pos[1];
   if(s.kayak){ const sw=W.swell(bx,bz,t)*2.2; boat.visible=true; boat.position.set(bx,sw,bz); if(W.U.uBoat) W.U.uBoat.value.set(bx,bz,s.head,1);
     // 船每前進約半公尺就在浮萍的水道記錄裡加一個點
+    if(window.__PADS){ const L=window.__lastBoat||(window.__lastBoat={x:bx,z:bz}); const spd=dt>0?Math.min(4,Math.hypot(bx-L.x,bz-L.z)/dt):0; L.x=bx; L.z=bz; window.__PADS.update(dt,t,bx,bz,s.head,spd); }
     if(window.__DW){ const D=window.__DW, last=D.last; if(!last||Math.hypot(bx-last.x,bz-last.z)>.45){ D.last={x:bx,z:bz}; D.trail[D.next].set(bx,bz,t,0); D.next=(D.next+1)%D.trail.length; } } boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
     W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
   else if(s.yacht){ boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; const sw=W.swell(bx,bz,t)*.9; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }

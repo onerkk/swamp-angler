@@ -3,7 +3,7 @@ const SH4={};
 SH4.rainVS=`
 attribute vec3 aR;
 uniform float uTime; uniform vec3 uC; uniform float uSea; uniform vec3 uWind; uniform float uRad;
-varying vec2 vUv; varying float vT;
+varying vec2 vUv; varying float vT; varying vec2 vWp;
 float hh(float n){ return fract(sin(n)*43758.5453); }
 float seaH(vec2 p){
   vec2 wd = normalize(uWind.xy + vec2(1e-4)); float s = 0.45 + 1.1*uWind.z;
@@ -19,13 +19,14 @@ void main(){
   float y = uSea > 0.5 ? seaH(p) + 0.02 : 0.02;
   float sz = (0.18 + 0.28*aR.z)*(0.25 + vT*1.1);
   vUv = position.xz + 0.5;
-  vec3 wp = vec3(p.x + position.x*sz, y, p.y + position.z*sz);
+  vec3 wp = vec3(p.x + position.x*sz, y, p.y + position.z*sz); vWp = wp.xz;
   gl_Position = projectionMatrix*viewMatrix*vec4(wp, 1.0);
 }`;
 SH4.rainFS=`
-uniform float uRain; uniform vec3 uCol;
-varying vec2 vUv; varying float vT;
+uniform float uRain; uniform vec3 uCol; uniform vec4 uBoat;
+varying vec2 vUv; varying float vT; varying vec2 vWp;
 void main(){
+  if(uBoat.w>.5){ vec2 d=vWp-uBoat.xy; float c=cos(uBoat.z), s=sin(uBoat.z); vec2 l=vec2(d.x*c-d.y*s, d.x*s+d.y*c+.35); if((l.x*l.x)/.3025+(l.y*l.y)/5.29<1.0) discard; }
   float d = length(vUv - 0.5)*2.0;
   float ring = exp(-pow((d - 0.82)/0.09, 2.0)) + 0.5*exp(-pow((d - 0.5)/0.07, 2.0));
   float a = ring*(1.0 - vT)*uRain*0.55;
@@ -35,18 +36,18 @@ void main(){
 SH4.dropVS=`
 attribute vec3 aR;
 uniform float uTime; uniform vec3 uC; uniform float uRad; uniform float uScale;
-varying float vA;
+varying float vA; varying vec2 vP;
 float hh(float n){ return fract(sin(n)*43758.5453); }
 void main(){
   float cyc = uTime*(1.6 + aR.y) + aR.x*5.0; float n = floor(cyc); float t = fract(cyc);
   float a = hh(aR.x*51.3 + n*7.7)*6.2831853, r = sqrt(hh(aR.x*17.9 + n*5.3))*uRad;
   vec3 p = vec3(uC.x + cos(a)*r, max(0.0, sin(t*3.14159)*0.12*(0.5 + aR.z)) + 0.02, uC.z + sin(a)*r);
-  vec4 mv = viewMatrix*vec4(p, 1.0); gl_PointSize = max(1.0, 0.03*uScale/max(-mv.z, 0.1)); gl_Position = projectionMatrix*mv;
+  vP = p.xz; vec4 mv = viewMatrix*vec4(p, 1.0); gl_PointSize = max(1.0, 0.03*uScale/max(-mv.z, 0.1)); gl_Position = projectionMatrix*mv;
   vA = t < 0.6 ? 1.0 - t/0.6 : 0.0;
 }`;
 SH4.dropFS=`
-uniform float uRain; uniform vec3 uCol; varying float vA;
-void main(){ vec2 c = gl_PointCoord - 0.5; float a = (1.0 - smoothstep(0.2, 0.5, length(c)))*vA*uRain*0.8; if(a < 0.01) discard; gl_FragColor = vec4(uCol, a); }`;
+uniform float uRain; uniform vec3 uCol; uniform vec4 uBoat; varying float vA; varying vec2 vP;
+void main(){ if(uBoat.w>.5){ vec2 d=vP-uBoat.xy; float cc=cos(uBoat.z), ss=sin(uBoat.z); vec2 l=vec2(d.x*cc-d.y*ss, d.x*ss+d.y*cc+.35); if((l.x*l.x)/.3025+(l.y*l.y)/5.29<1.0) discard; } vec2 c = gl_PointCoord - 0.5; float a = (1.0 - smoothstep(0.2, 0.5, length(c)))*vA*uRain*0.8; if(a < 0.01) discard; gl_FragColor = vec4(uCol, a); }`;
 
 function createThrill(W,P,AT,c){
 'use strict';
@@ -58,13 +59,13 @@ const NR=260, rg=new T.InstancedBufferGeometry(), pl=new T.PlaneGeometry(1,1).ro
 rg.index=pl.index; rg.setAttribute('position',pl.attributes.position);
 const ar=new Float32Array(NR*3); for(let i=0;i<NR;i++){ ar[i*3]=Math.random(); ar[i*3+1]=Math.random()*.8; ar[i*3+2]=Math.random(); }
 rg.setAttribute('aR',new T.InstancedBufferAttribute(ar,3)); rg.instanceCount=NR;
-const rU={uTime:W.U.uTime,uC:{value:new T.Vector3()},uSea:W.U.uSea,uWind:W.U.uWind,uRad:{value:20},uRain:{value:0},uCol:{value:new T.Color(1,1,1)}};
+const rU={uBoat:W.U.uBoat,uTime:W.U.uTime,uC:{value:new T.Vector3()},uSea:W.U.uSea,uWind:W.U.uWind,uRad:{value:20},uRain:{value:0},uCol:{value:new T.Color(1,1,1)}};
 const rings=new T.Mesh(rg,new T.ShaderMaterial({uniforms:rU,vertexShader:SH4.rainVS,fragmentShader:SH4.rainFS,transparent:true,depthWrite:false}));
 rings.frustumCulled=false; rings.renderOrder=3; S.add(rings);
 const ND=300, dg=new T.BufferGeometry(), dp=new Float32Array(ND*3), dr=new Float32Array(ND*3);
 for(let i=0;i<ND;i++){ dr[i*3]=Math.random(); dr[i*3+1]=Math.random()*.8; dr[i*3+2]=Math.random(); }
 dg.setAttribute('position',new T.BufferAttribute(dp,3)); dg.setAttribute('aR',new T.BufferAttribute(dr,3));
-const dU={uTime:W.U.uTime,uC:rU.uC,uRad:{value:14},uScale:{value:800},uRain:rU.uRain,uCol:rU.uCol};
+const dU={uBoat:W.U.uBoat,uTime:W.U.uTime,uC:rU.uC,uRad:{value:14},uScale:{value:800},uRain:rU.uRain,uCol:rU.uCol};
 const drops=new T.Points(dg,new T.ShaderMaterial({uniforms:dU,vertexShader:SH4.dropVS,fragmentShader:SH4.dropFS,transparent:true,depthWrite:false}));
 drops.frustumCulled=false; S.add(drops); if(W.reflHide){ W.reflHide(rings); W.reflHide(drops); }
 

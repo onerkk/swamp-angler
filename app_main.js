@@ -1,4 +1,4 @@
-/*APPV:20261102040121*/
+/*APPV:20261102042956*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -1963,7 +1963,7 @@ const padPos=[];
   // 浮萍灣（釣點 -7,-17 一帶）：睡蓮成片，葉子大小不一、緊挨著長，中間留出釣位附近的水道
   const bay=[[-11.5,-13.5,22,2.6],[-12,-19.5,24,2.8],[-4.5,-21.5,18,2.3],[-10,-24,16,2.2],[-2,-14.5,12,1.9],[-14.5,-16.5,14,2.0]];
   for(const c of bay) for(let i=0;i<c[2];i++){ const a=R()*6.283, r=Math.sqrt(R())*c[3]; padPos.push([c[0]+Math.cos(a)*r, c[1]+Math.sin(a)*r, .16+R()*.26, R()*6.283]); } }
-const pads=new T.InstancedMesh(padGeo,padMat,padPos.length);
+const PAD_N=padPos.length, SHRED_MAX=48, pads=new T.InstancedMesh(padGeo,padMat,PAD_N+SHRED_MAX); pads.count=PAD_N;
 padPos.forEach((p,i)=>{ q4.setFromEuler(eu.set(0,p[3],0)); pv.set(p[0],.013+i*.00003,p[1]); sv.set(p[2],1,p[2]); m4.compose(pv,q4,sv); pads.setMatrixAt(i,m4);
   PH.addBox({x:p[0]-p[2],y:-.03,z:p[1]-p[2]},{x:p[0]+p[2],y:.025,z:p[1]+p[2]},()=>pads.visible,"睡蓮葉");
   const c=.85+((i*7919)%100)/100*.3; pads.setColorAt(i,new T.Color(c,c,c*.9)); });
@@ -1971,12 +1971,70 @@ pads.userData.lake=true; scene.add(pads);
 const petalMat=new T.MeshStandardMaterial({color:0xf3dfe4, roughness:.5, emissive:0x1a0a0c});
 const coreMat=new T.MeshStandardMaterial({color:0xe8c040, roughness:.6});
 const petalGeo=new T.SphereGeometry(1,10,8);
-{ const flowerParts=[];
-for(const k of [3,12,25,40,57,70]){ const p=padPos[k%padPos.length]; const g=new T.Group();
-  for(let i=0;i<10;i++){ const m=new T.Mesh(petalGeo,petalMat); const a=i/10*6.283; m.scale.set(.05,.014,.022); m.position.set(Math.cos(a)*.04,.02,Math.sin(a)*.04); m.rotation.set(0,-a,.55); g.add(m); }
-  const cm=new T.Mesh(new T.SphereGeometry(.022,10,8),coreMat); cm.position.y=.025; g.add(cm); g.position.set(p[0]+.05,.01,p[1]); g.traverse(o=>{ if(o.isMesh) flowerParts.push(o); }); }
-  // 六朵睡蓮共 66 個零件合成兩個網格（花瓣、花心），從 66 次繪製變 2 次
-  mergeMeshesByMaterial(T,flowerParts,null).forEach(m=>{ m.userData.lake=true; scene.add(m); }); }
+const FLOWER_PADS=[3,12,25,40,57,70].map(k=>k%padPos.length), flowerInst=[];
+{ const flowerParts=[], g=new T.Group();
+  for(let i=0;i<10;i++){ const m=new T.Mesh(petalGeo,petalMat); const a=i/10*6.283; m.scale.set(.05,.014,.022); m.position.set(Math.cos(a)*.04,.02,Math.sin(a)*.04); m.rotation.set(0,-a,.55); g.add(m); flowerParts.push(m); }
+  const cm=new T.Mesh(new T.SphereGeometry(.022,10,8),coreMat); cm.position.y=.025; g.add(cm); flowerParts.push(cm);
+  // 一朵花（花瓣、花心各一個網格）做成實例，六朵跟著各自的荷葉一起被推開、傾斜
+  for(const part of mergeMeshesByMaterial(T,flowerParts,g)){ const im=new T.InstancedMesh(part.geometry,part.material,FLOWER_PADS.length); im.frustumCulled=false; im.userData.lake=true; im.castShadow=false; scene.add(im); flowerInst.push(im); } }
+
+/* ---------- 荷葉被船推開、沖破 ----------
+   荷葉是長在水底的，船撞上去會被擠到一邊、邊緣被壓進水裡傾斜翹起；船夠快時葉子會被沖破成幾片碎葉，碎葉漂著、慢慢沉下去；
+   被推開的葉子約半分鐘慢慢漂回原位，破掉的葉子慢慢長回來。花跟著各自的荷葉一起動。 */
+const padS={ox:new Float32Array(PAD_N),oz:new Float32Array(PAD_N),vx:new Float32Array(PAD_N),vz:new Float32Array(PAD_N),th:new Float32Array(PAD_N),tx:new Float32Array(PAD_N),tz:new Float32Array(PAD_N),yw:new Float32Array(PAD_N),yv:new Float32Array(PAD_N),sc:new Float32Array(PAD_N).fill(1),hit:new Float32Array(PAD_N),burstAt:new Float32Array(PAD_N).fill(-1e9),act:new Uint8Array(PAD_N)};
+const flowerOf=new Map(); FLOWER_PADS.forEach((pi,j)=>flowerOf.set(pi,j));
+const pqY=new T.Quaternion(), pqT=new T.Quaternion(), pUp=new T.Vector3(0,1,0), pN=new T.Vector3(), pV=new T.Vector3(), pS=new T.Vector3(), pM=new T.Matrix4(), fM=new T.Matrix4();
+let padsDirty=false, flowersDirty=false;
+function writePad(i){ const p=padPos[i], th=padS.th[i]; pqY.setFromAxisAngle(pUp,p[3]+padS.yw[i]); pqT.identity();
+  if(th>1e-3){ pN.set(-padS.tx[i]*Math.sin(th),Math.cos(th),-padS.tz[i]*Math.sin(th)); pqT.setFromUnitVectors(pUp,pN); pqY.premultiply(pqT); }
+  const y=.013+i*.00003-.06*th, r=p[2]*padS.sc[i]; pV.set(p[0]+padS.ox[i],y,p[1]+padS.oz[i]); pS.set(r,1,r); pM.compose(pV,pqY,pS); pads.setMatrixAt(i,pM); padsDirty=true;
+  const fj=flowerOf.get(i); if(fj!==undefined){ pV.x+=.05; pV.y+=.004; pS.set(padS.sc[i],padS.sc[i],padS.sc[i]); fM.compose(pV,pqT,pS); for(const im of flowerInst) im.setMatrixAt(fj,fM); flowersDirty=true; } }
+FLOWER_PADS.forEach(writePad); flowerInst.forEach(im=>{ im.instanceMatrix.needsUpdate=true; }); pads.frustumCulled=false;
+const shreds=[]; let padClock=0;
+function hullPush(px,pz,R,bx,bz,c,s,seed,out){
+  const dx=px-bx, dz=pz-bz; if(dx*dx+dz*dz>36) return false;
+  const A=.40+R*.85, B=2.12+R*.85, lx=dx*c-dz*s, ly=dx*s+dz*c+.35, tt=(lx*lx)/(A*A)+(ly*ly)/(B*B); if(tt>=1) return false;
+  // 往最近的出口推：離船側近就往旁邊推；在船頭附近就往前推，並帶一點側向，葉子才會順著船身滑開而不是黏在船頭上
+  const exX=A*Math.sqrt(Math.max(0,1-(ly/B)*(ly/B)))-Math.abs(lx), exY=B*Math.sqrt(Math.max(0,1-(lx/A)*(lx/A)))-Math.abs(ly);
+  let sx=lx>=0?1:-1; if(Math.abs(lx)<.03) sx=(seed&1)?1:-1; const sy=ly>=0?1:-1; let nlx,nly,dist;
+  if(exX<=exY){ nlx=sx; nly=0; dist=exX; } else { nlx=sx*.9; nly=sy; const nn=Math.hypot(nlx,nly); nlx/=nn; nly/=nn; dist=exY/Math.max(.3,Math.abs(nly)); }
+  out.nx=nlx*c+nly*s; out.nz=-nlx*s+nly*c; out.d=Math.max(dist,.002)+.004; out.ly=ly; return true; }
+const hp={nx:0,nz:0,d:0,ly:0};
+function burstPad(i,nx,nz,speed){
+  const p=padPos[i], px=p[0]+padS.ox[i], pz=p[1]+padS.oz[i], R=p[2]*padS.sc[i]; padS.sc[i]*=.62; padS.burstAt[i]=padClock;
+  for(let k=0;k<3;k++){ if(shreds.length>=SHRED_MAX) shreds.shift(); const a=Math.random()*6.283, rr=R*(.2+Math.random()*.5), sp=.5+Math.random()*.9+speed*.5, tang=(Math.random()-.5)*1.6;
+    shreds.push({x:px+Math.cos(a)*rr,z:pz+Math.sin(a)*rr,vx:nx*sp-nz*tang,vz:nz*sp+nx*tang,r:R*(.28+Math.random()*.2),yaw:Math.random()*6.283,yv:(Math.random()-.5)*5,age:0,ci:i}); }
+  splash(px,.0,pz,8,.3); if(W.addRipple) W.addRipple(px,pz,.3); }
+function updatePads(dt,t,bx,bz,head,speed){
+  padClock+=dt; dt=Math.min(dt,.05); const c=Math.cos(head), s=Math.sin(head);
+  for(let i=0;i<PAD_N;i++){ const p=padPos[i];
+    if(padS.sc[i]<1){ padS.sc[i]=Math.min(1,padS.sc[i]+dt/70); padS.act[i]=1; }
+    const px=p[0]+padS.ox[i], pz=p[1]+padS.oz[i];
+    if(hullPush(px,pz,p[2]*padS.sc[i],bx,bz,c,s,i,hp)){
+      padS.ox[i]+=hp.nx*hp.d; padS.oz[i]+=hp.nz*hp.d; const imp=.35+speed*.9; padS.vx[i]+=hp.nx*imp; padS.vz[i]+=hp.nz*imp;
+      const vv=Math.hypot(padS.vx[i],padS.vz[i]); if(vv>2.4){ padS.vx[i]*=2.4/vv; padS.vz[i]*=2.4/vv; }
+      padS.th[i]=Math.min(.62,Math.max(padS.th[i],.16+.3*Math.min(1,hp.d/(p[2]+.1))+.1*speed)); padS.tx[i]=hp.nx; padS.tz[i]=hp.nz;
+      if(padS.hit[i]<=0){ padS.yv[i]+=(Math.random()-.5)*(1.2+speed*1.6); if(W.addRipple&&speed>.3) W.addRipple(px,pz,.08+.06*speed); }
+      padS.hit[i]=.45; padS.act[i]=1;
+      if(speed>1.15&&padS.sc[i]>.75&&hp.ly<-.3&&padClock-padS.burstAt[i]>6) burstPad(i,hp.nx,hp.nz,speed); }
+    if(!padS.act[i]) continue;
+    padS.ox[i]+=padS.vx[i]*dt; padS.oz[i]+=padS.vz[i]*dt; const dr=Math.exp(-2.4*dt); padS.vx[i]*=dr; padS.vz[i]*=dr;
+    if(padS.hit[i]<=0){ const k=1-Math.min(1,dt*.04); padS.ox[i]*=k; padS.oz[i]*=k; padS.th[i]*=Math.exp(-dt*1.6); if(padS.th[i]<.003) padS.th[i]=0; } else padS.hit[i]-=dt;
+    padS.yw[i]+=padS.yv[i]*dt; padS.yv[i]*=Math.exp(-1.8*dt);
+    const idle=Math.abs(padS.ox[i])<.0005&&Math.abs(padS.oz[i])<.0005&&Math.abs(padS.vx[i])+Math.abs(padS.vz[i])<.001&&padS.th[i]===0&&Math.abs(padS.yv[i])<.01&&padS.sc[i]>=1;
+    if(idle){ padS.ox[i]=padS.oz[i]=padS.vx[i]=padS.vz[i]=padS.yw[i]=padS.yv[i]=0; padS.act[i]=0; }
+    writePad(i); }
+  // 碎葉：漂開、旋轉、被船擠開，約 10 秒後慢慢沉下去、縮小消失
+  for(let k=shreds.length-1;k>=0;k--){ const q=shreds[k]; q.age+=dt; if(q.age>22){ shreds.splice(k,1); continue; }
+    if(hullPush(q.x,q.z,q.r,bx,bz,c,s,k,hp)){ q.x+=hp.nx*hp.d; q.z+=hp.nz*hp.d; q.vx+=hp.nx*.5; q.vz+=hp.nz*.5; }
+    q.x+=q.vx*dt; q.z+=q.vz*dt; const dr=Math.exp(-1.5*dt); q.vx*=dr; q.vz*=dr; q.yaw+=q.yv*dt; q.yv*=Math.exp(-1.2*dt); }
+  const n=shreds.length; pads.count=PAD_N+n;
+  for(let k=0;k<n;k++){ const q=shreds[k], sink=q.age>10?(q.age-10)*.004:0, size=q.r*(q.age>16?Math.max(0,1-(q.age-16)/6):1);
+    pqY.setFromAxisAngle(pUp,q.yaw); pV.set(q.x,.012-sink+k*.00002,q.z); pS.set(size,1,size); pM.compose(pV,pqY,pS); pads.setMatrixAt(PAD_N+k,pM);
+    if(!q.col){ q.col=true; const cc=new T.Color(.7,.78,.6); pads.setColorAt(PAD_N+k,cc); pads.instanceColor.needsUpdate=true; } }
+  if(padsDirty||n>0||shreds.length!==updatePads.lastN){ pads.instanceMatrix.needsUpdate=true; padsDirty=false; }
+  updatePads.lastN=n; if(flowersDirty){ flowerInst.forEach(im=>{ im.instanceMatrix.needsUpdate=true; }); flowersDirty=false; } }
+window.__PADS={update:updatePads,state:padS,shreds};
 
 /* ---------- 浮萍（真實做法）：一張畫了上千片細小葉片的貼圖，鋪在不規則的浮萍毯網格上 ----------
    真的浮萍是 3～5 公釐的小圓葉擠成一片綠毯，邊緣碎成一團一團。不用雜訊硬算，貼圖細節在手機解析度下也看得出是葉子。 */
@@ -3583,6 +3641,7 @@ function update(dt,t){
   const s=sp(), bx=s.pos[0], bz=s.pos[1];
   if(s.kayak){ const sw=W.swell(bx,bz,t)*2.2; boat.visible=true; boat.position.set(bx,sw,bz); if(W.U.uBoat) W.U.uBoat.value.set(bx,bz,s.head,1);
     // 船每前進約半公尺就在浮萍的水道記錄裡加一個點
+    if(window.__PADS){ const L=window.__lastBoat||(window.__lastBoat={x:bx,z:bz}); const spd=dt>0?Math.min(4,Math.hypot(bx-L.x,bz-L.z)/dt):0; L.x=bx; L.z=bz; window.__PADS.update(dt,t,bx,bz,s.head,spd); }
     if(window.__DW){ const D=window.__DW, last=D.last; if(!last||Math.hypot(bx-last.x,bz-last.z)>.45){ D.last={x:bx,z:bz}; D.trail[D.next].set(bx,bz,t,0); D.next=(D.next+1)%D.trail.length; } } boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
     W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
   else if(s.yacht){ boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; const sw=W.swell(bx,bz,t)*.9; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
@@ -4477,7 +4536,7 @@ const SH4={};
 SH4.rainVS=`
 attribute vec3 aR;
 uniform float uTime; uniform vec3 uC; uniform float uSea; uniform vec3 uWind; uniform float uRad;
-varying vec2 vUv; varying float vT;
+varying vec2 vUv; varying float vT; varying vec2 vWp;
 float hh(float n){ return fract(sin(n)*43758.5453); }
 float seaH(vec2 p){
   vec2 wd = normalize(uWind.xy + vec2(1e-4)); float s = 0.45 + 1.1*uWind.z;
@@ -4493,13 +4552,14 @@ void main(){
   float y = uSea > 0.5 ? seaH(p) + 0.02 : 0.02;
   float sz = (0.18 + 0.28*aR.z)*(0.25 + vT*1.1);
   vUv = position.xz + 0.5;
-  vec3 wp = vec3(p.x + position.x*sz, y, p.y + position.z*sz);
+  vec3 wp = vec3(p.x + position.x*sz, y, p.y + position.z*sz); vWp = wp.xz;
   gl_Position = projectionMatrix*viewMatrix*vec4(wp, 1.0);
 }`;
 SH4.rainFS=`
-uniform float uRain; uniform vec3 uCol;
-varying vec2 vUv; varying float vT;
+uniform float uRain; uniform vec3 uCol; uniform vec4 uBoat;
+varying vec2 vUv; varying float vT; varying vec2 vWp;
 void main(){
+  if(uBoat.w>.5){ vec2 d=vWp-uBoat.xy; float c=cos(uBoat.z), s=sin(uBoat.z); vec2 l=vec2(d.x*c-d.y*s, d.x*s+d.y*c+.35); if((l.x*l.x)/.3025+(l.y*l.y)/5.29<1.0) discard; }
   float d = length(vUv - 0.5)*2.0;
   float ring = exp(-pow((d - 0.82)/0.09, 2.0)) + 0.5*exp(-pow((d - 0.5)/0.07, 2.0));
   float a = ring*(1.0 - vT)*uRain*0.55;
@@ -4509,18 +4569,18 @@ void main(){
 SH4.dropVS=`
 attribute vec3 aR;
 uniform float uTime; uniform vec3 uC; uniform float uRad; uniform float uScale;
-varying float vA;
+varying float vA; varying vec2 vP;
 float hh(float n){ return fract(sin(n)*43758.5453); }
 void main(){
   float cyc = uTime*(1.6 + aR.y) + aR.x*5.0; float n = floor(cyc); float t = fract(cyc);
   float a = hh(aR.x*51.3 + n*7.7)*6.2831853, r = sqrt(hh(aR.x*17.9 + n*5.3))*uRad;
   vec3 p = vec3(uC.x + cos(a)*r, max(0.0, sin(t*3.14159)*0.12*(0.5 + aR.z)) + 0.02, uC.z + sin(a)*r);
-  vec4 mv = viewMatrix*vec4(p, 1.0); gl_PointSize = max(1.0, 0.03*uScale/max(-mv.z, 0.1)); gl_Position = projectionMatrix*mv;
+  vP = p.xz; vec4 mv = viewMatrix*vec4(p, 1.0); gl_PointSize = max(1.0, 0.03*uScale/max(-mv.z, 0.1)); gl_Position = projectionMatrix*mv;
   vA = t < 0.6 ? 1.0 - t/0.6 : 0.0;
 }`;
 SH4.dropFS=`
-uniform float uRain; uniform vec3 uCol; varying float vA;
-void main(){ vec2 c = gl_PointCoord - 0.5; float a = (1.0 - smoothstep(0.2, 0.5, length(c)))*vA*uRain*0.8; if(a < 0.01) discard; gl_FragColor = vec4(uCol, a); }`;
+uniform float uRain; uniform vec3 uCol; uniform vec4 uBoat; varying float vA; varying vec2 vP;
+void main(){ if(uBoat.w>.5){ vec2 d=vP-uBoat.xy; float cc=cos(uBoat.z), ss=sin(uBoat.z); vec2 l=vec2(d.x*cc-d.y*ss, d.x*ss+d.y*cc+.35); if((l.x*l.x)/.3025+(l.y*l.y)/5.29<1.0) discard; } vec2 c = gl_PointCoord - 0.5; float a = (1.0 - smoothstep(0.2, 0.5, length(c)))*vA*uRain*0.8; if(a < 0.01) discard; gl_FragColor = vec4(uCol, a); }`;
 
 function createThrill(W,P,AT,c){
 'use strict';
@@ -4532,13 +4592,13 @@ const NR=260, rg=new T.InstancedBufferGeometry(), pl=new T.PlaneGeometry(1,1).ro
 rg.index=pl.index; rg.setAttribute('position',pl.attributes.position);
 const ar=new Float32Array(NR*3); for(let i=0;i<NR;i++){ ar[i*3]=Math.random(); ar[i*3+1]=Math.random()*.8; ar[i*3+2]=Math.random(); }
 rg.setAttribute('aR',new T.InstancedBufferAttribute(ar,3)); rg.instanceCount=NR;
-const rU={uTime:W.U.uTime,uC:{value:new T.Vector3()},uSea:W.U.uSea,uWind:W.U.uWind,uRad:{value:20},uRain:{value:0},uCol:{value:new T.Color(1,1,1)}};
+const rU={uBoat:W.U.uBoat,uTime:W.U.uTime,uC:{value:new T.Vector3()},uSea:W.U.uSea,uWind:W.U.uWind,uRad:{value:20},uRain:{value:0},uCol:{value:new T.Color(1,1,1)}};
 const rings=new T.Mesh(rg,new T.ShaderMaterial({uniforms:rU,vertexShader:SH4.rainVS,fragmentShader:SH4.rainFS,transparent:true,depthWrite:false}));
 rings.frustumCulled=false; rings.renderOrder=3; S.add(rings);
 const ND=300, dg=new T.BufferGeometry(), dp=new Float32Array(ND*3), dr=new Float32Array(ND*3);
 for(let i=0;i<ND;i++){ dr[i*3]=Math.random(); dr[i*3+1]=Math.random()*.8; dr[i*3+2]=Math.random(); }
 dg.setAttribute('position',new T.BufferAttribute(dp,3)); dg.setAttribute('aR',new T.BufferAttribute(dr,3));
-const dU={uTime:W.U.uTime,uC:rU.uC,uRad:{value:14},uScale:{value:800},uRain:rU.uRain,uCol:rU.uCol};
+const dU={uBoat:W.U.uBoat,uTime:W.U.uTime,uC:rU.uC,uRad:{value:14},uScale:{value:800},uRain:rU.uRain,uCol:rU.uCol};
 const drops=new T.Points(dg,new T.ShaderMaterial({uniforms:dU,vertexShader:SH4.dropVS,fragmentShader:SH4.dropFS,transparent:true,depthWrite:false}));
 drops.frustumCulled=false; S.add(drops); if(W.reflHide){ W.reflHide(rings); W.reflHide(drops); }
 
@@ -7163,7 +7223,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102040121'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102042956'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
