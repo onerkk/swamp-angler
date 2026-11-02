@@ -27,8 +27,9 @@ function createGodRays({renderer:R,camera,U}){
       gl_FragColor=vec4(vec3(sum/40.0),1.0); }`});
   // 第二步：以加色疊回畫面，顏色是當下太陽／月亮的光色
   const addMat=new T.ShaderMaterial({uniforms:u,vertexShader:VS,depthTest:false,depthWrite:false,transparent:true,blending:T.AdditiveBlending,fragmentShader:`
-    uniform sampler2D tRays; uniform float uStrength; uniform vec3 uCol; varying vec2 vUv;
-    void main(){ float r=texture2D(tRays,vUv).r; gl_FragColor=vec4(uCol*min(r*uStrength,.3),1.0); }`});
+    uniform sampler2D tRays; uniform float uStrength, uHorizon; uniform vec3 uCol; varying vec2 vUv;
+    // 光柱只畫在天空與地平線附近；水面上只留一點點，不會把湖面洗白（晨昏逆光時使用者回報太亮）
+    void main(){ float r=texture2D(tRays,vUv).r, sky=uHorizon<0.0?1.0:mix(.15,1.0,smoothstep(uHorizon-.1,uHorizon+.02,vUv.y)); gl_FragColor=vec4(uCol*min(r*uStrength,.16)*sky,1.0); }`});
   const marchScene=new T.Scene(), addScene=new T.Scene();
   const m1=new T.Mesh(quadGeo,marchMat), m2=new T.Mesh(quadGeo,addMat); m1.frustumCulled=m2.frustumCulled=false; marchScene.add(m1); addScene.add(m2);
   let frame=0;
