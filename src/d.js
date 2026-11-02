@@ -403,6 +403,9 @@ function lose(reason){ if(easy()&&G.fd&&G.f){ G.f.lostWhy=null; land(); return; 
 }
 function startJump(){ const f=G.f; f.jumpT=f.jumpDur=.85+.25*Math.sqrt(G.fd.L); fishPos(tv,0); P.splash(tv.x,0,tv.z,30,1.2); W.addRipple(tv.x,tv.z,.9); Snd.splash(1);
   toast('魚躍出水面！先放手！','warn',1100); vib(30); G.fish.group.visible=true; }
+function liftAbove(g){ if(!g||!g.parent) return; g.parent.updateMatrixWorld(true); g.updateMatrixWorld(true);
+  const b=new THREE.Box3().setFromObject(g), w=W.swell?W.swell(g.getWorldPosition(tv4b).x,tv4b.z,G.t):0, need=w+.25-b.min.y;
+  if(need>0){ const inv=new THREE.Matrix4().copy(g.parent.matrixWorld).invert(), up=new THREE.Vector3(0,need,0).transformDirection(inv).multiplyScalar(need); g.position.add(up); } }
 function dispDist(){ return Math.max(.42,G.fd.L*(G.fd.sp.sh.snout?3:2.6))*(W.camera.aspect<1?1:.8); }   // 拿在手上的魚約佔畫面寬度七成，看得清楚又不會塞滿
 function land(){
   if(!easy()&&G.loc==='sea'&&!G.fd.item&&!G.fd.sp.special&&G.fd.sp.id!=='shark'&&G.fd.sp.id!=='gwhite'&&Math.random()<.12*(1-.12*TR('sea'))&&!KK.busy()&&!(window.__ECO&&window.__ECO.fxOn('repel'))){ G.state='snatch'; fishPos(tv,-.05); toast('就在魚出水的瞬間……','warn',1200); KK.snatchOver(tv.clone(),()=>{ G.state='fight'; lose('shark'); }); return; }
@@ -1060,6 +1063,7 @@ function update(dt){
   else if(st==='lost'){ G.stT+=dt; lineOn=false; setAct('・・・','',false); if(G.stT>1.3){ G.snapped=false; G.state='idle'; } }
   else if(st==='land'||st==='catch'||st==='post'){
     const g=G.fish.group, D=dispDist(); rod.pitchT=.45; bob.visible=false; lineOn=st!=='post';
+    if(st!=='land'&&g.parent===W.head) liftAbove(g);   /* 展示中的魚整條保持在水面以上（只在低於水面時往上抬，不會一直累加） */
     W.head.updateMatrixWorld(true);
     if(st==='land'&&G.netting){
       // 抄網起魚：①網子伸到魚旁、探進水裡 ②魚被兜進網袋 ③整網提出水面（網袋被拉垂、滴水）④拉到眼前，魚在網裡掙扎
@@ -1082,7 +1086,7 @@ function update(dt){
       if(p3>0&&p3<1&&Math.random()<dt*30) P.splash(n.position.x+rand(-.3,.3),n.position.y-.35*hoopR,n.position.z+rand(-.3,.3),1,.14);   // 網袋一路滴水
       G.fish.uni.uAmp.value=.08+.25*Math.max(0,Math.sin(t*7)); G.fish.uni.uSwim.value+=dt*14;
       rod.pitchT=.3; rod.bendT=.35;
-      if(t>=3.0){ G.netting=false; G.netSplash=false; G.netAt=null; n.visible=false; W.head.attach(g); g.position.set(0,.14*D,-D); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }
+      if(t>=3.0){ G.netting=false; G.netSplash=false; G.netAt=null; n.visible=false; W.head.attach(g); g.position.set(0,.14*D,-D); liftAbove(g); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }
     }
     else if(st==='land'){
       // 起魚三段：①竿子高舉，魚被線吊出水面、頭朝上掛在竿尖下甩動掙扎、身上滴水 ②把吊著的魚拉到眼前晃著 ③轉成展示角度
@@ -1103,7 +1107,7 @@ function update(dt){
         if(t<T1&&g.position.y>-.1&&!G.liftSplash){ G.liftSplash=true; P.splash(g.position.x,0,g.position.z,46,1.4); W.addRipple(g.position.x,g.position.z,1.1); if(P.foamBurst) P.foamBurst(g.position.x,g.position.z,10,.45+.4*(G.fd&&G.fd.L||.5)); Snd.splash(1.3); vib([20,30,60]); }
         if(Math.random()<dt*14) P.splash(g.position.x,g.position.y-L*.45,g.position.z,1,.12);   // 身上滴水
       } else { const s=sstep(T2,T3,t); W.head.localToWorld(tv.set(0,.14*D,-D)); g.position.lerp(tv,s); g.quaternion.slerp(tq,s); G.fish.uni.uAmp.value=.1; G.fish.uni.uSwim.value+=dt*12; }
-      if(t>=T3){ G.swing=null; G.liftSplash=false; W.head.attach(g); g.position.set(0,.14*D,-D); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }
+      if(t>=T3){ G.swing=null; G.liftSplash=false; W.head.attach(g); g.position.set(0,.14*D,-D); liftAbove(g); g.rotation.set(0,0,0); G.state='catch'; G.stT=0; showCard(); }
     } else if(st==='catch'){
       // 拿在手上的魚：不時用力甩尾掙扎（整條魚跟著扭），身上一直滴水，鰓蓋呼吸般微微起伏
       G.stT+=dt; G.thr=(G.thr||0)-dt; if(G.thr<=0){ G.thr=rand(1.6,3.4); G.thrT=.55; vib(12); }
