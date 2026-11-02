@@ -736,10 +736,11 @@ function updateKayak(dt){
   let thr=KY.thr, turn=KY.turn;
   if(keys.KeyW) thr=1; if(keys.KeyS) thr=-.6; if(keys.KeyA) turn=-1; if(keys.KeyD) turn=1;
   if(!can){ thr=0; turn=0; if(s.yacht){KY.v=0;KY.w=0;} }
-  if(!s.kayak&&!s.yacht){ KY.v=0; KY.w=0; WL.paddle(dt,0); stowRod(WL.padOn()); return; }
-  KY.v+=(thr*(s.yacht?9:1.5)-KY.v*(s.yacht?.6:.65))*dt;   /* 漁船靠引擎：最高約每秒 15 公尺（約 29 節），獨木舟約 2.3 公尺 */ KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
+  if(!s.kayak&&!s.yacht){ KY.v=0; KY.w=0; G.boatV=0; G.boatW=0; WL.paddle(dt,0); stowRod(WL.padOn()); return; }
+  KY.v+=(thr*(s.yacht?13.2:1.5)-KY.v*(s.yacht?.6:.65))*dt;   /* 遊艇雙引擎全速約每秒 22 公尺（約 43 節，運動型釣魚遊艇的極速），約 4 秒內衝到八成；獨木舟約 2.3 公尺 */ KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
   WL.paddle(dt,s.yacht?0:clamp(Math.max(Math.abs(thr),Math.abs(turn)*.7),0,1),AT.ring);   // 遊艇靠引擎，不划槳
   stowRod(s.yacht&&G.boatStation==='helm'?1:WL.padOn());
+  G.boatV=KY.v; G.boatW=KY.w;   /* 遊艇的姿態（抬頭、轉彎側傾）與艏浪、航跡依船速計算 */
   if(Math.abs(KY.v)<.002&&Math.abs(KY.w)<.002) return;
   G.head-=KY.w*dt;
   const fx=-Math.sin(G.head), fz=-Math.cos(G.head);
@@ -753,7 +754,7 @@ function updateKayak(dt){
   G.base.x=nx; G.base.z=nz;
   if(Math.abs(thr)>.1) G.yawT+=(0-G.yawT)*Math.min(1,dt*1.5);
   KY.wake-=dt; const spd=Math.abs(KY.v);
-  if(spd>.25&&KY.wake<=0){ KY.wake=.4; AT.ring(G.base.x-fx*1.9,G.base.z-fz*1.9,.6+spd*.5); AT.ring(G.base.x+fx*1.8,G.base.z+fz*1.8,.3+spd*.3); if(spd>.9) P.splash(G.base.x+fx*1.9,0,G.base.z+fz*1.9,3,.3); }
+  if(!s.yacht&&spd>.25&&KY.wake<=0){   /* 遊艇的艏浪與航跡由 wake.js 畫（留在水上、往外散開），這裡的水圈只給獨木舟 */ KY.wake=.4; AT.ring(G.base.x-fx*1.9,G.base.z-fz*1.9,.6+spd*.5); AT.ring(G.base.x+fx*1.8,G.base.z+fz*1.8,.3+spd*.3); if(spd>.9) P.splash(G.base.x+fx*1.9,0,G.base.z+fz*1.9,3,.3); }
 }
 const fadeEl=$('fade'), uwTag=$('uwTag');
 // 診斷：替幾個可能很重的動作計時，長任務就能指名是誰（存檔、換釣點、場景釋放、避障路徑、小屋進出）
@@ -831,10 +832,10 @@ function updateFight(dt){
   const lightCatch=!!(fd.item||fs.pow<.7||fd.w<.25);   // 漂流物、遺物（fd.item）、力氣很小或很輕的魚
   if(f.T<.1&&!G.held&&!lightCatch) f.slk+=dt/(2.8*DF.slack); else f.slk=Math.max(0,f.slk-dt*(G.held?3:1.5));
   const zone=f.T>.4&&f.T<.8;
-  const drain=(3+18*f.T)*(1+.8*clamp(good,0,1))*(zone?1.2:1)/(fs.stam*DF.stam*(.7+.25*Math.sqrt(fd.w)));
+  const drain=(3+18*f.T)*(1+.8*clamp(good,0,1))*(zone?1.2:1)/(fs.stam*DF.stam*(.7+.25*Math.sqrt(fd.w))*(fd.boss&&fd.boss.stam||1));   /* Boss 的耐力倍率：越後面的 Boss 遛越久 */
   f.stam=clamp(f.stam-drain*(window.__ECO&&window.__ECO.fxOn('meal_str')?1.3:1)*dt+(f.T<.2?2.5*dt:0),0,100);
   const reel=G.held?[.75,1,1.2][f.drag]*META.gear().reel.spd*clamp(1.25-f.T,.15,1)*(f.stam<8?1.4:1)*(zone?1.15:1)*(dive?.3:1):0;
-  const run=f.run?fs.spd*ST.spd*stamF*1.5*(G.held?.35:1)*(dive?.4:1):(G.held?0:.05);
+  const run=f.run?fs.spd*ST.spd*stamF*1.5*(G.held?.35:1)*(dive?.4:1)*(fd.boss&&fd.boss.spd||1):(G.held?0:.05);   /* Boss 的衝刺速度倍率：衝得越快越容易把線放光，捲線器的速度與線量就變得重要 */
   f.d=Math.max(0,f.d+(run-reel)*dt);
   f.theta=clamp(f.theta+f.latDir*fs.agi*ST.lat*.16*stamF*dt*(G.held?.7:1),-.85,.85);
   let az=f.az0+f.theta; { fishPos(tv,0); const r=Math.hypot(tv.x,tv.z), Rm=W.shoreR(Math.atan2(tv.x,-tv.z))-3; if(r>Rm) f.d=Math.max(2,f.d-(r-Rm)); }
