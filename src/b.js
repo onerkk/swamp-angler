@@ -415,17 +415,23 @@ void main(){
     if(uReef > 0.01&&uDetail>.5){
       vec3 Vr = refract(-V, N, 0.75);
       float iy = 1.0/max(-Vr.y, 0.12);
-      vec2 b0 = vW.xz + Vr.xz*4.5*iy;
+      vec2 b0 = vW.xz + Vr.xz*4.0*iy;
       float rf_ = noise2(b0*0.08)*0.6 + noise2(b0*0.23 + 3.1)*0.4;
-      float reefK = smoothstep(0.46, 0.56, rf_), grass = smoothstep(0.38, 0.46, rf_)*(1.0 - reefK);
-      float Dd = 4.5 - 1.6*reefK, Lp = Dd*iy;
+      float reefK = smoothstep(0.50, 0.60, rf_), grass = smoothstep(0.40, 0.48, rf_)*(1.0 - reefK);
+      // 熱帶淺海：沙洲淺（約 2 公尺）、溝槽深（約 8 公尺），淺處透出碧綠、深處轉成藍，水面因此一塊亮一塊深
+      float depthN = noise2(b0*0.035 + 7.3)*0.7 + noise2(b0*0.11 + 1.7)*0.3;
+      float Dd = mix(1.8, 8.0, smoothstep(0.30, 0.75, depthN)) - 1.2*reefK, Lp = Dd*iy;
       vec2 bp = vW.xz + Vr.xz*Lp;
-      float cs = 0.0;if(uDetail>.5)cs = (causF(bp, uTime) + 0.6*causF(bp*1.7 + 9.0, uTime*1.2))*mix(0.15, 1.0, uSunVis)*(1.0 - 0.7*uRain);   // 陰天下雨沒有陽光，海底不會有亮晶晶的光紋
+      float cs = 0.0;if(uDetail>.5)cs = (causF(bp, uTime) + 0.6*causF(bp*1.7 + 9.0, uTime*1.2))*mix(0.15, 1.0, uSunVis)*(1.0 - 0.7*uRain)*1.45;   // 陰天下雨沒有陽光，海底不會有亮晶晶的光紋；晴天淺沙上的光紋特別亮
+      // 白沙上有被水流推出的細沙紋
+      float sr = sin(dot(bp, vec2(0.8, 0.6))*9.0 + noise2(bp*1.3)*4.0)*0.5 + 0.5;
+      vec3 sand = vec3(0.93, 0.89, 0.76)*(0.86 + 0.14*sr)*(0.9 + 0.2*noise2(bp*2.7));
       vec3 rk = mix(vec3(0.10, 0.13, 0.11), vec3(0.04, 0.06, 0.06), noise2(bp*0.9));
-      vec3 bed = mix(mix(vec3(0.92, 0.88, 0.72), vec3(0.45, 0.50, 0.35), grass*0.6), rk, reefK);
-      bed *= lk*(0.6 + 0.75*cs*uLightK*(0.35 + 0.65*uSunVis)*(1.0 - 0.6*reefK)*(1.0 - smoothstep(6.0, 40.0, dist)));
-      vec3 Tr = exp(-vec3(0.38, 0.075, 0.055)*(Lp + Dd));
-      vec3 shal = bed*Tr + vec3(0.02, 0.30, 0.36)*lk*(1.0 - Tr);
+      vec3 bed = mix(mix(sand, vec3(0.45, 0.50, 0.35), grass*0.6), rk, reefK);
+      bed *= lk*(0.62 + 1.05*cs*uLightK*(0.35 + 0.65*uSunVis)*(1.0 - 0.6*reefK)*(1.0 - smoothstep(8.0, 50.0, dist)));
+      vec3 Tr = exp(-vec3(0.36, 0.065, 0.045)*(Lp + Dd));
+      vec3 inS = mix(vec3(0.06, 0.52, 0.56), vec3(0.02, 0.24, 0.40), smoothstep(2.5, 8.0, Dd))*lk;
+      vec3 shal = bed*Tr + inS*(1.0 - Tr);
       shal = mix(shal, vec3(dot(shal, vec3(0.3, 0.55, 0.15)))*vec3(0.85, 1.0, 1.0), 0.45*(1.0 - uSunVis) + 0.3*uRain);
       shal *= 1.0 - 0.45*uRain;   // 下雨：雲厚光弱、水面被雨打花，淺海明顯暗下來   // 陰天：淺水的藍綠色變得灰而柔和
       bodyD = mix(deepC, shal, uReef*(1.0 - smoothstep(20.0, 160.0, dist)));

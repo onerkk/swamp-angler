@@ -83,3 +83,4 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 垃圾回收卡頓根因：physics.js hit/inside/clear/resolve/refresh 原本每次呼叫都配置物件與陣列（每幀上萬次），改成不配置；c.js setLine 繞路結果快取（兩端移動 <5cm 或 0.25 秒內沿用），短線不繞路；釣線碰撞忽略「船體」箱。headless 量測每分鐘配置 518MB → 161MB
 - 搏魚翻白（c.js foam/foamBurst，d.js updateFight 呼叫）：程式畫的泡沫紋理（細胞泡沫邊＋氣泡），180 片實例化水面方片，壽命在著色器裡算（長大→碎成蕾絲→消失），強度依張力、衝刺、甩頭、魚的深度；跳水落水與起魚時一團爆開。測試掛鉤 window.__PROPS
 - 搏魚時魚本體在 14m 內放到水面下（透過水面看得到甩動翻身）；甩頭時尾巴拍水，c.js splash(x,y,z,n,pw,dx,dz) 可帶方向噴成弧；衝刺時兩側小漣漪成 V 形尾浪。測試：window.__testFight(x,z) 直接進入搏魚（可配 ?fish=bass）
+- 近海礁岩淺海（b.js uReef 分支）：海底深度依雜訊 1.8～8m 變化（沙洲碧綠、溝槽轉藍），白沙細沙紋，晴天光紋加強 1.45 倍，散射色依深度從碧綠到藍

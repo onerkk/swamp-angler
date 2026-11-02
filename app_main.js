@@ -1,4 +1,4 @@
-/*APPV:20261102082814*/
+/*APPV:20261102084804*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -1428,17 +1428,23 @@ void main(){
     if(uReef > 0.01&&uDetail>.5){
       vec3 Vr = refract(-V, N, 0.75);
       float iy = 1.0/max(-Vr.y, 0.12);
-      vec2 b0 = vW.xz + Vr.xz*4.5*iy;
+      vec2 b0 = vW.xz + Vr.xz*4.0*iy;
       float rf_ = noise2(b0*0.08)*0.6 + noise2(b0*0.23 + 3.1)*0.4;
-      float reefK = smoothstep(0.46, 0.56, rf_), grass = smoothstep(0.38, 0.46, rf_)*(1.0 - reefK);
-      float Dd = 4.5 - 1.6*reefK, Lp = Dd*iy;
+      float reefK = smoothstep(0.50, 0.60, rf_), grass = smoothstep(0.40, 0.48, rf_)*(1.0 - reefK);
+      // 熱帶淺海：沙洲淺（約 2 公尺）、溝槽深（約 8 公尺），淺處透出碧綠、深處轉成藍，水面因此一塊亮一塊深
+      float depthN = noise2(b0*0.035 + 7.3)*0.7 + noise2(b0*0.11 + 1.7)*0.3;
+      float Dd = mix(1.8, 8.0, smoothstep(0.30, 0.75, depthN)) - 1.2*reefK, Lp = Dd*iy;
       vec2 bp = vW.xz + Vr.xz*Lp;
-      float cs = 0.0;if(uDetail>.5)cs = (causF(bp, uTime) + 0.6*causF(bp*1.7 + 9.0, uTime*1.2))*mix(0.15, 1.0, uSunVis)*(1.0 - 0.7*uRain);   // 陰天下雨沒有陽光，海底不會有亮晶晶的光紋
+      float cs = 0.0;if(uDetail>.5)cs = (causF(bp, uTime) + 0.6*causF(bp*1.7 + 9.0, uTime*1.2))*mix(0.15, 1.0, uSunVis)*(1.0 - 0.7*uRain)*1.45;   // 陰天下雨沒有陽光，海底不會有亮晶晶的光紋；晴天淺沙上的光紋特別亮
+      // 白沙上有被水流推出的細沙紋
+      float sr = sin(dot(bp, vec2(0.8, 0.6))*9.0 + noise2(bp*1.3)*4.0)*0.5 + 0.5;
+      vec3 sand = vec3(0.93, 0.89, 0.76)*(0.86 + 0.14*sr)*(0.9 + 0.2*noise2(bp*2.7));
       vec3 rk = mix(vec3(0.10, 0.13, 0.11), vec3(0.04, 0.06, 0.06), noise2(bp*0.9));
-      vec3 bed = mix(mix(vec3(0.92, 0.88, 0.72), vec3(0.45, 0.50, 0.35), grass*0.6), rk, reefK);
-      bed *= lk*(0.6 + 0.75*cs*uLightK*(0.35 + 0.65*uSunVis)*(1.0 - 0.6*reefK)*(1.0 - smoothstep(6.0, 40.0, dist)));
-      vec3 Tr = exp(-vec3(0.38, 0.075, 0.055)*(Lp + Dd));
-      vec3 shal = bed*Tr + vec3(0.02, 0.30, 0.36)*lk*(1.0 - Tr);
+      vec3 bed = mix(mix(sand, vec3(0.45, 0.50, 0.35), grass*0.6), rk, reefK);
+      bed *= lk*(0.62 + 1.05*cs*uLightK*(0.35 + 0.65*uSunVis)*(1.0 - 0.6*reefK)*(1.0 - smoothstep(8.0, 50.0, dist)));
+      vec3 Tr = exp(-vec3(0.36, 0.065, 0.045)*(Lp + Dd));
+      vec3 inS = mix(vec3(0.06, 0.52, 0.56), vec3(0.02, 0.24, 0.40), smoothstep(2.5, 8.0, Dd))*lk;
+      vec3 shal = bed*Tr + inS*(1.0 - Tr);
       shal = mix(shal, vec3(dot(shal, vec3(0.3, 0.55, 0.15)))*vec3(0.85, 1.0, 1.0), 0.45*(1.0 - uSunVis) + 0.3*uRain);
       shal *= 1.0 - 0.45*uRain;   // 下雨：雲厚光弱、水面被雨打花，淺海明顯暗下來   // 陰天：淺水的藍綠色變得灰而柔和
       bodyD = mix(deepC, shal, uReef*(1.0 - smoothstep(20.0, 160.0, dist)));
@@ -7285,7 +7291,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102082814'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102084804'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
