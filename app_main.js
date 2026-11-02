@@ -1,4 +1,4 @@
-/*APPV:20261101232648*/
+/*APPV:20261102000205*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -1305,17 +1305,12 @@ void main(){
   float px = length(fwidth(p));
   float fadeD = 1.0 - smoothstep(0.012, 0.03, px);
   float leaf = noise2(p*42.0)*0.6 + noise2(p*11.0)*0.4;
-  // Individual floating leaves, with open water between them even inside a patch.
-  vec2 leafP=p*38.0+vec2(sin(uTime*.055),cos(uTime*.043))*.08;
-  vec2 cell=floor(leafP), leafUV=fract(leafP)-.5;
-  vec2 leafOffset=vec2(hash21(cell+3.1),hash21(cell+19.7))*.45-.225;
-  float leafRadius=.12+.12*hash21(cell+7.9);
-  float aa=max(.012,length(fwidth(leafP))*.65);
-  float leafShape=1.0-smoothstep(leafRadius-aa,leafRadius+aa,length((leafUV-leafOffset)*vec2(1.0,1.35)));
+  // 浮萍：真實的浮萍是成片的綠毯，邊緣碎成一小團一小團，不是均勻散在水面上的單顆圓點（以前每 2.6 公分一格放一顆，手機上看起來像整齊的小黑點）
   float leafPatch=smoothstep(.58,.79,dens);
-  float chosen=step(1.0-leafPatch*.88,hash21(cell+41.2));
-  float dw=leafShape*chosen*fadeD*(1.0-uSea);
-  dw+=leafPatch*.018*(1.0-fadeD)*(1.0-uSea);
+  float clump=noise2(p*6.5+vec2(uTime*.004,-uTime*.003))*.62+noise2(p*17.0)*.38;
+  float dwMat=smoothstep(.5,.62,leafPatch*.95+(clump-.5)*.55);
+  float frond=mix(.82,1.0,smoothstep(.3,.7,leaf)*fadeD);
+  float dw=dwMat*frond*(1.0-uSea);
   vec2 wd = normalize(uWind.xy + vec2(1e-4));
   float gust = smoothstep(0.35, 0.75, noise2(p*0.035 - uCloudOff*9.0)*0.7 + noise2(p*0.11 - uCloudOff*20.0)*0.3);
   float csh = uDetail>.5?1.0-0.85*cloudSh(p):1.0;
@@ -1464,7 +1459,7 @@ void main(){
   if(uBio > 0.01){ float bn = noise2(p*4.2 + vec2(uTime*0.23, -uTime*0.19))*noise2(p*1.1 - uTime*0.05);
     float bs = smoothstep(0.55, 0.8, bn)*(0.5 + 0.5*sin(uTime*3.1 + p.x*5.7 + p.y*3.3));
     col += vec3(0.05, 0.42, 0.8)*bs*uBio*(1.0 - smoothstep(4.0, 50.0, dist))*0.7; }
-  vec3 dwc = vec3(0.09, 0.19, 0.024)*(0.65 + 0.55*mix(0.5, leaf, fadeD))*(amb*0.75 + uLightCol*ndl*uSunVis*0.42*csh + 0.02);
+  vec3 dwc = vec3(0.17, 0.33, 0.045)*(0.75 + 0.4*mix(0.5, leaf, fadeD))*(amb*0.95 + uLightCol*ndl*uSunVis*0.55*csh + 0.05);
   col = mix(col, TM(dwc), dw);
   float foamS = (1.0 - smoothstep(0.3, 2.5, Rs - rp))*(0.5 + 0.5*noise2(p*1.3 + uTime*0.05))*(1.0 - uSea);
   float cap = smoothstep(0.16, 0.3, length(g))*clamp((uWind.z - 0.45)*2.2, 0.0, 1.0)*(0.5 + 0.5*noise2(p*2.0 - uCloudOff*30.0));
@@ -7096,7 +7091,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261101232648'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102000205'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
