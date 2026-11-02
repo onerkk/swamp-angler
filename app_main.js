@@ -1,4 +1,4 @@
-/*APPV:20261102021116*/
+/*APPV:20261102025212*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -65,15 +65,15 @@ function mergeMeshesByMaterial(T,meshes,relativeTo){
  for(const m of meshes){if(!m||!m.isMesh||Array.isArray(m.material)||m.isSkinnedMesh||m.isInstancedMesh)continue;m.updateWorldMatrix(true,false);if(!groups.has(m.material))groups.set(m.material,[]);groups.get(m.material).push(m);}
  const out=[];
  for(const [mat,list]of groups){
-  const hasUV=list.every(m=>m.geometry.attributes.uv),hasN=list.every(m=>m.geometry.attributes.normal);let vc=0,ic=0;
+  const hasUV=list.every(m=>m.geometry.attributes.uv),hasN=list.every(m=>m.geometry.attributes.normal),hasC=list.every(m=>m.geometry.attributes.color);let vc=0,ic=0;
   for(const m of list){const g=m.geometry;vc+=g.attributes.position.count;ic+=g.index?g.index.count:g.attributes.position.count;}
-  const pos=new Float32Array(vc*3),nor=hasN?new Float32Array(vc*3):null,uv=hasUV?new Float32Array(vc*2):null,idx=vc>65535?new Uint32Array(ic):new Uint16Array(ic);
+  const pos=new Float32Array(vc*3),nor=hasN?new Float32Array(vc*3):null,uv=hasUV?new Float32Array(vc*2):null,colr=hasC?new Float32Array(vc*3):null,idx=vc>65535?new Uint32Array(ic):new Uint16Array(ic);
   const mtx=new T.Matrix4(),nm=new T.Matrix3(),v=new T.Vector3();let vo=0,io=0;
-  for(const m of list){const g=m.geometry,p=g.attributes.position,n=g.attributes.normal,u=g.attributes.uv;mtx.multiplyMatrices(inv,m.matrixWorld);nm.getNormalMatrix(mtx);
-   for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(mtx);pos.set([v.x,v.y,v.z],(vo+i)*3);if(nor){v.fromBufferAttribute(n,i).applyMatrix3(nm).normalize();nor.set([v.x,v.y,v.z],(vo+i)*3);}if(uv)uv.set([u.getX(i),u.getY(i)],(vo+i)*2);}
+  for(const m of list){const g=m.geometry,p=g.attributes.position,n=g.attributes.normal,u=g.attributes.uv,cA=g.attributes.color;mtx.multiplyMatrices(inv,m.matrixWorld);nm.getNormalMatrix(mtx);
+   for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(mtx);pos.set([v.x,v.y,v.z],(vo+i)*3);if(nor){v.fromBufferAttribute(n,i).applyMatrix3(nm).normalize();nor.set([v.x,v.y,v.z],(vo+i)*3);}if(uv)uv.set([u.getX(i),u.getY(i)],(vo+i)*2);if(colr)colr.set([cA.getX(i),cA.getY(i),cA.getZ(i)],(vo+i)*3);}
    if(g.index)for(let i=0;i<g.index.count;i++)idx[io+i]=g.index.getX(i)+vo;else for(let i=0;i<p.count;i++)idx[io+i]=vo+i;
    io+=g.index?g.index.count:p.count;vo+=p.count;}
-  const geo=new T.BufferGeometry();geo.setAttribute('position',new T.BufferAttribute(pos,3));if(nor)geo.setAttribute('normal',new T.BufferAttribute(nor,3));if(uv)geo.setAttribute('uv',new T.BufferAttribute(uv,2));geo.setIndex(new T.BufferAttribute(idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();
+  const geo=new T.BufferGeometry();geo.setAttribute('position',new T.BufferAttribute(pos,3));if(nor)geo.setAttribute('normal',new T.BufferAttribute(nor,3));if(uv)geo.setAttribute('uv',new T.BufferAttribute(uv,2));if(colr)geo.setAttribute('color',new T.BufferAttribute(colr,3));geo.setIndex(new T.BufferAttribute(idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();
   const merged=new T.Mesh(geo,mat);merged.castShadow=list.some(m=>m.castShadow);merged.receiveShadow=list.some(m=>m.receiveShadow);merged.renderOrder=list[0].renderOrder;out.push(merged);
  }
  return out;
@@ -1952,9 +1952,12 @@ const padGeo=new T.CircleGeometry(1,24,.16,Math.PI*2-.32); padGeo.rotateX(-Math.
 const padMat=new T.MeshStandardMaterial({map:padTex, roughness:.86, metalness:0, side:T.DoubleSide, envMapIntensity:.18});   // 葉面蠟質只有淡淡光澤，陰天不會反射成一片白
 const padPos=[];
 { const R=rng(11); const cl=[[-3.0,-5.5,9],[-2.4,-9.5,8],[3.4,-7.2,10],[2.9,-13,7],[-5.5,-15,10],[6,-18,9],[-3.8,-24,8],[5,-28,7],[-7,-30,9],[3.4,-4.6,6],[-3.3,-3.6,5]];
-  for(const c of cl) for(let i=0;i<c[2];i++){ const a=R()*6.283, r=Math.sqrt(R())*1.6; padPos.push([c[0]+Math.cos(a)*r, c[1]+Math.sin(a)*r, .13+R()*.22, R()*6.283]); } }
+  for(const c of cl) for(let i=0;i<c[2];i++){ const a=R()*6.283, r=Math.sqrt(R())*1.6; padPos.push([c[0]+Math.cos(a)*r, c[1]+Math.sin(a)*r, .13+R()*.22, R()*6.283]); }
+  // 浮萍灣（釣點 -7,-17 一帶）：睡蓮成片，葉子大小不一、緊挨著長，中間留出釣位附近的水道
+  const bay=[[-11.5,-13.5,22,2.6],[-12,-19.5,24,2.8],[-4.5,-21.5,18,2.3],[-10,-24,16,2.2],[-2,-14.5,12,1.9],[-14.5,-16.5,14,2.0]];
+  for(const c of bay) for(let i=0;i<c[2];i++){ const a=R()*6.283, r=Math.sqrt(R())*c[3]; padPos.push([c[0]+Math.cos(a)*r, c[1]+Math.sin(a)*r, .16+R()*.26, R()*6.283]); } }
 const pads=new T.InstancedMesh(padGeo,padMat,padPos.length);
-padPos.forEach((p,i)=>{ q4.setFromEuler(eu.set(0,p[3],0)); pv.set(p[0],.006+i*.00003,p[1]); sv.set(p[2],1,p[2]); m4.compose(pv,q4,sv); pads.setMatrixAt(i,m4);
+padPos.forEach((p,i)=>{ q4.setFromEuler(eu.set(0,p[3],0)); pv.set(p[0],.013+i*.00003,p[1]); sv.set(p[2],1,p[2]); m4.compose(pv,q4,sv); pads.setMatrixAt(i,m4);
   PH.addBox({x:p[0]-p[2],y:-.03,z:p[1]-p[2]},{x:p[0]+p[2],y:.025,z:p[1]+p[2]},()=>pads.visible,"睡蓮葉");
   const c=.85+((i*7919)%100)/100*.3; pads.setColorAt(i,new T.Color(c,c,c*.9)); });
 pads.userData.lake=true; scene.add(pads);
@@ -1967,6 +1970,31 @@ for(const k of [3,12,25,40,57,70]){ const p=padPos[k%padPos.length]; const g=new
   const cm=new T.Mesh(new T.SphereGeometry(.022,10,8),coreMat); cm.position.y=.025; g.add(cm); g.position.set(p[0]+.05,.01,p[1]); g.traverse(o=>{ if(o.isMesh) flowerParts.push(o); }); }
   // 六朵睡蓮共 66 個零件合成兩個網格（花瓣、花心），從 66 次繪製變 2 次
   mergeMeshesByMaterial(T,flowerParts,null).forEach(m=>{ m.userData.lake=true; scene.add(m); }); }
+
+/* ---------- 浮萍（真實做法）：一張畫了上千片細小葉片的貼圖，鋪在不規則的浮萍毯網格上 ----------
+   真的浮萍是 3～5 公釐的小圓葉擠成一片綠毯，邊緣碎成一團一團。不用雜訊硬算，貼圖細節在手機解析度下也看得出是葉子。 */
+const dwTex=(()=>{ const N=512, cv=document.createElement('canvas'); cv.width=cv.height=N; const x=cv.getContext('2d'); x.clearRect(0,0,N,N); const R=rng(23);
+  const pal=[[118,160,52],[96,146,44],[132,172,60],[84,132,40],[150,184,70],[108,150,48]];
+  for(let i=0;i<2600;i++){ const px=R()*N, py=R()*N, r=2.6+R()*2.2, c=pal[(R()*pal.length)|0], sh=.82+R()*.3, rot=R()*6.283, e=.78+R()*.22;
+    for(const ox of [-N,0,N]) for(const oy of [-N,0,N]){ const cx=px+ox, cy=py+oy; if(cx<-8||cy<-8||cx>N+8||cy>N+8) continue;
+      x.save(); x.translate(cx,cy); x.rotate(rot); x.scale(1,e);
+      x.fillStyle='rgba('+((c[0]*.55)|0)+','+((c[1]*.55)|0)+','+((c[2]*.55)|0)+',1)'; x.beginPath(); x.arc(0,0,r+.7,0,6.283); x.fill();
+      const g=x.createRadialGradient(-r*.3,-r*.3,r*.1,0,0,r); g.addColorStop(0,'rgb('+((c[0]*sh*1.12)|0)+','+((c[1]*sh*1.1)|0)+','+((c[2]*sh)|0)+')'); g.addColorStop(1,'rgb('+((c[0]*sh*.78)|0)+','+((c[1]*sh*.82)|0)+','+((c[2]*sh*.7)|0)+')');
+      x.fillStyle=g; x.beginPath(); x.arc(0,0,r,0,6.283); x.fill(); x.restore(); } }
+  const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; t.anisotropy=4; t.encoding=T.sRGBEncoding; return t; })();
+const dwMat=new T.MeshStandardMaterial({map:dwTex, roughness:.8, metalness:0, alphaTest:.5, transparent:false, vertexColors:true, envMapIntensity:.15, side:T.DoubleSide});
+{ const R=rng(37), parts=[];
+  // 大片的毯子在睡蓮之間與岸邊，小團散在毯子外圍；形狀用角度雜訊做成不規則，邊緣再用頂點色壓暗、顏色略有深淺
+  const mats=[[-12.5,-14,3.4],[-11,-20.5,3.8],[-14.8,-18,2.6],[-5,-22.8,2.4],[-9.5,-25.5,2.8],[-3.2,-15.5,1.6],[-15.5,-22.5,2.0],[-7.8,-11.5,1.8]];
+  for(let k=0;k<30;k++){ const b=mats[k%mats.length], a=R()*6.283, d=b[2]*(1.05+R()*1.1); mats.push([b[0]+Math.cos(a)*d,b[1]+Math.sin(a)*d,.25+R()*.7]); }
+  for(const m of mats){ const seg=m[2]>1.2?40:16, g=new T.CircleGeometry(1,seg), ph=R()*6.283, ph2=R()*6.283, pos=g.attributes.position, col=new Float32Array(pos.count*3), uv=g.attributes.uv;
+    for(let i=0;i<pos.count;i++){ const x0=pos.getX(i), y0=pos.getY(i), r0=Math.hypot(x0,y0), an=Math.atan2(y0,x0);
+      const wob=1+.22*Math.sin(an*3+ph)+.14*Math.sin(an*7+ph2)+.07*Math.sin(an*13+ph*2); const r=r0*m[2]*wob;
+      const wx=m[0]+Math.cos(an)*r, wz=m[1]+Math.sin(an)*r; pos.setXYZ(i,wx,0,wz); uv.setXY(i,wx*2.6,wz*2.6);
+      const edge=r0>.85?.78:1, tint=.88+.2*fbm(wx*.9,wz*.9,2); col[i*3]=edge*tint; col[i*3+1]=edge*tint; col[i*3+2]=edge*tint*.92; }
+    g.setAttribute('color',new T.BufferAttribute(col,3)); g.computeVertexNormals(); const mesh=new T.Mesh(g,dwMat); parts.push(mesh); }
+  // renderOrder 1：水面不寫深度卻會蓋住比浪高低的東西，浮萍毯排在水面之後畫就不會被浪蓋掉
+  mergeMeshesByMaterial(T,parts,null).forEach(mm=>{ mm.position.y=.006; mm.renderOrder=1; mm.userData.lake=true; mm.receiveShadow=true; scene.add(mm); if(W.reflHide) W.reflHide(mm); }); }
 
 const bladeGeo=new T.PlaneGeometry(.022,1,1,5); bladeGeo.translate(0,.5,0);
 { const p=bladeGeo.attributes.position; for(let i=0;i<p.count;i++){ const y=p.getY(i); p.setX(i,p.getX(i)*(1-y*.9)); p.setZ(i,y*y*.06); } bladeGeo.computeVertexNormals(); }
@@ -7107,7 +7135,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102021116'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102025212'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
