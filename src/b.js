@@ -302,16 +302,8 @@ void main(){
   float nearShore = 1.0 - smoothstep(2.0, 20.0, Rs - rp);
   float nearDock = 1.0 - smoothstep(2.5, 7.0, length(vec2(p.x*0.8, p.y - 0.5)));
   float lane = exp(-p.x*p.x/70.0)*smoothstep(4.0, 12.0, -p.y)*(1.0 - smoothstep(40.0, 80.0, -p.y));
-  float dens = fbm3(p*0.055 + vec2(7.3, 2.1)) + nearShore*0.26 + nearDock*0.12 - lane*0.3 - 0.22*smoothstep(0.55, 0.78, noise2(p*0.45 + 3.7));
-  float px = length(fwidth(p));
-  float fadeD = 1.0 - smoothstep(0.012, 0.03, px);
-  float leaf = noise2(p*42.0)*0.6 + noise2(p*11.0)*0.4;
-  // 浮萍：真實的浮萍是成片的綠毯，邊緣碎成一小團一小團，不是均勻散在水面上的單顆圓點（以前每 2.6 公分一格放一顆，手機上看起來像整齊的小黑點）
-  float leafPatch=smoothstep(.58,.79,dens);
-  float clump=noise2(p*6.5+vec2(uTime*.004,-uTime*.003))*.62+noise2(p*17.0)*.38;
-  float dwMat=smoothstep(.5,.62,leafPatch*.95+(clump-.5)*.55);
-  float frond=mix(.82,1.0,smoothstep(.3,.7,leaf)*fadeD);
-  float dw=dwMat*frond*(1.0-uSea);
+  // 不再畫程式產生的浮萍：真實路線下它看起來像一片假綠毯，也省下每個像素好幾次雜訊計算
+  float dw=0.0;
   vec2 wd = normalize(uWind.xy + vec2(1e-4));
   float gust = smoothstep(0.35, 0.75, noise2(p*0.035 - uCloudOff*9.0)*0.7 + noise2(p*0.11 - uCloudOff*20.0)*0.3);
   float csh = uDetail>.5?1.0-0.85*cloudSh(p):1.0;
@@ -462,8 +454,6 @@ void main(){
   if(uBio > 0.01){ float bn = noise2(p*4.2 + vec2(uTime*0.23, -uTime*0.19))*noise2(p*1.1 - uTime*0.05);
     float bs = smoothstep(0.55, 0.8, bn)*(0.5 + 0.5*sin(uTime*3.1 + p.x*5.7 + p.y*3.3));
     col += vec3(0.05, 0.42, 0.8)*bs*uBio*(1.0 - smoothstep(4.0, 50.0, dist))*0.7; }
-  vec3 dwc = vec3(0.17, 0.33, 0.045)*(0.75 + 0.4*mix(0.5, leaf, fadeD))*(amb*0.95 + uLightCol*ndl*uSunVis*0.55*csh + 0.05);
-  col = mix(col, TM(dwc), dw);
   float foamS = (1.0 - smoothstep(0.3, 2.5, Rs - rp))*(0.5 + 0.5*noise2(p*1.3 + uTime*0.05))*(1.0 - uSea);
   float cap = smoothstep(0.16, 0.3, length(g))*clamp((uWind.z - 0.45)*2.2, 0.0, 1.0)*(0.5 + 0.5*noise2(p*2.0 - uCloudOff*30.0));
   #ifdef SEAGRID
@@ -545,7 +535,7 @@ const sunLight = new T.DirectionalLight(0xffffff, 0.9); scene.add(sunLight); sce
 renderer.shadowMap.type=T.PCFSoftShadowMap;sunLight.castShadow=true;sunLight.shadow.bias=-.00018;sunLight.shadow.normalBias=.012;sunLight.shadow.radius=2;
 Object.assign(sunLight.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.2,far:130});sunLight.shadow.camera.updateProjectionMatrix();
 // 陰影一律開著：關掉再打開會讓全場材質重新編譯而卡一下；低畫質改用小張陰影圖、較低更新頻率
-function setShadows(q){renderer.shadowMap.enabled=true;const n=q==='ultra'?Math.min(4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='auto'?1024:q==='mid'?1024:512;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
+function setShadows(q){renderer.shadowMap.enabled=true;const n=q==='ultra'?Math.min(window.__resourcePolicy?.mobile?2048:4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='auto'?1024:q==='mid'?1024:512;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
 const hemi = new T.HemisphereLight(0xffffff, 0x223322, 0.55); scene.add(hemi);
 
 const materialQuality=createMaterialQuality();let materialScanTimes=new WeakMap();
@@ -669,7 +659,7 @@ function renderRefl(){
   // 倒影依畫質用較低頻率更新：水面本來就有波紋，20～30 次／秒肉眼看不出差別，卻省下整整一次全場景繪製；鏡頭大幅移動時立刻補畫
   { const e=camera.matrixWorld.elements, key=[e[8],e[9],e[10],e[12],e[13],e[14]].map(v=>Math.round(v*8)).join(','), hz=window.__effectBudget?.reflectionHz||60, now=U.uTime.value;
     if(reflCamKey===key&&now-lastRefl<1/hz&&now>=lastRefl&&WU.uReflOn.value===1) return; reflCamKey=key; lastRefl=now; }
-  renderer.getDrawingBufferSize(_sz); const cap=window.__gfxStatus&&window.__gfxStatus.level===7?1536:window.__GFX==='high'?1024:640,k=Math.min(reflScale,cap/Math.max(_sz.x,_sz.y)),w=Math.max(64,Math.round(_sz.x*k)), h=Math.max(64,Math.round(_sz.y*k));
+  renderer.getDrawingBufferSize(_sz); const mobile=!!window.__resourcePolicy?.mobile,cap=mobile?(window.__gfxStatus&&window.__gfxStatus.level>=6?768:window.__GFX==='high'?640:512):(window.__gfxStatus&&window.__gfxStatus.level===7?1536:window.__GFX==='high'?1024:640),k=Math.min(reflScale,cap/Math.max(_sz.x,_sz.y)),w=Math.max(64,Math.round(_sz.x*k)), h=Math.max(64,Math.round(_sz.y*k));
   if(reflRT.width!==w||reflRT.height!==h) reflRT.setSize(w,h);
   _rp.set(_cp.x,0,_cp.z); _vw.subVectors(_rp,_cp).reflect(_n).negate().add(_rp);
   _rm.extractRotation(camera.matrixWorld); _la.set(0,0,-1).applyMatrix4(_rm).add(_cp);

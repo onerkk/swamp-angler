@@ -660,7 +660,9 @@ G.saveRef=save;
 window.__STORY=createStory({save,persist,toast,Snd,vib,goSpot:i=>goSpot(i),curSpot:()=>G.spot,idle:()=>G.state==='idle',pan:on=>{ G.cinePan=on; if(!on) G.yawT=0; },addXP:x=>META.addXP(x),setCoins:()=>setCoins(),syncHUD:()=>META.syncHUD()});
 const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* Adaptive profiles change resolution, reflection, shadow and effect budgets together. */
-window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;return Math.max(.35,Math.min(3.25,Math.max(2,window.devicePixelRatio||1),Math.sqrt(12000000/(w*h)),limit/w,limit/h));};
+window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;const px=window.__resourcePolicy?.mobile?2200000:12000000;
+ // 手機上限約 220 萬像素（接近 1080p）：手機螢幕的實際像素密度常到 3 倍以上，照原生密度畫整片水面會讓 GPU 每幀多做幾倍的工作，肉眼卻看不出差別
+ return Math.max(.35,Math.min(3.25,Math.max(2,window.devicePixelRatio||1),Math.sqrt(px/(w*h)),limit/w,limit/h));};
 const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,initialLevel:window.__resourcePolicy?.mobile?1:4,profile:(p,scope,cap)=>{if(window.__resourcePolicy?.recovery&&p.mode==='auto'){const safe={...p,...graphicsProfiles(cap)[Math.min(p.level,2)],maxLevel:2,reason:'前次中斷後的保護模式'};return{...safe,pr:Math.min(safe.pr,.8)};}return stableCabinGraphicsProfile(aquariumGraphicsProfile(p,scope,cap),scope,window.__resourcePolicy?.mobile);},apply:s=>{
   window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;const tier=effectTier(s.mode,!!window.__resourcePolicy?.mobile);window.__effectTier=tier;window.__effectBudget=effectBudget(s.effectLevel??s.level,tier);if(W.setEffects)W.setEffects(s.effectLevel??s.level,tier);
   if(W.setWaterDetail)W.setWaterDetail(s.geometry);if(W.setShadows)W.setShadows(s.shadow);if(W.setRefl)W.setRefl(s.reflection>0,s.reflection);W.setPR(s.pr);
@@ -1137,8 +1139,8 @@ requestAnimationFrame(frame);
     const slow=setInterval(()=>{ if(lbox&&lbox.classList.contains('done')){ clearInterval(slow); return; } if(performance.now()-lastT>15000&&ltip) ltip.textContent='網路比較慢，仍在下載中，請不要關閉畫面…（也可以先按「開始釣魚」，畫面會在下載完後自動變成真實場景）\n目前：'+(window.__LASTURL||'')+'（'+(window.__LOADN||'')+'）'; },3000);
     try{ window.__REAL=createReal(W,P,(p,done,err)=>{ if(!ln) return; if(p!==lastP){ lastP=p; lastT=performance.now(); }
       if(lbar) lbar.style.width=Math.max(3,Math.round((done?1:p)*100))+'%';
-      if(done||Math.round(p*100)>=100){ if(!window.__REALDONE){ try{ W.renderer.compile(W.scene,W.camera); }catch(_){} }
-      // 上一行：場景載完時趁還在載入畫面，一次把全場材質的著色器編譯好，避免開始玩後第一次看到某個東西才編譯而卡一下
+      if(done||Math.round(p*100)>=100){ if(!window.__REALDONE){ try{ W.renderer.compile(W.scene,W.camera); if(W.renderer.initTexture){ const seen=new Set(); W.scene.traverse(o=>{ const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[]; for(const m of ms) for(const k in m){ const t=m[k]; if(t&&t.isTexture&&!seen.has(t)){ seen.add(t); try{ W.renderer.initTexture(t); }catch(_){} } } }); } }catch(_){} }
+      // 上一行：場景載完時趁還在載入畫面，一次把全場材質的著色器編譯好、貼圖全部先上傳到顯示卡，避免開始玩後轉頭第一次看到某個東西才編譯、上傳而卡一下
       window.__REALDONE=true; ln.textContent='✅ 真實場景已載入'; if(lbox) lbox.classList.add('done'); try{ localStorage.setItem('swampAngler.loaded','1'); }catch(e){} if(sb&&sb.dataset.t){ sb.textContent=sb.dataset.t; sb.style.opacity=''; } }
       else if(err&&p===0) ln.textContent='部分場景檔案載入失敗，暫用簡化畫面（'+err+'）';
       else ln.textContent='正在載入真實場景… '+Math.round(p*100)+'%'; }); }catch(e){ console.warn(e); }

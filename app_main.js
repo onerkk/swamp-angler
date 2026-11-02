@@ -1,4 +1,4 @@
-/*APPV:20261102001209*/
+/*APPV:20261102015517*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -1303,16 +1303,8 @@ void main(){
   float nearShore = 1.0 - smoothstep(2.0, 20.0, Rs - rp);
   float nearDock = 1.0 - smoothstep(2.5, 7.0, length(vec2(p.x*0.8, p.y - 0.5)));
   float lane = exp(-p.x*p.x/70.0)*smoothstep(4.0, 12.0, -p.y)*(1.0 - smoothstep(40.0, 80.0, -p.y));
-  float dens = fbm3(p*0.055 + vec2(7.3, 2.1)) + nearShore*0.26 + nearDock*0.12 - lane*0.3 - 0.22*smoothstep(0.55, 0.78, noise2(p*0.45 + 3.7));
-  float px = length(fwidth(p));
-  float fadeD = 1.0 - smoothstep(0.012, 0.03, px);
-  float leaf = noise2(p*42.0)*0.6 + noise2(p*11.0)*0.4;
-  // 浮萍：真實的浮萍是成片的綠毯，邊緣碎成一小團一小團，不是均勻散在水面上的單顆圓點（以前每 2.6 公分一格放一顆，手機上看起來像整齊的小黑點）
-  float leafPatch=smoothstep(.58,.79,dens);
-  float clump=noise2(p*6.5+vec2(uTime*.004,-uTime*.003))*.62+noise2(p*17.0)*.38;
-  float dwMat=smoothstep(.5,.62,leafPatch*.95+(clump-.5)*.55);
-  float frond=mix(.82,1.0,smoothstep(.3,.7,leaf)*fadeD);
-  float dw=dwMat*frond*(1.0-uSea);
+  // 不再畫程式產生的浮萍：真實路線下它看起來像一片假綠毯，也省下每個像素好幾次雜訊計算
+  float dw=0.0;
   vec2 wd = normalize(uWind.xy + vec2(1e-4));
   float gust = smoothstep(0.35, 0.75, noise2(p*0.035 - uCloudOff*9.0)*0.7 + noise2(p*0.11 - uCloudOff*20.0)*0.3);
   float csh = uDetail>.5?1.0-0.85*cloudSh(p):1.0;
@@ -1463,8 +1455,6 @@ void main(){
   if(uBio > 0.01){ float bn = noise2(p*4.2 + vec2(uTime*0.23, -uTime*0.19))*noise2(p*1.1 - uTime*0.05);
     float bs = smoothstep(0.55, 0.8, bn)*(0.5 + 0.5*sin(uTime*3.1 + p.x*5.7 + p.y*3.3));
     col += vec3(0.05, 0.42, 0.8)*bs*uBio*(1.0 - smoothstep(4.0, 50.0, dist))*0.7; }
-  vec3 dwc = vec3(0.17, 0.33, 0.045)*(0.75 + 0.4*mix(0.5, leaf, fadeD))*(amb*0.95 + uLightCol*ndl*uSunVis*0.55*csh + 0.05);
-  col = mix(col, TM(dwc), dw);
   float foamS = (1.0 - smoothstep(0.3, 2.5, Rs - rp))*(0.5 + 0.5*noise2(p*1.3 + uTime*0.05))*(1.0 - uSea);
   float cap = smoothstep(0.16, 0.3, length(g))*clamp((uWind.z - 0.45)*2.2, 0.0, 1.0)*(0.5 + 0.5*noise2(p*2.0 - uCloudOff*30.0));
   #ifdef SEAGRID
@@ -1546,7 +1536,7 @@ const sunLight = new T.DirectionalLight(0xffffff, 0.9); scene.add(sunLight); sce
 renderer.shadowMap.type=T.PCFSoftShadowMap;sunLight.castShadow=true;sunLight.shadow.bias=-.00018;sunLight.shadow.normalBias=.012;sunLight.shadow.radius=2;
 Object.assign(sunLight.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.2,far:130});sunLight.shadow.camera.updateProjectionMatrix();
 // 陰影一律開著：關掉再打開會讓全場材質重新編譯而卡一下；低畫質改用小張陰影圖、較低更新頻率
-function setShadows(q){renderer.shadowMap.enabled=true;const n=q==='ultra'?Math.min(4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='auto'?1024:q==='mid'?1024:512;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
+function setShadows(q){renderer.shadowMap.enabled=true;const n=q==='ultra'?Math.min(window.__resourcePolicy?.mobile?2048:4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='auto'?1024:q==='mid'?1024:512;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
 const hemi = new T.HemisphereLight(0xffffff, 0x223322, 0.55); scene.add(hemi);
 
 const materialQuality=createMaterialQuality();let materialScanTimes=new WeakMap();
@@ -1670,7 +1660,7 @@ function renderRefl(){
   // 倒影依畫質用較低頻率更新：水面本來就有波紋，20～30 次／秒肉眼看不出差別，卻省下整整一次全場景繪製；鏡頭大幅移動時立刻補畫
   { const e=camera.matrixWorld.elements, key=[e[8],e[9],e[10],e[12],e[13],e[14]].map(v=>Math.round(v*8)).join(','), hz=window.__effectBudget?.reflectionHz||60, now=U.uTime.value;
     if(reflCamKey===key&&now-lastRefl<1/hz&&now>=lastRefl&&WU.uReflOn.value===1) return; reflCamKey=key; lastRefl=now; }
-  renderer.getDrawingBufferSize(_sz); const cap=window.__gfxStatus&&window.__gfxStatus.level===7?1536:window.__GFX==='high'?1024:640,k=Math.min(reflScale,cap/Math.max(_sz.x,_sz.y)),w=Math.max(64,Math.round(_sz.x*k)), h=Math.max(64,Math.round(_sz.y*k));
+  renderer.getDrawingBufferSize(_sz); const mobile=!!window.__resourcePolicy?.mobile,cap=mobile?(window.__gfxStatus&&window.__gfxStatus.level>=6?768:window.__GFX==='high'?640:512):(window.__gfxStatus&&window.__gfxStatus.level===7?1536:window.__GFX==='high'?1024:640),k=Math.min(reflScale,cap/Math.max(_sz.x,_sz.y)),w=Math.max(64,Math.round(_sz.x*k)), h=Math.max(64,Math.round(_sz.y*k));
   if(reflRT.width!==w||reflRT.height!==h) reflRT.setSize(w,h);
   _rp.set(_cp.x,0,_cp.z); _vw.subVectors(_rp,_cp).reflect(_n).negate().add(_rp);
   _rm.extractRotation(camera.matrixWorld); _la.set(0,0,-1).applyMatrix4(_rm).add(_cp);
@@ -3676,7 +3666,7 @@ for(let k=0;k<7;k++){ const g=new T.Group(); const bd=new T.Mesh(new T.SphereGeo
   [-.55,0,.55].forEach((a,j)=>{ for(const s of [1,-1]){ const l=new T.Mesh(legG,stMat); l.position.z=(1-j)*.006; l.rotation.y=s>0?a:Math.PI-a; g.add(l); } });
   // 身體和六隻腳合成一個網格：每隻水黽從 7 次繪製變 1 次，群組仍照原本方式移動
   const parts=g.children.slice(); const merged=mergeMeshesByMaterial(T,parts,g); parts.forEach(o=>g.remove(o)); merged.forEach(m=>g.add(m));
-  g.scale.setScalar(1.6); g.visible=false; g.userData={vx:0,vz:0,t:0}; S.add(g); striders.push(g); }
+  g.scale.setScalar(1.6); g.visible=false; g.userData={vx:0,vz:0,t:0}; S.add(g); if(W.reflHide) W.reflHide(g); striders.push(g); }
 /* ---------- 跳出水面的魚 ---------- */
 const jumpers={}; let jf=null;
 function startJump(x,z){ const ids=['bluegill','crappie','reba','lmbass'], id=ids[Math.floor(Math.random()*ids.length)];
@@ -3905,7 +3895,8 @@ if(T.GLTFLoader){
       tmp.scale.setScalar((hMin+rnd()*(hMax-hMin))/Math.max(k.h,1e-3)); tmp.position.set(x,y-.02,zz); tmp.rotation.set(0,rnd()*Math.PI*2,0); tmp.updateMatrix();
       if(!perKind.has(k)) perKind.set(k,[]); perKind.get(k).push(tmp.matrix.clone()); }
     for(const [k,mats] of perKind){ k.w.traverse(o=>{ if(o.isMesh){ o.castShadow=false; if(o.material){ o.material.envMapIntensity=.9; } } });
-      instanceCopies(T,k.w,mats).forEach(im=>{ im.userData.lake=true; im.userData.veg=true; im.visible=!(W.isSea&&W.isSea()); W.scene.add(im); }); } });
+      instanceCopies(T,k.w,mats).forEach(im=>{ im.userData.lake=true; im.userData.veg=true; im.visible=!(W.isSea&&W.isSea()); W.scene.add(im); if(window.__resourcePolicy?.mobile&&W.reflHide) W.reflHide(im); }); } });
+    // 手機上岸邊小草不畫進倒影：倒影解析度低，本來就只是一抹綠，省下整個倒影繪製的一大半
   scatter('grass_medium_01.glb',34,.3,.6,ZONES,.12);
   scatter('grass_medium_02.glb',14,.35,.7,ZONES,.12);
   scatter('shrub_03.glb',10,.6,1.1,ZONES,.2);
@@ -7095,7 +7086,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102001209'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102015517'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9233,7 +9224,9 @@ G.saveRef=save;
 window.__STORY=createStory({save,persist,toast,Snd,vib,goSpot:i=>goSpot(i),curSpot:()=>G.spot,idle:()=>G.state==='idle',pan:on=>{ G.cinePan=on; if(!on) G.yawT=0; },addXP:x=>META.addXP(x),setCoins:()=>setCoins(),syncHUD:()=>META.syncHUD()});
 const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* Adaptive profiles change resolution, reflection, shadow and effect budgets together. */
-window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;return Math.max(.35,Math.min(3.25,Math.max(2,window.devicePixelRatio||1),Math.sqrt(12000000/(w*h)),limit/w,limit/h));};
+window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;const px=window.__resourcePolicy?.mobile?2200000:12000000;
+ // 手機上限約 220 萬像素（接近 1080p）：手機螢幕的實際像素密度常到 3 倍以上，照原生密度畫整片水面會讓 GPU 每幀多做幾倍的工作，肉眼卻看不出差別
+ return Math.max(.35,Math.min(3.25,Math.max(2,window.devicePixelRatio||1),Math.sqrt(px/(w*h)),limit/w,limit/h));};
 const gfxAuto=createAdaptiveGraphics({cap:window.__gfxCap,initialLevel:window.__resourcePolicy?.mobile?1:4,profile:(p,scope,cap)=>{if(window.__resourcePolicy?.recovery&&p.mode==='auto'){const safe={...p,...graphicsProfiles(cap)[Math.min(p.level,2)],maxLevel:2,reason:'前次中斷後的保護模式'};return{...safe,pr:Math.min(safe.pr,.8)};}return stableCabinGraphicsProfile(aquariumGraphicsProfile(p,scope,cap),scope,window.__resourcePolicy?.mobile);},apply:s=>{
   window.__GFX=s.effect;window.__gfxStatus=s;window.__waterQuality=s.water;const tier=effectTier(s.mode,!!window.__resourcePolicy?.mobile);window.__effectTier=tier;window.__effectBudget=effectBudget(s.effectLevel??s.level,tier);if(W.setEffects)W.setEffects(s.effectLevel??s.level,tier);
   if(W.setWaterDetail)W.setWaterDetail(s.geometry);if(W.setShadows)W.setShadows(s.shadow);if(W.setRefl)W.setRefl(s.reflection>0,s.reflection);W.setPR(s.pr);
@@ -9710,8 +9703,8 @@ requestAnimationFrame(frame);
     const slow=setInterval(()=>{ if(lbox&&lbox.classList.contains('done')){ clearInterval(slow); return; } if(performance.now()-lastT>15000&&ltip) ltip.textContent='網路比較慢，仍在下載中，請不要關閉畫面…（也可以先按「開始釣魚」，畫面會在下載完後自動變成真實場景）\n目前：'+(window.__LASTURL||'')+'（'+(window.__LOADN||'')+'）'; },3000);
     try{ window.__REAL=createReal(W,P,(p,done,err)=>{ if(!ln) return; if(p!==lastP){ lastP=p; lastT=performance.now(); }
       if(lbar) lbar.style.width=Math.max(3,Math.round((done?1:p)*100))+'%';
-      if(done||Math.round(p*100)>=100){ if(!window.__REALDONE){ try{ W.renderer.compile(W.scene,W.camera); }catch(_){} }
-      // 上一行：場景載完時趁還在載入畫面，一次把全場材質的著色器編譯好，避免開始玩後第一次看到某個東西才編譯而卡一下
+      if(done||Math.round(p*100)>=100){ if(!window.__REALDONE){ try{ W.renderer.compile(W.scene,W.camera); if(W.renderer.initTexture){ const seen=new Set(); W.scene.traverse(o=>{ const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[]; for(const m of ms) for(const k in m){ const t=m[k]; if(t&&t.isTexture&&!seen.has(t)){ seen.add(t); try{ W.renderer.initTexture(t); }catch(_){} } } }); } }catch(_){} }
+      // 上一行：場景載完時趁還在載入畫面，一次把全場材質的著色器編譯好、貼圖全部先上傳到顯示卡，避免開始玩後轉頭第一次看到某個東西才編譯、上傳而卡一下
       window.__REALDONE=true; ln.textContent='✅ 真實場景已載入'; if(lbox) lbox.classList.add('done'); try{ localStorage.setItem('swampAngler.loaded','1'); }catch(e){} if(sb&&sb.dataset.t){ sb.textContent=sb.dataset.t; sb.style.opacity=''; } }
       else if(err&&p===0) ln.textContent='部分場景檔案載入失敗，暫用簡化畫面（'+err+'）';
       else ln.textContent='正在載入真實場景… '+Math.round(p*100)+'%'; }); }catch(e){ console.warn(e); }

@@ -115,7 +115,8 @@ if(T.GLTFLoader){
       tmp.scale.setScalar((hMin+rnd()*(hMax-hMin))/Math.max(k.h,1e-3)); tmp.position.set(x,y-.02,zz); tmp.rotation.set(0,rnd()*Math.PI*2,0); tmp.updateMatrix();
       if(!perKind.has(k)) perKind.set(k,[]); perKind.get(k).push(tmp.matrix.clone()); }
     for(const [k,mats] of perKind){ k.w.traverse(o=>{ if(o.isMesh){ o.castShadow=false; if(o.material){ o.material.envMapIntensity=.9; } } });
-      instanceCopies(T,k.w,mats).forEach(im=>{ im.userData.lake=true; im.userData.veg=true; im.visible=!(W.isSea&&W.isSea()); W.scene.add(im); }); } });
+      instanceCopies(T,k.w,mats).forEach(im=>{ im.userData.lake=true; im.userData.veg=true; im.visible=!(W.isSea&&W.isSea()); W.scene.add(im); if(window.__resourcePolicy?.mobile&&W.reflHide) W.reflHide(im); }); } });
+    // 手機上岸邊小草不畫進倒影：倒影解析度低，本來就只是一抹綠，省下整個倒影繪製的一大半
   scatter('grass_medium_01.glb',34,.3,.6,ZONES,.12);
   scatter('grass_medium_02.glb',14,.35,.7,ZONES,.12);
   scatter('shrub_03.glb',10,.6,1.1,ZONES,.2);

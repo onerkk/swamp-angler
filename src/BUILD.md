@@ -60,3 +60,6 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 遠近細節 lod.js：models/lod/*_lod1.glb（12%，遠處）與 *_lod0.glb（35%，中低畫質的近處）是倒木、樹樁、岸邊岩石的簡化幾何（無貼圖、Draco），由 GLTFLoader 掛鉤自動配對，遠處換幾何、材質不變；新增大型岸邊模型時用 /tmp 的 gltf-transform 腳本（simplify ratio 0.12、prune keepAttributes、draco）產生並加入 LOD_MODELS
 - 合併繪製 batching.js：mergeMeshesByMaterial（同材質小零件合成一個網格，例：睡蓮花、水黽）、instanceCopies（岸邊散植改實例化）；湖區繪製次數約 446 → 202
 - 水面細波紋層數 uWaterLOD：高 4、中 3、低 2
+- 手機像素預算：__gfxCap 在手機上限約 220 萬像素（約 1080p），不照原生 3 倍密度畫；倒影 RT 手機最長邊 ≤768、陰影 ≤2048；岸邊小草與水黽不進倒影
+- 載入完成時預先編譯著色器並 initTexture 全部貼圖，避免轉頭第一次看到才上傳而卡頓
+- 程式浮萍已移除（真實路線，不要假綠毯）
