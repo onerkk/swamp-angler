@@ -539,7 +539,7 @@ function syncFish(){ const hd=c.data(), want={fresh:hd.fresh,sea:hd.seaTank?hd.s
       o.rotation.y=f.yaw; const b=bounds(tk,rec.L);o.position.set(0,(b.y0+b.y1)/2,tk.spec.d*.2);
       if(W.qualityTextures)W.qualityTextures(o);tk.g.add(o);if(tk.optics)tk.optics.add(o);tk.motion.add(f);pickTarget(f,tk);tk.fish.push(f);tk.motion.pack();
       }catch(err){if(created){for(let i=tk.motion.bodies.length-1;i>=0;i--)if(tk.motion.bodies[i].o===created)tk.motion.bodies.splice(i,1);disposeAquariumResident(created,tk.optics);}tk.pending.push(rec);if(tk.lastError!==String(err)){tk.lastError=String(err);console.error('tank fish',rec&&rec.id,err);}}},'aquarium resident '+rec.id);}); } }
-// 標本：依真實長度展示（做標本就是要看牠真正有多大）
+// 標本牆：依真實長度展示（做標本就是要看牠真正有多大）
 // · 1 公尺以下：掛在前牆右半邊的木板上，木板依魚長裁切，兩排依長度由大到小排
 // · 超過 1 公尺：像真正的釣魚小屋一樣，用細繩從天花板吊起來，沿著房間寬度（8.8 公尺）的五條吊掛線排
 const MW={z0:-4.25,z1:-.5,rows:[2.42,1.72]}, CEIL_Z=[-3.35,-2.45,-.7,.3,1.3], CEIL_X=[-4.05,4.05], WALL_MAX_L=1.0;
