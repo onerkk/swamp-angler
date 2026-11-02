@@ -25,6 +25,8 @@ uniform vec2 uCloudOff;
 uniform float uCShadow;
 uniform sampler2D uBandA;
 uniform sampler2D uBandB;
+uniform sampler2D uHzA;
+uniform sampler2D uHzB;
 uniform sampler2D uFullA;
 uniform sampler2D uFullB;
 uniform sampler2D uMask;
@@ -185,9 +187,20 @@ vec3 photoS(sampler2D band, sampler2D full, vec3 d){
   vec3 c = (vb > 0.003 && vb < 0.997) ? texture2D(band, vec2(u, vb)).rgb : texture2D(full, vec2(u, e*0.31830989 + 0.5)).rgb;
   return pow(c, vec3(2.2));
 }
+vec3 photoPost(vec3 c, vec3 d);
 vec3 photoEnv(vec3 dir){
   vec3 d = normalize(dir);
-  vec3 c = mix(photoS(uBandA, uFullA, d), photoS(uBandB, uFullB, d), uPMix);
+  return photoPost(mix(photoS(uBandA, uFullA, d), photoS(uBandB, uFullB, d), uPMix), d);
+}
+// 遠處水面的霧色：取實拍全景地平線上方一段、左右大範圍模糊過的平均色（h.js 載入照片時算好的一條 256 格色帶）。
+// 以前直接取照片地平線那一格：照片裡遠山、樹叢的剪影在某個方位突然結束，水面的霧色就跟著在那個方位一刀變色，畫面上出現一條直的接縫
+vec3 photoHaze(vec3 dir){
+  vec3 d = normalize(dir);
+  float u = fract(atan(d.x, -d.z)*0.15915494 + uYaw);
+  vec3 c = mix(texture2D(uHzA, vec2(u, 0.5)).rgb, texture2D(uHzB, vec2(u, 0.5)).rgb, uPMix);
+  return photoPost(pow(c, vec3(2.2)), d);
+}
+vec3 photoPost(vec3 c, vec3 d){
   float g = dot(c, vec3(0.3, 0.59, 0.11));
   // 陰天／下雨：天空部分換成實拍的陰天雲層照片（Poly Haven，CC0）；遠山、岸邊等地景保留原照片
   if(uOvcK > 0.01 && d.y > -0.02){
@@ -471,7 +484,7 @@ void main(){
   float foam = clamp(foamS*0.55 + cap*0.8, 0.0, 0.9)*(1.0 - dw);
   col = mix(col, TM((amb*0.9 + uLightCol*ndl*0.5*csh)*0.55), foam);
   float mist = uMist*0.4*smoothstep(12.0, 90.0, dist);
-  vec3 fogC = uPhoto > 0.5 ? photoEnv(normalize(vec3(-V.x, 0.015, -V.z))) : fogColor(-V);
+  vec3 fogC = uPhoto > 0.5 ? photoHaze(vec3(-V.x, 0.015, -V.z)) : fogColor(-V);
   col = mix(col, fogC, clamp((fogF(dist)*0.9 + mist)*(1.0 - 0.6*uSea), 0.0, 0.95));
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
@@ -518,7 +531,7 @@ const head = new T.Group(); head.rotation.x = -0.16; player.add(head); head.add(
 const V = () => new T.Vector3();
 const U = { uTime:{value:0}, uSunDir:{value:new T.Vector3(0,1,0)}, uLightCol:{value:V()}, uSunDisk:{value:new T.Vector3(0,1,0)},
   uSunCol:{value:V()}, uMoonDir:{value:new T.Vector3(0,1,0)}, uMoonCol:{value:V()}, uZenith:{value:V()}, uHorizon:{value:V()},
-  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0},uDetail:{value:1},uWaterLOD:{value:0},uBoat:{value:new T.Vector4(0,0,0,0)}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.012,.075,.13)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
+  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0},uDetail:{value:1},uWaterLOD:{value:0},uBoat:{value:new T.Vector4(0,0,0,0)}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uHzA:{value:null}, uHzB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.012,.075,.13)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
 
 // 天空球（含樹林遠景）
 const skyMat = new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:SH.common+SH.skyFS, side:T.BackSide, depthWrite:false, depthTest:false});

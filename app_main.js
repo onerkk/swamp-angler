@@ -1,4 +1,4 @@
-/*APPV:20261102141933*/
+/*APPV:20261102152024*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -832,25 +832,27 @@ if(typeof module!=='undefined'&&module.exports)module.exports={createWaterOptics
 /* Above-water fragments and underwater radiance are rendered separately. The water
    shader transmits the underwater target, then applies its reflection on top. */
 function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
-  const T=THREE,roots=new Set(),patched=new WeakSet(),pass={value:0};
+  const T=THREE,roots=new Set(),patched=new WeakSet(),pass={value:0},solidMats=[];
   // 跟螢幕一樣用 sRGB 編碼：倒影、水下、主畫面三個階段的輸出編碼一致，每個材質就不會每幀在兩種著色器設定之間來回切換（那會讓 three.js 每幀重算程式鍵值、製造大量垃圾）
   const rt=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true,encoding:T.sRGBEncoding});
   let lightScanAt=-Infinity,lastPass=-Infinity,lastSize='';const cam=new T.PerspectiveCamera(),size=new T.Vector2();cam.layers.set(1);cam.matrixAutoUpdate=false;
   WU.uSubmerged={value:rt.texture};WU.uSubmergedSize={value:new T.Vector2(1,1)};WU.uSubmergedOn={value:0};
-  function patch(mat){
+  // solid：人形角色這類不透明的模型保留深度寫入，否則頭髮、手臂、身體前後次序會錯亂；水下那一層改把顏色預先乘上透明度（不透明材質不做混色，直接寫進去）
+  function patch(mat,solid){
     if(patched.has(mat))return;patched.add(mat);
     const prev=mat.onBeforeCompile,key=mat.customProgramCacheKey.bind(mat);
-    mat.transparent=true;mat.depthWrite=false;
+    solid=!!solid;const solidU={value:solid?1:0};if(solid)solidMats.push([mat,solidU]);
+    if(!solid){mat.transparent=true;mat.depthWrite=false;}
     mat.onBeforeCompile=(s,r)=>{
       if(prev)prev(s,r);
-      Object.assign(s.uniforms,{uSubPass:pass,uSubTime:U.uTime,uSubWind:U.uWind,uSubSea:U.uSea});
+      Object.assign(s.uniforms,{uSubSolid:solidU,uSubPass:pass,uSubTime:U.uTime,uSubWind:U.uWind,uSubSea:U.uSea});
       s.vertexShader='varying vec3 vSubWorld;\n'+s.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
         vec4 subVertex=vec4(transformed,1.0);
         #ifdef USE_INSTANCING
         subVertex=instanceMatrix*subVertex;
         #endif
         vSubWorld=(modelMatrix*subVertex).xyz;`);
-      s.fragmentShader='varying vec3 vSubWorld;\nuniform float uSubPass,uSubTime,uSubSea;\nuniform vec3 uSubWind;\n'+waterWaveGLSL()+'\n'+s.fragmentShader.replace(/}\s*$/,`
+      s.fragmentShader='varying vec3 vSubWorld;\nuniform float uSubPass,uSubTime,uSubSea,uSubSolid;\nuniform vec3 uSubWind;\n'+waterWaveGLSL()+'\n'+s.fragmentShader.replace(/}\s*$/,`
         float subDepth=waterSample(vSubWorld.xz,uSubTime,uSubWind,uSubSea).y-vSubWorld.y;
         if(uSubPass<.5){if(subDepth>0.0)discard;}
         else{
@@ -858,15 +860,16 @@ function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
           float waterFade=exp(-subDepth*mix(1.05,.5,uSubSea));
           gl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(.025,.09,.075),1.0-exp(-subDepth*.55));
           gl_FragColor.a*=waterFade;
+          if(uSubSolid>.5)gl_FragColor.rgb*=gl_FragColor.a;
         }
       }`);
     };
-    mat.customProgramCacheKey=()=>key()+'|submerged-v1';mat.needsUpdate=true;
+    mat.customProgramCacheKey=()=>key()+(solid?'|submerged-v1s':'|submerged-v1');mat.needsUpdate=true;
   }
-  function add(root){
-    if(!root)return;roots.add(root);root.traverse(o=>{
+  function add(root,opt){
+    if(!root)return;roots.add(root);const solid=!!(opt&&opt.solid);root.traverse(o=>{
       if(!o.isMesh)return;o.layers.enable(1);
-      for(const mat of(Array.isArray(o.material)?o.material:[o.material]))if(mat)patch(mat);
+      for(const mat of(Array.isArray(o.material)?o.material:[o.material]))if(mat)patch(mat,solid);
     });
   }
   function remove(root){roots.delete(root);}
@@ -880,6 +883,8 @@ const mobile=!!window.__resourcePolicy?.mobile,cap=mobile?(window.__gfxStatus&&w
     const target=R.getRenderTarget(),color=R.getClearColor(new T.Color()),alpha=R.getClearAlpha(),background=scene.background,tone=R.toneMapping,encoding=R.outputEncoding,shadows=R.shadowMap.autoUpdate,shadowRequest=R.shadowMap.needsUpdate;
     try{
       R.shadowMap.needsUpdate=false;pass.value=1;scene.background=null;R.toneMapping=T.NoToneMapping;R.outputEncoding=T.LinearEncoding;R.shadowMap.autoUpdate=false;
+      // 實心模式的材質：當下不透明（不混色）才需要自己把顏色乘上透明度；正在淡入淡出的透明狀態交給混色處理
+      for(const [m,u] of solidMats)u.value=m.transparent?0:1;
       R.setRenderTarget(rt);R.setClearColor(0,0);R.clear();R.render(scene,cam);lastSize=key;lastPass=U.uTime.value;WU.uSubmergedOn.value=1;
     }finally{
       pass.value=0;R.setRenderTarget(target);R.setClearColor(color,alpha);scene.background=background;R.toneMapping=tone;R.outputEncoding=encoding;R.shadowMap.autoUpdate=shadows;R.shadowMap.needsUpdate=shadowRequest;
@@ -1134,6 +1139,8 @@ uniform vec2 uCloudOff;
 uniform float uCShadow;
 uniform sampler2D uBandA;
 uniform sampler2D uBandB;
+uniform sampler2D uHzA;
+uniform sampler2D uHzB;
 uniform sampler2D uFullA;
 uniform sampler2D uFullB;
 uniform sampler2D uMask;
@@ -1294,9 +1301,20 @@ vec3 photoS(sampler2D band, sampler2D full, vec3 d){
   vec3 c = (vb > 0.003 && vb < 0.997) ? texture2D(band, vec2(u, vb)).rgb : texture2D(full, vec2(u, e*0.31830989 + 0.5)).rgb;
   return pow(c, vec3(2.2));
 }
+vec3 photoPost(vec3 c, vec3 d);
 vec3 photoEnv(vec3 dir){
   vec3 d = normalize(dir);
-  vec3 c = mix(photoS(uBandA, uFullA, d), photoS(uBandB, uFullB, d), uPMix);
+  return photoPost(mix(photoS(uBandA, uFullA, d), photoS(uBandB, uFullB, d), uPMix), d);
+}
+// 遠處水面的霧色：取實拍全景地平線上方一段、左右大範圍模糊過的平均色（h.js 載入照片時算好的一條 256 格色帶）。
+// 以前直接取照片地平線那一格：照片裡遠山、樹叢的剪影在某個方位突然結束，水面的霧色就跟著在那個方位一刀變色，畫面上出現一條直的接縫
+vec3 photoHaze(vec3 dir){
+  vec3 d = normalize(dir);
+  float u = fract(atan(d.x, -d.z)*0.15915494 + uYaw);
+  vec3 c = mix(texture2D(uHzA, vec2(u, 0.5)).rgb, texture2D(uHzB, vec2(u, 0.5)).rgb, uPMix);
+  return photoPost(pow(c, vec3(2.2)), d);
+}
+vec3 photoPost(vec3 c, vec3 d){
   float g = dot(c, vec3(0.3, 0.59, 0.11));
   // 陰天／下雨：天空部分換成實拍的陰天雲層照片（Poly Haven，CC0）；遠山、岸邊等地景保留原照片
   if(uOvcK > 0.01 && d.y > -0.02){
@@ -1580,7 +1598,7 @@ void main(){
   float foam = clamp(foamS*0.55 + cap*0.8, 0.0, 0.9)*(1.0 - dw);
   col = mix(col, TM((amb*0.9 + uLightCol*ndl*0.5*csh)*0.55), foam);
   float mist = uMist*0.4*smoothstep(12.0, 90.0, dist);
-  vec3 fogC = uPhoto > 0.5 ? photoEnv(normalize(vec3(-V.x, 0.015, -V.z))) : fogColor(-V);
+  vec3 fogC = uPhoto > 0.5 ? photoHaze(vec3(-V.x, 0.015, -V.z)) : fogColor(-V);
   col = mix(col, fogC, clamp((fogF(dist)*0.9 + mist)*(1.0 - 0.6*uSea), 0.0, 0.95));
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
@@ -1627,7 +1645,7 @@ const head = new T.Group(); head.rotation.x = -0.16; player.add(head); head.add(
 const V = () => new T.Vector3();
 const U = { uTime:{value:0}, uSunDir:{value:new T.Vector3(0,1,0)}, uLightCol:{value:V()}, uSunDisk:{value:new T.Vector3(0,1,0)},
   uSunCol:{value:V()}, uMoonDir:{value:new T.Vector3(0,1,0)}, uMoonCol:{value:V()}, uZenith:{value:V()}, uHorizon:{value:V()},
-  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0},uDetail:{value:1},uWaterLOD:{value:0},uBoat:{value:new T.Vector4(0,0,0,0)}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.012,.075,.13)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
+  uGlow:{value:V()}, uFogCol:{value:V()}, uFogDen:{value:0.01}, uMist:{value:0.5}, uDay:{value:1}, uCloud:{value:0.45}, uOvcA:{value:null}, uOvcB:{value:null}, uOvcK:{value:0}, uSunVis:{value:1}, uEye:{value:new T.Vector3(0,2.4,0)}, uRain:{value:0},uDetail:{value:1},uWaterLOD:{value:0},uBoat:{value:new T.Vector4(0,0,0,0)}, uWind:{value:new T.Vector3(1,0,.15)}, uCloudOff:{value:new T.Vector2()}, uCShadow:{value:0}, uBandA:{value:null}, uBandB:{value:null}, uHzA:{value:null}, uHzB:{value:null}, uFullA:{value:null}, uFullB:{value:null}, uMask:{value:null}, uPMix:{value:0}, uPhoto:{value:0}, uYaw:{value:.25}, uExpo:{value:1}, uSea:{value:0}, uSeaCol:{value:new T.Vector3(.012,.075,.13)}, uReef:{value:0}, uNight:{value:0}, uNightDeep:{value:.1}, uMoonK:{value:0}, uBio:{value:0}, uLightK:{value:1} };
 
 // 天空球（含樹林遠景）
 const skyMat = new T.ShaderMaterial({uniforms:U, vertexShader:SH.skyVS, fragmentShader:SH.common+SH.skyFS, side:T.BackSide, depthWrite:false, depthTest:false});
@@ -4111,12 +4129,19 @@ mgr.onError=(u)=>{ if(window.__CDN&&u&&u.indexOf(window.__CDN.base)===0) return;
 const tl=new T.TextureLoader(mgr);
 const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter=T.LinearFilter; t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; return t; };
 const tex={}, env={}, masks={};
+// 遠處水面的霧色帶：取全景照片地平線上方 0.5°～6° 那一段，每個方位取平均，再左右各模糊約 17°，做成 256×1 的色帶。
+// 照片裡遠山、樹叢剪影的邊緣不會再讓水面霧色一刀變色
+function hazeStrip(img){ const N=256, H=img.height, y0=Math.round(H*(1-.300)), y1=Math.round(H*(1-.208)), cv=document.createElement('canvas'); cv.width=N; cv.height=Math.max(1,y1-y0);
+  const g=cv.getContext('2d'); g.drawImage(img,0,y0,img.width,y1-y0,0,0,N,cv.height); const d=g.getImageData(0,0,N,cv.height).data, col=new Float32Array(N*3);
+  for(let x=0;x<N;x++) for(let y=0;y<cv.height;y++) for(let c=0;c<3;c++) col[x*3+c]+=d[(y*N+x)*4+c]/cv.height;
+  const out=new Uint8Array(N*4), R=12; for(let x=0;x<N;x++){ for(let c=0;c<3;c++){ let s=0; for(let k=-R;k<=R;k++) s+=col[((x+k+N)%N)*3+c]; out[x*4+c]=Math.round(s/(2*R+1)); } out[x*4+3]=255; }
+  const t=new T.DataTexture(out,N,1,T.RGBAFormat); t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; t.minFilter=t.magFilter=T.LinearFilter; t.needsUpdate=true; return t; }
 function loadKey(k){ const id=SET+'_'+k; if(tex[id]) return; const o={ready:false,n:0}; tex[id]=o; const fin=()=>{ if(++o.n===2) o.ready=true; }, p=SETS[SET].pre;
-  o.band=prep(tl.load(`${p}${k}_band.jpg`,fin)); o.full=prep(tl.load(`${p}${k}_full.jpg`,fin)); }
+  o.band=prep(tl.load(`${p}${k}_band.jpg`,t=>{ try{ o.hz=hazeStrip(t.image); }catch(e){ console.warn('haze strip',e); } fin(); })); o.full=prep(tl.load(`${p}${k}_full.jpg`,fin)); }
 function loadEnv(k){ const id=SET+'_'+k; if(env[id]!==undefined) return; env[id]=null; if(!T.RGBELoader) return;
   new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(`${SETS[SET].pre}${k}.hdr`,t=>{ env[id]=t;W.invalidateEnvironment(); }); }
 function useSet(name){ SET=name; META=SETS[name].meta; if(!masks[name]) masks[name]=prep(tl.load(SETS[name].mask)); U.uMask.value=masks[name];
-  for(const id in tex){ if(!id.startsWith(name+'_')){ tex[id].band.dispose(); tex[id].full.dispose(); delete tex[id]; } }
+  for(const id in tex){ if(!id.startsWith(name+'_')){ tex[id].band.dispose(); tex[id].full.dispose(); if(tex[id].hz) tex[id].hz.dispose(); delete tex[id]; } }
   ['day','dawn','night'].forEach(k=>{ loadKey(k); loadEnv(k); });W.invalidateEnvironment(); }
 useSet('lake');
 
@@ -4137,7 +4162,7 @@ W.setPhotoHook((h,wx)=>{
   const [a,b,m]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b];
   if(!A||!A.ready||!B||!B.ready) return null;
   if(!started){ started=true; W.setPhotoActive(); if(cb) cb(1,true,errors); }
-  U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m;
+  U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m; U.uHzA.value=A.hz||A.band; U.uHzB.value=B.hz||B.band;
   U.uRadianceA.value=env[SET+'_'+a]||null;U.uRadianceB.value=env[SET+'_'+b]||null;U.uRadianceReady.value=U.uRadianceA.value&&U.uRadianceB.value?1:0;
   const MA=META[a], MB=META[b], L=(x,y)=>x+(y-x)*m;
   sunDir(MA,dA); sunDir(MB,dB); dir.copy(dA).lerp(dB,m).normalize();
@@ -5481,7 +5506,9 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/mermaid_v2.glb',g=>{ const o=g.
   o.updateMatrixWorld(true); const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,.15-b2.min.y,-c2.z);
   mer3=new T.Group(); mer3.add(o); npc.add(mer3); mer.visible=false; mer3.updateMatrixWorld(true); try{ if(window.__MER){ const ctl=window.__MER.rig(o); merMats.push(ctl.mesh.material); let wv=0;
       merRig={pose:p=>{ ctl.swim(Math.min(.6,p.tail*2.2)); if(p.breathe>.015) ctl.talk(.3); if(p.tail>.17&&(wv-=.016)<=0){ wv=9; ctl.wave(); ctl.smile(4); } }}; }   // 霜汐：完整骨架與表情，靠近時微笑揮手、說話時嘴巴會動
-    else merRig=autoRig(o,'tail'); }catch(e){ console.warn('mer rig',e); } });
+    else merRig=autoRig(o,'tail'); }catch(e){ console.warn('mer rig',e); }
+  /* 魚尾垂進水裡的部分交給水下層，水線附近加上濕潤反光 */
+  if(W.optics) W.optics.add(o); if(W.submerged) W.submerged.add(o,{solid:true}); });
 let merRig=null;
 const glow=new T.Sprite(new T.SpriteMaterial({map:halo.material.map,color:0x66ccff,blending:T.AdditiveBlending,depthWrite:false,transparent:true})); glow.scale.set(4,4,1); glow.position.y=1.2; npc.add(glow);
 /* 對話介面 */
@@ -7228,12 +7255,15 @@ function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=
       const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); o.updateMatrixWorld(true);
       try{ hc=window.__HUMAN.rig(o,{ghost:true,relax:-.18}); const mt=hc.mesh.material; mt.transparent=true; mt.opacity=.95; mt.fog=true;
         mt.emissive=new T.Color(0x1f6b45); mt.emissiveMap=null; mt.emissiveIntensity=1;   /* 綠光用純色疊加：不能用原貼圖當發光圖，否則烘焙在模型上的活人臉會蓋過女鬼臉與表情 */   /* 身上自帶幽幽的綠光：夜裡也看得清楚身體和臉 */
-        W.renderer.localClippingEnabled=true; mt.clippingPlanes=[new T.Plane(new T.Vector3(0,1,0),.02)]; mats.push(mt); }catch(e){ console.warn('lin rig',e); }   /* 水面以下切掉：沉下去時真的像沒入水中 */
+        mats.push(mt); }catch(e){ console.warn('lin rig',e); }
+      /* 水面以下交給水下層（跟魚、霜汐同一套）：沉下去時身體在水裡越深越暗、被水面反光蓋住，不再是一刀切掉 */
+      if(W.optics) W.optics.add(o); if(W.submerged) W.submerged.add(o,{solid:true});
       model=new T.Group(); model.add(o); { const gl=new T.PointLight(0x6dffa8,1.6,5,1.6); gl.position.set(0,1.35,.55); model.add(gl); const gl2=new T.PointLight(0x6dffa8,.8,3,2); gl2.position.set(0,.8,-.4); model.add(gl2); }
       model.visible=false; W.scene.add(model); loading=false; fn(model); },undefined,()=>{ loading=false; }); return; }
   GL.load('models/ghost.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ mt.fog=true; mt.transparent=true; mt.opacity=.88; mt.depthWrite=true; mt.roughness=1; mt.metalness=0; if(mt.map){ mt.emissive=new T.Color(0x8fa0b8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.12; } mats.push(mt); } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); o.updateMatrixWorld(true); try{ ghostRig=autoRig(o,'human'); }catch(e){ console.warn('ghost rig',e); }
+    if(W.optics) W.optics.add(o); if(W.submerged) W.submerged.add(o,{solid:true});
     model=new T.Group(); model.add(o); model.visible=false; W.scene.add(model); loading=false; fn(model); },undefined,()=>{ loading=false; }); }
 // 真人尖叫與哀鳴（OpenGameArt CC0）
 const tv=new T.Vector3();
@@ -7505,7 +7535,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102141933'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102152024'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -7689,6 +7719,8 @@ function endingShots(E,c){
   const rigs=[], RP={mer:{},heng:{},ghost:{},king:{},old:{}}; let rt=0; E.setFrameHook(()=>{ rt+=1/60; rigs.forEach(r=>r.rig.pose(Object.assign({t:rt},RP[r.k]))); });
   let pending=0; const load=(u,f)=>{ if(cache[u]) return f(cache[u]); pending++; GL.load(u,g=>{ cache[u]=g; pending--; f(g); },undefined,()=>{ pending--; console.warn('ending model',u); }); };
   const keep=o=>{ S.add(o); made.push(o); return o; };
+  // 角色穿過水面的部分要真的在水裡：水面以下交給水下層（越深越暗、被水面折射與反光蓋住），水線附近加上濕潤反光。必須在骨架綁好之後才掛，綁骨會換掉網格
+  const wade=o=>{ if(W.optics) W.optics.add(o); if(W.submerged) W.submerged.add(o,{solid:true}); };
   const drop=()=>{ made.splice(0).forEach(o=>{ S.remove(o); o.traverse&&o.traverse(m=>{ if(m.material&&m.material.map&&m.material.map.isCanvasTexture) m.material.map.dispose(); }); }); };
   const sw=(x,z,t)=>W.swell?W.swell(x,z,t):0;
   let T0=0; const now=()=>performance.now()/1000-T0;
@@ -7699,7 +7731,7 @@ function endingShots(E,c){
   const king=new T.Group(); // 滄淵模型有骨架（SkinnedMesh），要用 SkeletonUtils 複製，骨頭才會跟著搬到新位置
   load(window.__MER?'models/king_v2.glb':'models/seaking.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material=m.material.clone(); m.material.emissive=new T.Color(0x000000); m.material.color.setScalar(.82); } } }); o.scale.setScalar(5); king.add(o); king.updateMatrixWorld(true);
     if(window.__MER){ const ctl=window.__MER.king(o); window.__kingCtlE=ctl; rigs.push({k:'king',rig:{pose:p=>{ ctl.swim(Math.min(.7,(p.tail||.1)*2)); ctl.head(p.headYaw||0,p.headPitch||0); }}}); }   /* 滄淵：依新設定圖重做的模型，完整骨架與表情 */
-    else rigs.push({k:'king',rig:autoRig(o,'tail')}); });
+    else rigs.push({k:'king',rig:autoRig(o,'tail')}); wade(o); });
   const kingEye=new T.PointLight(0x9fe8ff,0,14,2); kingEye.position.set(0,4.2,1.2); king.add(kingEye);
   // 月光海路：從月亮正下方一路鋪到船邊的碎銀光，隨浪閃爍
   const glitTex=(()=>{ const cv=document.createElement('canvas'); cv.width=256; cv.height=512; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,256,512);
@@ -7770,10 +7802,10 @@ function endingShots(E,c){
   function loadHuman(url,dst,glow,key,hgt){ load(url,g=>{ const o=g.scene.clone(true); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ m.material=mt.clone(); if(mt.map){ m.material.emissive=new T.Color(glow); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.55; } } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar((hgt||1.62)/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); dst.add(o); dst.updateMatrixWorld(true);
-    if(url==='models/lin_v1.glb'&&window.__HUMAN){ const hc=window.__HUMAN.rig(o,{ghost:true,relax:-.18}); window.__linCtlE=hc; hc.expr(5); rigs.push({k:'ghost',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.4); hc.set('hr',p.headRoll||0); }}}); return; }   /* 結局的她：新模型、哀傷的女鬼臉 */
+    if(url==='models/lin_v1.glb'&&window.__HUMAN){ const hc=window.__HUMAN.rig(o,{ghost:true,relax:-.18}); window.__linCtlE=hc; hc.expr(5); rigs.push({k:'ghost',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.4); hc.set('hr',p.headRoll||0); }}}); wade(o); return; }   /* 結局的她：新模型、哀傷的女鬼臉 */
     if((url==='models/girl_v2.glb'||url==='models/old_v2.glb')&&window.__HUMAN){ const nm=url.indexOf('girl')>=0?'girl':'old', hc=window.__HUMAN.preset(nm,o); window['__'+nm+'CtlE']=hc; hc.mesh.visible=true; hc.isVis=()=>{ let o2=dst; while(o2){ if(!o2.visible) return false; o2=o2.parent; } return true; };
-      rigs.push({k:key||'heng',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.2); hc.set('hr',p.headRoll||0); }}}); return; }   /* 生前的小女孩、老漁人：新模型與表情 */
-    rigs.push({k:key||(dst===hGhost?'ghost':'heng'),rig:autoRig(o,'human')}); }); }
+      rigs.push({k:key||'heng',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.2); hc.set('hr',p.headRoll||0); }}}); wade(o); return; }   /* 生前的小女孩、老漁人：新模型與表情 */
+    rigs.push({k:key||(dst===hGhost?'ghost':'heng'),rig:autoRig(o,'human')}); wade(o); }); }
   loadHuman(window.__HUMAN?'models/lin_v1.glb':'models/ghost.glb',hGhost,0xb8c8d8); loadHuman(window.__HUMAN?'models/girl_v2.glb':'models/girl.glb',hAlive,0xf0e8dc,'heng',1.35);   // 生前的林秋月：十歲的小女孩
   // 老漁人（使用者提供設定圖生成）：只在最後的晨光裡出現
   const oldG=new T.Group(); loadHuman(window.__HUMAN?'models/old_v2.glb':'models/oldman.glb',oldG,0xfff0d8,'old');
@@ -7792,7 +7824,7 @@ function endingShots(E,c){
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(1.9/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-.38-b2.min.y,-c2.z); merW.add(o); merW.updateMatrixWorld(true);
     if(window.__MER){ const ctl=window.__MER.rig(o); window.__merCtlE=ctl; rigs.push({k:'mer',rig:{pose:p=>{ ctl.swim(Math.min(.9,(p.tail||.1)*2.4)); ctl.head(p.headYaw||0,p.headPitch||0); }}}); }   // 結局的霜汐：完整骨架與表情
-    else rigs.push({k:'mer',rig:autoRig(o,'tail')}); });   // 尾巴沒在淺水裡，像從水裡探出半身
+    else rigs.push({k:'mer',rig:autoRig(o,'tail')}); wade(o); });   // 尾巴沒在淺水裡，像從水裡探出半身
   const merL=new T.PointLight(0xcfe0ff,0,7,1.5); merL.position.set(.8,2.2,1.4); merG.add(merL);
   // 最亮的那片月鱗：從霜汐手上飄進提燈，燈火由暖黃變成月光色
   const scaleTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=64; const g=cv.getContext('2d'), rg=g.createRadialGradient(32,32,0,32,32,32); rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(.25,'rgba(210,230,255,.85)'); rg.addColorStop(1,'rgba(160,200,255,0)'); g.fillStyle=rg; g.fillRect(0,0,64,64); return new T.CanvasTexture(cv); })();

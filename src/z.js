@@ -159,6 +159,8 @@ function endingShots(E,c){
   const rigs=[], RP={mer:{},heng:{},ghost:{},king:{},old:{}}; let rt=0; E.setFrameHook(()=>{ rt+=1/60; rigs.forEach(r=>r.rig.pose(Object.assign({t:rt},RP[r.k]))); });
   let pending=0; const load=(u,f)=>{ if(cache[u]) return f(cache[u]); pending++; GL.load(u,g=>{ cache[u]=g; pending--; f(g); },undefined,()=>{ pending--; console.warn('ending model',u); }); };
   const keep=o=>{ S.add(o); made.push(o); return o; };
+  // 角色穿過水面的部分要真的在水裡：水面以下交給水下層（越深越暗、被水面折射與反光蓋住），水線附近加上濕潤反光。必須在骨架綁好之後才掛，綁骨會換掉網格
+  const wade=o=>{ if(W.optics) W.optics.add(o); if(W.submerged) W.submerged.add(o,{solid:true}); };
   const drop=()=>{ made.splice(0).forEach(o=>{ S.remove(o); o.traverse&&o.traverse(m=>{ if(m.material&&m.material.map&&m.material.map.isCanvasTexture) m.material.map.dispose(); }); }); };
   const sw=(x,z,t)=>W.swell?W.swell(x,z,t):0;
   let T0=0; const now=()=>performance.now()/1000-T0;
@@ -169,7 +171,7 @@ function endingShots(E,c){
   const king=new T.Group(); // 滄淵模型有骨架（SkinnedMesh），要用 SkeletonUtils 複製，骨頭才會跟著搬到新位置
   load(window.__MER?'models/king_v2.glb':'models/seaking.glb',g=>{ const o=T.SkeletonUtils?T.SkeletonUtils.clone(g.scene):g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material){ m.material=m.material.clone(); m.material.emissive=new T.Color(0x000000); m.material.color.setScalar(.82); } } }); o.scale.setScalar(5); king.add(o); king.updateMatrixWorld(true);
     if(window.__MER){ const ctl=window.__MER.king(o); window.__kingCtlE=ctl; rigs.push({k:'king',rig:{pose:p=>{ ctl.swim(Math.min(.7,(p.tail||.1)*2)); ctl.head(p.headYaw||0,p.headPitch||0); }}}); }   /* 滄淵：依新設定圖重做的模型，完整骨架與表情 */
-    else rigs.push({k:'king',rig:autoRig(o,'tail')}); });
+    else rigs.push({k:'king',rig:autoRig(o,'tail')}); wade(o); });
   const kingEye=new T.PointLight(0x9fe8ff,0,14,2); kingEye.position.set(0,4.2,1.2); king.add(kingEye);
   // 月光海路：從月亮正下方一路鋪到船邊的碎銀光，隨浪閃爍
   const glitTex=(()=>{ const cv=document.createElement('canvas'); cv.width=256; cv.height=512; const g=cv.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,256,512);
@@ -240,10 +242,10 @@ function endingShots(E,c){
   function loadHuman(url,dst,glow,key,hgt){ load(url,g=>{ const o=g.scene.clone(true); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ m.material=mt.clone(); if(mt.map){ m.material.emissive=new T.Color(glow); m.material.emissiveMap=mt.map; m.material.emissiveIntensity=.55; } } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar((hgt||1.62)/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); dst.add(o); dst.updateMatrixWorld(true);
-    if(url==='models/lin_v1.glb'&&window.__HUMAN){ const hc=window.__HUMAN.rig(o,{ghost:true,relax:-.18}); window.__linCtlE=hc; hc.expr(5); rigs.push({k:'ghost',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.4); hc.set('hr',p.headRoll||0); }}}); return; }   /* 結局的她：新模型、哀傷的女鬼臉 */
+    if(url==='models/lin_v1.glb'&&window.__HUMAN){ const hc=window.__HUMAN.rig(o,{ghost:true,relax:-.18}); window.__linCtlE=hc; hc.expr(5); rigs.push({k:'ghost',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.4); hc.set('hr',p.headRoll||0); }}}); wade(o); return; }   /* 結局的她：新模型、哀傷的女鬼臉 */
     if((url==='models/girl_v2.glb'||url==='models/old_v2.glb')&&window.__HUMAN){ const nm=url.indexOf('girl')>=0?'girl':'old', hc=window.__HUMAN.preset(nm,o); window['__'+nm+'CtlE']=hc; hc.mesh.visible=true; hc.isVis=()=>{ let o2=dst; while(o2){ if(!o2.visible) return false; o2=o2.parent; } return true; };
-      rigs.push({k:key||'heng',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.2); hc.set('hr',p.headRoll||0); }}}); return; }   /* 生前的小女孩、老漁人：新模型與表情 */
-    rigs.push({k:key||(dst===hGhost?'ghost':'heng'),rig:autoRig(o,'human')}); }); }
+      rigs.push({k:key||'heng',rig:{pose:p=>{ hc.set('hy',p.headYaw||0); hc.set('hp',(p.headPitch||0)*1.2); hc.set('hr',p.headRoll||0); }}}); wade(o); return; }   /* 生前的小女孩、老漁人：新模型與表情 */
+    rigs.push({k:key||(dst===hGhost?'ghost':'heng'),rig:autoRig(o,'human')}); wade(o); }); }
   loadHuman(window.__HUMAN?'models/lin_v1.glb':'models/ghost.glb',hGhost,0xb8c8d8); loadHuman(window.__HUMAN?'models/girl_v2.glb':'models/girl.glb',hAlive,0xf0e8dc,'heng',1.35);   // 生前的林秋月：十歲的小女孩
   // 老漁人（使用者提供設定圖生成）：只在最後的晨光裡出現
   const oldG=new T.Group(); loadHuman(window.__HUMAN?'models/old_v2.glb':'models/oldman.glb',oldG,0xfff0d8,'old');
@@ -262,7 +264,7 @@ function endingShots(E,c){
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(1.9/Math.max(sz.y,1e-6)); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-.38-b2.min.y,-c2.z); merW.add(o); merW.updateMatrixWorld(true);
     if(window.__MER){ const ctl=window.__MER.rig(o); window.__merCtlE=ctl; rigs.push({k:'mer',rig:{pose:p=>{ ctl.swim(Math.min(.9,(p.tail||.1)*2.4)); ctl.head(p.headYaw||0,p.headPitch||0); }}}); }   // 結局的霜汐：完整骨架與表情
-    else rigs.push({k:'mer',rig:autoRig(o,'tail')}); });   // 尾巴沒在淺水裡，像從水裡探出半身
+    else rigs.push({k:'mer',rig:autoRig(o,'tail')}); wade(o); });   // 尾巴沒在淺水裡，像從水裡探出半身
   const merL=new T.PointLight(0xcfe0ff,0,7,1.5); merL.position.set(.8,2.2,1.4); merG.add(merL);
   // 最亮的那片月鱗：從霜汐手上飄進提燈，燈火由暖黃變成月光色
   const scaleTex=(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=64; const g=cv.getContext('2d'), rg=g.createRadialGradient(32,32,0,32,32,32); rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(.25,'rgba(210,230,255,.85)'); rg.addColorStop(1,'rgba(160,200,255,0)'); g.fillStyle=rg; g.fillRect(0,0,64,64); return new T.CanvasTexture(cv); })();

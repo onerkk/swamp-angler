@@ -18,12 +18,19 @@ mgr.onError=(u)=>{ if(window.__CDN&&u&&u.indexOf(window.__CDN.base)===0) return;
 const tl=new T.TextureLoader(mgr);
 const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter=T.LinearFilter; t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; return t; };
 const tex={}, env={}, masks={};
+// 遠處水面的霧色帶：取全景照片地平線上方 0.5°～6° 那一段，每個方位取平均，再左右各模糊約 17°，做成 256×1 的色帶。
+// 照片裡遠山、樹叢剪影的邊緣不會再讓水面霧色一刀變色
+function hazeStrip(img){ const N=256, H=img.height, y0=Math.round(H*(1-.300)), y1=Math.round(H*(1-.208)), cv=document.createElement('canvas'); cv.width=N; cv.height=Math.max(1,y1-y0);
+  const g=cv.getContext('2d'); g.drawImage(img,0,y0,img.width,y1-y0,0,0,N,cv.height); const d=g.getImageData(0,0,N,cv.height).data, col=new Float32Array(N*3);
+  for(let x=0;x<N;x++) for(let y=0;y<cv.height;y++) for(let c=0;c<3;c++) col[x*3+c]+=d[(y*N+x)*4+c]/cv.height;
+  const out=new Uint8Array(N*4), R=12; for(let x=0;x<N;x++){ for(let c=0;c<3;c++){ let s=0; for(let k=-R;k<=R;k++) s+=col[((x+k+N)%N)*3+c]; out[x*4+c]=Math.round(s/(2*R+1)); } out[x*4+3]=255; }
+  const t=new T.DataTexture(out,N,1,T.RGBAFormat); t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; t.minFilter=t.magFilter=T.LinearFilter; t.needsUpdate=true; return t; }
 function loadKey(k){ const id=SET+'_'+k; if(tex[id]) return; const o={ready:false,n:0}; tex[id]=o; const fin=()=>{ if(++o.n===2) o.ready=true; }, p=SETS[SET].pre;
-  o.band=prep(tl.load(`${p}${k}_band.jpg`,fin)); o.full=prep(tl.load(`${p}${k}_full.jpg`,fin)); }
+  o.band=prep(tl.load(`${p}${k}_band.jpg`,t=>{ try{ o.hz=hazeStrip(t.image); }catch(e){ console.warn('haze strip',e); } fin(); })); o.full=prep(tl.load(`${p}${k}_full.jpg`,fin)); }
 function loadEnv(k){ const id=SET+'_'+k; if(env[id]!==undefined) return; env[id]=null; if(!T.RGBELoader) return;
   new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(`${SETS[SET].pre}${k}.hdr`,t=>{ env[id]=t;W.invalidateEnvironment(); }); }
 function useSet(name){ SET=name; META=SETS[name].meta; if(!masks[name]) masks[name]=prep(tl.load(SETS[name].mask)); U.uMask.value=masks[name];
-  for(const id in tex){ if(!id.startsWith(name+'_')){ tex[id].band.dispose(); tex[id].full.dispose(); delete tex[id]; } }
+  for(const id in tex){ if(!id.startsWith(name+'_')){ tex[id].band.dispose(); tex[id].full.dispose(); if(tex[id].hz) tex[id].hz.dispose(); delete tex[id]; } }
   ['day','dawn','night'].forEach(k=>{ loadKey(k); loadEnv(k); });W.invalidateEnvironment(); }
 useSet('lake');
 
@@ -44,7 +51,7 @@ W.setPhotoHook((h,wx)=>{
   const [a,b,m]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b];
   if(!A||!A.ready||!B||!B.ready) return null;
   if(!started){ started=true; W.setPhotoActive(); if(cb) cb(1,true,errors); }
-  U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m;
+  U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m; U.uHzA.value=A.hz||A.band; U.uHzB.value=B.hz||B.band;
   U.uRadianceA.value=env[SET+'_'+a]||null;U.uRadianceB.value=env[SET+'_'+b]||null;U.uRadianceReady.value=U.uRadianceA.value&&U.uRadianceB.value?1:0;
   const MA=META[a], MB=META[b], L=(x,y)=>x+(y-x)*m;
   sunDir(MA,dA); sunDir(MB,dB); dir.copy(dA).lerp(dB,m).normalize();

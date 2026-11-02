@@ -1,25 +1,27 @@
 /* Above-water fragments and underwater radiance are rendered separately. The water
    shader transmits the underwater target, then applies its reflection on top. */
 function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
-  const T=THREE,roots=new Set(),patched=new WeakSet(),pass={value:0};
+  const T=THREE,roots=new Set(),patched=new WeakSet(),pass={value:0},solidMats=[];
   // 跟螢幕一樣用 sRGB 編碼：倒影、水下、主畫面三個階段的輸出編碼一致，每個材質就不會每幀在兩種著色器設定之間來回切換（那會讓 three.js 每幀重算程式鍵值、製造大量垃圾）
   const rt=new T.WebGLRenderTarget(4,4,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true,encoding:T.sRGBEncoding});
   let lightScanAt=-Infinity,lastPass=-Infinity,lastSize='';const cam=new T.PerspectiveCamera(),size=new T.Vector2();cam.layers.set(1);cam.matrixAutoUpdate=false;
   WU.uSubmerged={value:rt.texture};WU.uSubmergedSize={value:new T.Vector2(1,1)};WU.uSubmergedOn={value:0};
-  function patch(mat){
+  // solid：人形角色這類不透明的模型保留深度寫入，否則頭髮、手臂、身體前後次序會錯亂；水下那一層改把顏色預先乘上透明度（不透明材質不做混色，直接寫進去）
+  function patch(mat,solid){
     if(patched.has(mat))return;patched.add(mat);
     const prev=mat.onBeforeCompile,key=mat.customProgramCacheKey.bind(mat);
-    mat.transparent=true;mat.depthWrite=false;
+    solid=!!solid;const solidU={value:solid?1:0};if(solid)solidMats.push([mat,solidU]);
+    if(!solid){mat.transparent=true;mat.depthWrite=false;}
     mat.onBeforeCompile=(s,r)=>{
       if(prev)prev(s,r);
-      Object.assign(s.uniforms,{uSubPass:pass,uSubTime:U.uTime,uSubWind:U.uWind,uSubSea:U.uSea});
+      Object.assign(s.uniforms,{uSubSolid:solidU,uSubPass:pass,uSubTime:U.uTime,uSubWind:U.uWind,uSubSea:U.uSea});
       s.vertexShader='varying vec3 vSubWorld;\n'+s.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
         vec4 subVertex=vec4(transformed,1.0);
         #ifdef USE_INSTANCING
         subVertex=instanceMatrix*subVertex;
         #endif
         vSubWorld=(modelMatrix*subVertex).xyz;`);
-      s.fragmentShader='varying vec3 vSubWorld;\nuniform float uSubPass,uSubTime,uSubSea;\nuniform vec3 uSubWind;\n'+waterWaveGLSL()+'\n'+s.fragmentShader.replace(/}\s*$/,`
+      s.fragmentShader='varying vec3 vSubWorld;\nuniform float uSubPass,uSubTime,uSubSea,uSubSolid;\nuniform vec3 uSubWind;\n'+waterWaveGLSL()+'\n'+s.fragmentShader.replace(/}\s*$/,`
         float subDepth=waterSample(vSubWorld.xz,uSubTime,uSubWind,uSubSea).y-vSubWorld.y;
         if(uSubPass<.5){if(subDepth>0.0)discard;}
         else{
@@ -27,15 +29,16 @@ function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
           float waterFade=exp(-subDepth*mix(1.05,.5,uSubSea));
           gl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(.025,.09,.075),1.0-exp(-subDepth*.55));
           gl_FragColor.a*=waterFade;
+          if(uSubSolid>.5)gl_FragColor.rgb*=gl_FragColor.a;
         }
       }`);
     };
-    mat.customProgramCacheKey=()=>key()+'|submerged-v1';mat.needsUpdate=true;
+    mat.customProgramCacheKey=()=>key()+(solid?'|submerged-v1s':'|submerged-v1');mat.needsUpdate=true;
   }
-  function add(root){
-    if(!root)return;roots.add(root);root.traverse(o=>{
+  function add(root,opt){
+    if(!root)return;roots.add(root);const solid=!!(opt&&opt.solid);root.traverse(o=>{
       if(!o.isMesh)return;o.layers.enable(1);
-      for(const mat of(Array.isArray(o.material)?o.material:[o.material]))if(mat)patch(mat);
+      for(const mat of(Array.isArray(o.material)?o.material:[o.material]))if(mat)patch(mat,solid);
     });
   }
   function remove(root){roots.delete(root);}
@@ -49,6 +52,8 @@ const mobile=!!window.__resourcePolicy?.mobile,cap=mobile?(window.__gfxStatus&&w
     const target=R.getRenderTarget(),color=R.getClearColor(new T.Color()),alpha=R.getClearAlpha(),background=scene.background,tone=R.toneMapping,encoding=R.outputEncoding,shadows=R.shadowMap.autoUpdate,shadowRequest=R.shadowMap.needsUpdate;
     try{
       R.shadowMap.needsUpdate=false;pass.value=1;scene.background=null;R.toneMapping=T.NoToneMapping;R.outputEncoding=T.LinearEncoding;R.shadowMap.autoUpdate=false;
+      // 實心模式的材質：當下不透明（不混色）才需要自己把顏色乘上透明度；正在淡入淡出的透明狀態交給混色處理
+      for(const [m,u] of solidMats)u.value=m.transparent?0:1;
       R.setRenderTarget(rt);R.setClearColor(0,0);R.clear();R.render(scene,cam);lastSize=key;lastPass=U.uTime.value;WU.uSubmergedOn.value=1;
     }finally{
       pass.value=0;R.setRenderTarget(target);R.setClearColor(color,alpha);scene.background=background;R.toneMapping=tone;R.outputEncoding=encoding;R.shadowMap.autoUpdate=shadows;R.shadowMap.needsUpdate=shadowRequest;
