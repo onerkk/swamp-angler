@@ -1,4 +1,4 @@
-/*APPV:20261102164409*/
+/*APPV:20261102170050*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -926,28 +926,42 @@ const mat=new T.ShaderMaterial({uniforms:U,vertexShader:VS,fragmentShader:FS,tra
 // 左右艏浪：散開速度依克爾文角；船尾航跡：散得慢、寬、留得久
 const arms=[trail(150,11,1,1.1,.32,1),trail(150,11,1,1.1,.32,1)], wash=trail(170,16,.12,1.8,.6,.95);
 const all=[...arms,wash];
-/* 船頭水花：點粒子，丟出去後受重力落回水面。每顆是一團不規則的白水（程式畫的水團貼圖、隨機旋轉），
-   大小用真實公尺換算成螢幕像素（依畫面高度與視角），不再是固定的小圓點 */
-const NP=1600, sp=new Float32Array(NP*3), sv=new Float32Array(NP*3), sl=new Float32Array(NP), ssz=new Float32Array(NP), srot=new Float32Array(NP); sl.fill(-1);
-const pg=new T.BufferGeometry(); pg.setAttribute('position',new T.BufferAttribute(sp,3)); pg.setAttribute('aL',new T.BufferAttribute(sl,1)); pg.setAttribute('aS',new T.BufferAttribute(ssz,1)); pg.setAttribute('aR',new T.BufferAttribute(srot,1)); pg.boundingSphere=new T.Sphere(new T.Vector3(),1e5);
-const clumpTex=(()=>{ const N=128, cv=document.createElement('canvas'); cv.width=cv.height=N; const g=cv.getContext('2d');
-  // 一團水：十幾顆大小不一的柔邊水珠疊在一起，邊緣再撒細水霧
-  for(let i=0;i<16;i++){ const a=Math.random()*6.28, r=Math.random()*N*.24, x=N/2+Math.cos(a)*r, y=N/2+Math.sin(a)*r, rr=N*(.08+Math.random()*.16), gr=g.createRadialGradient(x,y,0,x,y,rr);
-    gr.addColorStop(0,'rgba(255,255,255,.95)'); gr.addColorStop(.55,'rgba(255,255,255,.55)'); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(0,0,N,N); }
-  for(let i=0;i<260;i++){ const a=Math.random()*6.28, r=N*(.15+Math.random()*.33), x=N/2+Math.cos(a)*r, y=N/2+Math.sin(a)*r; g.fillStyle=`rgba(255,255,255,${.2+Math.random()*.5})`; g.beginPath(); g.arc(x,y,.6+Math.random()*1.6,0,6.28); g.fill(); }
-  const t=new T.CanvasTexture(cv); return t; })();
-U.uSprite={value:clumpTex}; U.uPx={value:800};
+/* 船頭水花：兩種粒子
+   1. 水滴：很小（3～9 公分），沿著飛行方向拉成細長的動態模糊線條、半透明，大量成串——真實的浪花是一束束細水絲，不是棉花團
+   2. 水霧：大而淡的霧團（0.5～1.5 公尺），被風吹散、慢慢變大變淡，留在空中讓船從旁邊穿過
+   每顆粒子是一片朝向鏡頭、沿速度方向拉長的四邊形（實例化繪製），大小用真實公尺 */
+const NP=2600, sp=new Float32Array(NP*3), sv=new Float32Array(NP*3), sl=new Float32Array(NP), ssz=new Float32Array(NP), sty=new Float32Array(NP), sl0=new Float32Array(NP); sl.fill(-1);
+const qg=new T.InstancedBufferGeometry(); qg.setAttribute('position',new T.BufferAttribute(new Float32Array([-1,-1,0, 1,-1,0, 1,1,0, -1,1,0]),3)); qg.setIndex([0,1,2,0,2,3]);
+const iP=new T.InstancedBufferAttribute(sp,3), iV=new T.InstancedBufferAttribute(sv,3), iL=new T.InstancedBufferAttribute(sl,1), iS=new T.InstancedBufferAttribute(ssz,1), iT=new T.InstancedBufferAttribute(sty,1), iL0=new T.InstancedBufferAttribute(sl0,1);
+[iP,iV,iL,iS,iT,iL0].forEach(a=>a.setUsage(T.DynamicDrawUsage));
+qg.setAttribute('iP',iP); qg.setAttribute('iV',iV); qg.setAttribute('iL',iL); qg.setAttribute('iS',iS); qg.setAttribute('iT',iT); qg.setAttribute('iL0',iL0); qg.instanceCount=NP; qg.boundingSphere=new T.Sphere(new T.Vector3(),1e5);
 const pm=new T.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,
-  vertexShader:`attribute float aL; attribute float aS; attribute float aR; uniform float uPx; varying float vL; varying float vR; void main(){ vL=aL; vR=aR; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=aL<0.0?0.0:clamp(aS*uPx/max(-mv.z,.4),1.0,220.0); gl_Position=projectionMatrix*mv; }`,
-  fragmentShader:`uniform float uLight; uniform sampler2D uSprite; varying float vL; varying float vR; void main(){ if(vL<0.0) discard; vec2 q=gl_PointCoord-.5; float c=cos(vR), s=sin(vR); q=vec2(c*q.x-s*q.y,s*q.x+c*q.y)+.5;
-    vec4 tx=texture2D(uSprite,q); float a=tx.a*.9*clamp(vL*1.6,0.0,1.0); if(a<.02) discard;
-    gl_FragColor=vec4(vec3(.93,.97,1.0)*(.28+.85*uLight),a); }`});
-const pts=new T.Points(pg,pm); pts.frustumCulled=false; pts.renderOrder=4; pts.userData.flatOnWater=true; pts.visible=false; S.add(pts);
-const _px=new T.Vector2();
+  vertexShader:`attribute vec3 iP; attribute vec3 iV; attribute float iL; attribute float iS; attribute float iT; attribute float iL0; varying vec2 vQ; varying float vA; varying float vT;
+  void main(){ vQ=position.xy; vT=iT; if(iL<0.0){ gl_Position=vec4(2.0,2.0,2.0,1.0); vA=0.0; return; }
+    float age=1.0-iL/max(iL0,.01);
+    vec4 c=viewMatrix*vec4(iP,1.0); vec3 vv=(viewMatrix*vec4(iV,0.0)).xyz; vec2 d=vv.xy; float sp=length(d);
+    vec2 ax=sp>.05?d/sp:vec2(0.0,1.0), ay=vec2(-ax.y,ax.x);
+    float size=iS*(iT>.5?(1.0+age*1.8):1.0);
+    // 水滴：沿速度方向拉長（相當於約 1/25 秒的動態模糊），寬度就是水滴大小；水霧：圓而大
+    float len=iT>.5?size:size+sp*.04, wid=iT>.5?size:size*.45;
+    c.xy+=ax*position.x*len+ay*position.y*wid;
+    gl_Position=projectionMatrix*c;
+    vA=(iT>.5?.16*(1.0-age):.55)*smoothstep(0.0,.12,iL)*smoothstep(1.0,.9,age); }`,
+  fragmentShader:`uniform float uLight; varying vec2 vQ; varying float vA; varying float vT;
+  void main(){ float r=dot(vQ,vQ); if(r>1.0) discard;
+    float a=vA*(vT>.5?exp(-r*2.2):(1.0-r)*(1.0-r));
+    // 水本身是透明的：亮處是天光的反射，水滴帶一點海水的藍綠
+    vec3 col=mix(vec3(.80,.90,.95),vec3(.97,.99,1.0),vT)*(.3+.8*uLight);
+    gl_FragColor=vec4(col,a); }`});
+const pts=new T.Mesh(qg,pm); pts.frustumCulled=false; pts.renderOrder=4; pts.userData.flatOnWater=true; pts.visible=false; S.add(pts);
 let pHead=0, curtainAcc=0, emitAcc=0, sampleT=0, wasOn=false;
 // 船殼在水線的半寬：船頭尖、往後 8 公尺內漸寬到最寬
 const hullHalf=(o,lz)=>o.beam*Math.min(1,.35+(lz-o.bow)/8);
-function emit(x,y,z,vx,vy,vz,life,size){ const i=pHead; pHead=(pHead+1)%NP; sp[i*3]=x; sp[i*3+1]=y; sp[i*3+2]=z; sv[i*3]=vx; sv[i*3+1]=vy; sv[i*3+2]=vz; sl[i]=life; ssz[i]=size; srot[i]=Math.random()*6.28; }
+function put(x,y,z,vx,vy,vz,life,size,type){ const i=pHead; pHead=(pHead+1)%NP; sp[i*3]=x; sp[i*3+1]=y; sp[i*3+2]=z; sv[i*3]=vx; sv[i*3+1]=vy; sv[i*3+2]=vz; sl[i]=life; sl0[i]=life; ssz[i]=size; sty[i]=type; }
+function emit(x,y,z,vx,vy,vz,life,size){
+  if(size>.25){ put(x,y,z,vx*.6,vy*.6,vz*.6,life*1.3,size*1.1,1);
+    for(let k=0;k<3;k++){ const j=.15; put(x,y,z,vx*(1+(Math.random()-.5)*j),vy*(1+(Math.random()-.5)*j),vz*(1+(Math.random()-.5)*j),life*.8,.03+Math.random()*.05,0); } }
+  else put(x,y,z,vx,vy,vz,life,.025+Math.random()*.05,0); }
 function clear(){ all.forEach(r=>{ r.pts.length=0; r.m.visible=false; }); sl.fill(-1); pts.visible=false; }
 function build(r,t){ const n=Math.min(r.pts.length,r.n); if(n<2){ r.m.visible=false; return; }
   for(let k=0;k<n;k++){ const p=r.pts[r.pts.length-1-k], a=t-p.t0, fade=Math.exp(-a/(r.life*.45))*Math.min(1,a*4+.25);
@@ -960,7 +974,6 @@ function build(r,t){ const n=Math.min(r.pts.length,r.n); if(n<2){ r.m.visible=fa
   r.g.attributes.position.needsUpdate=true; r.g.attributes.aUv.needsUpdate=true; r.g.attributes.aA.needsUpdate=true; r.m.visible=true; }
 /* o：{on, x, z, head（船頭朝向，前方 = (-sin, -cos)）, speed（公尺/秒）, bow, stern（船首、船尾離原點的前後距離，船首為負）, beam（半寬）, water（吃水線高度）} */
 function update(dt,t,o){
-  { const cam=W.camera, h=W.renderer.getDrawingBufferSize(_px).y; U.uPx.value=h/(2*Math.tan((cam.fov||60)*Math.PI/360)); }
   U.uTime.value=t; U.uLight.value=Math.max(.06,Math.min(1,W.info?W.info.light:1)); W.camera.getWorldPosition(U.uCam.value);
   if(!o||!o.on){ if(wasOn) clear(); wasOn=false; return; } wasOn=true;
   const fx=-Math.sin(o.head), fz=-Math.cos(o.head), rx=-fz, rz=fx, s=Math.max(0,o.speed);
@@ -990,14 +1003,14 @@ function update(dt,t,o){
   let live=0;
   const halfAt=lz=>o.beam*Math.min(1,.35+(lz-o.bow)/8);
   const deckAt=lz=>(lz<o.bow+9?(o.deckBow||2.6):(o.deckMain||2.0))+(o.y||0);
-  for(let i=0;i<NP;i++){ if(sl[i]<0) continue; sl[i]-=dt; sv[i*3+1]-=9.8*dt; sv[i*3]*=1-dt*.35; sv[i*3+2]*=1-dt*.35; sp[i*3]+=sv[i*3]*dt; sp[i*3+1]+=sv[i*3+1]*dt; sp[i*3+2]+=sv[i*3+2]*dt;
+  for(let i=0;i<NP;i++){ if(sl[i]<0) continue; sl[i]-=dt; sv[i*3+1]-=9.8*dt; { const dr=sty[i]>.5?2.2:.3; sv[i*3]*=1-dt*dr; sv[i*3+2]*=1-dt*dr; if(sty[i]>.5) sv[i*3+1]=sv[i*3+1]*(1-dt*1.8)+9.8*dt*.85; } sp[i*3]+=sv[i*3]*dt; sp[i*3+1]+=sv[i*3+1]*dt; sp[i*3+2]+=sv[i*3+2]*dt;
     // 落到船身範圍內、低於甲板：打在甲板上散掉（不會穿過船身）
     const dx=sp[i*3]-o.x, dz=sp[i*3+2]-o.z, lz=-(dx*fx+dz*fz), lx=dx*rx+dz*rz;
     // 只有往下掉、剛好落到甲板高度的才算打在甲板上（從船邊水面剛甩起來、還在往上飛的不算，否則一出生就被消掉）
     const onDeck=sv[i*3+1]<0&&lz>o.bow&&lz<o.stern&&Math.abs(lx)<halfAt(lz)&&sp[i*3+1]<deckAt(lz)&&sp[i*3+1]>deckAt(lz)-1.2;
     if(sl[i]<=0||onDeck||sp[i*3+1]<W.swell(sp[i*3],sp[i*3+2],t)-.05) sl[i]=-1; else live++; }
-  pts.visible=live>0; if(live){ pg.attributes.position.needsUpdate=true; pg.attributes.aL.needsUpdate=true; pg.attributes.aS.needsUpdate=true; pg.attributes.aR.needsUpdate=true; } }
-return {update,clear,stats:()=>({ribbons:all.map(r=>({n:r.pts.length,vis:r.m.visible})),spray:sl.reduce((n,v)=>n+(v>=0?1:0),0),px:U.uPx.value,ptsVis:pts.visible})};
+  pts.visible=live>0; if(live){ iP.needsUpdate=true; iV.needsUpdate=true; iL.needsUpdate=true; iS.needsUpdate=true; iT.needsUpdate=true; iL0.needsUpdate=true; } }
+return {update,clear,stats:()=>({ribbons:all.map(r=>({n:r.pts.length,vis:r.m.visible})),spray:sl.reduce((n,v)=>n+(v>=0?1:0),0),ptsVis:pts.visible})};
 }
 if(typeof module!=='undefined'&&module.exports) module.exports={createBoatWake};
 /* Resident fish remain visible from the normal fishing view, including before casting. */
@@ -5567,38 +5580,73 @@ const st=document.createElement('style'); st.textContent=`
 #bossBan{position:fixed;left:50%;top:30%;transform:translate(-50%,-50%) scale(.6);z-index:25;text-align:center;padding:14px 28px;border-radius:18px;background:linear-gradient(135deg,rgba(60,10,10,.92),rgba(120,40,10,.92));border:2px solid #ffd56a;box-shadow:0 0 40px rgba(255,150,60,.7);opacity:0;pointer-events:none;transition:transform .35s cubic-bezier(.2,1.6,.4,1),opacity .35s}
 #bossBan.in{opacity:1;transform:translate(-50%,-50%) scale(1)}#bossBan.out{opacity:0;transform:translate(-50%,-60%) scale(.9)}#bossBan.hidden{display:none}
 #bossBan b{display:block;font-size:30px;color:#ffe9a8;letter-spacing:2px;text-shadow:0 2px 12px rgba(255,120,40,.9)}#bossBan small{display:block;margin-top:4px;font-size:13px;color:#ffd0a0;font-weight:700}
-#bossFlash{position:fixed;inset:0;z-index:24;background:#fff;opacity:0;pointer-events:none}#bossFlash.go{animation:bfl .6s ease-out}@keyframes bfl{0%{opacity:.85}100%{opacity:0}}#talBox .lock{color:var(--fg-dim);font-size:12px}#talBox .on{color:#7ff0a8;font-weight:800}`;
+#bossFlash{position:fixed;inset:0;z-index:24;background:#fff;opacity:0;pointer-events:none}#bossFlash.go{animation:bfl .6s ease-out}@keyframes bfl{0%{opacity:.85}100%{opacity:0}}#talBox .lock{color:var(--fg-dim);font-size:12px}#talBox .on{color:#7ff0a8;font-weight:800}
+#bossBtn{position:fixed;right:12px;top:calc(env(safe-area-inset-top,0px) + 196px);z-index:6;display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding:7px 14px 7px 12px;border-radius:16px;border:1px solid rgba(255,213,106,.7);background:linear-gradient(135deg,rgba(92,58,8,.92),rgba(150,98,20,.9));color:#ffe9a8;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,.35);max-width:58vw;text-align:right}
+#bossBtn b{font-size:14px;letter-spacing:.5px;white-space:nowrap}#bossBtn small{font-size:11px;color:#ffd9a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52vw}
+#bossBtn.glow{animation:bossGlow 1.6s ease-in-out infinite alternate}@keyframes bossGlow{from{box-shadow:0 0 0 1px rgba(255,213,106,.5),0 0 6px rgba(255,190,80,.4)}to{box-shadow:0 0 0 2px #ffd56a,0 0 18px rgba(255,190,80,.9)}}
+#bossBtn.on{background:linear-gradient(135deg,rgba(110,30,20,.94),rgba(170,70,25,.92))}#bossBtn.ready{border-color:#7ff0a8;box-shadow:0 0 14px rgba(127,240,168,.6)}
+body.sheetOn #bossBtn,body.ending #bossBtn,body.athome #bossBtn,body.catching #bossBtn{display:none!important}
+#talBox .bcards{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+#talBox .bcard{padding:12px 14px;border-radius:16px;background:linear-gradient(135deg,rgba(255,213,106,.10),rgba(255,140,60,.05));border:1px solid rgba(255,213,106,.28)}
+#talBox .bcard.on{border-color:#ffb067;background:linear-gradient(135deg,rgba(255,120,60,.18),rgba(255,213,106,.06))}#talBox .bcard.done{border-color:rgba(127,240,168,.35)}#talBox .bcard.lock{opacity:.5}
+#talBox .bh{display:flex;justify-content:space-between;align-items:baseline}#talBox .bh b{font-size:18px;color:#ffe9a8}#talBox .bh small{color:#d8c79a}
+#talBox .bi{font-size:13px;color:#d9dde2;margin-top:4px;line-height:1.5}#talBox .bp{margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(232,214,170,.08);color:#e8d6aa;font-size:13px;line-height:1.6;font-style:italic}
+#talBox .ba{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}#talBox .ba .big{padding:10px 18px;font-size:15px}#talBox .bst{width:100%;font-size:13px;color:#ffd9a0}#talBox .bst.ok{color:#7ff0a8;font-weight:800}`;
 document.head.appendChild(st);
 const box=document.createElement('div'); box.id='talBox'; box.className='hidden'; box.innerHTML='<div class="tb"></div>'; document.body.appendChild(box);
 const btn=document.createElement('button'); btn.className='chip sm'; btn.id='talBtn'; btn.setAttribute('aria-label','天賦與挑戰'); btn.textContent='⭐';
 const t2=document.getElementById('top2'); if(t2) t2.appendChild(btn);
 function dot(){ btn.classList.toggle('dot',pts()>0||(!S.bossOn&&BOSS.some(b=>(S.lv||1)>=b.lv&&!S.boss[b.id]))); }
 const row=(a,b,r)=>`<div class="row"><div class="nm"><b>${a}</b><small>${b}</small></div><div class="rt">${r}</div></div>`;
-function render(){ const p=pts();
-  let h=`<h3>天賦與大師挑戰<button class="sbtn" data-t="x">✕</button></h3>`;
+let mode='tal';
+const spotIdx=z=>typeof SPOTS!=='undefined'?SPOTS.findIndex(q=>q.id===z):-1;
+/* 挑戰的狀態：在不在對的釣點、對的時段 */
+function bossState(b){ const here=c.loc()===b.loc&&c.zoneId()===b.zone, timeOk=b.per.indexOf(c.period())>=0; return {here,timeOk,ready:here&&timeOk}; }
+function bossView(){
+  let h=`<h3>👑 大師挑戰<button class="sbtn" data-t="x">✕</button></h3><div class="pt">老漁人的《漁獲簿》：他四十年來沒釣上岸的魚。接受挑戰後，到指定的釣點與時段，牠就會來咬餌。</div>`;
+  h+=`<div class="bcards">`;
+  for(const b of BOSS){ const done=S.boss[b.id]||0, on=S.bossOn===b.id, lock=(S.lv||1)<b.lv, st=bossState(b);
+    const cls=lock?'lock':on?'on':done?'done':'open';
+    let act='';
+    if(lock) act=`<span class="lk">🔒 Lv ${b.lv} 解鎖</span>`;
+    else if(on) act=`<div class="bst ${st.ready?'ok':''}">${st.ready?'✅ 條件符合，等牠咬餌':!st.here?'📍 還沒到'+b.hint.split('・')[0]:'⏳ 等到'+b.per.map(x=>PER_NAME[x]).join('或')}</div>${!st.here&&spotIdx(b.zone)>=0?`<button class="sbtn pri" data-t="go" data-v="${b.id}">前往${b.hint.split('・')[0]}</button>`:''}<button class="sbtn" data-t="quit">放棄</button>`;
+    else act=`<button class="sbtn big${done?'':' pri'}" data-t="boss" data-v="${b.id}">${done?'再戰（🔷×1）':'接受挑戰'}</button>`;
+    h+=`<div class="bcard ${cls}"><div class="bh"><b>${done?'👑':'🐉'} ${b.name}</b><small>Lv ${b.lv}</small></div>
+      <div class="bi">📍 ${b.hint}</div>
+      <div class="bi">首勝：稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷×${b.tide||1}${done?`<br>已擊敗 ${done} 次`:''}</div>
+      ${done&&b.page?`<div class="bp">📖 ${b.page}</div>`:''}<div class="ba">${act}</div></div>`; }
+  return h+'</div>'; }
+function render(){ if(mode==='boss'){ box.firstChild.innerHTML=bossView(); return; } const p=pts();
+  let h=`<h3>⭐ 天賦<button class="sbtn" data-t="x">✕</button></h3>`;
   h+=`<div class="pt">${(S.lv||1)<5?'Lv 5 起每升一級得 1 點天賦':`可用天賦點：${p}（Lv ${S.lv}，已用 ${spent()}）`}</div>`;
   for(const k in TAL){ const r=rank(k), T=TAL[k], mx=talMax(k), lock=(S.lv||1)<(T.lv||0);
     h+=row(`${T.i} ${T.n} <span class="pips">${'●'.repeat(r)}${'○'.repeat(mx-r)}</span>`,lock?`<span class="lock">Lv ${T.lv} 開放：${T.d(1)}（每級）</span>`:r?T.d(r):'尚未投入',lock?'🔒':r>=mx?'<span class="on">滿級</span>':`<button class="sbtn${p>0?' pri':''}" data-t="add" data-v="${k}">＋1</button>`); }
   if(spent()>0) h+=`<div style="text-align:right;margin-top:6px"><button class="sbtn danger" data-t="reset">重置天賦（🪙${TAL_RESET.toLocaleString()}）</button></div>`;
-  h+='<div class="sec">大師挑戰：接受後，在指定釣點與時段會遇到 Boss。Boss 體型巨大、拉力極強，建議先強化裝備。</div>';
-  for(const b of BOSS){ const done=S.boss[b.id], on=S.bossOn===b.id, lock=(S.lv||1)<b.lv;
-    const sub=lock?`<span class="lock">Lv ${b.lv} 解鎖</span>`:`${b.hint}<br>首勝：稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷×${b.tide||1}${done?`<br>已擊敗 ${done} 次（再戰 🔷×1）`:''}${done&&b.page?`<br><i style="color:#d8c79a">📖 ${b.page}</i>`:''}`;
-    const r=lock?'🔒':on?'<span class="on">進行中</span><br><button class="sbtn" data-t="quit">放棄</button>':`<button class="sbtn${done?'':' pri'}" data-t="boss" data-v="${b.id}">${done?'再戰':'接受挑戰'}</button>`;
-    h+=row(`${done?'👑':'🐉'} ${b.name}`,sub,r); }
+  h+=`<div class="sec"><button class="sbtn pri" data-t="mode" data-v="boss" style="width:100%">👑 大師挑戰（${BOSS.filter(x=>(S.lv||1)>=x.lv&&!S.boss[x.id]).length} 隻可挑戰）</button></div>`;
   if(window.__LVINFO){ const L=window.__LVINFO, lv=S.lv||1, need=L.xpNext(lv), up=[]; for(let k=lv+1;k<=lv+12&&up.length<4;k++){ const g=L.gains(k).filter(x=>x!=='天賦點 +1'); if(g.length) up.push(`<div class="tk"><b>Lv ${k}</b>　${g.join('、')}</div>`); }
     h+=`<div class="sec">等級里程碑</div><div class="pt">Lv ${lv}：經驗 ${Math.floor(S.xp||0).toLocaleString()} / ${need.toLocaleString()}　｜　強化上限 +${enhCapAt(lv)}</div>${up.join('')}`; }
   if(S.titles.length){ const cur=S.titleSel&&S.titles.indexOf(S.titleSel)>=0?S.titleSel:S.titles[S.titles.length-1]; h+=`<div class="sec">已獲得稱號（點選要顯示在主畫面的稱號）</div><div>${S.titles.map(t=>`<button class="ttl${t===cur?' on':''}" data-t="title" data-v="${t}">${t}</button>`).join('')}</div>`; }
   box.firstChild.innerHTML=h; }
-btn.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); render(); box.classList.remove('hidden'); });
+btn.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); mode='tal'; render(); box.classList.remove('hidden'); });
+/* 主畫面的大師挑戰入口：金色膠囊按鈕。沒接挑戰時顯示可挑戰數量並發光；接了挑戰顯示目標、地點與目前是否符合條件 */
+const bb2=document.createElement('button'); bb2.id='bossBtn'; bb2.setAttribute('aria-label','大師挑戰'); document.body.appendChild(bb2);
+function bossBtn(){ const b=BOSS.find(x=>x.id===S.bossOn), avail=BOSS.filter(x=>(S.lv||1)>=x.lv&&!S.boss[x.id]).length;
+  if(b){ const st=bossState(b); bb2.className='on'+(st.ready?' ready':''); bb2.innerHTML=`<b>👑 ${b.name}</b><small>${st.ready?'✅ 條件符合，等牠咬餌':b.hint}</small>`; }
+  else { bb2.className=avail?'glow':''; bb2.innerHTML=`<b>👑 大師挑戰</b><small>${avail?avail+' 隻等你挑戰':'漁獲簿'}</small>`; }
+  bb2.style.display=(S.lv||1)>=15?'':'none'; }
+bb2.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); mode='boss'; render(); box.classList.remove('hidden'); });
 box.addEventListener('click',e=>{ if(e.target===box){ box.classList.add('hidden'); return; } const b=e.target.closest('[data-t]'); if(!b) return; const t=b.dataset.t, v=b.dataset.v;
   if(t==='x'){ box.classList.add('hidden'); return; }
+  if(t==='mode'){ mode=v; render(); box.firstChild.scrollTop=0; return; }
+  if(t==='go'){ const B=BOSS.find(x=>x.id===v), i=B?spotIdx(B.zone):-1; const why=window.__STORY&&window.__STORY.lock?window.__STORY.lock(i):null;
+    if(i<0) return; if(why){ c.toast(why,'warn'); return; } box.classList.add('hidden'); if(window.__goSpot) window.__goSpot(i); return; }
   if(t==='add'&&TAL[v]&&pts()>0&&rank(v)<talMax(v)&&(S.lv||1)>=(TAL[v].lv||0)){ S.tal[v]=rank(v)+1; c.Snd.coin(); }
   if(t==='reset'){ if(S.coins<TAL_RESET){ c.toast('金幣不夠','bad'); } else { S.coins-=TAL_RESET; S.tal=talZero(); c.setCoins(); } }
   if(t==='boss'){ S.bossOn=v; tries=0; const B=BOSS.find(x=>x.id===v); c.toast(`🐉 已接受挑戰：${B.name}（${B.hint}）`,'good',3000); }
   if(t==='quit') S.bossOn=null;
   if(t==='title'){ S.titleSel=v; showTitle(); }
   c.persist(); render(); dot(); });
-setInterval(dot,3000); dot();
+setInterval(()=>{ dot(); bossBtn(); },2000); dot(); bossBtn();
 return {rank,apply,applyBoss,bossWin,bossIntro,tick};
 }
 /* ===== 月光灣：霜汐的故事 ===== */
@@ -7693,7 +7741,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261102164409'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261102170050'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

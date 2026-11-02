@@ -31,28 +31,42 @@ const mat=new T.ShaderMaterial({uniforms:U,vertexShader:VS,fragmentShader:FS,tra
 // 左右艏浪：散開速度依克爾文角；船尾航跡：散得慢、寬、留得久
 const arms=[trail(150,11,1,1.1,.32,1),trail(150,11,1,1.1,.32,1)], wash=trail(170,16,.12,1.8,.6,.95);
 const all=[...arms,wash];
-/* 船頭水花：點粒子，丟出去後受重力落回水面。每顆是一團不規則的白水（程式畫的水團貼圖、隨機旋轉），
-   大小用真實公尺換算成螢幕像素（依畫面高度與視角），不再是固定的小圓點 */
-const NP=1600, sp=new Float32Array(NP*3), sv=new Float32Array(NP*3), sl=new Float32Array(NP), ssz=new Float32Array(NP), srot=new Float32Array(NP); sl.fill(-1);
-const pg=new T.BufferGeometry(); pg.setAttribute('position',new T.BufferAttribute(sp,3)); pg.setAttribute('aL',new T.BufferAttribute(sl,1)); pg.setAttribute('aS',new T.BufferAttribute(ssz,1)); pg.setAttribute('aR',new T.BufferAttribute(srot,1)); pg.boundingSphere=new T.Sphere(new T.Vector3(),1e5);
-const clumpTex=(()=>{ const N=128, cv=document.createElement('canvas'); cv.width=cv.height=N; const g=cv.getContext('2d');
-  // 一團水：十幾顆大小不一的柔邊水珠疊在一起，邊緣再撒細水霧
-  for(let i=0;i<16;i++){ const a=Math.random()*6.28, r=Math.random()*N*.24, x=N/2+Math.cos(a)*r, y=N/2+Math.sin(a)*r, rr=N*(.08+Math.random()*.16), gr=g.createRadialGradient(x,y,0,x,y,rr);
-    gr.addColorStop(0,'rgba(255,255,255,.95)'); gr.addColorStop(.55,'rgba(255,255,255,.55)'); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(0,0,N,N); }
-  for(let i=0;i<260;i++){ const a=Math.random()*6.28, r=N*(.15+Math.random()*.33), x=N/2+Math.cos(a)*r, y=N/2+Math.sin(a)*r; g.fillStyle=`rgba(255,255,255,${.2+Math.random()*.5})`; g.beginPath(); g.arc(x,y,.6+Math.random()*1.6,0,6.28); g.fill(); }
-  const t=new T.CanvasTexture(cv); return t; })();
-U.uSprite={value:clumpTex}; U.uPx={value:800};
+/* 船頭水花：兩種粒子
+   1. 水滴：很小（3～9 公分），沿著飛行方向拉成細長的動態模糊線條、半透明，大量成串——真實的浪花是一束束細水絲，不是棉花團
+   2. 水霧：大而淡的霧團（0.5～1.5 公尺），被風吹散、慢慢變大變淡，留在空中讓船從旁邊穿過
+   每顆粒子是一片朝向鏡頭、沿速度方向拉長的四邊形（實例化繪製），大小用真實公尺 */
+const NP=2600, sp=new Float32Array(NP*3), sv=new Float32Array(NP*3), sl=new Float32Array(NP), ssz=new Float32Array(NP), sty=new Float32Array(NP), sl0=new Float32Array(NP); sl.fill(-1);
+const qg=new T.InstancedBufferGeometry(); qg.setAttribute('position',new T.BufferAttribute(new Float32Array([-1,-1,0, 1,-1,0, 1,1,0, -1,1,0]),3)); qg.setIndex([0,1,2,0,2,3]);
+const iP=new T.InstancedBufferAttribute(sp,3), iV=new T.InstancedBufferAttribute(sv,3), iL=new T.InstancedBufferAttribute(sl,1), iS=new T.InstancedBufferAttribute(ssz,1), iT=new T.InstancedBufferAttribute(sty,1), iL0=new T.InstancedBufferAttribute(sl0,1);
+[iP,iV,iL,iS,iT,iL0].forEach(a=>a.setUsage(T.DynamicDrawUsage));
+qg.setAttribute('iP',iP); qg.setAttribute('iV',iV); qg.setAttribute('iL',iL); qg.setAttribute('iS',iS); qg.setAttribute('iT',iT); qg.setAttribute('iL0',iL0); qg.instanceCount=NP; qg.boundingSphere=new T.Sphere(new T.Vector3(),1e5);
 const pm=new T.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,
-  vertexShader:`attribute float aL; attribute float aS; attribute float aR; uniform float uPx; varying float vL; varying float vR; void main(){ vL=aL; vR=aR; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=aL<0.0?0.0:clamp(aS*uPx/max(-mv.z,.4),1.0,220.0); gl_Position=projectionMatrix*mv; }`,
-  fragmentShader:`uniform float uLight; uniform sampler2D uSprite; varying float vL; varying float vR; void main(){ if(vL<0.0) discard; vec2 q=gl_PointCoord-.5; float c=cos(vR), s=sin(vR); q=vec2(c*q.x-s*q.y,s*q.x+c*q.y)+.5;
-    vec4 tx=texture2D(uSprite,q); float a=tx.a*.9*clamp(vL*1.6,0.0,1.0); if(a<.02) discard;
-    gl_FragColor=vec4(vec3(.93,.97,1.0)*(.28+.85*uLight),a); }`});
-const pts=new T.Points(pg,pm); pts.frustumCulled=false; pts.renderOrder=4; pts.userData.flatOnWater=true; pts.visible=false; S.add(pts);
-const _px=new T.Vector2();
+  vertexShader:`attribute vec3 iP; attribute vec3 iV; attribute float iL; attribute float iS; attribute float iT; attribute float iL0; varying vec2 vQ; varying float vA; varying float vT;
+  void main(){ vQ=position.xy; vT=iT; if(iL<0.0){ gl_Position=vec4(2.0,2.0,2.0,1.0); vA=0.0; return; }
+    float age=1.0-iL/max(iL0,.01);
+    vec4 c=viewMatrix*vec4(iP,1.0); vec3 vv=(viewMatrix*vec4(iV,0.0)).xyz; vec2 d=vv.xy; float sp=length(d);
+    vec2 ax=sp>.05?d/sp:vec2(0.0,1.0), ay=vec2(-ax.y,ax.x);
+    float size=iS*(iT>.5?(1.0+age*1.8):1.0);
+    // 水滴：沿速度方向拉長（相當於約 1/25 秒的動態模糊），寬度就是水滴大小；水霧：圓而大
+    float len=iT>.5?size:size+sp*.04, wid=iT>.5?size:size*.45;
+    c.xy+=ax*position.x*len+ay*position.y*wid;
+    gl_Position=projectionMatrix*c;
+    vA=(iT>.5?.16*(1.0-age):.55)*smoothstep(0.0,.12,iL)*smoothstep(1.0,.9,age); }`,
+  fragmentShader:`uniform float uLight; varying vec2 vQ; varying float vA; varying float vT;
+  void main(){ float r=dot(vQ,vQ); if(r>1.0) discard;
+    float a=vA*(vT>.5?exp(-r*2.2):(1.0-r)*(1.0-r));
+    // 水本身是透明的：亮處是天光的反射，水滴帶一點海水的藍綠
+    vec3 col=mix(vec3(.80,.90,.95),vec3(.97,.99,1.0),vT)*(.3+.8*uLight);
+    gl_FragColor=vec4(col,a); }`});
+const pts=new T.Mesh(qg,pm); pts.frustumCulled=false; pts.renderOrder=4; pts.userData.flatOnWater=true; pts.visible=false; S.add(pts);
 let pHead=0, curtainAcc=0, emitAcc=0, sampleT=0, wasOn=false;
 // 船殼在水線的半寬：船頭尖、往後 8 公尺內漸寬到最寬
 const hullHalf=(o,lz)=>o.beam*Math.min(1,.35+(lz-o.bow)/8);
-function emit(x,y,z,vx,vy,vz,life,size){ const i=pHead; pHead=(pHead+1)%NP; sp[i*3]=x; sp[i*3+1]=y; sp[i*3+2]=z; sv[i*3]=vx; sv[i*3+1]=vy; sv[i*3+2]=vz; sl[i]=life; ssz[i]=size; srot[i]=Math.random()*6.28; }
+function put(x,y,z,vx,vy,vz,life,size,type){ const i=pHead; pHead=(pHead+1)%NP; sp[i*3]=x; sp[i*3+1]=y; sp[i*3+2]=z; sv[i*3]=vx; sv[i*3+1]=vy; sv[i*3+2]=vz; sl[i]=life; sl0[i]=life; ssz[i]=size; sty[i]=type; }
+function emit(x,y,z,vx,vy,vz,life,size){
+  if(size>.25){ put(x,y,z,vx*.6,vy*.6,vz*.6,life*1.3,size*1.1,1);
+    for(let k=0;k<3;k++){ const j=.15; put(x,y,z,vx*(1+(Math.random()-.5)*j),vy*(1+(Math.random()-.5)*j),vz*(1+(Math.random()-.5)*j),life*.8,.03+Math.random()*.05,0); } }
+  else put(x,y,z,vx,vy,vz,life,.025+Math.random()*.05,0); }
 function clear(){ all.forEach(r=>{ r.pts.length=0; r.m.visible=false; }); sl.fill(-1); pts.visible=false; }
 function build(r,t){ const n=Math.min(r.pts.length,r.n); if(n<2){ r.m.visible=false; return; }
   for(let k=0;k<n;k++){ const p=r.pts[r.pts.length-1-k], a=t-p.t0, fade=Math.exp(-a/(r.life*.45))*Math.min(1,a*4+.25);
@@ -65,7 +79,6 @@ function build(r,t){ const n=Math.min(r.pts.length,r.n); if(n<2){ r.m.visible=fa
   r.g.attributes.position.needsUpdate=true; r.g.attributes.aUv.needsUpdate=true; r.g.attributes.aA.needsUpdate=true; r.m.visible=true; }
 /* o：{on, x, z, head（船頭朝向，前方 = (-sin, -cos)）, speed（公尺/秒）, bow, stern（船首、船尾離原點的前後距離，船首為負）, beam（半寬）, water（吃水線高度）} */
 function update(dt,t,o){
-  { const cam=W.camera, h=W.renderer.getDrawingBufferSize(_px).y; U.uPx.value=h/(2*Math.tan((cam.fov||60)*Math.PI/360)); }
   U.uTime.value=t; U.uLight.value=Math.max(.06,Math.min(1,W.info?W.info.light:1)); W.camera.getWorldPosition(U.uCam.value);
   if(!o||!o.on){ if(wasOn) clear(); wasOn=false; return; } wasOn=true;
   const fx=-Math.sin(o.head), fz=-Math.cos(o.head), rx=-fz, rz=fx, s=Math.max(0,o.speed);
@@ -95,13 +108,13 @@ function update(dt,t,o){
   let live=0;
   const halfAt=lz=>o.beam*Math.min(1,.35+(lz-o.bow)/8);
   const deckAt=lz=>(lz<o.bow+9?(o.deckBow||2.6):(o.deckMain||2.0))+(o.y||0);
-  for(let i=0;i<NP;i++){ if(sl[i]<0) continue; sl[i]-=dt; sv[i*3+1]-=9.8*dt; sv[i*3]*=1-dt*.35; sv[i*3+2]*=1-dt*.35; sp[i*3]+=sv[i*3]*dt; sp[i*3+1]+=sv[i*3+1]*dt; sp[i*3+2]+=sv[i*3+2]*dt;
+  for(let i=0;i<NP;i++){ if(sl[i]<0) continue; sl[i]-=dt; sv[i*3+1]-=9.8*dt; { const dr=sty[i]>.5?2.2:.3; sv[i*3]*=1-dt*dr; sv[i*3+2]*=1-dt*dr; if(sty[i]>.5) sv[i*3+1]=sv[i*3+1]*(1-dt*1.8)+9.8*dt*.85; } sp[i*3]+=sv[i*3]*dt; sp[i*3+1]+=sv[i*3+1]*dt; sp[i*3+2]+=sv[i*3+2]*dt;
     // 落到船身範圍內、低於甲板：打在甲板上散掉（不會穿過船身）
     const dx=sp[i*3]-o.x, dz=sp[i*3+2]-o.z, lz=-(dx*fx+dz*fz), lx=dx*rx+dz*rz;
     // 只有往下掉、剛好落到甲板高度的才算打在甲板上（從船邊水面剛甩起來、還在往上飛的不算，否則一出生就被消掉）
     const onDeck=sv[i*3+1]<0&&lz>o.bow&&lz<o.stern&&Math.abs(lx)<halfAt(lz)&&sp[i*3+1]<deckAt(lz)&&sp[i*3+1]>deckAt(lz)-1.2;
     if(sl[i]<=0||onDeck||sp[i*3+1]<W.swell(sp[i*3],sp[i*3+2],t)-.05) sl[i]=-1; else live++; }
-  pts.visible=live>0; if(live){ pg.attributes.position.needsUpdate=true; pg.attributes.aL.needsUpdate=true; pg.attributes.aS.needsUpdate=true; pg.attributes.aR.needsUpdate=true; } }
-return {update,clear,stats:()=>({ribbons:all.map(r=>({n:r.pts.length,vis:r.m.visible})),spray:sl.reduce((n,v)=>n+(v>=0?1:0),0),px:U.uPx.value,ptsVis:pts.visible})};
+  pts.visible=live>0; if(live){ iP.needsUpdate=true; iV.needsUpdate=true; iL.needsUpdate=true; iS.needsUpdate=true; iT.needsUpdate=true; iL0.needsUpdate=true; } }
+return {update,clear,stats:()=>({ribbons:all.map(r=>({n:r.pts.length,vis:r.m.visible})),spray:sl.reduce((n,v)=>n+(v>=0?1:0),0),ptsVis:pts.visible})};
 }
 if(typeof module!=='undefined'&&module.exports) module.exports={createBoatWake};

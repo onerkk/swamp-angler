@@ -92,37 +92,72 @@ const st=document.createElement('style'); st.textContent=`
 #bossBan{position:fixed;left:50%;top:30%;transform:translate(-50%,-50%) scale(.6);z-index:25;text-align:center;padding:14px 28px;border-radius:18px;background:linear-gradient(135deg,rgba(60,10,10,.92),rgba(120,40,10,.92));border:2px solid #ffd56a;box-shadow:0 0 40px rgba(255,150,60,.7);opacity:0;pointer-events:none;transition:transform .35s cubic-bezier(.2,1.6,.4,1),opacity .35s}
 #bossBan.in{opacity:1;transform:translate(-50%,-50%) scale(1)}#bossBan.out{opacity:0;transform:translate(-50%,-60%) scale(.9)}#bossBan.hidden{display:none}
 #bossBan b{display:block;font-size:30px;color:#ffe9a8;letter-spacing:2px;text-shadow:0 2px 12px rgba(255,120,40,.9)}#bossBan small{display:block;margin-top:4px;font-size:13px;color:#ffd0a0;font-weight:700}
-#bossFlash{position:fixed;inset:0;z-index:24;background:#fff;opacity:0;pointer-events:none}#bossFlash.go{animation:bfl .6s ease-out}@keyframes bfl{0%{opacity:.85}100%{opacity:0}}#talBox .lock{color:var(--fg-dim);font-size:12px}#talBox .on{color:#7ff0a8;font-weight:800}`;
+#bossFlash{position:fixed;inset:0;z-index:24;background:#fff;opacity:0;pointer-events:none}#bossFlash.go{animation:bfl .6s ease-out}@keyframes bfl{0%{opacity:.85}100%{opacity:0}}#talBox .lock{color:var(--fg-dim);font-size:12px}#talBox .on{color:#7ff0a8;font-weight:800}
+#bossBtn{position:fixed;right:12px;top:calc(env(safe-area-inset-top,0px) + 196px);z-index:6;display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding:7px 14px 7px 12px;border-radius:16px;border:1px solid rgba(255,213,106,.7);background:linear-gradient(135deg,rgba(92,58,8,.92),rgba(150,98,20,.9));color:#ffe9a8;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,.35);max-width:58vw;text-align:right}
+#bossBtn b{font-size:14px;letter-spacing:.5px;white-space:nowrap}#bossBtn small{font-size:11px;color:#ffd9a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52vw}
+#bossBtn.glow{animation:bossGlow 1.6s ease-in-out infinite alternate}@keyframes bossGlow{from{box-shadow:0 0 0 1px rgba(255,213,106,.5),0 0 6px rgba(255,190,80,.4)}to{box-shadow:0 0 0 2px #ffd56a,0 0 18px rgba(255,190,80,.9)}}
+#bossBtn.on{background:linear-gradient(135deg,rgba(110,30,20,.94),rgba(170,70,25,.92))}#bossBtn.ready{border-color:#7ff0a8;box-shadow:0 0 14px rgba(127,240,168,.6)}
+body.sheetOn #bossBtn,body.ending #bossBtn,body.athome #bossBtn,body.catching #bossBtn{display:none!important}
+#talBox .bcards{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+#talBox .bcard{padding:12px 14px;border-radius:16px;background:linear-gradient(135deg,rgba(255,213,106,.10),rgba(255,140,60,.05));border:1px solid rgba(255,213,106,.28)}
+#talBox .bcard.on{border-color:#ffb067;background:linear-gradient(135deg,rgba(255,120,60,.18),rgba(255,213,106,.06))}#talBox .bcard.done{border-color:rgba(127,240,168,.35)}#talBox .bcard.lock{opacity:.5}
+#talBox .bh{display:flex;justify-content:space-between;align-items:baseline}#talBox .bh b{font-size:18px;color:#ffe9a8}#talBox .bh small{color:#d8c79a}
+#talBox .bi{font-size:13px;color:#d9dde2;margin-top:4px;line-height:1.5}#talBox .bp{margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(232,214,170,.08);color:#e8d6aa;font-size:13px;line-height:1.6;font-style:italic}
+#talBox .ba{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}#talBox .ba .big{padding:10px 18px;font-size:15px}#talBox .bst{width:100%;font-size:13px;color:#ffd9a0}#talBox .bst.ok{color:#7ff0a8;font-weight:800}`;
 document.head.appendChild(st);
 const box=document.createElement('div'); box.id='talBox'; box.className='hidden'; box.innerHTML='<div class="tb"></div>'; document.body.appendChild(box);
 const btn=document.createElement('button'); btn.className='chip sm'; btn.id='talBtn'; btn.setAttribute('aria-label','天賦與挑戰'); btn.textContent='⭐';
 const t2=document.getElementById('top2'); if(t2) t2.appendChild(btn);
 function dot(){ btn.classList.toggle('dot',pts()>0||(!S.bossOn&&BOSS.some(b=>(S.lv||1)>=b.lv&&!S.boss[b.id]))); }
 const row=(a,b,r)=>`<div class="row"><div class="nm"><b>${a}</b><small>${b}</small></div><div class="rt">${r}</div></div>`;
-function render(){ const p=pts();
-  let h=`<h3>天賦與大師挑戰<button class="sbtn" data-t="x">✕</button></h3>`;
+let mode='tal';
+const spotIdx=z=>typeof SPOTS!=='undefined'?SPOTS.findIndex(q=>q.id===z):-1;
+/* 挑戰的狀態：在不在對的釣點、對的時段 */
+function bossState(b){ const here=c.loc()===b.loc&&c.zoneId()===b.zone, timeOk=b.per.indexOf(c.period())>=0; return {here,timeOk,ready:here&&timeOk}; }
+function bossView(){
+  let h=`<h3>👑 大師挑戰<button class="sbtn" data-t="x">✕</button></h3><div class="pt">老漁人的《漁獲簿》：他四十年來沒釣上岸的魚。接受挑戰後，到指定的釣點與時段，牠就會來咬餌。</div>`;
+  h+=`<div class="bcards">`;
+  for(const b of BOSS){ const done=S.boss[b.id]||0, on=S.bossOn===b.id, lock=(S.lv||1)<b.lv, st=bossState(b);
+    const cls=lock?'lock':on?'on':done?'done':'open';
+    let act='';
+    if(lock) act=`<span class="lk">🔒 Lv ${b.lv} 解鎖</span>`;
+    else if(on) act=`<div class="bst ${st.ready?'ok':''}">${st.ready?'✅ 條件符合，等牠咬餌':!st.here?'📍 還沒到'+b.hint.split('・')[0]:'⏳ 等到'+b.per.map(x=>PER_NAME[x]).join('或')}</div>${!st.here&&spotIdx(b.zone)>=0?`<button class="sbtn pri" data-t="go" data-v="${b.id}">前往${b.hint.split('・')[0]}</button>`:''}<button class="sbtn" data-t="quit">放棄</button>`;
+    else act=`<button class="sbtn big${done?'':' pri'}" data-t="boss" data-v="${b.id}">${done?'再戰（🔷×1）':'接受挑戰'}</button>`;
+    h+=`<div class="bcard ${cls}"><div class="bh"><b>${done?'👑':'🐉'} ${b.name}</b><small>Lv ${b.lv}</small></div>
+      <div class="bi">📍 ${b.hint}</div>
+      <div class="bi">首勝：稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷×${b.tide||1}${done?`<br>已擊敗 ${done} 次`:''}</div>
+      ${done&&b.page?`<div class="bp">📖 ${b.page}</div>`:''}<div class="ba">${act}</div></div>`; }
+  return h+'</div>'; }
+function render(){ if(mode==='boss'){ box.firstChild.innerHTML=bossView(); return; } const p=pts();
+  let h=`<h3>⭐ 天賦<button class="sbtn" data-t="x">✕</button></h3>`;
   h+=`<div class="pt">${(S.lv||1)<5?'Lv 5 起每升一級得 1 點天賦':`可用天賦點：${p}（Lv ${S.lv}，已用 ${spent()}）`}</div>`;
   for(const k in TAL){ const r=rank(k), T=TAL[k], mx=talMax(k), lock=(S.lv||1)<(T.lv||0);
     h+=row(`${T.i} ${T.n} <span class="pips">${'●'.repeat(r)}${'○'.repeat(mx-r)}</span>`,lock?`<span class="lock">Lv ${T.lv} 開放：${T.d(1)}（每級）</span>`:r?T.d(r):'尚未投入',lock?'🔒':r>=mx?'<span class="on">滿級</span>':`<button class="sbtn${p>0?' pri':''}" data-t="add" data-v="${k}">＋1</button>`); }
   if(spent()>0) h+=`<div style="text-align:right;margin-top:6px"><button class="sbtn danger" data-t="reset">重置天賦（🪙${TAL_RESET.toLocaleString()}）</button></div>`;
-  h+='<div class="sec">大師挑戰：接受後，在指定釣點與時段會遇到 Boss。Boss 體型巨大、拉力極強，建議先強化裝備。</div>';
-  for(const b of BOSS){ const done=S.boss[b.id], on=S.bossOn===b.id, lock=(S.lv||1)<b.lv;
-    const sub=lock?`<span class="lock">Lv ${b.lv} 解鎖</span>`:`${b.hint}<br>首勝：稱號「${b.title}」・🪙${b.coins.toLocaleString()}・💎×${b.cry}・🔷×${b.tide||1}${done?`<br>已擊敗 ${done} 次（再戰 🔷×1）`:''}${done&&b.page?`<br><i style="color:#d8c79a">📖 ${b.page}</i>`:''}`;
-    const r=lock?'🔒':on?'<span class="on">進行中</span><br><button class="sbtn" data-t="quit">放棄</button>':`<button class="sbtn${done?'':' pri'}" data-t="boss" data-v="${b.id}">${done?'再戰':'接受挑戰'}</button>`;
-    h+=row(`${done?'👑':'🐉'} ${b.name}`,sub,r); }
+  h+=`<div class="sec"><button class="sbtn pri" data-t="mode" data-v="boss" style="width:100%">👑 大師挑戰（${BOSS.filter(x=>(S.lv||1)>=x.lv&&!S.boss[x.id]).length} 隻可挑戰）</button></div>`;
   if(window.__LVINFO){ const L=window.__LVINFO, lv=S.lv||1, need=L.xpNext(lv), up=[]; for(let k=lv+1;k<=lv+12&&up.length<4;k++){ const g=L.gains(k).filter(x=>x!=='天賦點 +1'); if(g.length) up.push(`<div class="tk"><b>Lv ${k}</b>　${g.join('、')}</div>`); }
     h+=`<div class="sec">等級里程碑</div><div class="pt">Lv ${lv}：經驗 ${Math.floor(S.xp||0).toLocaleString()} / ${need.toLocaleString()}　｜　強化上限 +${enhCapAt(lv)}</div>${up.join('')}`; }
   if(S.titles.length){ const cur=S.titleSel&&S.titles.indexOf(S.titleSel)>=0?S.titleSel:S.titles[S.titles.length-1]; h+=`<div class="sec">已獲得稱號（點選要顯示在主畫面的稱號）</div><div>${S.titles.map(t=>`<button class="ttl${t===cur?' on':''}" data-t="title" data-v="${t}">${t}</button>`).join('')}</div>`; }
   box.firstChild.innerHTML=h; }
-btn.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); render(); box.classList.remove('hidden'); });
+btn.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); mode='tal'; render(); box.classList.remove('hidden'); });
+/* 主畫面的大師挑戰入口：金色膠囊按鈕。沒接挑戰時顯示可挑戰數量並發光；接了挑戰顯示目標、地點與目前是否符合條件 */
+const bb2=document.createElement('button'); bb2.id='bossBtn'; bb2.setAttribute('aria-label','大師挑戰'); document.body.appendChild(bb2);
+function bossBtn(){ const b=BOSS.find(x=>x.id===S.bossOn), avail=BOSS.filter(x=>(S.lv||1)>=x.lv&&!S.boss[x.id]).length;
+  if(b){ const st=bossState(b); bb2.className='on'+(st.ready?' ready':''); bb2.innerHTML=`<b>👑 ${b.name}</b><small>${st.ready?'✅ 條件符合，等牠咬餌':b.hint}</small>`; }
+  else { bb2.className=avail?'glow':''; bb2.innerHTML=`<b>👑 大師挑戰</b><small>${avail?avail+' 隻等你挑戰':'漁獲簿'}</small>`; }
+  bb2.style.display=(S.lv||1)>=15?'':'none'; }
+bb2.addEventListener('click',()=>{ c.Snd.init&&c.Snd.init(); mode='boss'; render(); box.classList.remove('hidden'); });
 box.addEventListener('click',e=>{ if(e.target===box){ box.classList.add('hidden'); return; } const b=e.target.closest('[data-t]'); if(!b) return; const t=b.dataset.t, v=b.dataset.v;
   if(t==='x'){ box.classList.add('hidden'); return; }
+  if(t==='mode'){ mode=v; render(); box.firstChild.scrollTop=0; return; }
+  if(t==='go'){ const B=BOSS.find(x=>x.id===v), i=B?spotIdx(B.zone):-1; const why=window.__STORY&&window.__STORY.lock?window.__STORY.lock(i):null;
+    if(i<0) return; if(why){ c.toast(why,'warn'); return; } box.classList.add('hidden'); if(window.__goSpot) window.__goSpot(i); return; }
   if(t==='add'&&TAL[v]&&pts()>0&&rank(v)<talMax(v)&&(S.lv||1)>=(TAL[v].lv||0)){ S.tal[v]=rank(v)+1; c.Snd.coin(); }
   if(t==='reset'){ if(S.coins<TAL_RESET){ c.toast('金幣不夠','bad'); } else { S.coins-=TAL_RESET; S.tal=talZero(); c.setCoins(); } }
   if(t==='boss'){ S.bossOn=v; tries=0; const B=BOSS.find(x=>x.id===v); c.toast(`🐉 已接受挑戰：${B.name}（${B.hint}）`,'good',3000); }
   if(t==='quit') S.bossOn=null;
   if(t==='title'){ S.titleSel=v; showTitle(); }
   c.persist(); render(); dot(); });
-setInterval(dot,3000); dot();
+setInterval(()=>{ dot(); bossBtn(); },2000); dot(); bossBtn();
 return {rank,apply,applyBoss,bossWin,bossIntro,tick};
 }
