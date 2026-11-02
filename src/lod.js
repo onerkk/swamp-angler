@@ -33,10 +33,13 @@ function createGeometryLOD(){
   if(!scene||!camera)return;if(!cam){cam=new camera.position.constructor();pos=new camera.position.constructor();}
   const now=typeof performance!=='undefined'?performance.now()/1000:scanT+dt;if(now>=scanT){scanT=now+2;list=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&lodOf.has(fullOf.get(o.geometry)||o.geometry))list.push(o);});}
   camera.getWorldPosition(cam);const d=lodDistance(tier),near2=d*d,far2=(d*1.15)*(d*1.15);let n=0,f=0;
-  for(const m of list){const full=fullOf.get(m.geometry)||m.geometry,e=lodOf.get(full),lod=e&&e.far;if(!lod)continue;const near=tier==='high'?full:(e.mid||full);
-   if(!full.boundingSphere)full.computeBoundingSphere();pos.setFromMatrixPosition(m.matrixWorld);const r=full.boundingSphere?full.boundingSphere.radius*Math.max(m.matrixWorld.getMaxScaleOnAxis(),1e-3):0,dd=Math.max(0,pos.distanceTo(cam)-r),d2=dd*dd;
-   if(m.geometry!==lod){if(d2>far2)m.geometry=lod;else if(m.geometry!==near)m.geometry=near;}else if(d2<near2)m.geometry=near;
-   if(m.geometry===lod)f++;else n++;}
+  // 高畫質：7 公尺內原檔、7～18 公尺中間版、更遠簡化版（一根 8 萬面的枯木在 10 公尺外用 35% 面數已看不出差別）；中低畫質近處就用中間版
+  const fullD=tier==='high'?7:0;
+  for(const m of list){const full=fullOf.get(m.geometry)||m.geometry,e=lodOf.get(full),lod=e&&e.far;if(!lod)continue;const mid=e.mid||full;
+   if(!full.boundingSphere)full.computeBoundingSphere();pos.setFromMatrixPosition(m.matrixWorld);const r=full.boundingSphere?full.boundingSphere.radius*Math.max(m.matrixWorld.getMaxScaleOnAxis(),1e-3):0,dd=Math.max(0,pos.distanceTo(cam)-r);
+   let want=m.geometry;
+   if(dd>d*1.15)want=lod;else if(dd<d){if(fullD===0)want=mid;else if(dd<fullD)want=full;else if(dd>fullD*1.15)want=mid;else want=m.geometry===lod?mid:m.geometry;}else if(m.geometry===lod)want=lod;
+   m.geometry=want;if(m.geometry===lod)f++;else n++;}
   stats.near=n;stats.far=f;
  }
  return{install,update,stats};

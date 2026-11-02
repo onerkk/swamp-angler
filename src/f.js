@@ -63,7 +63,12 @@ canoeCollider.update=()=>{const b=ctx.base();canoeCollider.boxes[0].frame={x:b.x
 if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const source=x.material,mp=source.map; if(mp){ tuneTextureSampling(T,mp,W.renderer.capabilities.getMaxAnisotropy()); } x.material=new T.MeshStandardMaterial({map:mp||null,normalMap:source.normalMap||null,roughnessMap:source.roughnessMap||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.85,metalness:0}); x.castShadow=x.receiveShadow=true; } });
   const w=new T.Group(); w.add(o); w.rotation.y=Math.PI; w.updateMatrixWorld(true); let b=new T.Box3().setFromObject(w); const sz=b.getSize(new T.Vector3()); w.scale.set(.78/Math.max(sz.x,1e-6),.42/Math.max(sz.y,1e-6),4.2/Math.max(sz.z,1e-6));   // 長寬高分開縮放成真實獨木舟比例
   w.updateMatrixWorld(true); b=new T.Box3().setFromObject(w); const c=b.getCenter(new T.Vector3()); w.position.set(-c.x,-.2-b.min.y,-.35-c.z);
-  boat.children.forEach(ch=>{ if(ch!==padG) ch.visible=false; }); boat.add(w); });   // 只藏舊塑膠艇的船身，槳要留著
+  o.traverse(x=>{ if(x.isMesh) x.renderOrder=-2; });
+  // 船艙水線遮罩：一片只寫深度、不畫顏色的橢圓蓋在船艙水線上，排在船體之後、其他東西之前畫。
+  // 船艙比水面低，水面、浮萍、睡蓮、雨圈這些貼在水面的東西才不會畫進船裡（船看起來像沉了）；船板先畫好不受影響
+  const capGeo=new T.CircleGeometry(1,40); capGeo.rotateX(-Math.PI/2); const cap=new T.Mesh(capGeo,new T.MeshBasicMaterial({colorWrite:false,depthWrite:true,side:T.DoubleSide}));
+  cap.scale.set(.34,1,2.0); cap.position.set(0,.045,-.35); cap.renderOrder=-1; cap.frustumCulled=false; cap.userData.hullCap=true; boat.add(cap);
+  boat.children.forEach(ch=>{ if(ch!==padG&&ch!==w&&ch!==cap) ch.visible=false; }); boat.add(w); });   // 只藏舊塑膠艇的船身，槳要留著
 { const yel=new T.MeshStandardMaterial({color:0xf2b705,roughness:.32}), blk=new T.MeshStandardMaterial({color:0x151515,roughness:.6}), gry=new T.MeshStandardMaterial({color:0x33363b,metalness:.5,roughness:.4});
   const hull=new T.Mesh(new T.SphereGeometry(1,48,20),yel); hull.scale.set(.36,.22,1.95); hull.position.set(0,.02,-.15); boat.add(hull);
   const ridge=new T.Mesh(new T.SphereGeometry(1,24,10),yel); ridge.scale.set(.06,.05,1.2); ridge.position.set(0,.215,-.9); boat.add(ridge);
@@ -251,7 +256,9 @@ let snagRipT=0;
 function update(dt,t){
   snagRipT-=dt; if(snagRipT<=0&&SNAG_RIP.length&&!(W.isSea&&W.isSea())){ snagRipT=.7+Math.random()*.9; const r=SNAG_RIP[Math.floor(Math.random()*SNAG_RIP.length)]; W.addRipple(r[0]+(Math.random()-.5)*.4,r[1]+(Math.random()-.5)*.4,.22); }   // 樹幹入水處的小漣漪
   const s=sp(), bx=s.pos[0], bz=s.pos[1];
-  if(s.kayak){ const sw=W.swell(bx,bz,t)*2.2; boat.visible=true; boat.position.set(bx,sw,bz); if(W.U.uBoat) W.U.uBoat.value.set(bx,bz,s.head,1); boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
+  if(s.kayak){ const sw=W.swell(bx,bz,t)*2.2; boat.visible=true; boat.position.set(bx,sw,bz); if(W.U.uBoat) W.U.uBoat.value.set(bx,bz,s.head,1);
+    // 船每前進約半公尺就在浮萍的水道記錄裡加一個點
+    if(window.__DW){ const D=window.__DW, last=D.last; if(!last||Math.hypot(bx-last.x,bz-last.z)>.45){ D.last={x:bx,z:bz}; D.trail[D.next].set(bx,bz,t,0); D.next=(D.next+1)%D.trail.length; } } boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
     W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
   else if(s.yacht){ boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; const sw=W.swell(bx,bz,t)*.9; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
   else { boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; W.player.position.set(0,2.4,0); W.head.rotation.z=0; }

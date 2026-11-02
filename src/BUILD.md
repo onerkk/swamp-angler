@@ -67,3 +67,6 @@ y 雲端存檔（Firebase Google 登入）與 PWA 安裝
 - 浮萍灣：睡蓮加密（c.js bay 叢）＋真實浮萍毯（dwTex 畫 2600 片小葉的 512 貼圖、不規則圓形網格合併成一個網格、renderOrder 1 排在水面後、DoubleSide）
 - 水下層 submerged.js 手機最長邊 ≤1024（高）／768／640；診斷加入場景切換資源趨勢，幀統計忽略背景空檔
 - 獨木舟船艙遮罩：U.uBoat（x,z,head,on），水面著色器在船艙橢圓內 discard，船底不再透出水面與漣漪
+- 船艙水線遮罩（f.js hullCap）：只寫深度的橢圓蓋在船艙水線，renderOrder -1，船體 -2；任何貼在水面的東西（水、浮萍、睡蓮、雨圈）都不會畫進船裡
+- 浮萍被船推開（c.js dwMat.onBeforeCompile）：船身橢圓內不畫，uTrail 24 點水道 28 秒合攏；f.js 每前進 0.45m 記一點
+- LOD 高畫質三級：7m 內原檔、7～18m 中間版、以外簡化版

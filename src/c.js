@@ -92,6 +92,18 @@ const dwTex=(()=>{ const N=512, cv=document.createElement('canvas'); cv.width=cv
       x.fillStyle=g; x.beginPath(); x.arc(0,0,r,0,6.283); x.fill(); x.restore(); } }
   const t=new T.CanvasTexture(cv); t.wrapS=t.wrapT=T.RepeatWrapping; t.anisotropy=4; t.encoding=T.sRGBEncoding; return t; })();
 const dwMat=new T.MeshStandardMaterial({map:dwTex, roughness:.8, metalness:0, alphaTest:.5, transparent:false, vertexColors:true, envMapIntensity:.15, side:T.DoubleSide});
+// 船推開浮萍：船身周圍一圈不畫，船走過的路留下一條慢慢合攏的水道（約 28 秒合回來）；uTrail 由 f.js 在船移動時寫入
+const DW_TRAIL=24, dwTrail=[]; for(let i=0;i<DW_TRAIL;i++) dwTrail.push(new T.Vector4(0,0,-1e9,0));
+window.__DW={trail:dwTrail,next:0};
+dwMat.onBeforeCompile=sh=>{ sh.uniforms.uBoat=U.uBoat; sh.uniforms.uTime=U.uTime; sh.uniforms.uTrail={value:dwTrail};
+  sh.vertexShader='varying vec3 vDwW;\n'+sh.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvDwW=(modelMatrix*vec4(transformed,1.0)).xyz;');
+  sh.fragmentShader='varying vec3 vDwW; uniform vec4 uBoat; uniform float uTime; uniform vec4 uTrail['+DW_TRAIL+'];\n'+sh.fragmentShader.replace('#include <alphatest_fragment>',
+   `{ vec2 p=vDwW.xz; float keep=1.0;
+      if(uBoat.w>0.5){ vec2 d=p-uBoat.xy; float c=cos(uBoat.z), s=sin(uBoat.z); vec2 l=vec2(d.x*c-d.y*s, d.x*s+d.y*c+0.35); float e=(l.x*l.x)/0.36+(l.y*l.y)/5.9; keep*=smoothstep(.8,1.15,e); }
+      for(int i=0;i<${DW_TRAIL};i++){ vec4 t=uTrail[i]; float age=uTime-t.z; float r=.62*(1.0-age/28.0); if(r>0.0){ float q=length(p-t.xy)/r; keep*=smoothstep(.75,1.1,q); } }
+      diffuseColor.a*=keep; }
+    #include <alphatest_fragment>`); };
+dwMat.customProgramCacheKey=()=>'duckweedPush';
 { const R=rng(37), parts=[];
   // 大片的毯子在睡蓮之間與岸邊，小團散在毯子外圍；形狀用角度雜訊做成不規則，邊緣再用頂點色壓暗、顏色略有深淺
   const mats=[[-12.5,-14,3.4],[-11,-20.5,3.8],[-14.8,-18,2.6],[-5,-22.8,2.4],[-9.5,-25.5,2.8],[-3.2,-15.5,1.6],[-15.5,-22.5,2.0],[-7.8,-11.5,1.8]];
