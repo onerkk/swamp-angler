@@ -403,9 +403,20 @@ function lose(reason){ if(easy()&&G.fd&&G.f){ G.f.lostWhy=null; land(); return; 
 }
 function startJump(){ const f=G.f; f.jumpT=f.jumpDur=.85+.25*Math.sqrt(G.fd.L); fishPos(tv,0); P.splash(tv.x,0,tv.z,30,1.2); W.addRipple(tv.x,tv.z,.9); Snd.splash(1);
   toast('魚躍出水面！先放手！','warn',1100); vib(30); G.fish.group.visible=true; }
-function liftAbove(g){ if(!g||!g.parent) return; g.parent.updateMatrixWorld(true); g.updateMatrixWorld(true);
-  const b=new THREE.Box3(), bb=new THREE.Box3(); g.traverse(o=>{ if(!o.isMesh||o.isSprite||!o.visible||!o.geometry) return; if(!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); b.union(bb); }); if(b.isEmpty()) return; const w=W.swell?W.swell(g.getWorldPosition(tv4b).x,tv4b.z,G.t):0, need=Math.min(w+.25-b.min.y,(G.fd&&G.fd.L||1)*1.2+.5);   /* 上限：最多抬約一個魚身，不會飛到天上 */
-  if(need>0){ const inv=new THREE.Matrix4().copy(g.parent.matrixWorld).invert(), up=new THREE.Vector3(0,need,0).transformDirection(inv).multiplyScalar(need); g.position.add(up); } }
+/* 拿在眼前展示的魚整條要在水面以上。低頭時大型魚（Boss、鯊魚、旗魚）的展示位置會落到水面下——
+   水面下的部分交給水下層，主畫面會裁掉，看起來就是魚不見了。
+   做法：沿著鏡頭到魚的視線把魚拉近，魚在畫面上的位置不變、只是變大，直到整條在水面上；
+   以前是直接往上抬，大魚會被抬到畫面最上方甚至天上。只量魚身網格，不量 Boss 光暈這類特效 */
+function fishLowest(g){ const b=new THREE.Box3(), bb=new THREE.Box3(); g.updateMatrixWorld(true);
+  g.traverse(o=>{ if(!o.isMesh||o.isSprite||!o.visible||!o.geometry) return; if(!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); b.union(bb); });
+  return b.isEmpty()?null:b.min.y; }
+function liftAbove(g){ if(!g||!g.parent) return; g.parent.updateMatrixWorld(true);
+  const w=(W.swell?W.swell(g.getWorldPosition(tv4b).x,tv4b.z,G.t):0)+.25, low=fishLowest(g); if(low==null||low>=w) return;
+  const p0=g.position.clone(); let lo=.55, hi=1;
+  for(let k=0;k<8;k++){ const m=(lo+hi)/2; g.position.copy(p0).multiplyScalar(m); const y=fishLowest(g); if(y!=null&&y>=w) lo=m; else hi=m; }
+  g.position.copy(p0).multiplyScalar(lo); const y=fishLowest(g);
+  // 鏡頭幾乎直直往下看時，拉近也不夠：最後才少量往上抬
+  if(y!=null&&y<w){ const need=Math.min(w-y,(G.fd&&G.fd.L||1)*.6), inv=new THREE.Matrix4().copy(g.parent.matrixWorld).invert(); g.position.add(new THREE.Vector3(0,1,0).transformDirection(inv).multiplyScalar(need)); } }
 function dispDist(){ return Math.max(.42,G.fd.L*(G.fd.sp.sh.snout?3:2.6))*(W.camera.aspect<1?1:.8); }   // 拿在手上的魚約佔畫面寬度七成，看得清楚又不會塞滿
 function land(){
   if(!easy()&&G.loc==='sea'&&!G.fd.item&&!G.fd.sp.special&&G.fd.sp.id!=='shark'&&G.fd.sp.id!=='gwhite'&&Math.random()<.12*(1-.12*TR('sea'))&&!KK.busy()&&!(window.__ECO&&window.__ECO.fxOn('repel'))){ G.state='snatch'; fishPos(tv,-.05); toast('就在魚出水的瞬間……','warn',1200); KK.snatchOver(tv.clone(),()=>{ G.state='fight'; lose('shark'); }); return; }
