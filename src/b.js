@@ -724,8 +724,14 @@ function raysParams(){ if(!raysOn()) return null; const sd=U.uSunDir.value, vis=
   const mk=U.uMoonK?U.uMoonK.value:0; if(mk>.05&&U.uMoonDir){ _grDir.copy(U.uMoonDir.value).normalize(); _grCol.setRGB(.62,.72,.95); return {dir:_grDir,color:_grCol,strength:mk*.45,thresh:.16}; }
   return null; }
 const radiance=createSceneRadiance(T,renderer,prepareScene),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
+/* 戶外陰影：太陽方向、鏡頭位置與朝向都沒變的時候（等魚咬餌、看風景），每 0.5 秒才重算一次；一有變化就照原本的頻率。
+   畫面完全一樣，省下的是每秒十幾次重畫所有投影物（倒木、樹樁一個就 4～8 萬面） */
+let _shSig='', _shC=new T.Vector3(), _shD=new T.Vector3();
+function shadowSigChanged(){ camera.getWorldPosition(_shC); camera.getWorldDirection(_shD); const sd=U.uSunDir.value;
+  const sig=[sd.x,sd.y,sd.z].map(v=>Math.round(v*300)).join(',')+'|'+[_shC.x,_shC.y,_shC.z].map(v=>Math.round(v*5)).join(',')+'|'+[_shD.x,_shD.y,_shD.z].map(v=>Math.round(v*30)).join(',');
+  if(sig===_shSig) return false; _shSig=sig; return true; }
 function render(){prepareScene(scene);const oldEnv=scene.environment;if(window.__effectBudget?.environment===false)scene.environment=null;const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
- try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz||20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz;if(renderer.shadowMap.needsUpdate)lastShadow=now;
+ try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz||20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz&&(shadowSigChanged()||now-lastShadow>=.5);if(renderer.shadowMap.needsUpdate)lastShadow=now;
   const shadowNow=renderer.shadowMap.needsUpdate;
   pass('sub',()=>submerged.render());
   if(reflEnabled){try{pass('refl',renderRefl);}catch(e){reflEnabled=false;WU.uReflOn.value=0;console.warn('refl off',e);}}

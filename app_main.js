@@ -1,4 +1,4 @@
-/*APPV:20261103065826*/
+/*APPV:20261103073138*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -2068,8 +2068,14 @@ function raysParams(){ if(!raysOn()) return null; const sd=U.uSunDir.value, vis=
   const mk=U.uMoonK?U.uMoonK.value:0; if(mk>.05&&U.uMoonDir){ _grDir.copy(U.uMoonDir.value).normalize(); _grCol.setRGB(.62,.72,.95); return {dir:_grDir,color:_grCol,strength:mk*.45,thresh:.16}; }
   return null; }
 const radiance=createSceneRadiance(T,renderer,prepareScene),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
+/* 戶外陰影：太陽方向、鏡頭位置與朝向都沒變的時候（等魚咬餌、看風景），每 0.5 秒才重算一次；一有變化就照原本的頻率。
+   畫面完全一樣，省下的是每秒十幾次重畫所有投影物（倒木、樹樁一個就 4～8 萬面） */
+let _shSig='', _shC=new T.Vector3(), _shD=new T.Vector3();
+function shadowSigChanged(){ camera.getWorldPosition(_shC); camera.getWorldDirection(_shD); const sd=U.uSunDir.value;
+  const sig=[sd.x,sd.y,sd.z].map(v=>Math.round(v*300)).join(',')+'|'+[_shC.x,_shC.y,_shC.z].map(v=>Math.round(v*5)).join(',')+'|'+[_shD.x,_shD.y,_shD.z].map(v=>Math.round(v*30)).join(',');
+  if(sig===_shSig) return false; _shSig=sig; return true; }
 function render(){prepareScene(scene);const oldEnv=scene.environment;if(window.__effectBudget?.environment===false)scene.environment=null;const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
- try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz||20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz;if(renderer.shadowMap.needsUpdate)lastShadow=now;
+ try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz||20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz&&(shadowSigChanged()||now-lastShadow>=.5);if(renderer.shadowMap.needsUpdate)lastShadow=now;
   const shadowNow=renderer.shadowMap.needsUpdate;
   pass('sub',()=>submerged.render());
   if(reflEnabled){try{pass('refl',renderRefl);}catch(e){reflEnabled=false;WU.uReflOn.value=0;console.warn('refl off',e);}}
@@ -8310,7 +8316,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261103065826'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261103073138'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
