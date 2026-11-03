@@ -86,6 +86,14 @@ async function draw(opt){ opt=opt||{}; const st=stats(), cv=document.createEleme
     const lt=Math.max(.35,Math.min(1,(window.__W&&window.__W.info&&window.__W.info.light)||1)); if(lt<1){ hx.globalCompositeOperation='source-atop'; hx.fillStyle=`rgba(8,14,22,${(1-lt)*.75})`; hx.fillRect(0,0,hc.width,hc.height); }
     g.drawImage(hc,20,SH-430,1040,520);
   }
+  // 霜汐拍立得：最近收到的月鱗畫像，用膠帶斜貼在右上角的天空處
+  const S0=window.__SAVE||{}, mg=(S0.merGift||[]).slice(-1)[0];
+  if(mg){ const im=await new Promise(r=>{ const i=new Image(); i.onload=()=>r(i); i.onerror=()=>r(null); i.src='media/mergift/'+mg; });
+    if(im){ g.save(); g.translate(905,190); g.rotate(.09); g.shadowColor='rgba(0,0,0,.55)'; g.shadowBlur=24; g.shadowOffsetY=10; g.fillStyle='#f7f3ea'; g.fillRect(-130,-150,260,310); g.shadowBlur=0; g.shadowOffsetY=0;
+      const iw=230, ih=230; g.drawImage(im,-iw/2,-135,iw,ih);
+      g.fillStyle='#3a2a18'; g.font=`700 30px ${SERIF}`; g.textAlign='center'; g.fillText('霜汐',0,135);
+      g.fillStyle='#8a7350'; g.font=`500 18px ${SANS}`; g.fillText(`月鱗畫像 ${(S0.merGift||[]).length}/${window.__MERGIFT?window.__MERGIFT.count():8}`,0,156-4);
+      g.rotate(-.12); g.fillStyle='rgba(235,225,190,.75)'; g.fillRect(-48,-168,96,34); g.restore(); g.textAlign='left'; } }
   // 一句挑戰（用自己的最大漁獲當鉤子）
   if(st.heroRec&&st.heroSp){ const line1=`我拉起了 ${wkg(st.heroRec.w)} 的${st.heroSp.name}`; g.textAlign='right'; g.font=`900 54px ${SERIF}`; g.lineWidth=8; g.strokeStyle='rgba(0,0,0,.75)'; g.strokeText(line1,W0-48,SH-62); g.fillStyle='#fff'; g.fillText(line1,W0-48,SH-62);
     g.font=`800 34px ${SANS}`; g.fillStyle='#ffd56a'; g.strokeText('你呢？',W0-48,SH-16); g.fillText('你呢？',W0-48,SH-16); g.textAlign='left'; }
