@@ -563,7 +563,7 @@ function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.i
     }catch(err){ console.error('mount',rec&&rec.id,err); } });
   // 天花板吊掛：真實長度，沿房間寬度排；吊繩接到天花板。座標換到標本群組（它轉了 −90°、往前移）的本地座標
   const pz=mountG.position.z, toLocal=(x,y,z)=>new T.Vector3(z-pz,y,-x), lanes=CEIL_Z.map(()=>CEIL_X[0]), ropeM=new T.MeshStandardMaterial({color:0x8a7a5a,roughness:.9});
-  const tooBig=[];
+  const tooBig=big.map(o=>o.rec); big.length=0;   /* 一公尺以上的標本都在標本館照真實大小展示，小屋天花板不再吊掛（會擋住水族箱與視線） */
   big.forEach(({rec,sp})=>{ try{ const L=rec.L; let li=lanes.findIndex(x=>x+L<=CEIL_X[1]); if(li<0){ overflow++; return; } const xc=lanes[li]+L/2; lanes[li]+=L+.35; c.want(rec.id);
     const f=fishObj(rec); if(!f) return; f.scale.setScalar(L); f.rotation.set(0,0,0); f.updateMatrixWorld(true);   /* 先用最後在房間裡的朝向（頭朝 +x）量高度與鰭展，再轉成群組的本地朝向 */
     const bb=new T.Box3().setFromObject(f); f.rotation.set(0,Math.PI/2,0); const hh=Math.max(.08,(bb.max.y-bb.min.y)/2||L*.12), hd=Math.max(.05,(bb.max.z-bb.min.z)/2), y=ROOM.h-.2-hh;
@@ -574,8 +574,8 @@ function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.i
     const np=new T.Mesh(new T.PlaneGeometry(.34,.085),label(rec,sp)); np.material.side=T.DoubleSide; np.position.copy(toLocal(xc,y-hh-.1,CEIL_Z[li])); np.rotation.y=Math.PI/2; mountG.add(np);
     }catch(err){ console.error('mount',rec&&rec.id,err); } });
   // 放不下的巨物：前牆上釘一張手寫紙條記下來（不讓玩家以為標本不見了）
-  if(tooBig.length){ const cv=document.createElement('canvas'); cv.width=320; cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#e9dcbc'; g.fillRect(0,0,320,256); g.fillStyle='#3a2410'; g.font='bold 26px serif'; g.fillText('小屋放不下的巨物',20,40); g.font='22px serif';
-    tooBig.slice(0,6).forEach((r,k)=>{ const sp=c.species(r.id); g.fillText('・'+(sp?sp.name:r.id)+'　'+Math.round(r.L*100)+' cm',20,84+k*30); }); g.font='18px serif'; g.fillStyle='#6b5030'; g.fillText('天花板太低，掛不下牠們的真實大小',20,244);
+  if(tooBig.length){ const cv=document.createElement('canvas'); cv.width=320; cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#e9dcbc'; g.fillRect(0,0,320,256); g.fillStyle='#3a2410'; g.font='bold 26px serif'; g.fillText('大型標本在標本館',20,40); g.font='22px serif';
+    tooBig.slice(0,6).forEach((r,k)=>{ const sp=c.species(r.id); g.fillText('・'+(sp?sp.name:r.id)+'　'+Math.round(r.L*100)+' cm',20,84+k*30); }); g.font='18px serif'; g.fillStyle='#6b5030'; g.fillText('從小屋下方「🏛 標本館」進去看',20,244);
     const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; const note=new T.Mesh(new T.PlaneGeometry(.5,.4),new T.MeshStandardMaterial({map:tx,roughness:.9})); note.position.set(ROOM.x-.02,1.75,-.25); note.rotation.y=-Math.PI/2; mountG.add(note); }
   mountG.userData.overflow=overflow; mountG.userData.tooBig=tooBig.map(r=>r.id); }   // 單一個標本出錯就跳過，不影響其他東西
 const tv=new T.Vector3();

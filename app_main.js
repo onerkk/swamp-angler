@@ -1,4 +1,4 @@
-/*APPV:20261103011145*/
+/*APPV:20261103012836*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -6851,18 +6851,24 @@ function buildRoom(){ while(roomG.children.length) roomG.remove(roomG.children[0
   for(let z=4;z>-len-2;z-=4){ const b=new T.Mesh(new T.BoxGeometry(HW*2,.35,.3),beamM); b.position.set(0,HH-.4,z); roomG.add(b); }
   for(const s of [-1,1]) { const rail=new T.Mesh(new T.BoxGeometry(.3,.35,len+8),beamM); rail.position.set(s*(HW-2.5),HH-.75,-len/2+2); roomG.add(rail); }
   // 中央走道的地毯
-  const rugT=tl.load('models/home/fabric_pattern_07_Diffuse.jpg'); rugT.wrapS=rugT.wrapT=T.RepeatWrapping; rugT.repeat.set(1.5,len/2); rugT.encoding=T.sRGBEncoding; const rug=new T.Mesh(new T.PlaneGeometry(2.2,len+4),new T.MeshStandardMaterial({color:0x6a1e1a,roughness:.95,bumpMap:rugT,bumpScale:.002})); rug.rotation.x=-Math.PI/2; rug.position.set(0,.01,-len/2+2); roomG.add(rug); }
+  const rugT=tl.load('models/home/fabric_pattern_07_Diffuse.jpg'); rugT.wrapS=rugT.wrapT=T.RepeatWrapping; rugT.repeat.set(1.5,len/2); rugT.encoding=T.sRGBEncoding; const rug=new T.Mesh(new T.PlaneGeometry(2.2,len+4),new T.MeshStandardMaterial({color:0x3e100c,roughness:.95,bumpMap:rugT,bumpScale:.002})); rug.rotation.x=-Math.PI/2; rug.position.set(0,.01,-len/2+2); roomG.add(rug); }
 // 燈光：暖色的頂光加兩側補光，不開陰影（大型魚多也不會卡）
 const hemiL=new T.HemisphereLight(0xfff0dc,0x6a5440,2.1), ambL=new T.AmbientLight(0xffe8d0,.55); scene.add(hemiL,ambL); const key=new T.DirectionalLight(0xfff2e0,1.6); key.position.set(3,10,4); scene.add(key); const fill=new T.DirectionalLight(0xbcd2ff,.45); fill.position.set(-4,6,-10); scene.add(fill);
 function plate(t1,t2){ const cv=document.createElement('canvas'); cv.width=512; cv.height=160; const g=cv.getContext('2d'); g.fillStyle='#c8a050'; g.fillRect(0,0,512,160); g.strokeStyle='#6b4a1a'; g.lineWidth=8; g.strokeRect(6,6,500,148);
   g.fillStyle='#2a1a08'; g.textAlign='center'; g.font='bold 54px serif'; g.fillText(t1,256,70); g.font='32px serif'; g.fillText(t2,256,125); const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; return tx; }
 const decoG=new T.Group(); scene.add(decoG); const GL=T.GLTFLoader?new T.GLTFLoader():null, mcache={};
+const TAGS={sofa:'🛋️ 點沙發坐下',seat:'點腳凳坐下',shelf:'📚 點書櫃翻手記',chest:'🧰 點寶箱打開',light:'💡 點油燈開關燈'};
+function tagSprite(t){ const cv=document.createElement('canvas'); cv.width=512; cv.height=112; const g=cv.getContext('2d'); g.fillStyle='rgba(20,14,8,.82)'; const r=52; g.beginPath(); g.moveTo(r,4); g.arcTo(508,4,508,108,r); g.arcTo(508,108,4,108,r); g.arcTo(4,108,4,4,r); g.arcTo(4,4,508,4,r); g.fill(); g.strokeStyle='rgba(255,213,106,.7)'; g.lineWidth=4; g.stroke();
+  g.fillStyle='#ffe9a8'; g.font='bold 48px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(t,256,58); const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding;
+  const sp=new T.Sprite(new T.SpriteMaterial({map:tx,depthTest:false,transparent:true})); sp.scale.set(1.1,.24,1); sp.renderOrder=10; return sp; }
+const tagList=[];
 function deco(name,x,y,z,ry,width,use){ if(!GL) return; const go=g=>{ const o=g.scene.clone(true); if(use) o.userData.use=use; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material&&m.material.map) m.material.map.anisotropy=8; } });
     o.rotation.y=ry||0; o.updateMatrixWorld(true); let b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(width/Math.max(.01,Math.max(sz.x,sz.z))); o.updateMatrixWorld(true); b.setFromObject(o);
-    o.position.set(x-(b.min.x+b.max.x)/2,y-b.min.y,z-(b.min.z+b.max.z)/2); decoG.add(o); };
+    o.position.set(x-(b.min.x+b.max.x)/2,y-b.min.y,z-(b.min.z+b.max.z)/2); decoG.add(o);
+    if(use&&TAGS[use]&&!(use==='light'&&name!=='vintage_oil_lamp')&&!(use==='seat'&&x>0)){ const t=tagSprite(TAGS[use]); t.position.set(x,y+(b.max.y-b.min.y)+.35,z); t.userData.ph=Math.random()*6; t.userData.use=use; t.userData.target=o; decoG.add(t); tagList.push(t); } };
   if(mcache[name]) mcache[name].then(go); else { mcache[name]=new Promise(r=>GL.load('models/home/'+name+'.glb',r,undefined,()=>{})); mcache[name].then(go); } }
 /* 大廳的擺設：入口是一組沙發休息區與書櫃；走道上方每 8 公尺一盞吊燈；兩側牆上每 6 公尺一盞壁燈；盆栽、木箱、寶箱點綴 */
-function furnish(){ while(decoG.children.length) decoG.remove(decoG.children[0]);
+function furnish(){ while(decoG.children.length) decoG.remove(decoG.children[0]); tagList.length=0;
   deco('sofa_02',0,0,4.6,Math.PI,2.2,'sofa'); deco('coffee_table_round_01',0,0,3.2,0,.9); deco('Ottoman_01',-1.6,0,3.4,.4,.7,'seat'); deco('Ottoman_01',1.6,0,3.4,-.4,.7,'seat');
   deco('wooden_bookshelf_worn',-HW+.4,0,4.5,Math.PI/2,1.6,'shelf'); deco('wooden_bookshelf_worn',HW-.4,0,4.5,-Math.PI/2,1.6,'shelf');
   deco('potted_plant_01',-HW+.7,0,2.2,0,.7); deco('potted_plant_01',HW-.7,0,2.2,0,.7); deco('potted_plant_01',-HW+.7,0,-len-.8,0,.7); deco('potted_plant_01',HW-.7,0,-len-.8,0,.7);
@@ -6945,7 +6951,7 @@ function use(id,o){ const H=window.__HOME, r=(k)=>{ try{ return H&&H.furnUse?H.f
   if(id==='chest'){ const res=r('chest'); tip(res&&res.msg?res.msg:'寶箱裡塞滿了老漁人的舊漁具',3400); return; }
   if(id==='light'){ dim=!dim; lightsAll.forEach(l=>{ l.intensity=l.userData.base*(dim&&!l.isSpotLight?.25:1); }); tip(dim?'燈調暗了，只剩標本上方的頂燈':'燈全開',1600); } }
 function pick(e){ const r=el.getBoundingClientRect(), v=new T.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1), rc=new T.Raycaster(); rc.setFromCamera(v,cam);
-  const h=rc.intersectObject(decoG,true)[0]; if(!h||h.distance>9) return; let o=h.object; while(o&&!(o.userData&&o.userData.use)) o=o.parent; if(o) use(o.userData.use,o); }
+  const h=rc.intersectObject(decoG,true)[0]; if(!h||h.distance>9) return; let o=h.object; while(o&&!(o.userData&&o.userData.use)) o=o.parent; if(o) use(o.userData.use,o.userData.target||o); }
 let drag=null; const el=R.domElement;
 el.addEventListener('pointerdown',e=>{ if(!on) return; drag={x:e.clientX,y:e.clientY,yaw:yawT,pitch:pitchT}; e.stopImmediatePropagation(); },true);
 el.addEventListener('pointermove',e=>{ if(!on||!drag) return; yawT=drag.yaw-(e.clientX-drag.x)*.006; pitchT=Math.max(-.6,Math.min(.9,drag.pitch-(e.clientY-drag.y)*.006)); e.stopImmediatePropagation(); },true);
@@ -6956,14 +6962,14 @@ function fadeTo(v,stop){ clearInterval(fadeT); fadeT=setInterval(()=>{ const d=v
 function music(on2){ const S=window.__SAVE||{}; if(on2&&S.sound!==false){ bgm.play().catch(()=>{}); fadeTo(.32); } else fadeTo(0,true); }
 function enter(){ on=true; music(true); lightsAll.length=0; [hemiL,ambL,key,fill].forEach(l=>{ l.userData.base=l.userData.base||l.intensity; lightsAll.push(l); }); seated=false; camY=camYT=1.65; built=false; sig=''; layout(); document.body.classList.add('inHall'); camX=camXT=0; camZ=camZT=3; yaw=yawT=0; pitch=pitchT=.1; idx=0; setTimeout(()=>focus(0),400); }
 function exit(){ on=false; music(false); document.body.classList.remove('inHall'); }
-function render(dt){ if(!on) return; items.forEach(it=>{ if(!it.ready) place(it); });
+function render(dt){ if(!on) return; const tt=performance.now()/1000; tagList.forEach(t=>{ if(t.parent) t.position.y+=Math.sin(tt*2+t.userData.ph)*.0015; }); items.forEach(it=>{ if(!it.ready) place(it); });
   if((joy.x||joy.y)&&seated){ seated=false; camYT=1.65; }   /* 推搖桿就站起來 */
   if(joy.x||joy.y){ const sp=2.6*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw);
     camXT=camX=Math.max(-HW+.8,Math.min(HW-.8,camX+(fx*-joy.y+rx*joy.x)*sp)); camZT=camZ=Math.max(-len-1.5,Math.min(5.2,camZ+(fz*-joy.y+rz*joy.x)*sp)); }
   const k=Math.min(1,dt*3); camX+=(camXT-camX)*k; camZ+=(camZT-camZ)*k; yaw+=(yawT-yaw)*Math.min(1,dt*6); pitch+=(pitchT-pitch)*Math.min(1,dt*6);
   const s=R.getSize(new T.Vector2()); cam.aspect=s.x/s.y; cam.fov=s.x<s.y?72:58; cam.updateProjectionMatrix();
   camY+=(camYT-camY)*Math.min(1,dt*3); cam.position.set(camX,camY,camZ); cam.rotation.order='YXZ'; cam.rotation.set(pitch,yaw,0);
-  const prev=R.getRenderTarget(); R.setRenderTarget(null); R.render(scene,cam); R.setRenderTarget(prev); }
+  const prev=R.getRenderTarget(), ex=R.toneMappingExposure, tm=R.toneMapping; R.toneMapping=T.ACESFilmicToneMapping; R.toneMappingExposure=1.25; R.setRenderTarget(null); try{ R.render(scene,cam); } finally { R.toneMappingExposure=ex; R.toneMapping=tm; R.setRenderTarget(prev); } }   /* 標本館自己的曝光，不受外面晝夜影響 */
 function faceUse(id){ let t=null; decoG.traverse(o=>{ if(!t&&o.userData&&o.userData.use===id) t=o; }); if(!t) return null; const c=new T.Box3().setFromObject(t).getCenter(new T.Vector3());
   camXT=camX=Math.max(-HW+.8,Math.min(HW-.8,c.x)); camZT=camZ=Math.min(5.2,c.z-3.2); yawT=yaw=Math.atan2(-(c.x-camX),-(c.z-camZ)); pitchT=pitch=-.25; cam.position.set(camX,camY,camZ); cam.rotation.set(pitch,yaw,0); cam.updateMatrixWorld(true);
   const v=c.clone().project(cam), r=el.getBoundingClientRect(); return {x:r.left+(v.x+1)/2*r.width,y:r.top+(1-v.y)/2*r.height}; }
@@ -7535,7 +7541,7 @@ function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.i
     }catch(err){ console.error('mount',rec&&rec.id,err); } });
   // 天花板吊掛：真實長度，沿房間寬度排；吊繩接到天花板。座標換到標本群組（它轉了 −90°、往前移）的本地座標
   const pz=mountG.position.z, toLocal=(x,y,z)=>new T.Vector3(z-pz,y,-x), lanes=CEIL_Z.map(()=>CEIL_X[0]), ropeM=new T.MeshStandardMaterial({color:0x8a7a5a,roughness:.9});
-  const tooBig=[];
+  const tooBig=big.map(o=>o.rec); big.length=0;   /* 一公尺以上的標本都在標本館照真實大小展示，小屋天花板不再吊掛（會擋住水族箱與視線） */
   big.forEach(({rec,sp})=>{ try{ const L=rec.L; let li=lanes.findIndex(x=>x+L<=CEIL_X[1]); if(li<0){ overflow++; return; } const xc=lanes[li]+L/2; lanes[li]+=L+.35; c.want(rec.id);
     const f=fishObj(rec); if(!f) return; f.scale.setScalar(L); f.rotation.set(0,0,0); f.updateMatrixWorld(true);   /* 先用最後在房間裡的朝向（頭朝 +x）量高度與鰭展，再轉成群組的本地朝向 */
     const bb=new T.Box3().setFromObject(f); f.rotation.set(0,Math.PI/2,0); const hh=Math.max(.08,(bb.max.y-bb.min.y)/2||L*.12), hd=Math.max(.05,(bb.max.z-bb.min.z)/2), y=ROOM.h-.2-hh;
@@ -7546,8 +7552,8 @@ function syncMounts(){ const list=c.data().mounts, sig=list.map(r=>r.id+r.d+(c.i
     const np=new T.Mesh(new T.PlaneGeometry(.34,.085),label(rec,sp)); np.material.side=T.DoubleSide; np.position.copy(toLocal(xc,y-hh-.1,CEIL_Z[li])); np.rotation.y=Math.PI/2; mountG.add(np);
     }catch(err){ console.error('mount',rec&&rec.id,err); } });
   // 放不下的巨物：前牆上釘一張手寫紙條記下來（不讓玩家以為標本不見了）
-  if(tooBig.length){ const cv=document.createElement('canvas'); cv.width=320; cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#e9dcbc'; g.fillRect(0,0,320,256); g.fillStyle='#3a2410'; g.font='bold 26px serif'; g.fillText('小屋放不下的巨物',20,40); g.font='22px serif';
-    tooBig.slice(0,6).forEach((r,k)=>{ const sp=c.species(r.id); g.fillText('・'+(sp?sp.name:r.id)+'　'+Math.round(r.L*100)+' cm',20,84+k*30); }); g.font='18px serif'; g.fillStyle='#6b5030'; g.fillText('天花板太低，掛不下牠們的真實大小',20,244);
+  if(tooBig.length){ const cv=document.createElement('canvas'); cv.width=320; cv.height=256; const g=cv.getContext('2d'); g.fillStyle='#e9dcbc'; g.fillRect(0,0,320,256); g.fillStyle='#3a2410'; g.font='bold 26px serif'; g.fillText('大型標本在標本館',20,40); g.font='22px serif';
+    tooBig.slice(0,6).forEach((r,k)=>{ const sp=c.species(r.id); g.fillText('・'+(sp?sp.name:r.id)+'　'+Math.round(r.L*100)+' cm',20,84+k*30); }); g.font='18px serif'; g.fillStyle='#6b5030'; g.fillText('從小屋下方「🏛 標本館」進去看',20,244);
     const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; const note=new T.Mesh(new T.PlaneGeometry(.5,.4),new T.MeshStandardMaterial({map:tx,roughness:.9})); note.position.set(ROOM.x-.02,1.75,-.25); note.rotation.y=-Math.PI/2; mountG.add(note); }
   mountG.userData.overflow=overflow; mountG.userData.tooBig=tooBig.map(r=>r.id); }   // 單一個標本出錯就跳過，不影響其他東西
 const tv=new T.Vector3();
@@ -8230,7 +8236,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261103011145'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261103012836'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
