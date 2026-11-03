@@ -1,4 +1,4 @@
-/*APPV:20261103075741*/
+/*APPV:20261103082045*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -8036,7 +8036,14 @@ function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=
   if(window.__HUMAN){ GL.load('models/lin_v1.glb',g=>{ const o=g.scene; o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
       const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); o.updateMatrixWorld(true);
       try{ hc=window.__HUMAN.rig(o,{ghost:true,relax:-.18}); const mt=hc.mesh.material; mt.transparent=true; mt.opacity=.95; mt.fog=true;
-        mt.emissive=new T.Color(0x1f6b45); mt.emissiveMap=null; mt.emissiveIntensity=1;   /* 綠光用純色疊加：不能用原貼圖當發光圖，否則烘焙在模型上的活人臉會蓋過女鬼臉與表情 */   /* 身上自帶幽幽的綠光：夜裡也看得清楚身體和臉 */
+        mt.emissive=new T.Color(0x1f6b45); mt.emissiveMap=null; mt.emissiveIntensity=1;
+        /* 綠光不是全身一樣亮：臉最亮，往下越來越暗，腳邊幾乎只剩一點點（使用者回報全身同一種綠太假）。
+           用模型本身的高度算：頭頂到腳底分成 0～1，發光乘上一條曲線 */
+        { const g0=hc.mesh.geometry; if(!g0.boundingBox) g0.computeBoundingBox(); const y0=g0.boundingBox.min.y, y1=g0.boundingBox.max.y, prev=mt.onBeforeCompile, key=mt.customProgramCacheKey?mt.customProgramCacheKey.bind(mt):()=>'';
+          mt.onBeforeCompile=(sh,r)=>{ if(prev) prev(sh,r); sh.uniforms.uGlowY0={value:y0}; sh.uniforms.uGlowY1={value:y1};
+            sh.vertexShader='uniform float uGlowY0,uGlowY1;\nvarying float vGlowH;\n'+sh.vertexShader.replace('#include <skinning_vertex>','#include <skinning_vertex>\n vGlowH=clamp((transformed.y-uGlowY0)/max(uGlowY1-uGlowY0,1e-4),0.,1.);');
+            sh.fragmentShader='varying float vGlowH;\n'+sh.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n totalEmissiveRadiance*=mix(.12,.75,smoothstep(.05,.7,vGlowH))+1.25*smoothstep(.8,.93,vGlowH);'); };
+          mt.customProgramCacheKey=()=>key()+'|ghostGlowH'; mt.needsUpdate=true; }   /* 綠光用純色疊加：不能用原貼圖當發光圖，否則烘焙在模型上的活人臉會蓋過女鬼臉與表情 */   /* 身上自帶幽幽的綠光：夜裡也看得清楚身體和臉 */
         mats.push(mt); }catch(e){ console.warn('lin rig',e); }
       /* 水面以下交給水下層（跟魚、霜汐同一套）：沉下去時身體在水裡越深越暗、被水面反光蓋住，不再是一刀切掉 */
       if(W.optics) W.optics.add(o); if(W.submerged) W.submerged.add(o,{solid:true});
@@ -8318,7 +8325,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261103075741'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261103082045'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
