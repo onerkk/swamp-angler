@@ -1,4 +1,4 @@
-/*APPV:20261103001125*/
+/*APPV:20261103002517*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -6853,7 +6853,7 @@ function buildRoom(){ while(roomG.children.length) roomG.remove(roomG.children[0
   // 中央走道的地毯
   const rug=new T.Mesh(new T.PlaneGeometry(2.2,len+4),new T.MeshStandardMaterial({color:0x5a1e18,roughness:1})); rug.rotation.x=-Math.PI/2; rug.position.set(0,.01,-len/2+2); roomG.add(rug); }
 // 燈光：暖色的頂光加兩側補光，不開陰影（大型魚多也不會卡）
-scene.add(new T.HemisphereLight(0xfff0dc,0x2a2018,.9)); const key=new T.DirectionalLight(0xfff2e0,1.1); key.position.set(3,10,4); scene.add(key); const fill=new T.DirectionalLight(0xbcd2ff,.45); fill.position.set(-4,6,-10); scene.add(fill);
+scene.add(new T.HemisphereLight(0xfff0dc,0x4a3a2a,1.5)); scene.add(new T.AmbientLight(0xffe8d0,.35)); const key=new T.DirectionalLight(0xfff2e0,1.4); key.position.set(3,10,4); scene.add(key); const fill=new T.DirectionalLight(0xbcd2ff,.45); fill.position.set(-4,6,-10); scene.add(fill);
 function plate(t1,t2){ const cv=document.createElement('canvas'); cv.width=512; cv.height=160; const g=cv.getContext('2d'); g.fillStyle='#c8a050'; g.fillRect(0,0,512,160); g.strokeStyle='#6b4a1a'; g.lineWidth=8; g.strokeRect(6,6,500,148);
   g.fillStyle='#2a1a08'; g.textAlign='center'; g.font='bold 54px serif'; g.fillText(t1,256,70); g.font='32px serif'; g.fillText(t2,256,125); const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; return tx; }
 /* 依存檔的標本清單排版：一公尺以上的標本照真實長度，左右交錯吊掛 */
@@ -6864,8 +6864,8 @@ function layout(){ const S=window.__SAVE||{}, list=((S.home&&S.home.mounts)||[])
   const cur=[-1,-1]; list.forEach((rec,i)=>{ const side=i%2?1:-1, k=side<0?0:1, sp=SP.find(s=>s.id===rec.id); if(!sp) return; const zc=cur[k]-rec.L/2-1.5; cur[k]-=rec.L+3; items.push({rec,sp,side,z:zc}); });
   len=Math.max(24,-Math.min(cur[0],cur[1])+6); buildRoom();
   items.forEach(it=>{ const {rec,sp,side,z}=it, x=side*(HW-3.2);
-    const ped=new T.Mesh(new T.BoxGeometry(1.4,1.0,.5),new T.MeshStandardMaterial({color:0x3a2416,roughness:.7})); ped.position.set(x-side*1.2,.5,z+Math.min(rec.L/2,2)); fishG.add(ped);
-    const pl=new T.Mesh(new T.PlaneGeometry(1.3,.4),new T.MeshBasicMaterial({map:plate(sp.name,(rec.w<1?Math.round(rec.w*1000)+' g':rec.w>=100?Math.round(rec.w).toLocaleString()+' kg':rec.w.toFixed(1)+' kg')+'・'+Math.round(rec.L*100)+' cm')})); pl.position.set(x-side*1.2,1.02,z+Math.min(rec.L/2,2)+.26); pl.rotation.x=-.35; fishG.add(pl);
+    const ped=new T.Mesh(new T.BoxGeometry(1.4,1.0,.5),new T.MeshStandardMaterial({color:0x3a2416,roughness:.7})); ped.rotation.y=Math.PI/2; ped.position.set(x-side*1.8,.5,z); fishG.add(ped);
+    const pl=new T.Mesh(new T.PlaneGeometry(1.3,.4),new T.MeshBasicMaterial({map:plate(sp.name,(rec.w<1?Math.round(rec.w*1000)+' g':rec.w>=100?Math.round(rec.w).toLocaleString()+' kg':rec.w.toFixed(1)+' kg')+'・'+Math.round(rec.L*100)+' cm')})); pl.rotation.order='YXZ'; pl.rotation.set(-.35,side<0?Math.PI/2:-Math.PI/2,0); pl.position.set(x-side*2.06,1.02,z); fishG.add(pl);   /* 銅牌朝向走道 */
     it.ready=false; it.x=x; place(it); }); built=true; }
 function place(it){ const M=window.__MDL; if(it.ready||!M) return; if(!M.fishReady(it.sp.id)){ if(M.want) M.want(it.sp.id); return; }
   let f=null; try{ f=M.fish(it.sp); }catch(e){} if(!f||!f.group) return; const g=f.group; g.position.set(0,0,0); g.rotation.set(0,0,0); g.scale.setScalar(1); g.updateMatrixWorld(true);
@@ -6875,13 +6875,14 @@ function place(it){ const M=window.__MDL; if(it.ready||!M) return; if(!M.fishRea
   const y=Math.max(1.4+h/2,Math.min(HH-1.2-h/2,3.2+h*.15)); g.position.set(it.x-c.x,y-c.y,it.z-c.z); fishG.add(g); g.traverse(o=>{ if(o.isMesh) o.frustumCulled=false; });
   // 兩條吊繩接到屋頂桁架
   const ropeM=new T.MeshStandardMaterial({color:0x8a7a5a,roughness:.9}); for(const s of [-.3,.3]){ const top=HH-.6, bot=y+h*.35, r=new T.Mesh(new T.CylinderGeometry(.012,.012,Math.max(.1,top-bot),5),ropeM); r.position.set(it.x,(top+bot)/2,it.z+s*it.rec.L); fishG.add(r); }
+  if(fishG.children.filter(o=>o.isLight).length<10){ const sp2=new T.PointLight(0xffe2b8,1.6,Math.max(8,it.rec.L*2.2),1.6); sp2.position.set(it.x-it.side*1.5,HH-1.6,it.z); fishG.add(sp2); }   /* 每一隻標本一盞暖色頂燈 */
   it.ready=true; it.y=y; }
 /* 介面 */
 const ui=document.createElement('div'); ui.id='hallUI'; ui.innerHTML='<div class="hn"></div><div class="hb"><button data-k="prev">◀</button><button data-k="exit">🏠 回小屋</button><button data-k="next">▶</button></div>'; document.body.appendChild(ui);
 const st=document.createElement('style'); st.textContent=`#hallUI{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:30;display:none;flex-direction:column;align-items:center;gap:10px;pointer-events:none}
 #hallUI .hn{padding:6px 14px;border-radius:999px;background:rgba(20,14,8,.72);color:#ffe9a8;font-size:14px;font-weight:800}#hallUI .hb{display:flex;gap:10px;pointer-events:auto}
 #hallUI button{min-width:64px;padding:12px 16px;border-radius:999px;border:1px solid rgba(255,213,106,.6);background:rgba(42,31,14,.9);color:#ffe9a8;font-size:16px;font-weight:800;font-family:inherit}
-body.inHall #hallUI{display:flex}body.inHall #homeUI,body.inHall #top,body.inHall #top2,body.inHall #top3{display:none!important}`; document.head.appendChild(st);
+body.inHall #hallUI{display:flex}body.inHall #homeUI,body.inHall #top,body.inHall #top2,body.inHall #top3,body.inHall #joy,body.inHall #bCam{display:none!important}`; document.head.appendChild(st);
 const nameEl=ui.querySelector('.hn');
 function focus(i){ if(!items.length){ nameEl.textContent='還沒有一公尺以上的標本'; camZT=-4; camXT=0; yawT=0; pitchT=0; return; } idx=(i+items.length)%items.length; const it=items[idx];
   // 站在走道上、正對那一隻的側面，距離依魚長拉開到整條看得到
@@ -6901,7 +6902,7 @@ function render(dt){ if(!on) return; items.forEach(it=>{ if(!it.ready) place(it)
   const s=R.getSize(new T.Vector2()); cam.aspect=s.x/s.y; cam.fov=s.x<s.y?72:58; cam.updateProjectionMatrix();
   cam.position.set(camX,1.65,camZ); cam.rotation.order='YXZ'; cam.rotation.set(pitch,yaw,0);
   const prev=R.getRenderTarget(); R.setRenderTarget(null); R.render(scene,cam); R.setRenderTarget(prev); }
-return {enter,exit,render,active:()=>on};
+return {enter,exit,render,active:()=>on,info:()=>items.map(it=>({id:it.rec.id,ready:it.ready,x:+(it.x||0).toFixed(1),y:+(it.y||0).toFixed(1),z:+it.z.toFixed(1)})).concat([{cam:[+camX.toFixed(1),+camZ.toFixed(1)],len}])};
 }
 if(typeof module!=='undefined'&&module.exports) module.exports={createTrophyHall};
 /* ===== 老漁人的小屋：水族箱與標本牆（資料與規則） ===== */
@@ -8164,7 +8165,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261103001125'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261103002517'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
