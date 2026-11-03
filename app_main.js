@@ -1,4 +1,4 @@
-/*APPV:20261103073138*/
+/*APPV:20261103075206*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -8316,7 +8316,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261103073138'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261103075206'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -11049,6 +11049,10 @@ function frame(now){
   if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.rodGroup.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(typeof TROPHY_HALL!=='undefined'&&TROPHY_HALL.active()) TROPHY_HALL.render(dt); else if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { if(window.__GEOLOD) window.__GEOLOD.update(W.scene,W.camera,dt,window.__effectTier); W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
   if(HOME3D.active()){if(!homeWarmAt)homeWarmAt=now;if(homeWarmAt>0&&now-homeWarmAt>5000){homeWarmAt=-1;if(window.__DIAG)window.__DIAG.action('home','done','5 seconds rendered');}}else homeWarmAt=0;if(window.__DIAG)window.__DIAG.stage('render');screenCapture.afterFrame();fpsDisplay.frame(frameSeconds);if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
 
+  // 預先編譯著色器：換地點後 1.5 秒，在背景一次把場景裡所有材質（包含還沒出現的魚、特效）編譯好，
+  // 免得玩到一半第一次看到某樣東西才編譯、卡 0.5 秒（診斷裡「著色器編譯」那幾次長卡頓）
+  try{ const wm=window.__warm||(window.__warm={key:'',at:0}), home=typeof HOME3D!=='undefined'&&HOME3D.active(), key=(home?'home':G.loc||'lake')+'|'+G.spot, n=W.scene.children.length; if(key!==wm.key){ wm.key=key; wm.at=now+1500; wm.n=n; } else if(n!==wm.n){ wm.n=n; wm.at=now+3000; }   /* 之後又載入新模型：等 3 秒沒有新東西再補編譯一次 */
+    if(wm.at&&now>wm.at&&!home&&!(typeof TROPHY_HALL!=='undefined'&&TROPHY_HALL.active())&&W.renderer.compile){ wm.at=0; W.renderer.compile(W.scene,W.camera); } }catch(e){}
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
