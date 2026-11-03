@@ -47,28 +47,29 @@ function wkg(w){ return w>=1?(w>=100?Math.round(w).toLocaleString():w.toFixed(1)
 async function heroShot(sp,rec){ const W=window.__W, M=window.__MDL, P=window.__PROPS, G=window.__G, T=THREE; if(!W||!M||!sp) return null;
   if(!M.fishReady(sp.id)){ if(M.want) M.want(sp.id); for(let i=0;i<50&&!M.fishReady(sp.id);i++) await new Promise(r=>setTimeout(r,100)); if(!M.fishReady(sp.id)) return null; }
   let f=null; try{ f=M.fish(sp); }catch(e){ return null; } if(!f||!f.group) return null;
-  const g=f.group, L=Math.max(.3,rec.L||sp.len[1]/100); g.scale.setScalar(L); g.visible=true; W.scene.add(g); if(window.__seeThrough) window.__seeThrough(g);
+  const g=f.group, L=Math.max(.3,rec.L||sp.len[1]/100); g.scale.setScalar(L); g.visible=true; g.traverse(o=>{ o.visible=true; o.frustumCulled=false; }); W.scene.add(g); if(window.__seeThrough) window.__seeThrough(g);
   const cam=W.camera, base=new T.Vector3(); cam.getWorldPosition(base); const fwd=new T.Vector3(); cam.getWorldDirection(fwd); fwd.y=0; if(fwd.lengthSq()<1e-4) fwd.set(0,0,-1); fwd.normalize();
   const dist=L*1.9+2.5, fx=base.x+fwd.x*dist, fz=base.z+fwd.z*dist, wy=W.swell?W.swell(fx,fz,G?G.t:0):0;
   g.rotation.order='YXZ'; g.rotation.set(0,Math.atan2(fwd.x,fwd.z),.42); g.position.set(fx,wy+L*.12,fz);
   if(P&&P.splash){ P.splash(fx,wy,fz,90,2.2+L*.4); P.splash(fx-fwd.z*L*.35,wy,fz+fwd.x*L*.35,50,1.6+L*.3); } if(W.addRipple){ W.addRipple(fx,fz,1.2+L*.3); W.addRipple(fx+fwd.z*L*.3,fz-fwd.x*L*.3,.8+L*.2); }
   await new Promise(r=>setTimeout(r,420));   /* 讓水花噴起來 */
   // 低角度機位：在玩家與魚之間、離水面不到一公尺，略往上看
-  const pl=W.player, hd=W.head, sp0=pl.position.clone(), sq=pl.quaternion.clone(), hr=hd.rotation.clone(), cp=cam.position.clone(), cr=cam.rotation.clone();
+  // 低角度機位：把遊戲鏡頭暫時從玩家身上拿下來，直接放到水面附近對準魚拍（拍完原樣裝回去）
+  const parent=cam.parent, cp=cam.position.clone(), cq=cam.quaternion.clone(), cs=cam.scale.clone();
   let out=null;
-  try{ const camPos=new T.Vector3(base.x+fwd.x*dist*.18,wy+Math.max(.6,L*.22),base.z+fwd.z*dist*.18), look=new T.Vector3(fx,wy+L*.35,fz);
-    hd.rotation.set(0,0,0); cam.position.set(0,0,0); cam.rotation.set(0,0,0); pl.position.copy(camPos); const m=new T.Matrix4().lookAt(camPos,look,new T.Vector3(0,1,0)); pl.quaternion.setFromRotationMatrix(m);
-    pl.updateMatrixWorld(true); if(W.U&&W.U.uEye) cam.getWorldPosition(W.U.uEye.value);
+  try{ const camPos=new T.Vector3(base.x+fwd.x*dist*.18,wy+Math.max(.7,L*.25),base.z+fwd.z*dist*.18), look=new T.Vector3(fx,wy+L*.28,fz);
+    if(parent) parent.remove(cam); cam.position.copy(camPos); cam.scale.set(1,1,1); cam.lookAt(look); cam.updateMatrixWorld(true);
+    if(W.U&&W.U.uEye) W.U.uEye.value.copy(camPos);
     if(W.render) W.render(); else W.renderer.render(W.scene,cam);
     const src=W.renderer.domElement; out=document.createElement('canvas'); out.width=src.width; out.height=src.height; out.getContext('2d').drawImage(src,0,0); }
   catch(e){ out=null; }
-  finally{ pl.position.copy(sp0); pl.quaternion.copy(sq); hd.rotation.copy(hr); cam.position.copy(cp); cam.rotation.copy(cr); pl.updateMatrixWorld(true); W.scene.remove(g); if(W.submerged&&W.submerged.remove) W.submerged.remove(g); }
+  finally{ if(parent) parent.add(cam); cam.position.copy(cp); cam.quaternion.copy(cq); cam.scale.copy(cs); cam.updateMatrixWorld(true); W.scene.remove(g); }
   return out; }
 /* 版面：上半部真實遊戲畫面＋最大漁獲的 3D 模型＋一句挑戰；下半部是老漁人《漁獲簿》的紙頁：玩家、數據、十四枚魚王印章、故事航線 */
-async function draw(){ const st=stats(), cv=document.createElement('canvas'); cv.width=W0; cv.height=H0; const g=cv.getContext('2d');
+async function draw(opt){ opt=opt||{}; const st=stats(), cv=document.createElement('canvas'); cv.width=W0; cv.height=H0; const g=cv.getContext('2d');
   g.fillStyle='#05090d'; g.fillRect(0,0,W0,H0);
-  const shot=grabScene(), SH=720;
-  if(shot){ const sr=shot.width/shot.height, tr=W0/SH; let sw=shot.width, sh=shot.height, sx=0, sy=0; if(sr>tr){ sw=sh*tr; sx=(shot.width-sw)/2; } else { sh=sw/tr; sy=(shot.height-sh)*.3; } g.drawImage(shot,sx,sy,sw,sh,0,0,W0,SH); }
+  const hs=opt.inScene&&st.heroSp?await heroShot(st.heroSp,st.heroRec):null, shot=hs||grabScene(), SH=720;
+  if(shot){ const sr=shot.width/shot.height, tr=W0/SH; let sw=shot.width, sh=shot.height, sx=0, sy=0; if(sr>tr){ sw=sh*tr; sx=(shot.width-sw)/2; } else { sh=sw/tr; sy=(shot.height-sh)*(hs?.5:.3); } g.drawImage(shot,sx,sy,sw,sh,0,0,W0,SH); }   /* 主角鏡頭：魚在畫面正中，直式畫面要從中間裁 */
   // 電影感調色：上下壓暗、四角暗角
   let gr=g.createLinearGradient(0,0,0,SH); gr.addColorStop(0,'rgba(0,0,0,.55)'); gr.addColorStop(.28,'rgba(0,0,0,0)'); gr.addColorStop(.7,'rgba(0,0,0,.05)'); gr.addColorStop(1,'rgba(5,9,13,.92)'); g.fillStyle=gr; g.fillRect(0,0,W0,SH);
   gr=g.createRadialGradient(W0/2,SH*.45,SH*.35,W0/2,SH*.45,SH*.95); gr.addColorStop(0,'rgba(0,0,0,0)'); gr.addColorStop(1,'rgba(0,0,0,.45)'); g.fillStyle=gr; g.fillRect(0,0,W0,SH);
@@ -77,7 +78,7 @@ async function draw(){ const st=stats(), cv=document.createElement('canvas'); cv
   gr=g.createLinearGradient(0,40,0,160); gr.addColorStop(0,'#fff4d2'); gr.addColorStop(1,'#e6b85c'); g.fillStyle=gr; g.fillText('濕地垂釣',58,150);
   g.font=`600 30px ${SANS}`; g.fillStyle='rgba(255,244,214,.92)'; g.shadowColor='rgba(0,0,0,.8)'; g.shadowBlur=10; g.fillText('真實湖景、海釣、冰湖、傳說中的美人魚',62,200); g.shadowBlur=0;
   // 主角魚
-  const hero=st.heroSp?await heroFish(st.heroSp):null;
+  const hero=!hs&&st.heroSp?await heroFish(st.heroSp):null;
   if(hero){ const hc=document.createElement('canvas'); hc.width=hero.width; hc.height=hero.height; const hx=hc.getContext('2d'); hx.drawImage(hero,0,0);
     // 下面約四分之一沒在水裡：用漸層把魚的下緣淡掉，看起來是從水裡躍出來，不是浮在畫面上
     hx.globalCompositeOperation='destination-out'; const m=hx.createLinearGradient(0,hc.height*.62,0,hc.height*.9); m.addColorStop(0,'rgba(0,0,0,0)'); m.addColorStop(1,'rgba(0,0,0,1)'); hx.fillStyle=m; hx.fillRect(0,0,hc.width,hc.height);
@@ -123,7 +124,7 @@ const st=document.createElement('style'); st.textContent=`#poster{position:fixed
 #poster img{max-width:min(92vw,460px);max-height:72vh;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.6)}#poster .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 #poster button{padding:11px 18px;border-radius:999px;border:1px solid rgba(255,213,106,.6);background:#2a1f0e;color:#ffe9a8;font-size:15px;font-weight:800;font-family:inherit}#poster button.pri{background:#ffd56a;color:#2a1a00}#poster small{color:#9fb3c2;font-size:12px}`;
 document.head.appendChild(st);
-async function open(){ const cv=await draw(), url=cv.toDataURL('image/jpeg',.9), el=document.createElement('div'); el.id='poster';
+async function open(){ const cv=await draw({inScene:true}), url=cv.toDataURL('image/jpeg',.9), el=document.createElement('div'); el.id='poster';
   el.innerHTML=`<img src="${url}" alt="戰績海報"><div class="row"><button class="pri" data-k="share">📤 分享</button><button data-k="save">💾 儲存圖片</button><button data-k="x">關閉</button></div><small>分享時選 Threads 就能直接貼文</small>`;
   document.body.appendChild(el);
   el.addEventListener('click',async e=>{ const k=e.target.closest('[data-k]'); if(!k) return; const a=k.dataset.k;
