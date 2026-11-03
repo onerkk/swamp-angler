@@ -410,6 +410,7 @@ function render(){
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
     h+='<div class="note">魚訊放大視窗（自動：休閒、標準開，硬派、專家關）</div><div class="tabs">'+[['auto','自動'],['on','開'],['off','關']].map(m=>`<button class="tab${(save.mag||'auto')===m[0]?' on':''}" data-a="mag" data-v="${m[0]}">${m[1]}</button>`).join('')+'</div>';
     const tg=(k,name,sub,onv)=>row(name,sub,`<button class="sbtn${onv?' pri':''}" data-a="tg" data-v="${k}">${onv?'開':'關'}</button>`);
+    h+=tg('taa','抗鋸齒（TAA）','鏡頭靜止時把細枝、蘆葦、釣線的鋸齒和閃爍磨平（只在高畫質）',save.taa!==false);
     h+=tg('rays','光束','晨昏時陽光從天空與枯樹縫隙透出的光柱、小屋窗戶光（只在高畫質）',save.rays!==false);
     h+=tg('fps','顯示 FPS','左下角顯示實際遊戲幀率與最長幀耗時，每半秒更新',save.fps!==false);
     h+=tg('sound','音效','環境聲、捲線器、水花',Snd.isOn());
