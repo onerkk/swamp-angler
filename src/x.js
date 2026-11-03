@@ -12,11 +12,14 @@ function loadLamp(fn){ if(lamp) return fn(lamp); if(lampLoading||!GL) return; la
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), sc=.32/Math.max(sz.y,1e-6); o.scale.setScalar(sc); o.updateMatrixWorld(true);
     const b2=new T.Box3().setFromObject(o), c2=b2.getCenter(new T.Vector3()); o.position.set(-c2.x,-b2.min.y,-c2.z); lamp=new T.Group(); lamp.add(o); lamp.visible=false; W.scene.add(lamp); lampLoading=false; fn(lamp); },undefined,()=>{ lampLoading=false; }); }
 function lampWanted(){ if(fin) return true; if(!c.storyActive||!c.storyActive('lantern')||!c.progOf) return false; const p=c.progOf('lantern'); return !!p&&p[0]>=1&&p[1]>=3&&c.period()==='night'&&c.loc()==='lake'; }
+let lampNeed='', lampNeedT=-99;
 function updLamp(dt,t){ const want=lampWanted(); if(want&&!lamp){ loadLamp(()=>{}); }
   if(!lamp){ lampL.intensity=0; return; } lamp.visible=want; if(!want){ lampL.intensity=0; return; }
   if(!fin&&!S.lampHint&&c.toast){ S.lampHint=1; c.persist(); c.toast('🏮 老漁人的燈在你手邊亮了起來。滿月的夜晚（或掛上月光餌），提著它到浮萍灣。','good',5200); }
-  const b=c.base(), h=c.head(), fw=new T.Vector3(-Math.sin(h),0,-Math.cos(h)), rt=new T.Vector3(Math.cos(h),0,-Math.sin(h));
-  lamp.position.set(b.x,0,b.z).addScaledVector(fw,.9).addScaledVector(rt,-.4); lamp.position.y=1.02+Math.sin(t*1.7)*.015; lamp.rotation.y=h+Math.sin(t*.9)*.06; lamp.rotation.z=Math.sin(t*1.3)*.04;
+  const h=c.head(), fw=new T.Vector3(-Math.sin(h),0,-Math.cos(h)), rt=new T.Vector3(Math.cos(h),0,-Math.sin(h)), cp=W.camera.getWorldPosition(new T.Vector3());
+  lamp.position.copy(cp).addScaledVector(fw,.75).addScaledVector(rt,.42); lamp.position.y=cp.y-.62+Math.sin(t*1.7)*.015;   /* 右手邊、視線下方 */ lamp.rotation.y=h+Math.sin(t*.9)*.06; lamp.rotation.z=Math.sin(t*1.3)*.04;
+  if(!fin&&c.storyActive&&c.storyActive('lantern')&&c.toast){ const atLily=c.zone&&c.zone()==='lily', moonOk=c.moon()>.85||(S.bait==='moon'&&S.baits&&S.baits.moon>0), need=!atLily?'lily':!moonOk?'moon':'';
+    if(need&&need!==lampNeed&&t-lampNeedT>8){ lampNeed=need; lampNeedT=t; c.toast(need==='lily'?'🏮 燈在手邊亮著——划到「浮萍灣」，她在那裡等。':'🏮 已經到浮萍灣了。今晚不是滿月：在魚餌裡換上「月光餌」，她就會來。','warn',5200); } if(!need) lampNeed=''; }
   lampL.position.copy(lamp.position); lampL.position.y+=.18; lampL.intensity=1.6+Math.sin(t*11)*.15+Math.random()*.1; }
 let tt=0;
 const ov=document.getElementById('scare'), face=ov&&ov.querySelector('img');
@@ -206,7 +209,7 @@ function placeAhead(m,dist,side){ const b=c.base(), h=c.head(), fw=new T.Vector3
 const setOpacity=(m,a)=>m.traverse(o=>{ if(o.isMesh&&o.material) o.material.opacity=a; });
 // 結局：髮簪與三次相遇都完成後，滿月夜在浮萍灣提燈，她以生前的樣子出現
 function finaleReady(){ if(!c.storyActive||!c.storyActive('lantern')||!c.progOf) return false; const p=c.progOf('lantern'); if(!p) return false;
-  return p[0]>=1&&p[1]>=3&&p[2]<1&&c.period()==='night'&&c.zone&&c.zone()==='lily'&&(c.moon()>.85||(window.__G&&window.__G.baitUsed&&window.__G.baitUsed.id==='moon'))&&(c.state()==='idle'||c.state()==='wait'); }
+  return p[0]>=1&&p[1]>=3&&p[2]<1&&c.period()==='night'&&c.zone&&c.zone()==='lily'&&(c.moon()>.85||(window.__G&&window.__G.baitUsed&&window.__G.baitUsed.id==='moon')||(S.bait==='moon'&&S.baits&&S.baits.moon>0))&&(c.state()==='idle'||c.state()==='wait'); }
 const LINES=['……燈。','是爸爸的燈。','我等了好久……好久。','謝謝你，把燈提到這裡來。','替我跟他說——我要回家了。'];
 function startFinale(){ loadAlive(m=>{ placeAhead(m,5.5,0); m.position.y=-.3; m.visible=true; setOpacity(m,0); fin={t:0,li:0}; c.drip&&c.drip(); }); }
 function updFinale(dt){ fin.t+=dt; const t=fin.t; if(!alive) return;
