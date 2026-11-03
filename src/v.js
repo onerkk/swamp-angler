@@ -97,6 +97,13 @@ function bump(match){ let changed=false;
 function finish(ch){ if(isDone(ch.id)) return; st.done.push(ch.id); c.addXP(ch.xp); S.coins+=ch.coins; if(ch.title){ S.titles=S.titles||[]; if(S.titles.indexOf(ch.title)<0) S.titles.push(ch.title); } if(ch.baits){ S.baits=S.baits||{}; for(const k in ch.baits) S.baits[k]=(S.baits[k]||0)+ch.baits[k]; } c.setCoins(); if(c.syncHUD) c.syncHUD(); c.persist(); dot();
   if(ch.id==='c7'){ S.titles=S.titles||[]; if(S.titles.indexOf('守湖人')<0) S.titles.push('守湖人'); }
   setTimeout(()=>{ if(ch.id==='c7') showEnding(ch); else if(ch.reward==='mermaid'&&window.__mermaidReward) window.__mermaidReward(ch,()=>showPage(ch,true)); else showPage(ch,true); c.Snd&&c.Snd.fanfare&&c.Snd.fanfare(2); c.vib&&c.vib([40,40,120]); },1800); }
+/* 舊存檔補記主線（使用者 2026-11-03 同意）：舊版本是依等級直接開放釣點，沒有跑章節，
+   打過滄淵（大師挑戰或終章）或已經 Lv 30 以上的舊存檔，主線八章依序標記完成並補發章節獎勵；
+   後日談與隱藏章節不補，留給玩家自己跑。只做一次 */
+setTimeout(()=>{ try{ if(st.backfill) return; const vet=(st.grand&&st.grand.length>0)&&((S.boss&&S.boss.king)||(S.lv||1)>=30);
+  st.backfill=1; if(!vet){ c.persist(); return; } let n=0; ['c1','c2','c3','c4','ice','c5','c6','c7'].forEach(id=>{ const ch=byId(id); if(ch&&!isDone(id)){ /* 安靜補記：只補資料與獎勵，不跳每一章的完成頁與終章動畫 */ st.done.push(ch.id); if(ch.xp&&c.addXP) c.addXP(ch.xp); S.coins+=ch.coins||0; S.titles=S.titles||[]; if(ch.title&&S.titles.indexOf(ch.title)<0) S.titles.push(ch.title); if(ch.baits){ S.baits=S.baits||{}; for(const k in ch.baits) S.baits[k]=(S.baits[k]||0)+ch.baits[k]; } if(id==='c7'&&S.titles.indexOf('守湖人')<0) S.titles.push('守湖人'); n++; } }); if(n){ c.setCoins&&c.setCoins(); if(c.syncHUD) c.syncHUD(); }
+  c.persist(); if(n&&c.toast) c.toast(`📖 主線依你的進度補記完成（${n} 章），獎勵已補發。後日談從手記接著玩`,'good',5200); if(typeof dot==='function') dot(); }catch(e){ console.warn('story backfill',e); } },4000);
+
 /* 事件掛鉤 */
 function onCatch(fd,ctx){ if(!fd||!fd.sp) return; bump(t=>{ if(t.t!=='catch') return 0;
   if(t.sp&&fd.sp.id!==t.sp) return 0; if(t.zone&&ctx.zone!==t.zone) return 0; if(t.loc&&ctx.loc!==t.loc) return 0; if(t.per&&ctx.per!==t.per) return 0; if(t.rain&&!ctx.rain) return 0; if(t.rar&&fd.sp.rar<t.rar) return 0; return 1; }); }
