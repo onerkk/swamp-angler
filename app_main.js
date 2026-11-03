@@ -1,4 +1,4 @@
-/*APPV:20261103002517*/
+/*APPV:20261103004036*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -6856,15 +6856,29 @@ function buildRoom(){ while(roomG.children.length) roomG.remove(roomG.children[0
 scene.add(new T.HemisphereLight(0xfff0dc,0x4a3a2a,1.5)); scene.add(new T.AmbientLight(0xffe8d0,.35)); const key=new T.DirectionalLight(0xfff2e0,1.4); key.position.set(3,10,4); scene.add(key); const fill=new T.DirectionalLight(0xbcd2ff,.45); fill.position.set(-4,6,-10); scene.add(fill);
 function plate(t1,t2){ const cv=document.createElement('canvas'); cv.width=512; cv.height=160; const g=cv.getContext('2d'); g.fillStyle='#c8a050'; g.fillRect(0,0,512,160); g.strokeStyle='#6b4a1a'; g.lineWidth=8; g.strokeRect(6,6,500,148);
   g.fillStyle='#2a1a08'; g.textAlign='center'; g.font='bold 54px serif'; g.fillText(t1,256,70); g.font='32px serif'; g.fillText(t2,256,125); const tx=new T.CanvasTexture(cv); tx.encoding=T.sRGBEncoding; return tx; }
+const decoG=new T.Group(); scene.add(decoG); const GL=T.GLTFLoader?new T.GLTFLoader():null, mcache={};
+function deco(name,x,y,z,ry,width){ if(!GL) return; const go=g=>{ const o=g.scene.clone(true); o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; if(m.material&&m.material.map) m.material.map.anisotropy=8; } });
+    o.rotation.y=ry||0; o.updateMatrixWorld(true); let b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.setScalar(width/Math.max(.01,Math.max(sz.x,sz.z))); o.updateMatrixWorld(true); b.setFromObject(o);
+    o.position.set(x-(b.min.x+b.max.x)/2,y-b.min.y,z-(b.min.z+b.max.z)/2); decoG.add(o); };
+  if(mcache[name]) mcache[name].then(go); else { mcache[name]=new Promise(r=>GL.load('models/home/'+name+'.glb',r,undefined,()=>{})); mcache[name].then(go); } }
+/* 大廳的擺設：入口是一組沙發休息區與書櫃；走道上方每 8 公尺一盞吊燈；兩側牆上每 6 公尺一盞壁燈；盆栽、木箱、寶箱點綴 */
+function furnish(){ while(decoG.children.length) decoG.remove(decoG.children[0]);
+  deco('sofa_02',0,0,4.6,Math.PI,2.2); deco('coffee_table_round_01',0,0,3.2,0,.9); deco('Ottoman_01',-1.6,0,3.4,.4,.7); deco('Ottoman_01',1.6,0,3.4,-.4,.7);
+  deco('wooden_bookshelf_worn',-HW+.4,0,4.5,Math.PI/2,1.6); deco('wooden_bookshelf_worn',HW-.4,0,4.5,-Math.PI/2,1.6);
+  deco('potted_plant_01',-HW+.7,0,2.2,0,.7); deco('potted_plant_01',HW-.7,0,2.2,0,.7); deco('potted_plant_01',-HW+.7,0,-len-.8,0,.7); deco('potted_plant_01',HW-.7,0,-len-.8,0,.7);
+  deco('treasure_chest',0,0,-len-1.2,0,1.2); deco('vintage_oil_lamp',0,.95,3.2,0,.25);
+  for(let z=0;z>-len;z-=8) deco('lantern_chandelier_01',0,HH-2.2,z,0,1.3);
+  for(let z=-2;z>-len;z-=6){ deco('industrial_wall_lamp',-HW+.15,3.4,z,Math.PI/2,.5); deco('industrial_wall_lamp',HW-.15,3.4,z,-Math.PI/2,.5); }
+  for(let z=-4;z>-len;z-=12){ deco('wooden_crate_01',-HW+.6,0,z,.2,.6); deco('planter_box_01',HW-.6,0,z-3,0,.9); } }
 /* 依存檔的標本清單排版：一公尺以上的標本照真實長度，左右交錯吊掛 */
 function layout(){ const S=window.__SAVE||{}, list=((S.home&&S.home.mounts)||[]).filter(r=>r&&r.L>=1).sort((a,b)=>b.L-a.L), M=window.__MDL, SP=(window.__PROPS&&window.__PROPS.SPECIES)||[];
   const s2=list.map(r=>r.id+r.d+r.L).join('|'); if(s2===sig&&built) return; sig=s2;
   while(fishG.children.length) fishG.remove(fishG.children[0]); items=[];
   // 左右兩排各自往裡排：每一隻佔牠的長度加 3 公尺走動空間
   const cur=[-1,-1]; list.forEach((rec,i)=>{ const side=i%2?1:-1, k=side<0?0:1, sp=SP.find(s=>s.id===rec.id); if(!sp) return; const zc=cur[k]-rec.L/2-1.5; cur[k]-=rec.L+3; items.push({rec,sp,side,z:zc}); });
-  len=Math.max(24,-Math.min(cur[0],cur[1])+6); buildRoom();
+  len=Math.max(24,-Math.min(cur[0],cur[1])+6); buildRoom(); furnish();
   items.forEach(it=>{ const {rec,sp,side,z}=it, x=side*(HW-3.2);
-    const ped=new T.Mesh(new T.BoxGeometry(1.4,1.0,.5),new T.MeshStandardMaterial({color:0x3a2416,roughness:.7})); ped.rotation.y=Math.PI/2; ped.position.set(x-side*1.8,.5,z); fishG.add(ped);
+    const ped=new T.Mesh(new T.BoxGeometry(1.4,1.0,.5),new T.MeshStandardMaterial({map:woodTex([1,1]),color:0x4a3020,roughness:.55})); ped.rotation.y=Math.PI/2; ped.position.set(x-side*1.8,.5,z); fishG.add(ped);
     const pl=new T.Mesh(new T.PlaneGeometry(1.3,.4),new T.MeshBasicMaterial({map:plate(sp.name,(rec.w<1?Math.round(rec.w*1000)+' g':rec.w>=100?Math.round(rec.w).toLocaleString()+' kg':rec.w.toFixed(1)+' kg')+'・'+Math.round(rec.L*100)+' cm')})); pl.rotation.order='YXZ'; pl.rotation.set(-.35,side<0?Math.PI/2:-Math.PI/2,0); pl.position.set(x-side*2.06,1.02,z); fishG.add(pl);   /* 銅牌朝向走道 */
     it.ready=false; it.x=x; place(it); }); built=true; }
 function place(it){ const M=window.__MDL; if(it.ready||!M) return; if(!M.fishReady(it.sp.id)){ if(M.want) M.want(it.sp.id); return; }
@@ -6874,16 +6888,40 @@ function place(it){ const M=window.__MDL; if(it.ready||!M) return; if(!M.fishRea
   g.rotation.y=longX?Math.PI/2:0; g.updateMatrixWorld(true); b=new T.Box3().setFromObject(g); const c=b.getCenter(new T.Vector3()), h=b.max.y-b.min.y;
   const y=Math.max(1.4+h/2,Math.min(HH-1.2-h/2,3.2+h*.15)); g.position.set(it.x-c.x,y-c.y,it.z-c.z); fishG.add(g); g.traverse(o=>{ if(o.isMesh) o.frustumCulled=false; });
   // 兩條吊繩接到屋頂桁架
-  const ropeM=new T.MeshStandardMaterial({color:0x8a7a5a,roughness:.9}); for(const s of [-.3,.3]){ const top=HH-.6, bot=y+h*.35, r=new T.Mesh(new T.CylinderGeometry(.012,.012,Math.max(.1,top-bot),5),ropeM); r.position.set(it.x,(top+bot)/2,it.z+s*it.rec.L); fishG.add(r); }
-  if(fishG.children.filter(o=>o.isLight).length<10){ const sp2=new T.PointLight(0xffe2b8,1.6,Math.max(8,it.rec.L*2.2),1.6); sp2.position.set(it.x-it.side*1.5,HH-1.6,it.z); fishG.add(sp2); }   /* 每一隻標本一盞暖色頂燈 */
+  // 兩條吊繩：從屋頂桁架垂直往下，打到魚身真正的表面才停（以前停在半空，跟魚沒接上）
+  g.updateMatrixWorld(true); const ropeM=new T.MeshStandardMaterial({color:0x8a7a5a,roughness:.9}), rc=new T.Raycaster();
+  for(const s of [-.28,.28]){ const top=HH-.6, rz=it.z+s*it.rec.L; rc.set(new T.Vector3(it.x,top,rz),new T.Vector3(0,-1,0)); const hit=rc.intersectObject(g,true)[0]; const bot=hit?hit.point.y:y;
+    const r=new T.Mesh(new T.CylinderGeometry(.012,.012,Math.max(.1,top-bot),5),ropeM); r.position.set(it.x,(top+bot)/2,rz); fishG.add(r);
+    const knot=new T.Mesh(new T.SphereGeometry(.035,8,6),ropeM); knot.position.set(it.x,bot+.01,rz); fishG.add(knot); }
+  enrich(g);
+  if(fishG.children.filter(o=>o.isLight).length<6){ const sp2=new T.PointLight(0xffe2b8,1.6,Math.max(8,it.rec.L*2.2),1.6); sp2.position.set(it.x-it.side*1.5,HH-1.6,it.z); fishG.add(sp2); }   /* 每一隻標本一盞暖色頂燈 */
   it.ready=true; it.y=y; }
+const nmCache=new Map();
+function normalFrom(tex){ if(!tex||!tex.image) return null; if(nmCache.has(tex)) return nmCache.get(tex);
+  const im=tex.image, w=Math.min(1024,im.width||im.naturalWidth||0), h=Math.min(1024,im.height||im.naturalHeight||0); if(!w||!h) return null;
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d'); try{ g.drawImage(im,0,0,w,h); }catch(e){ return null; }
+  let d; try{ d=g.getImageData(0,0,w,h); }catch(e){ return null; } const src=d.data, L=new Float32Array(w*h); for(let i=0;i<w*h;i++) L[i]=(src[i*4]*.3+src[i*4+1]*.59+src[i*4+2]*.11)/255;
+  const out=g.createImageData(w,h), o=out.data, K=2.2;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const xm=(x-1+w)%w, xp=(x+1)%w, ym=Math.max(0,y-1), yp=Math.min(h-1,y+1);
+    const dx=(L[y*w+xp]-L[y*w+xm])*K, dy=(L[yp*w+x]-L[ym*w+x])*K, n=1/Math.sqrt(dx*dx+dy*dy+1), i=(y*w+x)*4; o[i]=(-dx*n*.5+.5)*255; o[i+1]=(dy*n*.5+.5)*255; o[i+2]=n*255; o[i+3]=255; }
+  g.putImageData(out,0,0); const t=new T.CanvasTexture(cv); t.flipY=tex.flipY; t.wrapS=tex.wrapS; t.wrapT=tex.wrapT; t.anisotropy=8; nmCache.set(tex,t); return t; }
+function enrich(g){ g.traverse(o=>{ if(!o.isMesh||!o.material) return; const mats=Array.isArray(o.material)?o.material:[o.material];
+  const nm=mats.map(m=>{ const p=new T.MeshPhysicalMaterial({map:m.map||null,color:m.color?m.color.clone():new T.Color(1,1,1),roughness:.42,metalness:0,clearcoat:.7,clearcoatRoughness:.22,transparent:m.transparent,opacity:m.opacity,alphaTest:m.alphaTest||0,side:m.side,skinning:!!m.skinning});
+    if(m.map){ m.map.anisotropy=8; p.normalMap=m.normalMap||normalFrom(m.map); p.normalScale=new T.Vector2(.9,.9); }
+    if(m.roughnessMap) p.roughnessMap=m.roughnessMap; return p; });
+  o.material=Array.isArray(o.material)?nm:nm[0]; }); }
 /* 介面 */
-const ui=document.createElement('div'); ui.id='hallUI'; ui.innerHTML='<div class="hn"></div><div class="hb"><button data-k="prev">◀</button><button data-k="exit">🏠 回小屋</button><button data-k="next">▶</button></div>'; document.body.appendChild(ui);
+const ui=document.createElement('div'); ui.id='hallUI'; ui.innerHTML='<div class="hj"><i></i></div><div class="hn"></div><div class="hb"><button data-k="prev">◀</button><button data-k="exit">🏠 回小屋</button><button data-k="next">▶</button></div>'; document.body.appendChild(ui);
 const st=document.createElement('style'); st.textContent=`#hallUI{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:30;display:none;flex-direction:column;align-items:center;gap:10px;pointer-events:none}
+#hallUI .hj{position:fixed;left:22px;bottom:calc(env(safe-area-inset-bottom,0px) + 150px);width:120px;height:120px;border-radius:50%;background:rgba(20,14,8,.45);border:1px solid rgba(255,213,106,.4);pointer-events:auto;touch-action:none}#hallUI .hj i{position:absolute;left:38px;top:38px;width:44px;height:44px;border-radius:50%;background:rgba(255,233,168,.75)}
 #hallUI .hn{padding:6px 14px;border-radius:999px;background:rgba(20,14,8,.72);color:#ffe9a8;font-size:14px;font-weight:800}#hallUI .hb{display:flex;gap:10px;pointer-events:auto}
 #hallUI button{min-width:64px;padding:12px 16px;border-radius:999px;border:1px solid rgba(255,213,106,.6);background:rgba(42,31,14,.9);color:#ffe9a8;font-size:16px;font-weight:800;font-family:inherit}
 body.inHall #hallUI{display:flex}body.inHall #homeUI,body.inHall #top,body.inHall #top2,body.inHall #top3,body.inHall #joy,body.inHall #bCam{display:none!important}`; document.head.appendChild(st);
-const nameEl=ui.querySelector('.hn');
+const nameEl=ui.querySelector('.hn'), joyEl=ui.querySelector('.hj'), knob=joyEl.querySelector('i'); let joy={x:0,y:0,id:null};
+function joyAt(e){ const r=joyEl.getBoundingClientRect(), dx=e.clientX-(r.left+r.width/2), dy=e.clientY-(r.top+r.height/2), d=Math.min(1,Math.hypot(dx,dy)/50), a=Math.atan2(dy,dx); joy.x=Math.cos(a)*d; joy.y=Math.sin(a)*d; knob.style.transform=`translate(${joy.x*40}px,${joy.y*40}px)`; }
+joyEl.addEventListener('pointerdown',e=>{ joy.id=e.pointerId; joyEl.setPointerCapture(e.pointerId); joyAt(e); e.stopPropagation(); });
+joyEl.addEventListener('pointermove',e=>{ if(joy.id===e.pointerId) joyAt(e); });
+const joyEnd=e=>{ if(joy.id!==e.pointerId) return; joy.id=null; joy.x=joy.y=0; knob.style.transform=''; }; joyEl.addEventListener('pointerup',joyEnd); joyEl.addEventListener('pointercancel',joyEnd);
 function focus(i){ if(!items.length){ nameEl.textContent='還沒有一公尺以上的標本'; camZT=-4; camXT=0; yawT=0; pitchT=0; return; } idx=(i+items.length)%items.length; const it=items[idx];
   // 站在走道上、正對那一隻的側面，距離依魚長拉開到整條看得到
   const d=Math.max(3,Math.min(HW*2-4.5,it.rec.L*1.35+1.5)); camXT=it.x-it.side*d; camZT=it.z; yawT=it.side<0?Math.PI/2:-Math.PI/2; pitchT=.18;
@@ -6895,9 +6933,14 @@ el.addEventListener('pointerdown',e=>{ if(!on) return; drag={x:e.clientX,y:e.cli
 el.addEventListener('pointermove',e=>{ if(!on||!drag) return; yawT=drag.yaw-(e.clientX-drag.x)*.006; pitchT=Math.max(-.6,Math.min(.9,drag.pitch-(e.clientY-drag.y)*.006)); e.stopImmediatePropagation(); },true);
 el.addEventListener('pointerup',e=>{ if(!on) return; drag=null; e.stopImmediatePropagation(); },true);
 el.addEventListener('click',e=>{ if(on) e.stopImmediatePropagation(); },true);
-function enter(){ on=true; built=false; sig=''; layout(); document.body.classList.add('inHall'); camX=camXT=0; camZ=camZT=3; yaw=yawT=0; pitch=pitchT=.1; idx=0; setTimeout(()=>focus(0),400); }
-function exit(){ on=false; document.body.classList.remove('inHall'); }
+const bgm=new Audio('end_piano.mp3'); bgm.loop=true; bgm.volume=0; let fadeT=null;
+function fadeTo(v,stop){ clearInterval(fadeT); fadeT=setInterval(()=>{ const d=v-bgm.volume; if(Math.abs(d)<.02){ bgm.volume=v; clearInterval(fadeT); if(stop) bgm.pause(); return; } bgm.volume=Math.max(0,Math.min(1,bgm.volume+Math.sign(d)*.02)); },60); }
+function music(on2){ const S=window.__SAVE||{}; if(on2&&S.sound!==false){ bgm.play().catch(()=>{}); fadeTo(.32); } else fadeTo(0,true); }
+function enter(){ on=true; music(true); built=false; sig=''; layout(); document.body.classList.add('inHall'); camX=camXT=0; camZ=camZT=3; yaw=yawT=0; pitch=pitchT=.1; idx=0; setTimeout(()=>focus(0),400); }
+function exit(){ on=false; music(false); document.body.classList.remove('inHall'); }
 function render(dt){ if(!on) return; items.forEach(it=>{ if(!it.ready) place(it); });
+  if(joy.x||joy.y){ const sp=2.6*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw);
+    camXT=camX=Math.max(-HW+.8,Math.min(HW-.8,camX+(fx*-joy.y+rx*joy.x)*sp)); camZT=camZ=Math.max(-len-1.5,Math.min(5.2,camZ+(fz*-joy.y+rz*joy.x)*sp)); }
   const k=Math.min(1,dt*3); camX+=(camXT-camX)*k; camZ+=(camZT-camZ)*k; yaw+=(yawT-yaw)*Math.min(1,dt*6); pitch+=(pitchT-pitch)*Math.min(1,dt*6);
   const s=R.getSize(new T.Vector2()); cam.aspect=s.x/s.y; cam.fov=s.x<s.y?72:58; cam.updateProjectionMatrix();
   cam.position.set(camX,1.65,camZ); cam.rotation.order='YXZ'; cam.rotation.set(pitch,yaw,0);
@@ -8165,7 +8208,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261103002517'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261103004036'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
