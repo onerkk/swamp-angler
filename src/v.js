@@ -149,7 +149,7 @@ const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click'
 const btn=document.createElement('button'); btn.className='chip sm'; btn.id='storyBtn'; btn.setAttribute('aria-label','老漁人的手記'); btn.textContent='📜';
 const t2=document.getElementById('top2'); if(t2) t2.appendChild(btn);
 const box=document.createElement('div'); box.id='storyBox'; box.className='hidden'; document.body.appendChild(box);
-const css=document.createElement('style'); css.textContent=`#storyBtn{position:relative;min-width:38px;min-height:27px;justify-content:center}#storyBtn.dot::after{content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:#ff5a4a}
+const css=document.createElement('style'); css.textContent=`#storyBtn{position:relative;min-width:44px;min-height:44px;justify-content:center;background:var(--glass)!important;border:1px solid var(--stroke)!important;border-radius:999px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}#storyBtn.dot::after{content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:#ff5a4a}
 #storyBox{position:fixed;inset:0;z-index:9;background:rgba(4,8,7,.66);display:flex;align-items:flex-end;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 40px) 10px calc(env(safe-area-inset-bottom,0px) + 10px)}#storyBox.hidden{display:none}
 #storyBox .pn{width:100%;max-width:520px;max-height:100%;overflow:auto;background:linear-gradient(180deg,#2a2216,#1a150e);border:1px solid rgba(230,200,140,.35);border-radius:18px;padding:16px 16px 18px;color:#f1e6cc;box-shadow:0 10px 40px rgba(0,0,0,.5)}
 #storyBox h3{margin:0 0 4px;font-size:19px;color:#ffe3a3}#storyBox .x{float:right;background:none;border:0;color:#f1e6cc;font-size:22px}

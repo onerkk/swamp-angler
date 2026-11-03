@@ -1,4 +1,4 @@
-/*APPV:20261103022022*/
+/*APPV:20261103024608*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -6623,7 +6623,7 @@ const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click'
 const btn=document.createElement('button'); btn.className='chip sm'; btn.id='storyBtn'; btn.setAttribute('aria-label','老漁人的手記'); btn.textContent='📜';
 const t2=document.getElementById('top2'); if(t2) t2.appendChild(btn);
 const box=document.createElement('div'); box.id='storyBox'; box.className='hidden'; document.body.appendChild(box);
-const css=document.createElement('style'); css.textContent=`#storyBtn{position:relative;min-width:38px;min-height:27px;justify-content:center}#storyBtn.dot::after{content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:#ff5a4a}
+const css=document.createElement('style'); css.textContent=`#storyBtn{position:relative;min-width:44px;min-height:44px;justify-content:center;background:var(--glass)!important;border:1px solid var(--stroke)!important;border-radius:999px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}#storyBtn.dot::after{content:'';position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:#ff5a4a}
 #storyBox{position:fixed;inset:0;z-index:9;background:rgba(4,8,7,.66);display:flex;align-items:flex-end;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 40px) 10px calc(env(safe-area-inset-bottom,0px) + 10px)}#storyBox.hidden{display:none}
 #storyBox .pn{width:100%;max-width:520px;max-height:100%;overflow:auto;background:linear-gradient(180deg,#2a2216,#1a150e);border:1px solid rgba(230,200,140,.35);border-radius:18px;padding:16px 16px 18px;color:#f1e6cc;box-shadow:0 10px 40px rgba(0,0,0,.5)}
 #storyBox h3{margin:0 0 4px;font-size:19px;color:#ffe3a3}#storyBox .x{float:right;background:none;border:0;color:#f1e6cc;font-size:22px}
@@ -8306,7 +8306,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261103022022'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261103024608'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
