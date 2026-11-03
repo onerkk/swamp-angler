@@ -255,7 +255,9 @@ function put(name,x,y,z,ry,sc,fn,failed){ const place=g=>{ const o=g.scene.clone
         if(/_artwork$/.test(mm.name)&&ART[name]){ const nm=mm.clone(); const tx=TL.load(ART[name]); tx.encoding=T.sRGBEncoding; tx.flipY=false; nm.map=tx; nm.color.set(0xffffff); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_glass$/.test(mm.name)){ m.castShadow=false; const nm=new T.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.12,roughness:.05,metalness:0,depthWrite:false}); if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; }
         if(/_lamp$/.test(mm.name)){ const nm=mm.clone(); nm.emissive=new T.Color(0xffd080); nm.emissiveIntensity=1.2; if(Array.isArray(m.material)) m.material[i]=nm; else m.material=nm; glowM.push(nm); } }); });
-    if(W.qualityTextures)W.qualityTextures(o);scene.add(o); addObs(o); if(fn) fn(o); };
+    if(W.qualityTextures)W.qualityTextures(o);scene.add(o); addObs(o); if(fn) fn(o);
+    // 小物不投影：家具定好大小之後，最大邊不到 0.6 公尺的（盆栽、書、油燈、鍋子、燈籠……）不參與陰影計算——它們的影子小到看不出來，卻佔了陰影圖大半的三角形
+    { const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); if(Math.max(sz.x,sz.y,sz.z)<.6) o.traverse(m=>{ if(m.isMesh) m.castShadow=false; }); } };
   if(mcache[name]) homeWork.add(()=>place(mcache[name]),'furniture '+name); else GL.load('models/home/'+name+'.glb',g=>{ mcache[name]=g; place(g); },undefined,()=>{console.warn('home model',name);if(failed)failed();}); }
 const LV={x:-.9,z:-.45};   /* 客廳區往前移：魚缸前留 1.4 公尺走道，可以走到玻璃前面看 */
 // 碰撞：落地的家具用實際模型的外框當障礙（升級換模型也自動跟著變），走路時不能穿過去
@@ -890,7 +892,7 @@ function resetGraphics(){if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.
 function exit(){ on=false;homeWork.setActive(false);resetGraphics();releaseSceneGPU(scene);W.radiance.release(); drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
 const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
-const reflectionAnchor=new T.Vector3(0,1.6,0);let lastHomeShadow=-Infinity;
+const reflectionAnchor=new T.Vector3(0,1.6,0);let lastHomeShadow=-Infinity, lastShadowSig='';
 function render(dt){t+=dt;if(W.prepareScene)W.prepareScene(scene);if(window.__effectBudget?.environment===false)scene.environment=null;else W.interiorReflection.update(scene,reflectionAnchor,W.scene.environment,t); yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
   vb+=((mode!=='room'&&mode!=='act'?1:0)-vb)*Math.min(1,dt*4); dYaw+=(dYawT-dYaw)*Math.min(1,dt*6); dPitch+=(dPitchT-dPitch)*Math.min(1,dt*6);
   // 在房間裡用搖桿走動：前進／後退、左右轉；不能走進水族箱、壁爐和牆
@@ -929,7 +931,9 @@ function render(dt){t+=dt;if(W.prepareScene)W.prepareScene(scene);if(window.__ef
   const shadowSize=window.__gfxStatus&&window.__gfxStatus.shadow==='ultra'?4096:window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
   const exposure=R.toneMappingExposure,shadows=R.shadowMap.enabled,shadowType=R.shadowMap.type,shadowAuto=R.shadowMap.autoUpdate,shadowRequest=R.shadowMap.needsUpdate;
   try{
-    R.shadowMap.autoUpdate=false;R.shadowMap.needsUpdate=t-lastHomeShadow>=1/(window.__effectBudget?.shadowHz||20)||!sun.shadow.map;if(R.shadowMap.needsUpdate)lastHomeShadow=t;R.toneMappingExposure=.88;R.shadowMap.enabled=true;R.shadowMap.type=T.PCFSoftShadowMap;
+    R.shadowMap.autoUpdate=false;{ const sig=Math.round(sun.position.x*20)+'|'+Math.round(sun.position.y*20)+'|'+Math.round(sun.position.z*20)+'|'+Math.round(sun.intensity*50)+'|'+mountSig;
+      /* 小屋大部分東西不動：陰影只在太陽位置／亮度改變、標本換了、或每 2 秒（缸裡的魚會游）才重算；以前每秒 20～30 次 */
+      R.shadowMap.needsUpdate=!sun.shadow.map||sig!==lastShadowSig||t-lastHomeShadow>=Math.max(2,1/(window.__effectBudget?.shadowHz||20)); if(R.shadowMap.needsUpdate){ lastHomeShadow=t; lastShadowSig=sig; } }R.toneMappingExposure=.88;R.shadowMap.enabled=true;R.shadowMap.type=T.PCFSoftShadowMap;
     R.setRenderTarget(null);W.radiance.render(scene,cam);
     // 白天陽光從左牆窗戶斜射進來：畫面裡看得到窗戶時，從窗口拉出光柱（跟著時段變亮變暗；關燈時更明顯）
     if(W.godRays&&W.raysOn&&W.raysOn()){ const dl=daylight(); if(dl>.05){ try{ W.godRays.render({camera:cam,point:winPt,color:winRayCol,strength:dl*(lightsOff()?.9:.6),thresh:.45}); }catch(e){ window.__noRays=true; } } }
