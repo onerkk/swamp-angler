@@ -1,4 +1,4 @@
-/*APPV:20261103075206*/
+/*APPV:20261103075741*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -8022,14 +8022,15 @@ const ov=document.getElementById('scare'), face=ov&&ov.querySelector('img');
 // 測試模式：網址加上 ghost 測試參數，不看章節、時段、次數，閒置或等魚約 5 秒出現、間隔 30 秒（只影響開這一頁的人）
 const TEST=/[?&]ghost=(1|glide|peek|behind|jump|grab|creep|bow|stalk)/.test(location.search), TEST_MODE=(location.search.match(/[?&]ghost=(glide|peek|behind|jump|grab|creep|bow|stalk)/)||[])[1]; let testLast=0;
 function eligible(){ if(TEST){ const st=c.state(); return (st==='idle'||st==='wait')&&!ev&&performance.now()-testLast>4000&&performance.now()-sessionStart>5000; }   /* 測試：上一段結束 4 秒後就再出現 */
-  if(S.noScare) return false; if(c.storyDone&&c.storyDone('lantern')) return false;
+  if(c.storyDone&&c.storyDone('lantern')) return false; const hp0=c.storyActive&&c.storyActive('lantern')&&c.progOf?c.progOf('lantern'):null;
+  if(S.noScare&&!(hp0&&hp0[1]<3)) return false;   /* 關了驚嚇也要能完成隱藏章節：那時只用不嚇人的出現方式（遠處飄過、水裡露頭） */
   if(c.period()!=='night'||c.loc()!=='lake') return false; const st=c.state(); if(st!=='idle'&&st!=='wait') return false;
   // 隱藏章節進行中：還沒遇滿 3 次時她出現得更勤（任務才過得了）；遇滿 3 次後就不再嚇人
   const hp=c.storyActive&&c.storyActive('lantern')&&c.progOf?c.progOf('lantern'):null, hunt=!!hp&&hp[1]<3;
   if(hp&&hp[1]>=3) return false;
-  if(performance.now()-sessionStart<(hunt?90*1000:10*60*1000)) return false;
+  if(performance.now()-sessionStart<(hunt?20*1000:10*60*1000)) return false;
   const g=S.ghost=S.ghost||{}; const day=new Date().toDateString(); if(g.day!==day){ g.day=day; g.n=0; }
-  if(g.n>=(hunt?10:2)) return false; if(g.last&&Date.now()-g.last<(hunt?5:60)*60*1000) return false; return true; }
+  if(g.n>=(hunt?10:2)) return false; if(g.last&&Date.now()-g.last<(hunt?2:60)*60*1000) return false; return true; }
 let hc=null; window.__GHOSTDBG=()=>({ev:ev&&{mode:ev.mode,phase:ev.phase,t:+ev.t.toFixed(1)},vis:!!(model&&model.visible),pos:model&&model.position.toArray().map(v=>+v.toFixed(2)),hc:!!hc,kids:model&&model.children.length,sk:hc&&hc.mesh.visible});   // 新的女鬼骨架控制器（表情、反頭、伸手、抽搐）
 function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=true;
   if(window.__HUMAN){ GL.load('models/lin_v1.glb',g=>{ const o=g.scene; o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
@@ -8076,7 +8077,8 @@ function muteAll(on){ try{ if(c.mute) c.mute(on); }catch(e){} }
 const MODES=['glide','peek','behind','jump','grab','creep','bow','stalk']; let testIdx=0;
 function pickMode(){ if(TEST){ if(TEST_MODE) return TEST_MODE; const m=MODES[testIdx%MODES.length]; testIdx++; return m; }
   const st=c.state(), c5=S.story&&S.story.done&&S.story.done.includes('c5');
-  const w={glide:40,peek:st==='wait'?30:0,behind:18,jump:c5?22:6,grab:hc?(c5?16:6):0,creep:hc?12:0,bow:hc?12:0,stalk:hc?12:0}; let tot=0; for(const k in w) tot+=w[k]; let r=Math.random()*tot; for(const k in w){ r-=w[k]; if(r<=0) return k; } return 'glide'; }
+  const w={glide:40,peek:st==='wait'?30:0,behind:18,jump:c5?22:6,grab:hc?(c5?16:6):0,creep:hc?12:0,bow:hc?12:0,stalk:hc?12:0};
+  if(S.noScare){ for(const k in w) if(k!=='glide'&&k!=='peek') w[k]=0; if(!w.peek) w.glide=1; }   /* 關了驚嚇：只遠處飄過或水裡露頭 */ let tot=0; for(const k in w) tot+=w[k]; let r=Math.random()*tot; for(const k in w){ r-=w[k]; if(r<=0) return k; } return 'glide'; }
 function placeRel(m,fw,rt,y){ const b=c.base(), h=c.head(), f=new T.Vector3(-Math.sin(h),0,-Math.cos(h)), r=new T.Vector3(Math.cos(h),0,-Math.sin(h));
   const p=new T.Vector3(b.x,0,b.z).addScaledVector(f,fw).addScaledVector(r,rt); m.position.set(p.x,y,p.z); return p; }
 function faceMe(m){ const b=c.base(); m.rotation.y=Math.atan2(b.x-m.position.x,b.z-m.position.z); }
@@ -8123,9 +8125,9 @@ function blend(dt){ if(!model||!model.visible) return; const lt=W.info?W.info.li
 function update(dt){ { const tt=performance.now()/1000; if(ghostRig&&!hc) ghostRig.pose({t:tt,breathe:.004,headRoll:.14+.05*Math.sin(tt*.7),headPitch:.12,skirt:.05}); if(aliveRig) aliveRig.pose({t:tt,headPitch:.08,skirt:.025}); } blend(dt);
   if(!ev){ lastTry+=dt; if(lastTry>1){ lastTry=0;
       if(!model&&!loading&&(TEST||!S.noScare&&c.period()==='night'&&c.loc()==='lake')) load(()=>{});
-      // 每秒擲一次：平常約 40 分鐘可出現的時間才遇到一次；隱藏章節要遇見她時約 1～2 分鐘
+      // 每秒擲一次：平常約 40 分鐘可出現的時間才遇到一次；隱藏章節要遇見她時約半分鐘（兩次之間至少隔 2 分鐘），一個晚上就能遇滿 3 次（使用者回報原本太少、任務過不了）
       const hp=c.storyActive&&c.storyActive('lantern')&&c.progOf?c.progOf('lantern'):null, hunt=!!hp&&hp[1]<3;
-      if(eligible()&&(TEST||Math.random()<(hunt?1/75:1/2400))){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }
+      if(eligible()&&(TEST||Math.random()<(hunt?1/30:1/2400))){ if(TEST) testLast=performance.now(); trigger(TEST); } } return; }
   ev.t+=dt; const t=ev.t, m=model; if(!m) return;
   if(ev.mode==='jump'){ m.position.y=Math.min(-.28,-1.9+t*2.1); faceMe(m); m.rotation.y+=Math.sin(t*9)*.04;
     if(t>.9&&!ev.face){ ev.face=true; if(ov) ov.classList.add('on'); sfx('scream_main',1); c.vib&&c.vib([120,40,160,40,320]); c.shake&&c.shake(3.2); }
@@ -8316,7 +8318,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261103075206'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261103075741'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
