@@ -2,6 +2,7 @@
   "name": "濕地垂釣",
   "short_name": "濕地垂釣",
   "description": "寫實 3D 釣魚遊戲：濕地、冰湖、月光灣與外海，65 種真實魚種。",
+  "id": "./?app=swamp-angler-2",
   "start_url": "./index.html?src=pwa",
   "scope": "./",
   "display": "fullscreen",
