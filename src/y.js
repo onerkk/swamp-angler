@@ -96,7 +96,7 @@ function compensate(){ if(!isOwner(user)){ c.toast('只有擁有者帳號可以�
 return {compensate,rescue,login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
 }
 /* ===== 安裝到桌面（PWA） ===== */
-const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches||navigator.standalone===true;   /* 安裝設定是全螢幕模式，也要算已安裝 */
   window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferred=e; });
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
