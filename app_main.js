@@ -1,4 +1,4 @@
-/*APPV:20261104012609*/
+/*APPV:20261104014115*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -3498,12 +3498,13 @@ const GEAR={
        {name:'4000 型高速輪',price:5000,lv:5,spd:2.6,drag:.7},{name:'碳纖旗艦輪',price:16000,lv:9,spd:3.0,drag:.55},
        {name:'重型鼓式捲線器',price:80000,lv:30,spd:3.3,drag:.48},{name:'頂級鼓式捲線器',price:200000,lv:44,spd:3.6,drag:.42}]};
 /* 畫面方向：自動（跟著手機）／直向／橫向。鎖定方向要在全螢幕（或安裝到主畫面）下才有效，所以切換時順便開全螢幕 */
-window.__applyOrient=(mode,gesture)=>{ const so=screen.orientation; if(!so||!so.lock){ if(mode!=='auto') toast('這個瀏覽器不能鎖定方向，請用手機的「自動旋轉」切換','warn',3200); return; }
-  if(mode==='auto'){ try{ so.unlock(); }catch(_){} toast('畫面方向：跟著手機轉','good',1400); return; }
-  const go=()=>so.lock(mode==='land'?'landscape':'portrait').then(()=>toast('畫面方向：'+(mode==='land'?'橫向':'直向'),'good',1400)).catch(()=>toast('要先開全螢幕或把遊戲加到主畫面，才能鎖定方向','warn',3200));
+const oToast=(m,k,ms)=>{ if(window.__orientToast) window.__orientToast(m,k,ms); };   /* 這段在全域執行，存檔與提示要從全域取（直接用 save 會出現 save is not defined） */
+window.__applyOrient=(mode,gesture)=>{ const so=screen.orientation; if(!so||!so.lock){ if(mode!=='auto') oToast('這個瀏覽器不能鎖定方向，請用手機的「自動旋轉」切換','warn',3200); return; }
+  if(mode==='auto'){ try{ so.unlock(); }catch(_){} oToast('畫面方向：跟著手機轉','good',1400); return; }
+  const go=()=>so.lock(mode==='land'?'landscape':'portrait').then(()=>oToast('畫面方向：'+(mode==='land'?'橫向':'直向'),'good',1400)).catch(()=>oToast('要先開全螢幕或把遊戲加到主畫面，才能鎖定方向','warn',3200));
   if(!document.fullscreenElement&&gesture&&document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().then(go,go); else go(); };
-document.addEventListener('fullscreenchange',()=>{ const m=save.orient||'auto'; if(m!=='auto'&&document.fullscreenElement&&screen.orientation&&screen.orientation.lock) screen.orientation.lock(m==='land'?'landscape':'portrait').catch(()=>{}); });
-{ const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>{ const m=save.orient||'auto'; if(m!=='auto') window.__applyOrient(m,true); }); }   /* 開始遊戲時套用上次選的方向（需要手勢） */
+document.addEventListener('fullscreenchange',()=>{ const m=(window.__SAVE||{}).orient||'auto'; if(m!=='auto'&&document.fullscreenElement&&screen.orientation&&screen.orientation.lock) screen.orientation.lock(m==='land'?'landscape':'portrait').catch(()=>{}); });
+{ const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>{ const m=(window.__SAVE||{}).orient||'auto'; if(m!=='auto') window.__applyOrient(m,true); }); }   /* 開始遊戲時套用上次選的方向（需要手勢） */
 // 依取得條件找裝備編號（Boss 獎勵發竿用）
 window.__GEARIDX=(k,req)=>GEAR[k].findIndex(x=>x.req===req);
 const BAITS=[
@@ -3812,7 +3813,7 @@ $('shX').addEventListener('click',close);
 sheet.addEventListener('click',e=>{ if(e.target===sheet) close(); });
 shB.addEventListener('click',e=>{
   const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(a==='diag'&&window.__DIAG){ if(v==='copy') window.__DIAG.copy().then(ok=>toast(ok?'已複製精簡摘要，可以直接貼上':'複製失敗，請截圖設定頁','good',2200)); else if(v==='download'){window.__DIAG.download();toast('已送出完整診斷報告','good',1800);}else { window.__DIAG.clear(); toast('已清除錯誤記錄','good',1200); } render(); return; }
-  if(a==='orient'){ save.orient=v; persist(); if(window.__applyOrient) window.__applyOrient(v,true); render(); return; }
+  if(a==='orient'){ window.__orientToast=toast; save.orient=v; persist(); if(window.__applyOrient) window.__applyOrient(v,true); render(); return; }
   if(a==='gfx'){ save.gfx=v;save.gfxRecoveryVersion=1; persist(); if(window.__applyGfx) window.__applyGfx(v); toast('畫質：'+({auto:'自動',high:'高',mid:'中',low:'低'})[v],'good',1200); render(); return; } if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
   if(a==='tab') shopTab=v;
   else if(a==='buy'){ const it=GEAR[shopTab][+v]; if(save.coins<it.price){ toast('金幣不夠','bad'); return; }
@@ -8337,7 +8338,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261104012609'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261104014115'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
