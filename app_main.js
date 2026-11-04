@@ -1,4 +1,4 @@
-/*APPV:20261104061302*/
+/*APPV:20261104140047*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -2061,6 +2061,16 @@ const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
 const godRays=createGodRays({renderer,camera,U}), _grCol=new T.Color(), _grDir=new T.Vector3();
 /* 光束的強度：白天看太陽高度（晨昏最明顯、正午很淡）、雲量；夜裡改用月光，弱很多。只在高畫質畫 */
 const taa=createTAA({renderer});
+/* 暖身：任何新載入的模型／貼圖，載完立刻送上顯示卡。以前要等它第一次出現在畫面上才上傳（診斷裡「幾何上傳 +79、貼圖上傳 +36」那種 0.5 秒卡頓）。
+   做法：把物件暫時放進一個只有它的小場景，用 4×4 的畫布畫一次（只上傳幾何，幾乎不花填色時間），貼圖用 initTexture 先上傳；畫完放回原位 */
+const warmScene=new T.Scene(), warmRT=new T.WebGLRenderTarget(4,4), warmCam=new T.PerspectiveCamera(60,1,.01,1000), warmBasic=new T.MeshBasicMaterial();
+warmScene.overrideMaterial=warmBasic;
+window.__WARM=function(obj){ if(!obj||!renderer.initTexture) return; const parent=obj.parent, idx=parent?parent.children.indexOf(obj):-1, vis=obj.visible, cul=[];
+  try{ obj.traverse(o=>{ if(o.isMesh||o.isSkinnedMesh||o.isInstancedMesh){ cul.push([o,o.frustumCulled]); o.frustumCulled=false; const ms=Array.isArray(o.material)?o.material:[o.material]; for(const m of ms){ if(!m) continue; for(const k in m){ const t=m[k]; if(t&&t.isTexture&&t.image) try{ renderer.initTexture(t); }catch(_){} } } } });
+    obj.visible=true; warmScene.add(obj); warmCam.position.set(0,0,5); warmCam.lookAt(0,0,0);
+    const prev=renderer.getRenderTarget(), ac=renderer.autoClear; renderer.setRenderTarget(warmRT); renderer.autoClear=true; renderer.render(warmScene,warmCam); renderer.setRenderTarget(prev); renderer.autoClear=ac; }
+  catch(e){ console.warn('warm',e); }
+  finally{ warmScene.remove(obj); if(parent){ parent.add(obj); if(idx>=0&&idx<parent.children.length-1){ parent.children.splice(parent.children.indexOf(obj),1); parent.children.splice(idx,0,obj); } } obj.visible=vis; for(const [o,c] of cul) o.frustumCulled=c; } };
 function taaOn(){ return materialQuality.tier==='high'&&!window.__noTAA&&!(window.__SAVE&&window.__SAVE.taa===false); }   /* 時間抗鋸齒：高畫質才開，設定裡可關 */
 function raysOn(){ return materialQuality.tier==='high'&&!window.__noRays&&!(window.__SAVE&&window.__SAVE.rays===false); }   /* 設定裡可以關掉 */
 function raysParams(){ if(!raysOn()) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
@@ -8367,7 +8377,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261104061302'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261104140047'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -11123,7 +11133,10 @@ requestAnimationFrame(frame);
     // 所有模型都經過 Draco 幾何壓縮（體積約剩 1/4）：每個 GLTF 載入器自動接上同一個 Draco 解壓器
     let resourceSave={};try{resourceSave=JSON.parse(localStorage.getItem('swampAngler.v1')||'{}');}catch(_){}const previous=readDiagnosticJournal();const recovery=!!(previous&&!previous.clean&&Date.now()-previous.at<600000&&((previous.started&&previous.visible!==false)||previous.recovery));window.__resourcePolicy=deviceResourcePolicy(navigator.userAgent,resourceSave.gfx||'auto',recovery);window.__imageBudget=createImageBudget(window.__resourcePolicy);installImageBudget(THREE,window.__imageBudget);
     if(THREE.DRACOLoader&&THREE.GLTFLoader){ const dl=new THREE.DRACOLoader();dl.setWorkerLimit(1); dl.setDecoderPath('vendor/draco/'); dl.preload();
-      for(const k of ['load','parse']){ const o=THREE.GLTFLoader.prototype[k]; THREE.GLTFLoader.prototype[k]=function(...a){ if(!this.dracoLoader) this.setDRACOLoader(dl); return o.apply(this,a); }; } } if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); window.__GEOLOD=createGeometryLOD(); window.__GEOLOD.install(THREE); }catch(e){ console.warn('cdn',e); }
+      for(const k of ['load','parse']){ const o=THREE.GLTFLoader.prototype[k]; THREE.GLTFLoader.prototype[k]=function(...a){ if(!this.dracoLoader) this.setDRACOLoader(dl);
+        const ci=k==='load'?1:2, cb=a[ci]; if(typeof cb==='function') a[ci]=g=>{ try{ if(window.__WARM&&g&&g.scene) window.__WARM(g.scene); }catch(_){} return cb(g); };   /* 模型一載完就先送上顯示卡 */
+        return o.apply(this,a); }; } }
+    if(THREE.TextureLoader){ const o=THREE.TextureLoader.prototype.load; THREE.TextureLoader.prototype.load=function(url,onLoad,...rest){ return o.call(this,url,t=>{ if(onLoad) onLoad(t); setTimeout(()=>{ try{ const W=window.__W; if(W&&W.renderer&&W.renderer.initTexture&&t&&t.image) W.renderer.initTexture(t); }catch(_){} },0); },...rest); };   /* 等呼叫端設好 encoding、wrap 之後再上傳，避免用錯的格式上傳一次 */ }   /* 一般貼圖（湖景照片、家具材質）載完就先上傳 */ if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); window.__GEOLOD=createGeometryLOD(); window.__GEOLOD.install(THREE); }catch(e){ console.warn('cdn',e); }
   try{
     const W=createWorld({canvas:document.getElementById('c')});W.renderer.info.autoReset=false; window.__DIAG=createDiag(W,{get G(){ return window.__G||{}; },get save(){ return (window.__G&&window.__G.saveRef)||{}; },persist:()=>{if(window.__G?.saveRef)localStorage.setItem(window.__SAVE_KEY||'swampAngler.v1',JSON.stringify(window.__G.saveRef));}}); const P=createProps(W);
     // 主畫面的載入提示：進度條、第一次進入的說明、網路慢時的提醒（避免玩家以為當機）

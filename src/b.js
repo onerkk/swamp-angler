@@ -717,6 +717,16 @@ const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
 const godRays=createGodRays({renderer,camera,U}), _grCol=new T.Color(), _grDir=new T.Vector3();
 /* 光束的強度：白天看太陽高度（晨昏最明顯、正午很淡）、雲量；夜裡改用月光，弱很多。只在高畫質畫 */
 const taa=createTAA({renderer});
+/* 暖身：任何新載入的模型／貼圖，載完立刻送上顯示卡。以前要等它第一次出現在畫面上才上傳（診斷裡「幾何上傳 +79、貼圖上傳 +36」那種 0.5 秒卡頓）。
+   做法：把物件暫時放進一個只有它的小場景，用 4×4 的畫布畫一次（只上傳幾何，幾乎不花填色時間），貼圖用 initTexture 先上傳；畫完放回原位 */
+const warmScene=new T.Scene(), warmRT=new T.WebGLRenderTarget(4,4), warmCam=new T.PerspectiveCamera(60,1,.01,1000), warmBasic=new T.MeshBasicMaterial();
+warmScene.overrideMaterial=warmBasic;
+window.__WARM=function(obj){ if(!obj||!renderer.initTexture) return; const parent=obj.parent, idx=parent?parent.children.indexOf(obj):-1, vis=obj.visible, cul=[];
+  try{ obj.traverse(o=>{ if(o.isMesh||o.isSkinnedMesh||o.isInstancedMesh){ cul.push([o,o.frustumCulled]); o.frustumCulled=false; const ms=Array.isArray(o.material)?o.material:[o.material]; for(const m of ms){ if(!m) continue; for(const k in m){ const t=m[k]; if(t&&t.isTexture&&t.image) try{ renderer.initTexture(t); }catch(_){} } } } });
+    obj.visible=true; warmScene.add(obj); warmCam.position.set(0,0,5); warmCam.lookAt(0,0,0);
+    const prev=renderer.getRenderTarget(), ac=renderer.autoClear; renderer.setRenderTarget(warmRT); renderer.autoClear=true; renderer.render(warmScene,warmCam); renderer.setRenderTarget(prev); renderer.autoClear=ac; }
+  catch(e){ console.warn('warm',e); }
+  finally{ warmScene.remove(obj); if(parent){ parent.add(obj); if(idx>=0&&idx<parent.children.length-1){ parent.children.splice(parent.children.indexOf(obj),1); parent.children.splice(idx,0,obj); } } obj.visible=vis; for(const [o,c] of cul) o.frustumCulled=c; } };
 function taaOn(){ return materialQuality.tier==='high'&&!window.__noTAA&&!(window.__SAVE&&window.__SAVE.taa===false); }   /* 時間抗鋸齒：高畫質才開，設定裡可關 */
 function raysOn(){ return materialQuality.tier==='high'&&!window.__noRays&&!(window.__SAVE&&window.__SAVE.rays===false); }   /* 設定裡可以關掉 */
 function raysParams(){ if(!raysOn()) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
