@@ -1,4 +1,4 @@
-/*APPV:20261103092822*/
+/*APPV:20261104012609*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -3497,6 +3497,13 @@ const GEAR={
  reel:[{name:'2000 型紡車輪',price:0,lv:1,spd:1.9,drag:1},{name:'3000 型紡車輪',price:1200,lv:3,spd:2.2,drag:.85},
        {name:'4000 型高速輪',price:5000,lv:5,spd:2.6,drag:.7},{name:'碳纖旗艦輪',price:16000,lv:9,spd:3.0,drag:.55},
        {name:'重型鼓式捲線器',price:80000,lv:30,spd:3.3,drag:.48},{name:'頂級鼓式捲線器',price:200000,lv:44,spd:3.6,drag:.42}]};
+/* 畫面方向：自動（跟著手機）／直向／橫向。鎖定方向要在全螢幕（或安裝到主畫面）下才有效，所以切換時順便開全螢幕 */
+window.__applyOrient=(mode,gesture)=>{ const so=screen.orientation; if(!so||!so.lock){ if(mode!=='auto') toast('這個瀏覽器不能鎖定方向，請用手機的「自動旋轉」切換','warn',3200); return; }
+  if(mode==='auto'){ try{ so.unlock(); }catch(_){} toast('畫面方向：跟著手機轉','good',1400); return; }
+  const go=()=>so.lock(mode==='land'?'landscape':'portrait').then(()=>toast('畫面方向：'+(mode==='land'?'橫向':'直向'),'good',1400)).catch(()=>toast('要先開全螢幕或把遊戲加到主畫面，才能鎖定方向','warn',3200));
+  if(!document.fullscreenElement&&gesture&&document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().then(go,go); else go(); };
+document.addEventListener('fullscreenchange',()=>{ const m=save.orient||'auto'; if(m!=='auto'&&document.fullscreenElement&&screen.orientation&&screen.orientation.lock) screen.orientation.lock(m==='land'?'landscape':'portrait').catch(()=>{}); });
+{ const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>{ const m=save.orient||'auto'; if(m!=='auto') window.__applyOrient(m,true); }); }   /* 開始遊戲時套用上次選的方向（需要手勢） */
 // 依取得條件找裝備編號（Boss 獎勵發竿用）
 window.__GEARIDX=(k,req)=>GEAR[k].findIndex(x=>x.req===req);
 const BAITS=[
@@ -3648,6 +3655,7 @@ function render(){
     h+='<div class="note">切換時段</div><div class="tabs">'+PRESETS.map((p,i)=>`<button class="tab" data-a="time" data-v="${i}">${p[1]}</button>`).join('')+'</div>';
     { const gq=save.gfx||'auto'; h+='<div class="note">畫質</div><div class="tabs">'+[['auto','自動'],['high','高'],['mid','中'],['low','低']].map(([k,n])=>`<button class="tab${gq===k?' on':''}" data-a="gfx" data-v="${k}">${n}</button>`).join('')+'</div><div class="note" style="font-size:12px">遊戲幀率上限 120 FPS，實際幀率取決於裝置與場景。所有畫質都保留全部特效（倒影、陰影、霧、光束、雨、水下光影）。高：特效全開、最高解析度。中、低：同樣的特效改用較省的版本（較低解析度、較少雨滴與水花、倒影與陰影較低頻率更新），換取流暢。自動（建議）：依實際幀率在這些等級之間調整，只改解析度與數量，不會造成切換卡頓。手機自動模式也限制貼圖記憶體；高畫質貼圖於下次開啟時載入。</div>'+`<div id="gfxLive" class="note" style="font-size:12px">${window.__gfxStatus?graphicsStatusText(window.__gfxStatus):'畫質初始化中'}</div>`; }
     { const n=window.__DIAG?window.__DIAG.count():0; h+=`<div class="note">問題回報（本次執行記錄 ${n} 筆錯誤）</div><div class="tabs"><button class="tab" data-a="diag" data-v="copy">📋 複製診斷摘要</button><button class="tab" data-a="diag" data-v="download">下載完整報告</button><button class="tab" data-a="diag" data-v="clear">清除記錄</button></div><div class="note" style="font-size:12px">摘要少於 1,000 字，適合貼訊息；完整報告包含前次中斷操作、貼圖尺寸、繪圖負載與錯誤堆疊。沒有 JS 錯誤不代表沒有系統中斷。</div>`; }
+    h+='<div class="note">畫面方向（直向、橫向都能玩；自動＝跟著手機轉）</div><div class="tabs">'+[['auto','自動'],['port','直向'],['land','橫向']].map(m=>`<button class="tab${(save.orient||'auto')===m[0]?' on':''}" data-a="orient" data-v="${m[0]}">${m[1]}</button>`).join('')+'</div>';
     h+='<div class="note">天氣</div><div class="tabs">'+[['auto','自動'],['clear','晴'],['breezy','有風'],['cloudy','陰'],['drizzle','毛毛雨'],['rain','雨'],['storm','雷雨'],['fog','霧']].map(w=>`<button class="tab${(save.wxMode||'auto')===w[0]?' on':''}" data-a="wx" data-v="${w[0]}">${w[1]}</button>`).join('')+'</div>';
     h+='<div class="note">釣魚難度（越難，金幣與經驗越多）</div><div class="tabs">'+Object.keys(DIFF).map(k=>`<button class="tab${(save.diff||'normal')===k?' on':''}" data-a="diff" data-v="${k}">${DIFF[k].n}</button>`).join('')+'</div>';
     h+='<div class="note">魚訊放大視窗（自動：休閒、標準開，硬派、專家關）</div><div class="tabs">'+[['auto','自動'],['on','開'],['off','關']].map(m=>`<button class="tab${(save.mag||'auto')===m[0]?' on':''}" data-a="mag" data-v="${m[0]}">${m[1]}</button>`).join('')+'</div>';
@@ -3804,6 +3812,7 @@ $('shX').addEventListener('click',close);
 sheet.addEventListener('click',e=>{ if(e.target===sheet) close(); });
 shB.addEventListener('click',e=>{
   const b=e.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a, v=b.dataset.v; Snd.init(); if(a==='diag'&&window.__DIAG){ if(v==='copy') window.__DIAG.copy().then(ok=>toast(ok?'已複製精簡摘要，可以直接貼上':'複製失敗，請截圖設定頁','good',2200)); else if(v==='download'){window.__DIAG.download();toast('已送出完整診斷報告','good',1800);}else { window.__DIAG.clear(); toast('已清除錯誤記錄','good',1200); } render(); return; }
+  if(a==='orient'){ save.orient=v; persist(); if(window.__applyOrient) window.__applyOrient(v,true); render(); return; }
   if(a==='gfx'){ save.gfx=v;save.gfxRecoveryVersion=1; persist(); if(window.__applyGfx) window.__applyGfx(v); toast('畫質：'+({auto:'自動',high:'高',mid:'中',low:'低'})[v],'good',1200); render(); return; } if(ECO.click(a,v,GEAR)){ render(); syncHUD(); return; }
   if(a==='tab') shopTab=v;
   else if(a==='buy'){ const it=GEAR[shopTab][+v]; if(save.coins<it.price){ toast('金幣不夠','bad'); return; }
@@ -8328,7 +8337,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261103092822'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261104012609'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
