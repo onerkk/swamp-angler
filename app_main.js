@@ -1,4 +1,4 @@
-/*APPV:20261104022726*/
+/*APPV:20261104024200*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -8270,9 +8270,20 @@ async function login(){ if(!window.FIREBASE_CFG){ c.toast('Google 登入尚未�
 async function logout(){ if(!auth) return; await push(); await auth.signOut(); localStorage.removeItem(KEY); c.toast('已登出，本機進度保留','',2000); }
 function docRef(){ return db.collection('saves').doc(user.uid); }
 // merge：正式存檔與測試存檔放在同一份文件的不同欄位，互相不覆蓋
-async function push(){ if(!user||!db||(TEST&&!owner)) return; try{ await docRef().set({[FIELD]:c.save(),[TFIELD]:Date.now(),name:user.displayName||'',v:1},{merge:true}); c.refresh&&c.refresh(); }catch(e){ console.warn('cloud push',e); } }
+/* 上傳保護（根治「登入後進度不見」）：
+   1. 這個帳號登入後，還沒把雲端讀回來比對之前，一律不上傳——以前登入的瞬間如果剛好觸發存檔，會先用本機（可能是清空後的 Lv 1）蓋掉雲端
+   2. 本機進度明顯比雲端低時拒絕上傳，不讓低進度蓋掉高進度
+   3. 每天第一次上傳時，把雲端原本那份另存成「每日備份」（保留 7 天，星期一到星期日各一份），救回存檔都找得到 */
+let pulledUid='', cloudLv=0, refusedToast=false;
+async function push(){ if(!user||!db||(TEST&&!owner)) return; if(pulledUid!==user.uid) return;
+  const cur=c.save(); if((cur.lv||1)<cloudLv){   /* 以等級判斷：花金幣、賣東西都不會讓等級下降，只有存檔被清掉、換成舊進度時才會 */ if(!refusedToast){ refusedToast=true; c.toast('⚠️ 本機進度比雲端低，不會覆蓋雲端。要用雲端進度請到設定按「救回存檔」','warn',5200); } return; }
+  try{ const day=new Date().getDay(), key='daily'+day+'_'+FIELD, today=new Date().toDateString(), upd={[FIELD]:cur,[TFIELD]:Date.now(),name:user.displayName||'',v:1};
+    if(lastDaily!==today){ const d=await docRef().get(); const D=d.exists?d.data():{}; if(D[FIELD]&&(!D[key+'_d']||D[key+'_d']!==today)){ upd[key]=D[FIELD]; upd[key+'_d']=today; } lastDaily=today; }
+    await docRef().set(upd,{merge:true}); cloudLv=Math.max(cloudLv,cur.lv||1); c.refresh&&c.refresh(); }catch(e){ console.warn('cloud push',e); } }
+let lastDaily='';
 // 登入當下：雲端沒有存檔 → 把本機進度存上去；雲端有而且進度較高 → 詢問；其他情況以本機為準
-async function onLogin(){ try{ const d=await docRef().get(); const local=c.save();
+async function onLogin(){ try{ const uid=user.uid; const d=await docRef().get(); const local=c.save(); const D=d.exists?d.data():{};
+    cloudLv=Math.max(0,...Object.keys(D).filter(k=>k===FIELD||k==='prev_'+FIELD||/^daily\d_/.test(k)&&!/_d$/.test(k)).map(k=>(D[k]&&D[k].lv)||0)); pulledUid=uid;   /* 讀回來比對過才開放上傳；記住雲端各份存檔中最高的進度 */
     if(!d.exists||!d.data()[FIELD]){ await push(); if(!TEST) c.toast('已把目前的進度存到雲端','good',2400); return; }
     const cloud=d.data()[FIELD]; if(JSON.stringify(cloud)===JSON.stringify(local)) return;
     const sl=score(local), sc=score(cloud);
@@ -8318,7 +8329,7 @@ if(TEST){ const go=()=>{ showGate(); if(window.FIREBASE_CFG) init().catch(()=>{}
 if(!TEST&&localStorage.getItem(KEY)==='1'&&window.FIREBASE_CFG) init().catch(()=>{});
 window.addEventListener('beforeunload',()=>{ if(user&&dirtyT){ clearTimeout(dirtyT); push(); } });
 async function rescue(){ if(!user){ c.toast('請先用 Google 登入','warn',2000); return; } try{ await init(); const d=await docRef().get(); const D=d.exists?d.data():{}; const C=[];
-    if(D[FIELD]) C.push(['雲端存檔',D[FIELD]]); if(D['prev_'+FIELD]) C.push(['雲端備份（被覆蓋前的那份）',D['prev_'+FIELD]]);
+    if(D[FIELD]) C.push(['雲端存檔',D[FIELD]]); if(D['prev_'+FIELD]) C.push(['雲端備份（被覆蓋前的那份）',D['prev_'+FIELD]]); for(let i=0;i<7;i++){ const k='daily'+i+'_'+FIELD; if(D[k]) C.push(['每日備份（'+(D[k+'_d']||'')+'）',D[k]]); }
     try{ const b=JSON.parse(localStorage.getItem(BK)||'null'); if(b) C.push(['本機備份',b]); }catch(e){}
     if(!TEST&&D.test){ const t=JSON.parse(JSON.stringify(D.test)); if(t.testSeeded){ t.coins=Math.min(t.coins||0,(D[FIELD]&&D[FIELD].coins)||0); delete t.testSeeded; } C.push(['測試帳號裡的進度副本（金幣不沿用）',t]); }
     if(!C.length){ c.toast('這個帳號找不到任何存檔','warn',2400); return; }
@@ -8343,7 +8354,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261104022726'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261104024200'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

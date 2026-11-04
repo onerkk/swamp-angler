@@ -33,9 +33,20 @@ async function login(){ if(!window.FIREBASE_CFG){ c.toast('Google 登入尚未�
 async function logout(){ if(!auth) return; await push(); await auth.signOut(); localStorage.removeItem(KEY); c.toast('已登出，本機進度保留','',2000); }
 function docRef(){ return db.collection('saves').doc(user.uid); }
 // merge：正式存檔與測試存檔放在同一份文件的不同欄位，互相不覆蓋
-async function push(){ if(!user||!db||(TEST&&!owner)) return; try{ await docRef().set({[FIELD]:c.save(),[TFIELD]:Date.now(),name:user.displayName||'',v:1},{merge:true}); c.refresh&&c.refresh(); }catch(e){ console.warn('cloud push',e); } }
+/* 上傳保護（根治「登入後進度不見」）：
+   1. 這個帳號登入後，還沒把雲端讀回來比對之前，一律不上傳——以前登入的瞬間如果剛好觸發存檔，會先用本機（可能是清空後的 Lv 1）蓋掉雲端
+   2. 本機進度明顯比雲端低時拒絕上傳，不讓低進度蓋掉高進度
+   3. 每天第一次上傳時，把雲端原本那份另存成「每日備份」（保留 7 天，星期一到星期日各一份），救回存檔都找得到 */
+let pulledUid='', cloudLv=0, refusedToast=false;
+async function push(){ if(!user||!db||(TEST&&!owner)) return; if(pulledUid!==user.uid) return;
+  const cur=c.save(); if((cur.lv||1)<cloudLv){   /* 以等級判斷：花金幣、賣東西都不會讓等級下降，只有存檔被清掉、換成舊進度時才會 */ if(!refusedToast){ refusedToast=true; c.toast('⚠️ 本機進度比雲端低，不會覆蓋雲端。要用雲端進度請到設定按「救回存檔」','warn',5200); } return; }
+  try{ const day=new Date().getDay(), key='daily'+day+'_'+FIELD, today=new Date().toDateString(), upd={[FIELD]:cur,[TFIELD]:Date.now(),name:user.displayName||'',v:1};
+    if(lastDaily!==today){ const d=await docRef().get(); const D=d.exists?d.data():{}; if(D[FIELD]&&(!D[key+'_d']||D[key+'_d']!==today)){ upd[key]=D[FIELD]; upd[key+'_d']=today; } lastDaily=today; }
+    await docRef().set(upd,{merge:true}); cloudLv=Math.max(cloudLv,cur.lv||1); c.refresh&&c.refresh(); }catch(e){ console.warn('cloud push',e); } }
+let lastDaily='';
 // 登入當下：雲端沒有存檔 → 把本機進度存上去；雲端有而且進度較高 → 詢問；其他情況以本機為準
-async function onLogin(){ try{ const d=await docRef().get(); const local=c.save();
+async function onLogin(){ try{ const uid=user.uid; const d=await docRef().get(); const local=c.save(); const D=d.exists?d.data():{};
+    cloudLv=Math.max(0,...Object.keys(D).filter(k=>k===FIELD||k==='prev_'+FIELD||/^daily\d_/.test(k)&&!/_d$/.test(k)).map(k=>(D[k]&&D[k].lv)||0)); pulledUid=uid;   /* 讀回來比對過才開放上傳；記住雲端各份存檔中最高的進度 */
     if(!d.exists||!d.data()[FIELD]){ await push(); if(!TEST) c.toast('已把目前的進度存到雲端','good',2400); return; }
     const cloud=d.data()[FIELD]; if(JSON.stringify(cloud)===JSON.stringify(local)) return;
     const sl=score(local), sc=score(cloud);
@@ -81,7 +92,7 @@ if(TEST){ const go=()=>{ showGate(); if(window.FIREBASE_CFG) init().catch(()=>{}
 if(!TEST&&localStorage.getItem(KEY)==='1'&&window.FIREBASE_CFG) init().catch(()=>{});
 window.addEventListener('beforeunload',()=>{ if(user&&dirtyT){ clearTimeout(dirtyT); push(); } });
 async function rescue(){ if(!user){ c.toast('請先用 Google 登入','warn',2000); return; } try{ await init(); const d=await docRef().get(); const D=d.exists?d.data():{}; const C=[];
-    if(D[FIELD]) C.push(['雲端存檔',D[FIELD]]); if(D['prev_'+FIELD]) C.push(['雲端備份（被覆蓋前的那份）',D['prev_'+FIELD]]);
+    if(D[FIELD]) C.push(['雲端存檔',D[FIELD]]); if(D['prev_'+FIELD]) C.push(['雲端備份（被覆蓋前的那份）',D['prev_'+FIELD]]); for(let i=0;i<7;i++){ const k='daily'+i+'_'+FIELD; if(D[k]) C.push(['每日備份（'+(D[k+'_d']||'')+'）',D[k]]); }
     try{ const b=JSON.parse(localStorage.getItem(BK)||'null'); if(b) C.push(['本機備份',b]); }catch(e){}
     if(!TEST&&D.test){ const t=JSON.parse(JSON.stringify(D.test)); if(t.testSeeded){ t.coins=Math.min(t.coins||0,(D[FIELD]&&D[FIELD].coins)||0); delete t.testSeeded; } C.push(['測試帳號裡的進度副本（金幣不沿用）',t]); }
     if(!C.length){ c.toast('這個帳號找不到任何存檔','warn',2400); return; }
