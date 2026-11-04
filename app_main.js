@@ -1,4 +1,4 @@
-/*APPV:20261104021549*/
+/*APPV:20261104022726*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -8260,7 +8260,12 @@ async function init(){ if(inited) return inited; if(!window.FIREBASE_CFG) return
   return inited; }
 async function login(){ if(!window.FIREBASE_CFG){ c.toast('Google 登入尚未設定（需要專案擁有者填入 Firebase 設定）','warn',3200); return; }
   if(busy) return; busy=true; try{ await init(); const p=new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({prompt:'select_account'});
-    try{ await auth.signInWithPopup(p); }catch(e){ if(/popup|blocked|cancelled|closed/i.test(e.code||'')) await auth.signInWithRedirect(p); else throw e; }
+    /* 只用彈出視窗登入。以前彈出失敗會改用「整頁跳轉」登入，但遊戲放在 GitHub Pages、登入輔助頁在 firebaseapp.com，
+       新版瀏覽器擋第三方儲存空間，跳轉回來讀不到登入結果，就一直要求重新登入（Firebase 官方文件說明的問題，建議改用彈出視窗） */
+    try{ await auth.signInWithPopup(p); }catch(e){ const code=e.code||'';
+      if(/popup-blocked/.test(code)) c.toast('瀏覽器擋住了登入視窗：請允許這個網站開啟彈出視窗，再按一次登入','warn',5200);
+      else if(/popup-closed|cancelled/.test(code)) c.toast('登入視窗被關掉了，再按一次登入就好','warn',3200);
+      else throw e; }
   }catch(e){ c.toast('登入失敗：'+(e.message||e),'bad',3200); } busy=false; }
 async function logout(){ if(!auth) return; await push(); await auth.signOut(); localStorage.removeItem(KEY); c.toast('已登出，本機進度保留','',2000); }
 function docRef(){ return db.collection('saves').doc(user.uid); }
@@ -8338,7 +8343,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261104021549'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261104022726'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

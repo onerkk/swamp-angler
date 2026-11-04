@@ -23,7 +23,12 @@ async function init(){ if(inited) return inited; if(!window.FIREBASE_CFG) return
   return inited; }
 async function login(){ if(!window.FIREBASE_CFG){ c.toast('Google 登入尚未設定（需要專案擁有者填入 Firebase 設定）','warn',3200); return; }
   if(busy) return; busy=true; try{ await init(); const p=new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({prompt:'select_account'});
-    try{ await auth.signInWithPopup(p); }catch(e){ if(/popup|blocked|cancelled|closed/i.test(e.code||'')) await auth.signInWithRedirect(p); else throw e; }
+    /* 只用彈出視窗登入。以前彈出失敗會改用「整頁跳轉」登入，但遊戲放在 GitHub Pages、登入輔助頁在 firebaseapp.com，
+       新版瀏覽器擋第三方儲存空間，跳轉回來讀不到登入結果，就一直要求重新登入（Firebase 官方文件說明的問題，建議改用彈出視窗） */
+    try{ await auth.signInWithPopup(p); }catch(e){ const code=e.code||'';
+      if(/popup-blocked/.test(code)) c.toast('瀏覽器擋住了登入視窗：請允許這個網站開啟彈出視窗，再按一次登入','warn',5200);
+      else if(/popup-closed|cancelled/.test(code)) c.toast('登入視窗被關掉了，再按一次登入就好','warn',3200);
+      else throw e; }
   }catch(e){ c.toast('登入失敗：'+(e.message||e),'bad',3200); } busy=false; }
 async function logout(){ if(!auth) return; await push(); await auth.signOut(); localStorage.removeItem(KEY); c.toast('已登出，本機進度保留','',2000); }
 function docRef(){ return db.collection('saves').doc(user.uid); }
