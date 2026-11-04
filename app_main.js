@@ -1,4 +1,4 @@
-/*APPV:20261104060038*/
+/*APPV:20261104061302*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -8276,7 +8276,7 @@ function docRef(){ return db.collection('saves').doc(user.uid); }
    2. 本機進度明顯比雲端低時拒絕上傳，不讓低進度蓋掉高進度
    3. 每天第一次上傳時，把雲端原本那份另存成「每日備份」（保留 7 天，星期一到星期日各一份），救回存檔都找得到 */
 let pulledUid='', cloudLv=0, refusedToast=false;
-async function push(){ if(!user||!db||(TEST&&!owner)) return; if(pulledUid!==user.uid) return;
+async function push(){ if(!user||!db||(TEST&&!owner)) return; if(pulledUid!==user.uid) return; if(window.__SAVE_LOCK) return;
   const cur=c.save(); if((cur.lv||1)<cloudLv){   /* 以等級判斷：花金幣、賣東西都不會讓等級下降，只有存檔被清掉、換成舊進度時才會 */ if(!refusedToast){ refusedToast=true; c.toast('⚠️ 本機進度比雲端低，不會覆蓋雲端。要用雲端進度請到設定按「救回存檔」','warn',5200); } return; }
   try{ const day=new Date().getDay(), key='daily'+day+'_'+FIELD, today=new Date().toDateString(), upd={[FIELD]:cur,[TFIELD]:Date.now(),name:user.displayName||'',v:1};
     if(lastDaily!==today){ const d=await docRef().get(); const D=d.exists?d.data():{}; if(D[FIELD]&&(!D[key+'_d']||D[key+'_d']!==today)){ upd[key]=D[FIELD]; upd[key+'_d']=today; } lastDaily=today; }
@@ -8367,7 +8367,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261104060038'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261104061302'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9923,7 +9923,7 @@ window.__SAVE_KEY=SAVE_KEY;
 let save={coins:0,total:0,sound:true,dex:{}};
 try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); if(s) save=Object.assign(save,s); }catch(e){}
 if(UNLOCK){ save.lv=Math.max(save.lv||1,60); save.coins=Math.max(save.coins||0,2000000); save.kayak=1; save.yacht=1; save.mer=Object.assign({n:20},save.mer||{}); if((save.mer.n||0)<20) save.mer.n=20; save.total=Math.max(save.total||0,500); save.intro=1; }
-function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} if(window.__CLOUD&&!UNLOCK) window.__CLOUD.dirty(); }   /* 全開測試的存檔絕不上傳雲端 */
+function persist(){ if(window.__SAVE_LOCK) return; try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} if(window.__CLOUD&&!UNLOCK) window.__CLOUD.dirty(); }   /* 全開測試的存檔絕不上傳雲端 */
 
 /* ---------- 音效（全程序合成） ---------- */
 const Snd=(()=>{
@@ -10523,7 +10523,11 @@ $('bHomeShop').addEventListener('click',openShop);
 window.__CLOUD=createCloud({save:()=>save,toast,test:TESTACC,
   grant:()=>{ if((save.coins||0)<999999){ save.coins=999999; setCoins(); META.syncHUD(); persist(); } toast('🧪 測試帳號：金幣 999,999','good',2600); },refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
   assistGrant:()=>{ if(window.__ASSIST&&window.__ASSIST.grant(save)){ setCoins(); META.syncHUD(); persist(); toast("輕鬆模式已啟用・全地圖開放・金幣 9,999,999","good",2800); } },
-  apply:obj=>{ if(window.__ASSIST) window.__ASSIST.grant(obj); try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} if(window.__DIAG)window.__DIAG.action('navigation','cloud-save-applied');location.reload(); }});
+  apply:obj=>{ if(window.__ASSIST) window.__ASSIST.grant(obj);
+    /* 根治「救回／補償／載入雲端之後還是舊進度」：以前只把新存檔寫進 localStorage 就重新整理，
+       但重新整理前遊戲的自動存檔又把記憶體裡的舊進度寫回去，新存檔被蓋掉。現在先把記憶體裡的存檔整個換成新的，再鎖住所有存檔寫入直到重新整理 */
+    try{ for(const k of Object.keys(save)) delete save[k]; Object.assign(save,JSON.parse(JSON.stringify(obj))); }catch(e){}
+    try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} window.__SAVE_LOCK=true; if(window.__DIAG)window.__DIAG.action('navigation','cloud-save-applied');location.reload(); }});
 const GHOST=createGhost(W,{toast:(m,c2,ms)=>toast(m,c2,ms),splash:(x,z,n,s)=>P.splash(x,0,z,n,s),ripple:(x,z,r)=>W.addRipple(x,z,r),splashSnd:k=>Snd.splash&&Snd.splash(k),save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>uiBusy()?'menu':G.state,base:()=>G.base,head:()=>G.head,yaw:()=>G.yaw,to:()=>G.to,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
 window.__GHOST=GHOST;
 // 烤好了：依兩面熟度評分，吃下去依魚的來源得到效果

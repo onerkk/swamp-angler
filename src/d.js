@@ -19,7 +19,7 @@ window.__SAVE_KEY=SAVE_KEY;
 let save={coins:0,total:0,sound:true,dex:{}};
 try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); if(s) save=Object.assign(save,s); }catch(e){}
 if(UNLOCK){ save.lv=Math.max(save.lv||1,60); save.coins=Math.max(save.coins||0,2000000); save.kayak=1; save.yacht=1; save.mer=Object.assign({n:20},save.mer||{}); if((save.mer.n||0)<20) save.mer.n=20; save.total=Math.max(save.total||0,500); save.intro=1; }
-function persist(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} if(window.__CLOUD&&!UNLOCK) window.__CLOUD.dirty(); }   /* 全開測試的存檔絕不上傳雲端 */
+function persist(){ if(window.__SAVE_LOCK) return; try{ localStorage.setItem(SAVE_KEY,JSON.stringify(save)); }catch(e){} if(window.__CLOUD&&!UNLOCK) window.__CLOUD.dirty(); }   /* 全開測試的存檔絕不上傳雲端 */
 
 /* ---------- 音效（全程序合成） ---------- */
 const Snd=(()=>{
@@ -619,7 +619,11 @@ $('bHomeShop').addEventListener('click',openShop);
 window.__CLOUD=createCloud({save:()=>save,toast,test:TESTACC,
   grant:()=>{ if((save.coins||0)<999999){ save.coins=999999; setCoins(); META.syncHUD(); persist(); } toast('🧪 測試帳號：金幣 999,999','good',2600); },refresh:()=>{ if(window.__SHEET&&window.__SHEET.refresh) window.__SHEET.refresh('set'); },
   assistGrant:()=>{ if(window.__ASSIST&&window.__ASSIST.grant(save)){ setCoins(); META.syncHUD(); persist(); toast("輕鬆模式已啟用・全地圖開放・金幣 9,999,999","good",2800); } },
-  apply:obj=>{ if(window.__ASSIST) window.__ASSIST.grant(obj); try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} if(window.__DIAG)window.__DIAG.action('navigation','cloud-save-applied');location.reload(); }});
+  apply:obj=>{ if(window.__ASSIST) window.__ASSIST.grant(obj);
+    /* 根治「救回／補償／載入雲端之後還是舊進度」：以前只把新存檔寫進 localStorage 就重新整理，
+       但重新整理前遊戲的自動存檔又把記憶體裡的舊進度寫回去，新存檔被蓋掉。現在先把記憶體裡的存檔整個換成新的，再鎖住所有存檔寫入直到重新整理 */
+    try{ for(const k of Object.keys(save)) delete save[k]; Object.assign(save,JSON.parse(JSON.stringify(obj))); }catch(e){}
+    try{ localStorage.setItem(SAVE_KEY,JSON.stringify(obj)); }catch(e){} window.__SAVE_LOCK=true; if(window.__DIAG)window.__DIAG.action('navigation','cloud-save-applied');location.reload(); }});
 const GHOST=createGhost(W,{toast:(m,c2,ms)=>toast(m,c2,ms),splash:(x,z,n,s)=>P.splash(x,0,z,n,s),ripple:(x,z,r)=>W.addRipple(x,z,r),splashSnd:k=>Snd.splash&&Snd.splash(k),save,persist:()=>persist(),period:()=>period(G.hour),loc:()=>G.loc||'lake',state:()=>uiBusy()?'menu':G.state,base:()=>G.base,head:()=>G.head,yaw:()=>G.yaw,to:()=>G.to,scream:()=>Snd.scream(),drip:()=>Snd.drip(),vib:p=>vib(p),shake:k=>{ G.gShake=k; },onMeet:()=>{ if(window.__STORY) window.__STORY.onMeet(); },storyDone:id=>!!(window.__STORY&&window.__STORY.done(id)),storyActive:id=>!!(window.__STORY&&window.__STORY.isActive&&window.__STORY.isActive(id)),moon:()=>window.__MOONPH?window.__MOONPH.illum():0,progOf:id=>window.__STORY&&window.__STORY.progOf?window.__STORY.progOf(id):null,say:t=>toast(t,'',3200),zone:()=>WL.zoneId(),scene:id=>{ if(window.__STORY) window.__STORY.onScene(id); }});
 window.__GHOST=GHOST;
 // 烤好了：依兩面熟度評分，吃下去依魚的來源得到效果

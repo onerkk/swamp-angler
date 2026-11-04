@@ -38,7 +38,7 @@ function docRef(){ return db.collection('saves').doc(user.uid); }
    2. 本機進度明顯比雲端低時拒絕上傳，不讓低進度蓋掉高進度
    3. 每天第一次上傳時，把雲端原本那份另存成「每日備份」（保留 7 天，星期一到星期日各一份），救回存檔都找得到 */
 let pulledUid='', cloudLv=0, refusedToast=false;
-async function push(){ if(!user||!db||(TEST&&!owner)) return; if(pulledUid!==user.uid) return;
+async function push(){ if(!user||!db||(TEST&&!owner)) return; if(pulledUid!==user.uid) return; if(window.__SAVE_LOCK) return;
   const cur=c.save(); if((cur.lv||1)<cloudLv){   /* 以等級判斷：花金幣、賣東西都不會讓等級下降，只有存檔被清掉、換成舊進度時才會 */ if(!refusedToast){ refusedToast=true; c.toast('⚠️ 本機進度比雲端低，不會覆蓋雲端。要用雲端進度請到設定按「救回存檔」','warn',5200); } return; }
   try{ const day=new Date().getDay(), key='daily'+day+'_'+FIELD, today=new Date().toDateString(), upd={[FIELD]:cur,[TFIELD]:Date.now(),name:user.displayName||'',v:1};
     if(lastDaily!==today){ const d=await docRef().get(); const D=d.exists?d.data():{}; if(D[FIELD]&&(!D[key+'_d']||D[key+'_d']!==today)){ upd[key]=D[FIELD]; upd[key+'_d']=today; } lastDaily=today; }

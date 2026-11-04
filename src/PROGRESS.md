@@ -7,6 +7,7 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 根治套用存檔被蓋回：c.apply 先換掉記憶體存檔並鎖住 persist／push（__SAVE_LOCK）再重整；已測 restoreBackup 重整後維持 Lv63
 - 雲端存檔保護（y.js push）：登入後讀回比對前不上傳（pulledUid）、本機等級低於雲端任一份就拒絕上傳（cloudLv）、每天第一次上傳把雲端舊份存成 daily<星期>_save（7 份）；救回存檔列出每日備份。Google 登入只用彈出視窗（不再 redirect）
 - 直向／橫向：manifest 改 any、設定「畫面方向 自動／直向／橫向」（screen.orientation.lock，需全螢幕，切換時自動開全螢幕）；橫向版面沿用既有 landscape CSS，已量測不重疊
 - 大眼鮪模型肚子朝上：m.js RFISH 新增 roll 選項翻正；全魚種背暗腹亮自動檢查，只有大眼鮪是反的
