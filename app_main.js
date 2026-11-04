@@ -1,4 +1,4 @@
-/*APPV:20261104024200*/
+/*APPV:20261104060038*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -3507,6 +3507,7 @@ document.addEventListener('fullscreenchange',()=>{ const m=(window.__SAVE||{}).o
 { const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>{ const m=(window.__SAVE||{}).orient||'auto'; if(m!=='auto') window.__applyOrient(m,true); }); }   /* 開始遊戲時套用上次選的方向（需要手勢） */
 // 依取得條件找裝備編號（Boss 獎勵發竿用）
 window.__GEARIDX=(k,req)=>GEAR[k].findIndex(x=>x.req===req);
+window.__GEARDEF=GEAR;   /* 擁有者補償用：依等級發裝備 */
 const BAITS=[
  {id:'worm',name:'蚯蚓',icon:'🪱',price:0,pack:0,lv:1,desc:'什麼魚都吃一點，用不完',aff:{prawn:1.5},rare:0,wait:1},
  {id:'corn',name:'甜玉米',icon:'🌽',price:60,pack:10,lv:1,desc:'鯉魚、草魚、鯽魚、印度鯪愛吃，咬口快',aff:{reba:2.2,bluegill:1.6,crappie:1.3,crucian:2.2,tilapia:1.8,carp:2.5,grasscarp:2.2,silvercarp:1.2,clarias:.5,mekong:1.5,yperch:.8,whitefish:.8,rabbit:1.8,scat:1.4},rare:-.2,wait:.75},
@@ -3671,7 +3672,7 @@ function render(){
       else if(st.state==='out') h+=row('☁️ 雲端存檔','用 Google 帳號登入，換手機或清除瀏覽器也不會丟進度。目前的本機進度會先上傳，不會被洗掉',`<button class="sbtn pri" data-a="cloud" data-v="in">Google 登入</button>`);
       else h+=row('☁️ 雲端存檔','Google 登入尚未設定',`<span class="lk">尚未設定</span>`);
       if(st.state==='in') h+=row('🛟 救回存檔','進度不見時用：檢查雲端存檔、雲端備份、本機備份，救回進度最高的那份',`<button class="sbtn" data-a="cloud" data-v="rescue">檢查並救回</button>`);
-      if(st.state==='in'&&window.__CLOUD.compensate&&st.owner) h+=row('🩹 一次性補償','存檔救不回時用：恢復 Lv 18、金幣、主線到終章前（圖鑑無法還原）',`<button class="sbtn" data-a="cloud" data-v="comp">恢復進度</button>`);
+      if(st.state==='in'&&window.__CLOUD.compensate&&st.owner) h+=row('🩹 一次性補償','存檔救不回時用：恢復到遺失前的 Lv 63、金幣、主線、魚王、裝備、標本館',`<button class="sbtn" data-a="cloud" data-v="comp">恢復進度</button>`);
       if(st.state==='in'&&window.__CLOUD.isTest&&window.__CLOUD.isTest()) h+=row('🧪 測試帳號','把正式版目前的進度複製過來覆蓋測試存檔（金幣維持 999,999）',`<button class="sbtn" data-a="cloud" data-v="copy">複製正式進度</button>`);
       h+=row('📘 新手指引','重新看一次每個按鈕的用途',`<button class="sbtn" data-a="tut">重看</button>`);
       h+=row('📲 安裝到桌面',PWA.installed()?'已安裝成 App，從桌面開啟時進度一樣保留':'像 App 一樣從手機桌面開啟，進度與瀏覽器共用',PWA.installed()?`<span class="lk">已安裝</span>`:`<button class="sbtn pri" data-a="pwa">安裝</button>`); }
@@ -8340,12 +8341,24 @@ async function rescue(){ if(!user){ c.toast('請先用 Google 登入','warn',200
   catch(e){ console.warn('rescue',e); c.toast('讀取雲端失敗，請稍後再試','warn',2400); } }
 // 一次性補償（只限擁有者）：存檔救不回時，把等級、金幣、劇情進度恢復到遺失前的狀態（圖鑑與魚獲紀錄無法還原）
 function compensate(){ if(!isOwner(user)){ c.toast('只有擁有者帳號可以使用','warn',2000); return; }
-  if(!confirm('把目前的存檔恢復成：Lv 18、金幣 999,999、主線到第七章與隱藏章節完成（終章「深淵之王」待觸發）、獨木舟與漁船已有、稱號「見習漁人」「守燈人」。\n目前的進度會先備份。確定嗎？')) return;
+  /* 2026-11-04 遺失前的狀態（依使用者截圖還原）：Lv 63、金幣 1,377,251、累積 586 尾、主線八章完成、擊敗五隻魚王、標本館八件大型標本 */
+  if(!confirm('把存檔恢復成遺失前的狀態：\nLv 63、金幣 1,377,251、主線八章完成、擊敗鱷雀鱔／鯰魚之王／旗魚王／大白鯊女王／滄淵、獨木舟與遊艇、Lv 63 以下的裝備、稱號、標本館八件大型標本。\n（天賦點數全部退回讓你重新分配；圖鑑以 32 種常見魚恢復）\n目前的進度會先備份。確定嗎？')) return;
   const s=JSON.parse(JSON.stringify(c.save())); try{ localStorage.setItem(BK,JSON.stringify(s)); }catch(e){}
-  s.lv=18; s.xp=0; s.coins=Math.max(s.coins||0,999999); s.kayak=true; s.yacht=true; s.tutDone=1; s.loaded=1;
-  s.story=s.story||{}; s.story.intro=1; s.story.done=['c1','c2','c3','c4','ice','c5','lantern','c6'];   /* 含隱藏章節「湖裡還有人等燈」 */ s.story.seen=s.story.seen||[]; s.story.read=s.story.read||[];
-  s.titles=Array.from(new Set([...(s.titles||[]),'見習漁人','守燈人'])); if(!s.title) s.title='守燈人';
-  s.spot=0; s.testSeeded=1; c.apply(s); setTimeout(push,1500); }
+  const P=window.__PROPS, SP=(P&&P.SPECIES)||[], G=window.__GEARDEF;
+  s.lv=63; s.xp=0; s.coins=Math.max(s.coins||0,1377251); s.total=Math.max(s.total||0,586); s.kayak=true; s.yacht=true; s.tutDone=1; s.loaded=1; s.spot=0;
+  s.story=s.story||{}; s.story.intro=1; s.story.done=Array.from(new Set([...(s.story.done||[]),'c1','c2','c3','c4','ice','c5','c6','c7'])); s.story.backfill=1; s.story.seen=s.story.seen||[]; s.story.read=s.story.read||[];
+  s.titles=Array.from(new Set([...(s.titles||[]),'見習漁人','湖畔好手','老練漁夫','傳說釣手','守湖宗師','鱷雀鱔獵人','鯰魚王者','怒海旗手','深海霸主','滄淵征服者','守湖人','老漁人的傳人'])); s.titleSel='老漁人的傳人'; s.title='老漁人的傳人';
+  s.boss=Object.assign({},s.boss||{},{gar:Math.max(1,(s.boss||{}).gar||0),flat:Math.max(1,(s.boss||{}).flat||0),marlin:Math.max(1,(s.boss||{}).marlin||0),gw:Math.max(1,(s.boss||{}).gw||0),king:Math.max(1,(s.boss||{}).king||0)});
+  s.baits=s.baits||{}; s.baits.moon=Math.max(s.baits.moon||0,3);
+  // 裝備：Lv 63 以下、不是魚王獎勵的全部擁有，裝上最好的
+  if(G){ s.gear=s.gear||{}; s.eq=s.eq||{}; for(const k of ['rod','line','reel']){ const own=[]; let best=0; (G[k]||[]).forEach((x,i)=>{ if(!x.req&&(x.lv||1)<=63){ own.push(i); if((x.lv||1)>=((G[k][best]||{}).lv||1)) best=i; } }); s.gear[k]=Array.from(new Set([...(s.gear[k]||[]),...own])); s.eq[k]=best; } }
+  // 圖鑑：等級需求最低的 32 種（遺失前是 32 種）
+  s.dex=s.dex||{}; SP.filter(x=>!x.item&&x.loc!=='tide').sort((a,b)=>(a.lv||0)-(b.lv||0)).slice(0,32).forEach(x=>{ s.dex[x.id]=s.dex[x.id]||1; });
+  // 標本館的八件大型標本（重量依截圖）
+  const big=[['gwhite',1544.6,6.76],['mekong',474.6],['arapaima',260.4],['marlin',265.7],['blackcarp',197.6],['gar',161.7],['shark',143.8],['flathead',83.7]], now=Date.now();
+  s.home=s.home||{}; s.home.mounts=s.home.mounts||[]; s.catchLog=s.catchLog||[];
+  big.forEach(([id,w,L],k)=>{ const sp=SP.find(x=>x.id===id); if(!sp) return; const len=L||(sp.len?sp.len[1]*.9/100:2); const rec={id,w,L:+len.toFixed(2),d:now-k*1000,t:now-k*1000,z:''}; if(!s.home.mounts.some(m=>m.id===id&&Math.abs(m.w-w)<.1)) s.home.mounts.push(rec); s.catchLog.push(Object.assign({},rec)); s.dex[id]=s.dex[id]||1; });
+  s.tal={}; s.testSeeded=1; c.apply(s); setTimeout(push,1500); }
 return {compensate,rescue,login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
 }
 /* ===== 安裝到桌面（PWA） ===== */
@@ -8354,7 +8367,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261104024200'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261104060038'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

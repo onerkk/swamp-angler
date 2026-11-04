@@ -265,6 +265,7 @@ document.addEventListener('fullscreenchange',()=>{ const m=(window.__SAVE||{}).o
 { const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>{ const m=(window.__SAVE||{}).orient||'auto'; if(m!=='auto') window.__applyOrient(m,true); }); }   /* 開始遊戲時套用上次選的方向（需要手勢） */
 // 依取得條件找裝備編號（Boss 獎勵發竿用）
 window.__GEARIDX=(k,req)=>GEAR[k].findIndex(x=>x.req===req);
+window.__GEARDEF=GEAR;   /* 擁有者補償用：依等級發裝備 */
 const BAITS=[
  {id:'worm',name:'蚯蚓',icon:'🪱',price:0,pack:0,lv:1,desc:'什麼魚都吃一點，用不完',aff:{prawn:1.5},rare:0,wait:1},
  {id:'corn',name:'甜玉米',icon:'🌽',price:60,pack:10,lv:1,desc:'鯉魚、草魚、鯽魚、印度鯪愛吃，咬口快',aff:{reba:2.2,bluegill:1.6,crappie:1.3,crucian:2.2,tilapia:1.8,carp:2.5,grasscarp:2.2,silvercarp:1.2,clarias:.5,mekong:1.5,yperch:.8,whitefish:.8,rabbit:1.8,scat:1.4},rare:-.2,wait:.75},
@@ -429,7 +430,7 @@ function render(){
       else if(st.state==='out') h+=row('☁️ 雲端存檔','用 Google 帳號登入，換手機或清除瀏覽器也不會丟進度。目前的本機進度會先上傳，不會被洗掉',`<button class="sbtn pri" data-a="cloud" data-v="in">Google 登入</button>`);
       else h+=row('☁️ 雲端存檔','Google 登入尚未設定',`<span class="lk">尚未設定</span>`);
       if(st.state==='in') h+=row('🛟 救回存檔','進度不見時用：檢查雲端存檔、雲端備份、本機備份，救回進度最高的那份',`<button class="sbtn" data-a="cloud" data-v="rescue">檢查並救回</button>`);
-      if(st.state==='in'&&window.__CLOUD.compensate&&st.owner) h+=row('🩹 一次性補償','存檔救不回時用：恢復 Lv 18、金幣、主線到終章前（圖鑑無法還原）',`<button class="sbtn" data-a="cloud" data-v="comp">恢復進度</button>`);
+      if(st.state==='in'&&window.__CLOUD.compensate&&st.owner) h+=row('🩹 一次性補償','存檔救不回時用：恢復到遺失前的 Lv 63、金幣、主線、魚王、裝備、標本館',`<button class="sbtn" data-a="cloud" data-v="comp">恢復進度</button>`);
       if(st.state==='in'&&window.__CLOUD.isTest&&window.__CLOUD.isTest()) h+=row('🧪 測試帳號','把正式版目前的進度複製過來覆蓋測試存檔（金幣維持 999,999）',`<button class="sbtn" data-a="cloud" data-v="copy">複製正式進度</button>`);
       h+=row('📘 新手指引','重新看一次每個按鈕的用途',`<button class="sbtn" data-a="tut">重看</button>`);
       h+=row('📲 安裝到桌面',PWA.installed()?'已安裝成 App，從桌面開啟時進度一樣保留':'像 App 一樣從手機桌面開啟，進度與瀏覽器共用',PWA.installed()?`<span class="lk">已安裝</span>`:`<button class="sbtn pri" data-a="pwa">安裝</button>`); }

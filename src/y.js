@@ -103,12 +103,24 @@ async function rescue(){ if(!user){ c.toast('請先用 Google 登入','warn',200
   catch(e){ console.warn('rescue',e); c.toast('讀取雲端失敗，請稍後再試','warn',2400); } }
 // 一次性補償（只限擁有者）：存檔救不回時，把等級、金幣、劇情進度恢復到遺失前的狀態（圖鑑與魚獲紀錄無法還原）
 function compensate(){ if(!isOwner(user)){ c.toast('只有擁有者帳號可以使用','warn',2000); return; }
-  if(!confirm('把目前的存檔恢復成：Lv 18、金幣 999,999、主線到第七章與隱藏章節完成（終章「深淵之王」待觸發）、獨木舟與漁船已有、稱號「見習漁人」「守燈人」。\n目前的進度會先備份。確定嗎？')) return;
+  /* 2026-11-04 遺失前的狀態（依使用者截圖還原）：Lv 63、金幣 1,377,251、累積 586 尾、主線八章完成、擊敗五隻魚王、標本館八件大型標本 */
+  if(!confirm('把存檔恢復成遺失前的狀態：\nLv 63、金幣 1,377,251、主線八章完成、擊敗鱷雀鱔／鯰魚之王／旗魚王／大白鯊女王／滄淵、獨木舟與遊艇、Lv 63 以下的裝備、稱號、標本館八件大型標本。\n（天賦點數全部退回讓你重新分配；圖鑑以 32 種常見魚恢復）\n目前的進度會先備份。確定嗎？')) return;
   const s=JSON.parse(JSON.stringify(c.save())); try{ localStorage.setItem(BK,JSON.stringify(s)); }catch(e){}
-  s.lv=18; s.xp=0; s.coins=Math.max(s.coins||0,999999); s.kayak=true; s.yacht=true; s.tutDone=1; s.loaded=1;
-  s.story=s.story||{}; s.story.intro=1; s.story.done=['c1','c2','c3','c4','ice','c5','lantern','c6'];   /* 含隱藏章節「湖裡還有人等燈」 */ s.story.seen=s.story.seen||[]; s.story.read=s.story.read||[];
-  s.titles=Array.from(new Set([...(s.titles||[]),'見習漁人','守燈人'])); if(!s.title) s.title='守燈人';
-  s.spot=0; s.testSeeded=1; c.apply(s); setTimeout(push,1500); }
+  const P=window.__PROPS, SP=(P&&P.SPECIES)||[], G=window.__GEARDEF;
+  s.lv=63; s.xp=0; s.coins=Math.max(s.coins||0,1377251); s.total=Math.max(s.total||0,586); s.kayak=true; s.yacht=true; s.tutDone=1; s.loaded=1; s.spot=0;
+  s.story=s.story||{}; s.story.intro=1; s.story.done=Array.from(new Set([...(s.story.done||[]),'c1','c2','c3','c4','ice','c5','c6','c7'])); s.story.backfill=1; s.story.seen=s.story.seen||[]; s.story.read=s.story.read||[];
+  s.titles=Array.from(new Set([...(s.titles||[]),'見習漁人','湖畔好手','老練漁夫','傳說釣手','守湖宗師','鱷雀鱔獵人','鯰魚王者','怒海旗手','深海霸主','滄淵征服者','守湖人','老漁人的傳人'])); s.titleSel='老漁人的傳人'; s.title='老漁人的傳人';
+  s.boss=Object.assign({},s.boss||{},{gar:Math.max(1,(s.boss||{}).gar||0),flat:Math.max(1,(s.boss||{}).flat||0),marlin:Math.max(1,(s.boss||{}).marlin||0),gw:Math.max(1,(s.boss||{}).gw||0),king:Math.max(1,(s.boss||{}).king||0)});
+  s.baits=s.baits||{}; s.baits.moon=Math.max(s.baits.moon||0,3);
+  // 裝備：Lv 63 以下、不是魚王獎勵的全部擁有，裝上最好的
+  if(G){ s.gear=s.gear||{}; s.eq=s.eq||{}; for(const k of ['rod','line','reel']){ const own=[]; let best=0; (G[k]||[]).forEach((x,i)=>{ if(!x.req&&(x.lv||1)<=63){ own.push(i); if((x.lv||1)>=((G[k][best]||{}).lv||1)) best=i; } }); s.gear[k]=Array.from(new Set([...(s.gear[k]||[]),...own])); s.eq[k]=best; } }
+  // 圖鑑：等級需求最低的 32 種（遺失前是 32 種）
+  s.dex=s.dex||{}; SP.filter(x=>!x.item&&x.loc!=='tide').sort((a,b)=>(a.lv||0)-(b.lv||0)).slice(0,32).forEach(x=>{ s.dex[x.id]=s.dex[x.id]||1; });
+  // 標本館的八件大型標本（重量依截圖）
+  const big=[['gwhite',1544.6,6.76],['mekong',474.6],['arapaima',260.4],['marlin',265.7],['blackcarp',197.6],['gar',161.7],['shark',143.8],['flathead',83.7]], now=Date.now();
+  s.home=s.home||{}; s.home.mounts=s.home.mounts||[]; s.catchLog=s.catchLog||[];
+  big.forEach(([id,w,L],k)=>{ const sp=SP.find(x=>x.id===id); if(!sp) return; const len=L||(sp.len?sp.len[1]*.9/100:2); const rec={id,w,L:+len.toFixed(2),d:now-k*1000,t:now-k*1000,z:''}; if(!s.home.mounts.some(m=>m.id===id&&Math.abs(m.w-w)<.1)) s.home.mounts.push(rec); s.catchLog.push(Object.assign({},rec)); s.dex[id]=s.dex[id]||1; });
+  s.tal={}; s.testSeeded=1; c.apply(s); setTimeout(push,1500); }
 return {compensate,rescue,login,logout,dirty,status,isTest:()=>TEST,copyMain:()=>copyMain(false),restoreBackup:()=>{ const b=localStorage.getItem(BK); if(!b){ c.toast('沒有備份','warn',1600); return; } c.apply(JSON.parse(b)); }};
 }
 /* ===== 安裝到桌面（PWA） ===== */
