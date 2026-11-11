@@ -12,7 +12,9 @@
   注意：測試腳本裡不要用 pkill -f／pgrep -f 比對自己命令列裡出現的字串，會把自己的 shell 殺掉
 - 雲端存檔第二版七個情境全部驗證通過（登入上傳、連續存檔、失敗顯示與補傳、清除瀏覽紀錄後救回、換新手機、登入讀不到雲端、舊格式轉換；皆無重複重新整理）
 - 遊艇引擎聲 Snd.engine(on,spd,thr)（d.js，程序合成；駕駛座才發動，updateKayak 每幀更新）
-- 待做：FPS（登入畫面與各地圖）——使用者 2026-11-11 要求，先量測再改
+- FPS（進行中，分支 wip-fps，未上 main）：光束在鏡頭靜止時每三幀才重算（godrays.js reuse）、開始畫面載入期間背景每三幀畫一次（d.js loadingIntro）。兩項都沒有錯誤，但畫面是否完全一致還沒驗證到（連續幀的差異被水面動畫蓋過，要改成凍結時間再比）。
+  量測（浮萍灣，高畫質）：進遊戲後每幀 179 次繪製、49 萬三角形；場景裡倒木 30 萬、樹樁 23 萬、石頭 14 萬三角形，48 個投影物共 76 萬三角形 → 下一步查這些高面數模型的遠近簡化為什麼沒生效（或只在 18 公尺外才換）
+  其他地圖（月光灣、近海、冰湖）還沒量到；需要使用者在實機上分別關掉「抗鋸齒（TAA）」「光束」回報 FPS，確認這兩項佔多少
 - 第一次進入卡頓：新增 window.__WARM（b.js）——所有 GLTF 模型載完立刻在 4×4 小畫布畫一次把幾何送上顯示卡、貼圖 initTexture；TextureLoader 載完（下一個 tick）initTexture；GLTFLoader/TextureLoader 在 d.js 全域包裝。已有：REALDONE 時全場 compile + initTexture、換地點 compile 暖身
 - 根治套用存檔被蓋回：c.apply 先換掉記憶體存檔並鎖住 persist／push（__SAVE_LOCK）再重整；已測 restoreBackup 重整後維持 Lv63
 - 雲端存檔保護（y.js push）：登入後讀回比對前不上傳（pulledUid）、本機等級低於雲端任一份就拒絕上傳（cloudLv）、每天第一次上傳把雲端舊份存成 daily<星期>_save（7 份）；救回存檔列出每日備份。Google 登入只用彈出視窗（不再 redirect）
