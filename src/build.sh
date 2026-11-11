@@ -26,15 +26,15 @@ BUILDSTAMP
 sed -i "s/__APP_BUILD__/$STAMP/" ../app_main.js
 { cat a.html; cat <<LOADER
 <script>
-/* 主程式載入器：先試 CDN（快），檢查版本號一致才執行；不一致或失敗就改從本站下載。依序執行兩個檔案 */
-(function(){ var V='$STAMP', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
+/* 主程式載入器：直接從本站下載（外部 CDN 已停用：倉庫超過 50 MB，jsDelivr 一律拒絕）。
+   下載失敗會自動重試三次（間隔拉長），再不行就改用一般的 script 標籤載入；全部失敗才顯示錯誤並提供重試按鈕 */
+(function(){ var V='$STAMP', F=['app_scan.js','app_main.js'];
   var note=function(t){ var e=document.getElementById('loadTip'); if(e&&t) e.textContent=t; };
   function run(code){ var b=new Blob([code],{type:'text/javascript'}), s=document.createElement('script'); s.src=URL.createObjectURL(b); return new Promise(function(ok){ s.onload=ok; s.onerror=ok; document.body.appendChild(s); }); }
-  function get(u){ return fetch(u,{cache:'no-cache'}).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }); }
-  function one(f){ var local=function(){ return get(f+'?v='+V); };
-    var p=useCdn?get(CDN+f).then(function(t){ if(t.indexOf('/*APPV:'+V+'*/')!==0) throw new Error('stale'); return t; }).catch(local):local();
-    return p.then(run); }
-  note('正在下載遊戲主程式…'); one(F[0]).then(function(){ return one(F[1]); }).catch(function(e){ var x=document.getElementById('loadErr'); if(x){ x.style.display='block'; x.textContent='⚠️ 主程式下載失敗：'+e+'，請重新整理'; } });
+  function get(u){ return fetch(u).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }).then(function(t){ if(t.indexOf('/*APPV:'+V+'*/')!==0) throw new Error('版本不符'); return t; }); }
+  function tag(f){ return new Promise(function(ok,no){ var s=document.createElement('script'); s.src=f+'?v='+V+'&t='+Date.now(); s.onload=ok; s.onerror=function(){ no(new Error('連不上伺服器')); }; document.body.appendChild(s); }); }
+  function one(f,n){ n=n||0; return get(f+'?v='+V+(n?'&r='+n:'')).then(run).catch(function(e){ if(n<3){ note('網路不穩，重新下載中…（第 '+(n+1)+' 次）'); return new Promise(function(ok){ setTimeout(ok,[800,2500,6000][n]); }).then(function(){ return one(f,n+1); }); } return tag(f); }); }
+  note('正在下載遊戲主程式…'); one(F[0]).then(function(){ return one(F[1]); }).catch(function(e){ var x=document.getElementById('loadErr'); if(x){ x.style.display='block'; x.innerHTML='⚠️ 主程式下載失敗（'+(e&&e.message||e)+'）。請確認網路後 <button onclick=\"location.reload()\" style=\"padding:6px 14px;border-radius:999px;border:0;background:#efc04c;font-weight:800\">重新載入</button>'; } });
 })();
 </script>
 </body></html>

@@ -331,7 +331,9 @@ body[data-fishing-state="wait"] #top2,body[data-fishing-state="lure"] #top2{opac
 <script>
 /* 模型、貼圖、音效改從全球 CDN（jsDelivr，直接鏡像這個 GitHub 倉庫）下載：有些電信網路連 GitHub 只有每秒幾十 KB，85MB 要等半小時以上。
    下載失敗時自動改回 GitHub 本站，並記住，下次直接用本站 */
-window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:localStorage.getItem('swampAngler.cdn')!=='off',
+/* 2026-11-11 停用：jsDelivr 對超過 50 MB 的倉庫一律回 403（Package size exceeded the configured limit of 50 MB），這個遊戲早就超過了。
+   每次開遊戲都先白白失敗一次才改用本站，網路不穩時連主程式都下載失敗、卡在開始畫面。現在全部直接從本站下載 */
+window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:false,
   url(u){ try{ if(!this.on||!u||/^(https?:|data:|blob:)/.test(u)||!/\.(glb|jpg|jpeg|png|webp|hdr|mp3)(\?|$)/i.test(u)) return u; return this.base+u.replace(/^\.?\//,''); }catch(e){ return u; } },
   fail(u){ if(this.on&&u&&u.indexOf(this.base)===0){ this.on=false; try{ localStorage.setItem('swampAngler.cdn','off'); }catch(e){} console.warn('CDN 下載失敗，改用本站',u); } }};
 </script>
@@ -439,15 +441,15 @@ window.addEventListener('unhandledrejection',e=>{ try{ const r=e.reason, m=(r&&(
 function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classList.remove('hidden');}
 </script>
 <script>
-/* 主程式載入器：先試 CDN（快），檢查版本號一致才執行；不一致或失敗就改從本站下載。依序執行兩個檔案 */
-(function(){ var V='20261111120753', CDN='https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@dc37ba346c48166ac3b93faaf4984f08a17ed5ce/', F=['app_scan.js','app_main.js'], useCdn=localStorage.getItem('swampAngler.cdn')!=='off';
+/* 主程式載入器：直接從本站下載（外部 CDN 已停用：倉庫超過 50 MB，jsDelivr 一律拒絕）。
+   下載失敗會自動重試三次（間隔拉長），再不行就改用一般的 script 標籤載入；全部失敗才顯示錯誤並提供重試按鈕 */
+(function(){ var V='20261111123119', F=['app_scan.js','app_main.js'];
   var note=function(t){ var e=document.getElementById('loadTip'); if(e&&t) e.textContent=t; };
   function run(code){ var b=new Blob([code],{type:'text/javascript'}), s=document.createElement('script'); s.src=URL.createObjectURL(b); return new Promise(function(ok){ s.onload=ok; s.onerror=ok; document.body.appendChild(s); }); }
-  function get(u){ return fetch(u,{cache:'no-cache'}).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }); }
-  function one(f){ var local=function(){ return get(f+'?v='+V); };
-    var p=useCdn?get(CDN+f).then(function(t){ if(t.indexOf('/*APPV:'+V+'*/')!==0) throw new Error('stale'); return t; }).catch(local):local();
-    return p.then(run); }
-  note('正在下載遊戲主程式…'); one(F[0]).then(function(){ return one(F[1]); }).catch(function(e){ var x=document.getElementById('loadErr'); if(x){ x.style.display='block'; x.textContent='⚠️ 主程式下載失敗：'+e+'，請重新整理'; } });
+  function get(u){ return fetch(u).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }).then(function(t){ if(t.indexOf('/*APPV:'+V+'*/')!==0) throw new Error('版本不符'); return t; }); }
+  function tag(f){ return new Promise(function(ok,no){ var s=document.createElement('script'); s.src=f+'?v='+V+'&t='+Date.now(); s.onload=ok; s.onerror=function(){ no(new Error('連不上伺服器')); }; document.body.appendChild(s); }); }
+  function one(f,n){ n=n||0; return get(f+'?v='+V+(n?'&r='+n:'')).then(run).catch(function(e){ if(n<3){ note('網路不穩，重新下載中…（第 '+(n+1)+' 次）'); return new Promise(function(ok){ setTimeout(ok,[800,2500,6000][n]); }).then(function(){ return one(f,n+1); }); } return tag(f); }); }
+  note('正在下載遊戲主程式…'); one(F[0]).then(function(){ return one(F[1]); }).catch(function(e){ var x=document.getElementById('loadErr'); if(x){ x.style.display='block'; x.innerHTML='⚠️ 主程式下載失敗（'+(e&&e.message||e)+'）。請確認網路後 <button onclick=\"location.reload()\" style=\"padding:6px 14px;border-radius:999px;border:0;background:#efc04c;font-weight:800\">重新載入</button>'; } });
 })();
 </script>
 </body></html>

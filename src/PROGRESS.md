@@ -7,6 +7,7 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-11 卡在開始畫面：jsDelivr 對超過 50 MB 的倉庫回 403，CDN 路徑已全部停用（a.html __CDN.on=false、build.sh 載入器只走本站：重試三次→script 標籤→顯示重新載入按鈕）。推送流程不必再做「Pin game scripts」那一步
 - 雲端存檔第二版（y.js，2026-11-11）：存檔壓成字串欄位 m2s（gzip+base64；測試帳號 t2s），備份 m2p、每日 m2d0..6；讀取新舊欄位取高分；上傳有 20 秒逾時、失敗顯示原因並重試、每次開遊戲第一次上傳後讀回核對；登入讀不到雲端就重試且不上傳；dirty 改節流（6 秒內必送）；開始畫面 #cloudLine 與設定頁顯示同步狀態、設定新增「立即同步」；舊格式欄位在新格式核對成功後清掉。
   驗證工具：/tmp/cloud_e2e.py（假 Firebase＋會檢查 1MiB／40000 索引上限的假伺服器；容器重置後要重寫，做法：route gstatic firebase-*-compat.js 回傳假的 firebase 物件，expose_function 當伺服器）
   注意：測試腳本裡不要用 pkill -f／pgrep -f 比對自己命令列裡出現的字串，會把自己的 shell 殺掉
