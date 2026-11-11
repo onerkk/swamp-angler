@@ -426,7 +426,8 @@ function render(){
     h+=tg('sound','音效','環境聲、捲線器、水花',Snd.isOn());
     h+=tg('vibe','震動','咬餌、拉扯時的手機震動',save.vibe!==false);
     { const st=window.__CLOUD?window.__CLOUD.status():{state:'nocfg'};
-      if(st.state==='in') h+=row('☁️ 雲端存檔','已登入 '+st.name+'，進度會自動同步到你的 Google 帳號',`<button class="sbtn" data-a="cloud" data-v="out">登出</button>`);
+      if(st.state==='in'){ h+=row('☁️ 雲端存檔','已登入 '+st.name+'<br><span style="color:'+(st.sync==='error'?'#ffb4a8':st.sync==='pending'?'#efc04c':'#9fe0b0')+'">'+(st.detail||'')+'</span>',`<button class="sbtn" data-a="cloud" data-v="out">登出</button>`);
+        h+=row('🔄 立即同步','馬上把進度存到雲端，並從雲端讀回來核對。換手機、清除瀏覽紀錄之前按一下，看到「已確認」才算存好',`<button class="sbtn pri" data-a="cloud" data-v="sync">立即同步</button>`); }
       else if(st.state==='out') h+=row('☁️ 雲端存檔','用 Google 帳號登入，換手機或清除瀏覽器也不會丟進度。目前的本機進度會先上傳，不會被洗掉',`<button class="sbtn pri" data-a="cloud" data-v="in">Google 登入</button>`);
       else h+=row('☁️ 雲端存檔','Google 登入尚未設定',`<span class="lk">尚未設定</span>`);
       if(st.state==='in') h+=row('🛟 救回存檔','進度不見時用：檢查雲端存檔、雲端備份、本機備份，救回進度最高的那份',`<button class="sbtn" data-a="cloud" data-v="rescue">檢查並救回</button>`);
@@ -608,7 +609,7 @@ shB.addEventListener('click',e=>{
   else if(a==='tg'){ if(v==='sound'){ Snd.set(!Snd.isOn()); save.sound=Snd.isOn(); } else if(v==='imm'){ save.imm=!save.imm; document.body.classList.toggle('immersive',save.imm); } else if(v==='scare'){ save.noScare=!save.noScare; } else if(v==='fps'){save.fps=save.fps===false;if(window.__setFPSVisible)window.__setFPSVisible(save.fps);} else save[v]=!(save[v]!==false); persist(); }
   else if(a==='diff'){ save.diff=v; persist(); toast('釣魚難度：'+DIFF[v].n); }
   else if(a==='shop'){ if(window.__SHOP) window.__SHOP(); }
-  else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else if(v==='rescue') window.__CLOUD.rescue(); else if(v==='comp') window.__CLOUD.compensate(); else if(v==='copy') window.__CLOUD.copyMain(); else window.__CLOUD.logout(); }
+  else if(a==='cloud'){ if(v==='in') window.__CLOUD.login(); else if(v==='rescue') window.__CLOUD.rescue(); else if(v==='sync') window.__CLOUD.syncNow(); else if(v==='comp') window.__CLOUD.compensate(); else if(v==='copy') window.__CLOUD.copyMain(); else window.__CLOUD.logout(); }
   else if(a==='tut'){ const sh=document.getElementById('sheet'); if(sh) sh.classList.add('hidden'); setTimeout(()=>startTutorial(true),300); return; }
   else if(a==='pwa'){ PWA.install().then(r=>{ if(r==='ios') toast('iPhone：按 Safari 的「分享」→「加入主畫面」','',4200); else if(r==='manual') toast('瀏覽器選單 ⋮ →「加到主畫面」或「安裝應用程式」','',4200); else if(r==='installed') toast('已經安裝了','',1600); }); }
   else if(a==='reset'){ if(!resetArm) resetArm=true; else { try{ localStorage.removeItem(window.__SAVE_KEY||'swampAngler.v1'); }catch(_){} if(window.__DIAG)window.__DIAG.action('navigation','user-reset');location.reload(); return; } }

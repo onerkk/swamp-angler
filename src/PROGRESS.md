@@ -7,6 +7,10 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 雲端存檔第二版（y.js，2026-11-11）：存檔壓成字串欄位 m2s（gzip+base64；測試帳號 t2s），備份 m2p、每日 m2d0..6；讀取新舊欄位取高分；上傳有 20 秒逾時、失敗顯示原因並重試、每次開遊戲第一次上傳後讀回核對；登入讀不到雲端就重試且不上傳；dirty 改節流（6 秒內必送）；開始畫面 #cloudLine 與設定頁顯示同步狀態、設定新增「立即同步」；舊格式欄位在新格式核對成功後清掉。
+  驗證工具：/tmp/cloud_e2e.py（假 Firebase＋會檢查 1MiB／40000 索引上限的假伺服器；容器重置後要重寫，做法：route gstatic firebase-*-compat.js 回傳假的 firebase 物件，expose_function 當伺服器）
+  注意：測試腳本裡不要用 pkill -f／pgrep -f 比對自己命令列裡出現的字串，會把自己的 shell 殺掉
+- 待做：FPS（登入畫面與各地圖）——使用者 2026-11-11 要求，下一段先量測再改
 - 第一次進入卡頓：新增 window.__WARM（b.js）——所有 GLTF 模型載完立刻在 4×4 小畫布畫一次把幾何送上顯示卡、貼圖 initTexture；TextureLoader 載完（下一個 tick）initTexture；GLTFLoader/TextureLoader 在 d.js 全域包裝。已有：REALDONE 時全場 compile + initTexture、換地點 compile 暖身
 - 根治套用存檔被蓋回：c.apply 先換掉記憶體存檔並鎖住 persist／push（__SAVE_LOCK）再重整；已測 restoreBackup 重整後維持 Lv63
 - 雲端存檔保護（y.js push）：登入後讀回比對前不上傳（pulledUid）、本機等級低於雲端任一份就拒絕上傳（cloudLv）、每天第一次上傳把雲端舊份存成 daily<星期>_save（7 份）；救回存檔列出每日備份。Google 登入只用彈出視窗（不再 redirect）
