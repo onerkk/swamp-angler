@@ -4,7 +4,7 @@
    原專案靠深度與上一幀的鏡頭做重投影，鏡頭在動也能用；我們的主畫面沒有深度，所以只在鏡頭靜止時累積，
    鏡頭一動就立刻只用當下這一幀（不會拖影）。會動的東西（水波、魚、浮標）用 YCoCg 色彩空間的 3×3 鄰域裁切，
    歷史顏色超出當下鄰域範圍就被拉回來，避免殘影。只在高畫質開 */
-function createTAA({renderer:R}){
+function createTAA({renderer:R,grab}){
   const T=THREE, size=new T.Vector2(), oc=new T.OrthographicCamera(-1,1,1,-1,0,1), quad=new T.PlaneGeometry(2,2);
   let cur=null, hist=[null,null], hi=0, w=0, h=0, frame=0, still=0, valid=false; const lastCam=new T.Matrix4(), savedP=new T.Matrix4();
   const halton=(i,b)=>{ let f=1,r=0; while(i>0){ f/=b; r+=f*(i%b); i=Math.floor(i/b); } return r; };
@@ -36,9 +36,9 @@ function createTAA({renderer:R}){
   function resolve(camera,on){ if(camera.__taaJ){ camera.projectionMatrix.copy(savedP); camera.projectionMatrixInverse.copy(savedP).invert(); camera.__taaJ=false; }
     if(!on||still<2){ valid=false; return false; } ensure();
     const prev=R.getRenderTarget(), ac=R.autoClear, tone=R.toneMapping, enc=R.outputEncoding;
-    try{ R.copyFramebufferToTexture(new T.Vector2(0,0),cur);
+    try{ const curTex=grab?grab():(R.copyFramebufferToTexture(new T.Vector2(0,0),cur),cur);
       R.toneMapping=T.NoToneMapping; R.outputEncoding=T.LinearEncoding; R.autoClear=true;
-      const src=hist[hi], dst=hist[1-hi]; u.tCur.value=cur; u.tHist.value=src.texture; u.uTexel.value.set(1/w,1/h); u.uAlpha.value=valid?.12:1;
+      const src=hist[hi], dst=hist[1-hi]; u.tCur.value=curTex; u.tHist.value=src.texture; u.uTexel.value.set(1/w,1/h); u.uAlpha.value=valid?.12:1;
       R.setRenderTarget(dst); R.render(sResolve,oc); hi=1-hi; valid=true;
       copyMat.uniforms.tSrc.value=dst.texture; R.setRenderTarget(null); R.autoClear=false; R.render(sCopy,oc);
     } finally { R.toneMapping=tone; R.outputEncoding=enc; R.autoClear=ac; R.setRenderTarget(prev); }

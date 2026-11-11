@@ -714,9 +714,16 @@ function renderRefl(){
 
 const optics=createWaterOptics(U);
 const submerged=createSubmergedRenderer({renderer,scene,camera,U,WU});
-const godRays=createGodRays({renderer,camera,U}), _grCol=new T.Color(), _grDir=new T.Vector3();
+const godRays=createGodRays({renderer,camera,U,grab:()=>frameGrab.get()}), _grCol=new T.Color(), _grDir=new T.Vector3();
 /* 光束的強度：白天看太陽高度（晨昏最明顯、正午很淡）、雲量；夜裡改用月光，弱很多。只在高畫質畫 */
-const taa=createTAA({renderer});
+/* 畫面複製共用：時間抗鋸齒與光束都要先把畫好的畫面複製成貼圖。以前各複製一次（整張畫面兩次），現在同一幀只複製一次、兩邊共用 */
+const frameGrab=(()=>{ let tex=null,w=0,h=0,stamp=-1,no=0; const size=new T.Vector2(), zero=new T.Vector2(0,0);
+  return { next(){ no++; }, get(){ renderer.getDrawingBufferSize(size); const W=Math.floor(size.x),H=Math.floor(size.y);
+      if(!tex||W!==w||H!==h){ if(tex) tex.dispose(); w=W; h=H; const fmt=(renderer.getContext().getContextAttributes()||{}).alpha===false?T.RGBFormat:T.RGBAFormat; tex=new T.DataTexture(null,w,h,fmt); tex.minFilter=tex.magFilter=T.LinearFilter; tex.generateMipmaps=false; stamp=-1; }
+      if(stamp!==no){ renderer.copyFramebufferToTexture(zero,tex); stamp=no; frameGrab.copies++; } return tex; },
+    release(){ if(tex){ tex.dispose(); tex=null; } w=h=0; stamp=-1; }, copies:0 }; })();
+const introEl=document.getElementById('intro'); const introOn=()=>!!(introEl&&!introEl.classList.contains('hidden'));   /* 開始畫面還蓋著的時候，後處理效果看不出來，不用算 */
+const taa=createTAA({renderer,grab:()=>frameGrab.get()});
 /* 暖身：任何新載入的模型／貼圖，載完立刻送上顯示卡。以前要等它第一次出現在畫面上才上傳（診斷裡「幾何上傳 +79、貼圖上傳 +36」那種 0.5 秒卡頓）。
    做法：把物件暫時放進一個只有它的小場景，用 4×4 的畫布畫一次（只上傳幾何，幾乎不花填色時間），貼圖用 initTexture 先上傳；畫完放回原位 */
 const warmScene=new T.Scene(), warmRT=new T.WebGLRenderTarget(4,4), warmCam=new T.PerspectiveCamera(60,1,.01,1000), warmBasic=new T.MeshBasicMaterial();
@@ -727,11 +734,11 @@ window.__WARM=function(obj){ if(!obj||!renderer.initTexture) return; const paren
     const prev=renderer.getRenderTarget(), ac=renderer.autoClear; renderer.setRenderTarget(warmRT); renderer.autoClear=true; renderer.render(warmScene,warmCam); renderer.setRenderTarget(prev); renderer.autoClear=ac; }
   catch(e){ console.warn('warm',e); }
   finally{ warmScene.remove(obj); if(parent){ parent.add(obj); if(idx>=0&&idx<parent.children.length-1){ parent.children.splice(parent.children.indexOf(obj),1); parent.children.splice(idx,0,obj); } } obj.visible=vis; for(const [o,c] of cul) o.frustumCulled=c; } };
-function taaOn(){ return materialQuality.tier==='high'&&!window.__noTAA&&!(window.__SAVE&&window.__SAVE.taa===false); }   /* 時間抗鋸齒：高畫質才開，設定裡可關 */
-function raysOn(){ return materialQuality.tier==='high'&&!window.__noRays&&!(window.__SAVE&&window.__SAVE.rays===false); }   /* 設定裡可以關掉 */
+function taaOn(){ return materialQuality.tier==='high'&&!window.__noTAA&&!(window.__SAVE&&window.__SAVE.taa===false)&&!introOn(); }   /* 時間抗鋸齒：高畫質才開，設定裡可關 */
+function raysOn(){ return materialQuality.tier==='high'&&!window.__noRays&&!(window.__SAVE&&window.__SAVE.rays===false)&&!introOn(); }   /* 設定裡可以關掉 */
 function raysParams(){ if(!raysOn()) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
-  if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); return {dir:_grDir,color:_grCol,strength:Math.min(.7,vis*(.08+.62*low*low)),thresh:.6}; }
-  const mk=U.uMoonK?U.uMoonK.value:0; if(mk>.05&&U.uMoonDir){ _grDir.copy(U.uMoonDir.value).normalize(); _grCol.setRGB(.62,.72,.95); return {dir:_grDir,color:_grCol,strength:mk*.45,thresh:.16}; }
+  if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); const st=Math.min(.7,vis*(.08+.62*low*low)); if(st<.1) return null;   /* 弱到看不出來（太陽仰角高於約 30 度、或陰天）就不算 */ return {dir:_grDir,color:_grCol,strength:st,thresh:.6}; }
+  const mk=U.uMoonK?U.uMoonK.value:0; if(mk>.05&&U.uMoonDir){ _grDir.copy(U.uMoonDir.value).normalize(); _grCol.setRGB(.62,.72,.95); if(mk*.45<.1) return null; return {dir:_grDir,color:_grCol,strength:mk*.45,thresh:.16}; }
   return null; }
 const radiance=createSceneRadiance(T,renderer,prepareScene),interiorReflection=createInteriorReflection(T,renderer);let lastShadow=-Infinity;
 /* 戶外陰影：太陽方向、鏡頭位置與朝向都沒變的時候（等魚咬餌、看風景），每 0.5 秒才重算一次；一有變化就照原本的頻率。
@@ -745,6 +752,7 @@ function render(){prepareScene(scene);const oldEnv=scene.environment;if(window._
   const shadowNow=renderer.shadowMap.needsUpdate;
   pass('sub',()=>submerged.render());
   if(reflEnabled){try{pass('refl',renderRefl);}catch(e){reflEnabled=false;WU.uReflOn.value=0;console.warn('refl off',e);}}
+  frameGrab.next();
   { const on=taaOn(); try{ taa.begin(camera,on); }catch(e){ window.__noTAA=true; } }
   pass('main',()=>radiance.render(scene,camera));
   { const on=taaOn(); try{ taa.resolve(camera,on); }catch(e){ window.__noTAA=true; console.warn('taa off',e); } }
@@ -756,7 +764,7 @@ function render(){prepareScene(scene);const oldEnv=scene.environment;if(window._
 const passStats=window.__passStats={sub:{ms:0,calls:0,tris:0},refl:{ms:0,calls:0,tris:0},main:{ms:0,calls:0,tris:0,shadow:false,shadowSize:0}};
 function pass(name,fn){const info=renderer.info,c0=info.render.calls,t0=info.render.triangles,n0=performance.now();fn();const st=passStats[name];st.ms=+(performance.now()-n0).toFixed(2);st.calls=info.render.calls-c0;st.tris=info.render.triangles-t0;}
 
-function suspendEffects(){if(typeof godRays!=='undefined')godRays.release();if(typeof taa!=='undefined')taa.release();releaseSceneGPU(scene);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}lastShadow=-Infinity;reflRT.setSize(4,4);WU.uReflOn.value=0;submerged.target.setSize(4,4);WU.uSubmergedOn.value=0;radiance.release();}
+function suspendEffects(){if(typeof godRays!=='undefined')godRays.release();if(typeof taa!=='undefined')taa.release();if(typeof frameGrab!=='undefined')frameGrab.release();releaseSceneGPU(scene);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}lastShadow=-Infinity;reflRT.setSize(4,4);WU.uReflOn.value=0;submerged.target.setSize(4,4);WU.uSubmergedOn.value=0;radiance.release();}
 function resetGraphics(){suspendEffects();if(envRT){envRT.dispose();envRT=null;scene.environment=null;}envJobs.reset();invalidateEnvironment();}
 function setIce(on){water.visible=!on;seaGrid.visible=!on;}
 function setSea(on){ seaMode=on; U.uSea.value=on?1:0; seaGrid.visible=water.visible; if(on){ WU.uDeep.value.set(.006,.03,.06); WU.uScatter.value.set(.02,.10,.12); } else { WU.uDeep.value.set(.010,.019,.011); WU.uScatter.value.set(.018,.045,.026); } }

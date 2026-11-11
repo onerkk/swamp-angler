@@ -76,7 +76,27 @@ const Snd=(()=>{
     music={bus,id:0}; music.id=setInterval(tick,120); tick(); }
   function musicStop(){ if(!music) return; const m=music; music=null; clearInterval(m.id); try{ m.bus.gain.setTargetAtTime(0,ctx.currentTime,.5); }catch(_){} setTimeout(()=>{ try{ m.bus.disconnect(); }catch(_){} },3000); }
   function setIndoor(on){indoor=!!on;if(outdoor)outdoor.gain.setTargetAtTime(indoor?0:1,ctx.currentTime,.12);if(indoor){reelLoop(0,1);musicStart();}else musicStop();}
-  return { init,setIndoor, isOn:()=>on, set(v){ on=v; if(out) out.gain.value=v?.8:0; },
+  /* 遊艇引擎聲（全程序合成，跟著船速即時變化）：
+     · 柴油雙引擎的低頻隆隆聲：兩個鋸齒波（基音與五度）加一個低八度正弦，過低通濾波；再用一個低頻振盪調變音量，做出「咚咚咚」的運轉節奏
+     · 轉速跟著油門與船速：怠速約 42 Hz、全速約 100 Hz，節奏也從慢到快，濾波隨轉速打開（聲音變亮、變吵）
+     · 破浪的水聲：雜訊過帶通濾波，音量跟船速平方成正比——停著只有引擎怠速，開快了水聲才蓋上來
+     只有站在駕駛座時發動；回到釣位就熄火（下錨釣魚），進小屋也會關 */
+  let eng=null;
+  function engine(onE,spd,thr){ if(!ctx||!outdoor||!nb) return; spd=Math.max(0,Math.min(1,spd||0)); thr=Math.max(0,Math.min(1,thr||0));
+    if(!eng){ if(!onE) return; const g=ctx.createGain(); g.gain.value=0; g.connect(outdoor);
+      const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=200; lp.Q.value=.9; const am=ctx.createGain(); am.gain.value=.7;
+      const o1=ctx.createOscillator(), o2=ctx.createOscillator(), sub=ctx.createOscillator(), lfo=ctx.createOscillator(), lg=ctx.createGain(), sg=ctx.createGain(), o2g=ctx.createGain();
+      o1.type='sawtooth'; o2.type='sawtooth'; sub.type='sine'; lfo.type='sine'; lg.gain.value=.3; sg.gain.value=.9; o2g.gain.value=.45;
+      lfo.connect(lg); lg.connect(am.gain); o1.connect(lp); o2.connect(o2g); o2g.connect(lp); sub.connect(sg); sg.connect(am); lp.connect(am); am.connect(g);
+      const ns=ctx.createBufferSource(); ns.buffer=nb; ns.loop=true; const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=600; bp.Q.value=.6; const wg=ctx.createGain(); wg.gain.value=0; ns.connect(bp); bp.connect(wg); wg.connect(outdoor);
+      for(const n of [o1,o2,sub,lfo,ns]) n.start(); eng={g,lp,o1,o2,sub,lfo,ns,bp,wg,offT:null}; }
+    const t=ctx.currentTime, rpm=.16+.84*Math.max(spd,thr*.65), f=42+rpm*58;
+    eng.o1.frequency.setTargetAtTime(f,t,.3); eng.o2.frequency.setTargetAtTime(f*1.5,t,.3); eng.sub.frequency.setTargetAtTime(f*.5,t,.3);
+    eng.lfo.frequency.setTargetAtTime(7+rpm*19,t,.3); eng.lp.frequency.setTargetAtTime(170+rpm*640,t,.35);
+    eng.g.gain.setTargetAtTime(onE?.05+.12*rpm:0,t,onE?.3:.45); eng.wg.gain.setTargetAtTime(onE?.02*spd+.2*spd*spd:0,t,.4); eng.bp.frequency.setTargetAtTime(480+950*spd,t,.4);
+    if(onE){ if(eng.offT){ clearTimeout(eng.offT); eng.offT=null; } }
+    else if(!eng.offT){ const e=eng; e.offT=setTimeout(()=>{ if(eng===e) eng=null; for(const n of [e.o1,e.o2,e.sub,e.lfo,e.ns]){ try{ n.stop(); }catch(_){} } try{ e.g.disconnect(); e.wg.disconnect(); }catch(_){} },2200); } }
+  return { init,setIndoor,engine, isOn:()=>on, set(v){ on=v; if(out) out.gain.value=v?.8:0; },
     whoosh:outdoors(function(){ nz(.4,'bandpass',2400,.9,.18,500); }),
     splash:outdoors(function(s){ s=s||1; if(sample('splash',Math.min(1,.25+.45*s),.85+Math.random()*.3+(s<.5?.25:0))) return; nz(.18+.3*s,'bandpass',1100,.7,.22*s,400); nz(.35+.4*s,'lowpass',700,.5,.16*s); tn(140,.12,'sine',.12*s,0,60); }),
     plop:outdoors(function(){ tn(320,.09,'sine',.14,0,120); nz(.06,'bandpass',1800,2,.05); }),
@@ -748,7 +768,7 @@ const boatStationButton=document.createElement('button');boatStationButton.id='b
 function switchBoatStation(){if(!SPOTS[G.spot].yacht||G.state!=='idle')return;G.boatStation=G.boatStation==='helm'?'fishing':'helm';KY.v=KY.w=KY.thr=KY.turn=0;G.yaw=G.yawT=0;toast(G.boatStation==='helm'?'駕駛座：搖桿控制航行，停船後返回側舷釣位':'船艉側舷釣位：已停船，向船外拋竿');}
 boatStationButton.addEventListener('click',switchBoatStation);
 function updateKayak(dt){
-  if(HOME3D.active()){ boatStationButton.hidden=true;joy.classList.remove('hidden'); return; }
+  if(HOME3D.active()){ boatStationButton.hidden=true;joy.classList.remove('hidden'); Snd.engine(false,0,0); return; }
   const s=SPOTS[G.spot], can=(s.kayak||(s.yacht&&G.boatStation==='helm'))&&G.state==='idle'&&!document.body.classList.contains('catching');
   joy.classList.toggle('hidden',!can);
   const z=s.kayak?zoneOf(G.base.x,G.base.z):G.spot; if(z!==KY.zone){ KY.zone=z; WL.setZone(z); }
@@ -756,6 +776,7 @@ function updateKayak(dt){
   let thr=KY.thr, turn=KY.turn;
   if(keys.KeyW) thr=1; if(keys.KeyS) thr=-.6; if(keys.KeyA) turn=-1; if(keys.KeyD) turn=1;
   if(!can){ thr=0; turn=0; if(s.yacht){KY.v=0;KY.w=0;} }
+  Snd.engine(!!s.yacht&&G.boatStation==='helm'&&G.state!=='travel',Math.abs(KY.v)/22,Math.abs(thr));   /* 遊艇引擎聲：站上駕駛座發動，船速越快越響 */
   if(!s.kayak&&!s.yacht){ KY.v=0; KY.w=0; G.boatV=0; G.boatW=0; WL.paddle(dt,0); stowRod(WL.padOn()); return; }
   KY.v+=(thr*(s.yacht?13.2:1.5)-KY.v*(s.yacht?.6:.65))*dt;   /* 遊艇雙引擎全速約每秒 22 公尺（約 43 節，運動型釣魚遊艇的極速），約 4 秒內衝到八成；獨木舟約 2.3 公尺 */ KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
   WL.paddle(dt,s.yacht?0:clamp(Math.max(Math.abs(thr),Math.abs(turn)*.7),0,1),AT.ring);   // 遊艇靠引擎，不划槳

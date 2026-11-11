@@ -4,7 +4,7 @@
    原專案用深度貼圖判斷天空；我們的主畫面直接畫到螢幕、沒有深度貼圖，所以改成把畫好的畫面複製一份（四分之一解析度），
    用亮度判斷亮天空：樹幹、小屋、遠山這些暗的東西自然擋住光，縫隙裡透出來的天光形成光柱。
    只在高畫質開，中低畫質不畫，不影響流暢度 */
-function createGodRays({renderer:R,camera,U}){
+function createGodRays({renderer:R,camera,U,grab}){
   const T=THREE, size=new T.Vector2(), sun=new T.Vector3(), ndc=new T.Vector3(), fwd=new T.Vector3();
   let copyTex=null, rt=null, cw=0, ch=0;
   const quadGeo=new T.PlaneGeometry(2,2), oc=new T.OrthographicCamera(-1,1,1,-1,0,1);
@@ -47,9 +47,10 @@ function createGodRays({renderer:R,camera,U}){
     ensure(); R.getDrawingBufferSize(size);
     const prevRT=R.getRenderTarget(), ac=R.autoClear, tone=R.toneMapping, enc=R.outputEncoding;
     try{
-      R.copyFramebufferToTexture(new T.Vector2(0,0),copyTex);
+      /* 戶外主畫面用共用的那份複製（跟時間抗鋸齒同一份）；小屋有自己的鏡頭與畫面，要自己複製一次 */
+      const srcTex=(grab&&!o.camera)?grab():(R.copyFramebufferToTexture(new T.Vector2(0,0),copyTex),copyTex);
       if(o.point) u.uHorizon.value=-1; else { const hz=ndc.clone(); fwd.y=0; if(fwd.lengthSq()>1e-6){ fwd.normalize(); hz.copy(sun).addScaledVector(fwd,2000).project(cam); u.uHorizon.value=hz.y*.5+.5; } else u.uHorizon.value=-1; }
-      u.tSrc.value=copyTex; u.uSun.value.set(sx,sy); u.uAspect.value=size.x/size.y; u.uThresh.value=o.thresh||.72; u.uDither.value=(frame++%8)/8;
+      u.tSrc.value=srcTex; u.uSun.value.set(sx,sy); u.uAspect.value=size.x/size.y; u.uThresh.value=o.thresh||.72; u.uDither.value=(frame++%8)/8;
       R.toneMapping=T.NoToneMapping; R.outputEncoding=T.LinearEncoding;
       R.setRenderTarget(rt); R.autoClear=true; R.render(marchScene,oc);
       R.setRenderTarget(prevRT); R.autoClear=false; u.tRays.value=rt.texture; u.uStrength.value=strength*fade; u.uCol.value.copy(o.color); R.render(addScene,oc);
