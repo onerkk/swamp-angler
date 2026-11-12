@@ -38,7 +38,10 @@ function createGeometryLOD(){
   for(const m of list){const full=fullOf.get(m.geometry)||m.geometry,e=lodOf.get(full),lod=e&&e.far;if(!lod)continue;const mid=e.mid||full;
    if(!full.boundingSphere)full.computeBoundingSphere();pos.setFromMatrixPosition(m.matrixWorld);const r=full.boundingSphere?full.boundingSphere.radius*Math.max(m.matrixWorld.getMaxScaleOnAxis(),1e-3):0,dd=Math.max(0,pos.distanceTo(cam)-r);
    let want=m.geometry;
-   if(dd>d*1.15)want=lod;else if(dd<d){if(fullD===0)want=mid;else if(dd<fullD)want=full;else if(dd>fullD*1.15)want=mid;else want=m.geometry===lod?mid:m.geometry;}else if(m.geometry===lod)want=lod;
+   if(dd>d*1.15)want=lod;else if(dd<d){if(fullD===0)want=mid;else if(dd<fullD)want=full;else if(dd>fullD*1.15)want=mid;else want=m.geometry===lod?mid:m.geometry;}
+   /* 緩衝帶（切換距離～再遠 15%）：原本只寫「已經是簡化版就維持」，一開始就落在這段距離的物件會永遠停在原檔（實測 21～23 公尺外的枯木、樹樁還在用 6～8 萬面）。
+      現在緩衝帶裡最多只用中間版，沒有中間版就用簡化版 */
+   else want=m.geometry===lod?lod:(e.mid||lod);
    m.geometry=want;if(m.geometry===lod)f++;else n++;}
   stats.near=n;stats.far=f;
  }

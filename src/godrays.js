@@ -6,7 +6,7 @@
    只在高畫質開，中低畫質不畫，不影響流暢度 */
 function createGodRays({renderer:R,camera,U,grab}){
   const T=THREE, size=new T.Vector2(), sun=new T.Vector3(), ndc=new T.Vector3(), fwd=new T.Vector3();
-  let copyTex=null, rt=null, cw=0, ch=0;
+  let copyTex=null, rt=null, cw=0, ch=0, raysRT=null, lastCam=null, tick=0; const lastM=new T.Matrix4();
   const quadGeo=new T.PlaneGeometry(2,2), oc=new T.OrthographicCamera(-1,1,1,-1,0,1);
   const u={tSrc:{value:null},tRays:{value:null},uSun:{value:new T.Vector2(.5,.5)},uAspect:{value:1},uStrength:{value:0},uCol:{value:new T.Color(1,.9,.7)},uThresh:{value:.72},uDither:{value:0},uHorizon:{value:-1}};
   const VS='varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0); }';
@@ -43,16 +43,20 @@ function createGodRays({renderer:R,camera,U,grab}){
     cam.getWorldPosition(sun); cam.getWorldDirection(fwd); const dir=o.point?ndc.copy(o.point).sub(sun).normalize().clone():o.dir; if(fwd.dot(dir)<.05) return false;
     if(o.point) ndc.copy(o.point).project(cam); else ndc.copy(sun).addScaledVector(dir,1000).project(cam); const sx=ndc.x*.5+.5, sy=ndc.y*.5+.5;
     const edge=Math.max(Math.abs(ndc.x),Math.abs(ndc.y)), fade=1-Math.min(1,Math.max(0,(edge-1.1)/.9));
-    if(fade<=0) return false;
+    if(fade<=0||strength*fade<.04) return false;   /* 淡到看不出來就整個不做（正午、太陽在畫面邊緣外） */
     ensure(); R.getDrawingBufferSize(size);
+    /* 鏡頭沒動時（等魚咬餌、看風景），光束的形狀幾乎不變：每三幀才重算一次，中間兩幀直接沿用上一張光束圖疊上去。
+       鏡頭一動就每幀重算，不會有光束跟不上畫面的情形。畫面相同，等魚時省下三分之二的光束運算 */
+    const moved=lastCam!==cam||!cam.matrixWorld.equals(lastM); lastCam=cam; lastM.copy(cam.matrixWorld); tick=(tick+1)%3; const reuse=!moved&&tick!==0&&raysRT===rt;
     const prevRT=R.getRenderTarget(), ac=R.autoClear, tone=R.toneMapping, enc=R.outputEncoding;
     try{
       /* 戶外主畫面用共用的那份複製（跟時間抗鋸齒同一份）；小屋有自己的鏡頭與畫面，要自己複製一次 */
-      const srcTex=(grab&&!o.camera)?grab():(R.copyFramebufferToTexture(new T.Vector2(0,0),copyTex),copyTex);
+      if(!reuse){ const srcTex=(grab&&!o.camera)?grab():(R.copyFramebufferToTexture(new T.Vector2(0,0),copyTex),copyTex);
       if(o.point) u.uHorizon.value=-1; else { const hz=ndc.clone(); fwd.y=0; if(fwd.lengthSq()>1e-6){ fwd.normalize(); hz.copy(sun).addScaledVector(fwd,2000).project(cam); u.uHorizon.value=hz.y*.5+.5; } else u.uHorizon.value=-1; }
       u.tSrc.value=srcTex; u.uSun.value.set(sx,sy); u.uAspect.value=size.x/size.y; u.uThresh.value=o.thresh||.72; u.uDither.value=(frame++%8)/8;
       R.toneMapping=T.NoToneMapping; R.outputEncoding=T.LinearEncoding;
-      R.setRenderTarget(rt); R.autoClear=true; R.render(marchScene,oc);
+      R.setRenderTarget(rt); R.autoClear=true; R.render(marchScene,oc); raysRT=rt; }
+      R.toneMapping=T.NoToneMapping; R.outputEncoding=T.LinearEncoding;
       R.setRenderTarget(prevRT); R.autoClear=false; u.tRays.value=rt.texture; u.uStrength.value=strength*fade; u.uCol.value.copy(o.color); R.render(addScene,oc);
     } finally { R.autoClear=ac; R.toneMapping=tone; R.outputEncoding=enc; R.setRenderTarget(prevRT); }
     return true; }

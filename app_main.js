@@ -1,4 +1,4 @@
-/*APPV:20261112130418*/
+/*APPV:20261112141500*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -53,7 +53,10 @@ function createGeometryLOD(){
   for(const m of list){const full=fullOf.get(m.geometry)||m.geometry,e=lodOf.get(full),lod=e&&e.far;if(!lod)continue;const mid=e.mid||full;
    if(!full.boundingSphere)full.computeBoundingSphere();pos.setFromMatrixPosition(m.matrixWorld);const r=full.boundingSphere?full.boundingSphere.radius*Math.max(m.matrixWorld.getMaxScaleOnAxis(),1e-3):0,dd=Math.max(0,pos.distanceTo(cam)-r);
    let want=m.geometry;
-   if(dd>d*1.15)want=lod;else if(dd<d){if(fullD===0)want=mid;else if(dd<fullD)want=full;else if(dd>fullD*1.15)want=mid;else want=m.geometry===lod?mid:m.geometry;}else if(m.geometry===lod)want=lod;
+   if(dd>d*1.15)want=lod;else if(dd<d){if(fullD===0)want=mid;else if(dd<fullD)want=full;else if(dd>fullD*1.15)want=mid;else want=m.geometry===lod?mid:m.geometry;}
+   /* 緩衝帶（切換距離～再遠 15%）：原本只寫「已經是簡化版就維持」，一開始就落在這段距離的物件會永遠停在原檔（實測 21～23 公尺外的枯木、樹樁還在用 6～8 萬面）。
+      現在緩衝帶裡最多只用中間版，沒有中間版就用簡化版 */
+   else want=m.geometry===lod?lod:(e.mid||lod);
    m.geometry=want;if(m.geometry===lod)f++;else n++;}
   stats.near=n;stats.far=f;
  }
@@ -901,7 +904,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={createSubmergedRe
    只在高畫質開，中低畫質不畫，不影響流暢度 */
 function createGodRays({renderer:R,camera,U,grab}){
   const T=THREE, size=new T.Vector2(), sun=new T.Vector3(), ndc=new T.Vector3(), fwd=new T.Vector3();
-  let copyTex=null, rt=null, cw=0, ch=0;
+  let copyTex=null, rt=null, cw=0, ch=0, raysRT=null, lastCam=null, tick=0; const lastM=new T.Matrix4();
   const quadGeo=new T.PlaneGeometry(2,2), oc=new T.OrthographicCamera(-1,1,1,-1,0,1);
   const u={tSrc:{value:null},tRays:{value:null},uSun:{value:new T.Vector2(.5,.5)},uAspect:{value:1},uStrength:{value:0},uCol:{value:new T.Color(1,.9,.7)},uThresh:{value:.72},uDither:{value:0},uHorizon:{value:-1}};
   const VS='varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0); }';
@@ -938,16 +941,20 @@ function createGodRays({renderer:R,camera,U,grab}){
     cam.getWorldPosition(sun); cam.getWorldDirection(fwd); const dir=o.point?ndc.copy(o.point).sub(sun).normalize().clone():o.dir; if(fwd.dot(dir)<.05) return false;
     if(o.point) ndc.copy(o.point).project(cam); else ndc.copy(sun).addScaledVector(dir,1000).project(cam); const sx=ndc.x*.5+.5, sy=ndc.y*.5+.5;
     const edge=Math.max(Math.abs(ndc.x),Math.abs(ndc.y)), fade=1-Math.min(1,Math.max(0,(edge-1.1)/.9));
-    if(fade<=0) return false;
+    if(fade<=0||strength*fade<.04) return false;   /* 淡到看不出來就整個不做（正午、太陽在畫面邊緣外） */
     ensure(); R.getDrawingBufferSize(size);
+    /* 鏡頭沒動時（等魚咬餌、看風景），光束的形狀幾乎不變：每三幀才重算一次，中間兩幀直接沿用上一張光束圖疊上去。
+       鏡頭一動就每幀重算，不會有光束跟不上畫面的情形。畫面相同，等魚時省下三分之二的光束運算 */
+    const moved=lastCam!==cam||!cam.matrixWorld.equals(lastM); lastCam=cam; lastM.copy(cam.matrixWorld); tick=(tick+1)%3; const reuse=!moved&&tick!==0&&raysRT===rt;
     const prevRT=R.getRenderTarget(), ac=R.autoClear, tone=R.toneMapping, enc=R.outputEncoding;
     try{
       /* 戶外主畫面用共用的那份複製（跟時間抗鋸齒同一份）；小屋有自己的鏡頭與畫面，要自己複製一次 */
-      const srcTex=(grab&&!o.camera)?grab():(R.copyFramebufferToTexture(new T.Vector2(0,0),copyTex),copyTex);
+      if(!reuse){ const srcTex=(grab&&!o.camera)?grab():(R.copyFramebufferToTexture(new T.Vector2(0,0),copyTex),copyTex);
       if(o.point) u.uHorizon.value=-1; else { const hz=ndc.clone(); fwd.y=0; if(fwd.lengthSq()>1e-6){ fwd.normalize(); hz.copy(sun).addScaledVector(fwd,2000).project(cam); u.uHorizon.value=hz.y*.5+.5; } else u.uHorizon.value=-1; }
       u.tSrc.value=srcTex; u.uSun.value.set(sx,sy); u.uAspect.value=size.x/size.y; u.uThresh.value=o.thresh||.72; u.uDither.value=(frame++%8)/8;
       R.toneMapping=T.NoToneMapping; R.outputEncoding=T.LinearEncoding;
-      R.setRenderTarget(rt); R.autoClear=true; R.render(marchScene,oc);
+      R.setRenderTarget(rt); R.autoClear=true; R.render(marchScene,oc); raysRT=rt; }
+      R.toneMapping=T.NoToneMapping; R.outputEncoding=T.LinearEncoding;
       R.setRenderTarget(prevRT); R.autoClear=false; u.tRays.value=rt.texture; u.uStrength.value=strength*fade; u.uCol.value.copy(o.color); R.render(addScene,oc);
     } finally { R.autoClear=ac; R.toneMapping=tone; R.outputEncoding=enc; R.setRenderTarget(prevRT); }
     return true; }
@@ -8520,7 +8527,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261112130418'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261112141500'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -11270,12 +11277,16 @@ let homeWarmAt=0;
 /* 標本館：一公尺以上的標本照真實大小吊掛展示（從小屋進去） */
 const TROPHY_HALL=createTrophyHall(W);
 { const hb=document.getElementById('bHall'); if(hb) hb.addEventListener('click',()=>{ Snd.init&&Snd.init(); TROPHY_HALL.enter(); }); }
+const introEl=document.getElementById('intro');
 function frame(now){
   const frameSeconds=frameLimiter.step(now);if(frameSeconds===null){requestAnimationFrame(frame);return;}
   if(graphicsRecovery.paused()||document.hidden||screenCapture.paused()){frameLimiter.reset(now);requestAnimationFrame(frame);return;}const dt=Math.min(.05,frameSeconds);window.__frameSeconds=frameSeconds;
   // Resolution changes clear the drawing buffer: apply them BEFORE drawing this frame.
   gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?HOME3D.qualityScope():UW.active()?'underwater':G.loc||'lake'});
-  if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.rodGroup.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(typeof TROPHY_HALL!=='undefined'&&TROPHY_HALL.active()) TROPHY_HALL.render(dt); else if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { if(window.__GEOLOD) window.__GEOLOD.update(W.scene,W.camera,dt,window.__effectTier); W.render(); LURE.renderPiP(W.renderer,dt); } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
+  if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.rodGroup.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(typeof TROPHY_HALL!=='undefined'&&TROPHY_HALL.active()) TROPHY_HALL.render(dt); else if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { if(window.__GEOLOD) window.__GEOLOD.update(W.scene,W.camera,dt,window.__effectTier);
+      /* 開始畫面、場景還在載入時：背景（蓋在說明文字後面的湖景）每三幀才畫一次，把時間讓給下載、解碼、上傳貼圖——載入更快，開始畫面也不會卡成 20 幾幀。載完或按下開始就恢復每幀都畫 */
+      const loadingIntro=!window.__REALDONE&&typeof introEl!=='undefined'&&introEl&&!introEl.classList.contains('hidden'); window.__introTick=((window.__introTick||0)+1)%3;
+      if(!loadingIntro||window.__introTick===0){ W.render(); LURE.renderPiP(W.renderer,dt); } } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
   if(HOME3D.active()){if(!homeWarmAt)homeWarmAt=now;if(homeWarmAt>0&&now-homeWarmAt>5000){homeWarmAt=-1;if(window.__DIAG)window.__DIAG.action('home','done','5 seconds rendered');}}else homeWarmAt=0;if(window.__DIAG)window.__DIAG.stage('render');screenCapture.afterFrame();fpsDisplay.frame(frameSeconds);if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
 
   // 預先編譯著色器：換地點後 1.5 秒，在背景一次把場景裡所有材質（包含還沒出現的魚、特效）編譯好，
