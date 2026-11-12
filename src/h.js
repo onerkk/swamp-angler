@@ -8,7 +8,7 @@ const SETS={
  lake:{pre:'env_',mask:'env_mask.png',meta:{dawn:{u:.3633,el:6.33,exp:.252,lc:[1.0,.72,.52],li:1.2,light:.7},day:{u:.3496,el:5.62,exp:1.0,lc:[1.0,.86,.7],li:2.4,light:1},night:{u:.6865,el:44.3,exp:.14,lc:[.55,.62,.85],li:.5,light:.3}}},
  ice:{pre:'ice_',mask:'ice_mask.png',meta:{dawn:{u:.6191,el:17.05,exp:.9,lc:[.9,.93,.97],li:1.4,light:.85},day:{u:.5996,el:28.3,exp:1.0,lc:[1.0,.96,.9],li:2.5,light:1},night:{u:.6191,el:17.05,exp:.9,lc:[.55,.62,.85],li:.5,light:.3}}},
  sea:{pre:'sea_',mask:'sea_mask.png',meta:{dawn:{u:.3623,el:4.92,exp:.305,lc:[1.0,.72,.5],li:1.3,light:.7},day:{u:.3447,el:48.16,exp:.568,lc:[1.0,.95,.88],li:2.6,light:1},night:{u:.3486,el:17.23,exp:1.343,lc:[.6,.68,.9],li:.45,light:.35}}}};
-let SET='lake', META=SETS.lake.meta, started=false;
+let SET='lake', META=SETS.lake.meta, started=false, shownSet='lake', photoOn=1;
 const YAW=.25; U.uYaw.value=YAW;
 let total=0, errors=0;
 const mgr=new T.LoadingManager();
@@ -46,11 +46,16 @@ const sunDir=(m,o)=>{ const th=(m.u-YAW)*Math.PI*2, e=m.el*Math.PI/180; return o
 // 實拍陰天天空：輕陰（Kloofendal Overcast）與厚雲雨天（Overcast Soil），依雲量、雨量淡入
 { const ld=f=>{ const t=tl.load(f); t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; t.minFilter=T.LinearFilter; t.generateMipmaps=false; return t; };
   U.uOvcA.value=ld('sky_ovc_light.jpg'); U.uOvcB.value=ld('sky_ovc_heavy.jpg'); }
+/* 目前這個地點、這個時段要用的實拍照片是不是都載好了（換地點時黑幕等這個） */
+W.photoReady=h=>{ try{ const [a,b]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b]; return !!(A&&A.ready&&B&&B.ready); }catch(e){ return true; } };
 W.setPhotoHook((h,wx)=>{
   { const k=Math.min(1,Math.max(0,(wx.cloud-.35)/.4)+wx.rain*.6); U.uOvcK.value+=(k-U.uOvcK.value)*.08; }
   const [a,b,m]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b];
-  if(!A||!A.ready||!B||!B.ready) return null;
-  if(!started){ started=true; W.setPhotoActive(); if(cb) cb(1,true,errors); }
+  /* 新地點的實拍照片還沒下載好：以前直接沿用上一個地點的照片，所以剛到海上會看到湖邊的樹林（還被拉得糊糊的）。
+     現在還沒好就先用程式算的天空頂著，照片一到再換上；換地點的黑幕也會等照片好了才拉開（見 d.js fadeOutWhenReady） */
+  if(!A||!A.ready||!B||!B.ready){ if(shownSet&&shownSet!==SET&&started){ U.uPhoto.value=0; shownSet=''; } return null; }
+  if(shownSet!==SET){ shownSet=SET; if(started) U.uPhoto.value=photoOn; }
+  if(!started){ started=true; W.setPhotoActive(); photoOn=U.uPhoto.value||1; if(cb) cb(1,true,errors); }
   U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m; U.uHzA.value=A.hz||A.band; U.uHzB.value=B.hz||B.band;
   U.uRadianceA.value=env[SET+'_'+a]||null;U.uRadianceB.value=env[SET+'_'+b]||null;U.uRadianceReady.value=U.uRadianceA.value&&U.uRadianceB.value?1:0;
   const MA=META[a], MB=META[b], L=(x,y)=>x+(y-x)*m;

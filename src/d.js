@@ -499,7 +499,9 @@ function homeEnter(){ const hd=HOME.data();
   setTimeout(()=>toast('釣友來參觀你的 '+kinds+' 種收藏，留下了 '+bt.icon+bt.name+' ×'+n,'good',2600),1200); }
 function recoverHome(err){Snd.setIndoor?.(false);if(window.__DIAG)window.__DIAG.action('home','error',err.message);console.error('home recovery',err);try{HOME3D.exit();}catch(_){}G.state='idle';document.body.classList.remove('athome','tankview','tankdive','grilling');fadeEl.classList.remove('on');toast('小屋載入暫時失敗，已返回釣點，遊戲進度保留','warn',4200);}
 // 切換場景時黑幕多撐 3 個畫面：新場景第一次繪製要把幾何與貼圖上傳到顯示卡，這一下會卡幾百毫秒，讓它發生在黑幕後面而不是玩家眼前
-function fadeOutWhenReady(){ let n=3; const step=()=>{ if(--n>0) requestAnimationFrame(step); else fadeEl.classList.remove('on'); }; requestAnimationFrame(step); }
+/* 換地點的黑幕：至少等 3 幀；如果新地點的實拍天空還在下載，最多再等 10 秒（下載好就立刻拉開），不讓玩家看到上一個地點的景色 */
+function fadeOutWhenReady(){ let n=3; const t0=performance.now(); const step=()=>{ const wait=!HOME3D.active()&&W.photoReady&&!W.photoReady(G.hour)&&performance.now()-t0<10000;
+  if(--n>0||wait) requestAnimationFrame(step); else fadeEl.classList.remove('on'); }; requestAnimationFrame(step); }
 function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收線再回家','warn');return;}if(!HOME.unlocked()){toast('完成主線第一章後才能整理小屋','warn');return;}persist();if(window.__DIAG)window.__DIAG.action('home','begin');G.state='travel';fadeEl.classList.add('on');Snd.paddle();
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');

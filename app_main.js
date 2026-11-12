@@ -1,4 +1,4 @@
-/*APPV:20261112160708*/
+/*APPV:20261112221305*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -4473,7 +4473,7 @@ const SETS={
  lake:{pre:'env_',mask:'env_mask.png',meta:{dawn:{u:.3633,el:6.33,exp:.252,lc:[1.0,.72,.52],li:1.2,light:.7},day:{u:.3496,el:5.62,exp:1.0,lc:[1.0,.86,.7],li:2.4,light:1},night:{u:.6865,el:44.3,exp:.14,lc:[.55,.62,.85],li:.5,light:.3}}},
  ice:{pre:'ice_',mask:'ice_mask.png',meta:{dawn:{u:.6191,el:17.05,exp:.9,lc:[.9,.93,.97],li:1.4,light:.85},day:{u:.5996,el:28.3,exp:1.0,lc:[1.0,.96,.9],li:2.5,light:1},night:{u:.6191,el:17.05,exp:.9,lc:[.55,.62,.85],li:.5,light:.3}}},
  sea:{pre:'sea_',mask:'sea_mask.png',meta:{dawn:{u:.3623,el:4.92,exp:.305,lc:[1.0,.72,.5],li:1.3,light:.7},day:{u:.3447,el:48.16,exp:.568,lc:[1.0,.95,.88],li:2.6,light:1},night:{u:.3486,el:17.23,exp:1.343,lc:[.6,.68,.9],li:.45,light:.35}}}};
-let SET='lake', META=SETS.lake.meta, started=false;
+let SET='lake', META=SETS.lake.meta, started=false, shownSet='lake', photoOn=1;
 const YAW=.25; U.uYaw.value=YAW;
 let total=0, errors=0;
 const mgr=new T.LoadingManager();
@@ -4511,11 +4511,16 @@ const sunDir=(m,o)=>{ const th=(m.u-YAW)*Math.PI*2, e=m.el*Math.PI/180; return o
 // 實拍陰天天空：輕陰（Kloofendal Overcast）與厚雲雨天（Overcast Soil），依雲量、雨量淡入
 { const ld=f=>{ const t=tl.load(f); t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; t.minFilter=T.LinearFilter; t.generateMipmaps=false; return t; };
   U.uOvcA.value=ld('sky_ovc_light.jpg'); U.uOvcB.value=ld('sky_ovc_heavy.jpg'); }
+/* 目前這個地點、這個時段要用的實拍照片是不是都載好了（換地點時黑幕等這個） */
+W.photoReady=h=>{ try{ const [a,b]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b]; return !!(A&&A.ready&&B&&B.ready); }catch(e){ return true; } };
 W.setPhotoHook((h,wx)=>{
   { const k=Math.min(1,Math.max(0,(wx.cloud-.35)/.4)+wx.rain*.6); U.uOvcK.value+=(k-U.uOvcK.value)*.08; }
   const [a,b,m]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b];
-  if(!A||!A.ready||!B||!B.ready) return null;
-  if(!started){ started=true; W.setPhotoActive(); if(cb) cb(1,true,errors); }
+  /* 新地點的實拍照片還沒下載好：以前直接沿用上一個地點的照片，所以剛到海上會看到湖邊的樹林（還被拉得糊糊的）。
+     現在還沒好就先用程式算的天空頂著，照片一到再換上；換地點的黑幕也會等照片好了才拉開（見 d.js fadeOutWhenReady） */
+  if(!A||!A.ready||!B||!B.ready){ if(shownSet&&shownSet!==SET&&started){ U.uPhoto.value=0; shownSet=''; } return null; }
+  if(shownSet!==SET){ shownSet=SET; if(started) U.uPhoto.value=photoOn; }
+  if(!started){ started=true; W.setPhotoActive(); photoOn=U.uPhoto.value||1; if(cb) cb(1,true,errors); }
   U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m; U.uHzA.value=A.hz||A.band; U.uHzB.value=B.hz||B.band;
   U.uRadianceA.value=env[SET+'_'+a]||null;U.uRadianceB.value=env[SET+'_'+b]||null;U.uRadianceReady.value=U.uRadianceA.value&&U.uRadianceB.value?1:0;
   const MA=META[a], MB=META[b], L=(x,y)=>x+(y-x)*m;
@@ -8569,7 +8574,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261112160708'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261112221305'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -10605,7 +10610,9 @@ function homeEnter(){ const hd=HOME.data();
   setTimeout(()=>toast('釣友來參觀你的 '+kinds+' 種收藏，留下了 '+bt.icon+bt.name+' ×'+n,'good',2600),1200); }
 function recoverHome(err){Snd.setIndoor?.(false);if(window.__DIAG)window.__DIAG.action('home','error',err.message);console.error('home recovery',err);try{HOME3D.exit();}catch(_){}G.state='idle';document.body.classList.remove('athome','tankview','tankdive','grilling');fadeEl.classList.remove('on');toast('小屋載入暫時失敗，已返回釣點，遊戲進度保留','warn',4200);}
 // 切換場景時黑幕多撐 3 個畫面：新場景第一次繪製要把幾何與貼圖上傳到顯示卡，這一下會卡幾百毫秒，讓它發生在黑幕後面而不是玩家眼前
-function fadeOutWhenReady(){ let n=3; const step=()=>{ if(--n>0) requestAnimationFrame(step); else fadeEl.classList.remove('on'); }; requestAnimationFrame(step); }
+/* 換地點的黑幕：至少等 3 幀；如果新地點的實拍天空還在下載，最多再等 10 秒（下載好就立刻拉開），不讓玩家看到上一個地點的景色 */
+function fadeOutWhenReady(){ let n=3; const t0=performance.now(); const step=()=>{ const wait=!HOME3D.active()&&W.photoReady&&!W.photoReady(G.hour)&&performance.now()-t0<10000;
+  if(--n>0||wait) requestAnimationFrame(step); else fadeEl.classList.remove('on'); }; requestAnimationFrame(step); }
 function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收線再回家','warn');return;}if(!HOME.unlocked()){toast('完成主線第一章後才能整理小屋','warn');return;}persist();if(window.__DIAG)window.__DIAG.action('home','begin');G.state='travel';fadeEl.classList.add('on');Snd.paddle();
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');
