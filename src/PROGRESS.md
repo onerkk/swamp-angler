@@ -7,6 +7,11 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-13 使用者回報兩件事（都還沒修好上線，嘗試存在分支 wip-rod-photo）：
+  1. 海上出現湖邊樹林：根因確定——h.js setPhotoHook 在新地點照片還沒載好時 return null，天空沿用上一個地點的照片；d.js fadeOutWhenReady 只等 3 幀。分支上的修法：W.photoReady(hour)、黑幕最多多等 10 秒、沒載好時 uPhoto=0 先用程式天空。還沒驗證（測試跑到 window.__goSpot(5) 之後沒有輸出，原因未查）
+  2. 手沒握在真實釣竿上：骨架連線不是握把中心線。分支上改用頂點算中心線（握把尾端與捲線器上方竿身兩處的中心連線）、捲線器對到 s=.125，結果竿子變得巨大且位置錯——推測蒙皮網格的頂點座標不能只乘 mesh.matrixWorld（要用 SkinnedMesh.boneTransform 取靜止姿勢位置）。下次先在頁面裡印出 tmin/tmax/tReel/k 再調
+  3. 遊艇：Yacht II 已下載並轉好（/tmp/sf/yacht.glb，9.7 萬面、1.2MB；容器重置要重抓 uid dadc775d1d044aee9f6744fa7b47648e）。現有遊艇是 Sketchfab「Frickie's yacht」＋ m.js attachYacht（正規化成長 26m、船頭 −z）＋ yacht-layout.js（釣位 x2.12 z15、駕駛座 x.6 z10，甲板高度靠材質名 material_3 判斷）＋ marine.js dressYacht（依材質名換船用材質）；換模型要改這三處
+  測試注意：/tmp 測試站的主程式要重試三次才載入（載入器會核對版本標頭），每次開頁多約 10 秒；rod2.py 這類多步驟測試要給 700 秒以上
 - 2026-11-12 Sketchfab 下載管道可用：使用者提供 API token（不要寫進倉庫；容器裡放 /tmp/sf/.tok，重置後請使用者再貼一次或重新產生）。
   用法：GET https://api.sketchfab.com/v3/search?type=models&q=…&downloadable=true，下載 GET /v3/models/{uid}/download，標頭 Authorization: Token <token>，回傳 glb／gltf 的短效網址
   · 已上線：真實釣竿 models/rod_real.glb（「Fishing Rod, Rigged and Animated」by ergin3d.com，CC BY 4.0，uid 78991bf44cf54acb8660bef317d72c7a；10 節骨頭 Bone001..010 沿 +X）。c.js realRod／poseRealRod：沿用 pts 彎曲曲線，每幀把骨頭擺到曲線上；載入成功才藏掉程序竿，擺姿勢出錯會退回程序竿。
