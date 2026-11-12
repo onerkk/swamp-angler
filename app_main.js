@@ -1,4 +1,4 @@
-/*APPV:20261112120435*/
+/*APPV:20261112130418*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -1301,9 +1301,25 @@ function dressYacht(T,object,materials){
   const selected=source.map((mt,i)=>{const out=materials[parts[i]]||mt;return out;});m.material=Array.isArray(m.material)?selected:selected[0];m.castShadow=true;m.receiveShadow=true;
  });
 }
+/* ===== 實物掃描道具（Poly Haven，CC0；models/home/*.glb，尺寸就是真實公尺）=====
+   realProp：同一個模型只下載一次，每次使用給一份複製品；seatProp：把道具擺到 (x,z)，底部貼齊 y，可以先放倒（rx）再轉向（ry） */
+const REALPROP={};
+function realProp(T,name,cb){ if(!T.GLTFLoader) return; const use=g=>{ try{ const o=g.scene.clone(true); o.traverse(m=>{ if(m.isMesh){ m.castShadow=true; m.receiveShadow=true; if(m.material&&m.material.map) m.material.map.anisotropy=4; } }); cb(o); }catch(e){ console.warn('prop',name,e); } };
+  (REALPROP[name]||(REALPROP[name]=new Promise(ok=>new T.GLTFLoader().load('models/home/'+name+'.glb',ok,undefined,()=>console.warn('prop load',name))))).then(use); }
+function seatProp(T,o,x,y,z,ry,rx){ const inner=o, g=new T.Group(); inner.rotation.x=rx||0; g.add(inner); g.rotation.y=ry||0; g.updateMatrixWorld(true); const b=new T.Box3().setFromObject(g); g.position.set(x-(b.min.x+b.max.x)/2,y-b.min.y,z-(b.min.z+b.max.z)/2); return g; }
+/* 遊艇上的真實道具：每一件都從上方往下找到甲板真正的表面再放上去（跟甲板五金同一個做法），會跟著船身一起動。
+   船頭在 −z、船尾在 +z：駕駛座在 z≈10（飛橋），釣位在 z≈15 右舷 */
+function addMarineProps(T,wrap,fittings){ const props=new T.Group(); props.name='Marine deck props'; wrap.add(props); const rc=new T.Raycaster(), down=new T.Vector3(0,-1,0), inv=new T.Matrix4();
+  const deckY=(x,z)=>{ wrap.updateMatrixWorld(true); rc.set(new T.Vector3(x,9,z).applyMatrix4(wrap.matrixWorld),down); inv.copy(wrap.matrixWorld).invert();
+    for(const h of rc.intersectObject(wrap,true)){ let skip=false; for(let p=h.object;p;p=p.parent) if(p===fittings||p===props){ skip=true; break; } if(!skip) return h.point.clone().applyMatrix4(inv).y; } return null; };
+  const put=(name,x,z,ry,rx)=>realProp(T,name,o=>{ const y=deckY(x,z); if(y==null) return; props.add(seatProp(T,o,x,y,z,ry,rx)); });
+  put('binoculars',-.45,9.0,.5); put('portable_searchlight',.5,8.9,Math.PI);                 // 駕駛台上：望遠鏡、手提探照燈
+  put('lifebuoy',1.1,.6,.4,-Math.PI/2);                                                        // 前甲板：平放的救生圈
+  put('plastic_crate_01',1.2,16.2,.25); put('metal_toolbox',1.15,13.6,-.3); put('wooden_bucket_01',1.5,17.0,0);   // 釣位旁：魚箱、工具箱、水桶
+  put('life_jacket',-1.2,15.2,.6,-Math.PI/2); put('lifebuoy',-1.25,16.6,1.2,-Math.PI/2); }   // 後甲板：救生衣、救生圈
 function addMarineHardware(T,wrap,deck,materials){
  // Dimensions and fittings are in metres, measured after the hull is normalized.
- const fittings=new T.Group();fittings.name='Marine deck fittings';wrap.add(fittings);
+ const fittings=new T.Group();fittings.name='Marine deck fittings';wrap.add(fittings); try{ addMarineProps(T,wrap,fittings); }catch(e){ console.warn('marine props',e); }
  function screw(x,y,z){const head=new T.Mesh(new T.CylinderGeometry(.009,.009,.003,12),materials.steel);head.position.set(x,y,z);fittings.add(head);const slot=new T.Mesh(new T.BoxGeometry(.011,.0015,.002),new T.MeshStandardMaterial({color:0x262b2e,roughness:.6}));slot.position.set(x,y+.002,z);fittings.add(slot);}
  const rc=new T.Raycaster(),down=new T.Vector3(0,-1,0);
  for(const [x,z]of[[-.7,-3.0],[.7,-3.0]]){
@@ -2337,6 +2353,11 @@ const NPL=46, planks=new T.InstancedMesh(new T.BoxGeometry(2.5,.055,.19), plankM
   plankMat.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute vec2 iOff;').replace('#include <uv_vertex>','#include <uv_vertex>\n#ifdef USE_UV\nvUv += iOff;\n#endif'); };
   plankMat.customProgramCacheKey=()=>'plankOff'; }
 planks.userData.lake=true; scene.add(planks);
+/* 碼頭上的真實道具（實物掃描）：水桶、魚箱和上面的漁夫帽、工具箱、救生圈、橡木桶。都靠邊放，不擋拋竿 */
+if(typeof realProp==='function'){ const dockProps=new T.Group(); dockProps.userData.lake=true; dockProps.visible=planks.visible; scene.add(dockProps); const DY=.88;
+  const put=(name,x,z,ry,rx,y)=>realProp(T,name,o=>dockProps.add(seatProp(T,o,x,y==null?DY:y,z,ry,rx)));
+  put('wooden_bucket_01',-.98,-2.5,.4); put('plastic_crate_01',.98,-1.9,.15); put('fishermans_hat',.98,-1.9,.9,0,DY+.26);
+  put('metal_toolbox',.95,.7,-.2); put('lifebuoy',-.92,1.5,.8,-Math.PI/2); put('wine_barrel_01',.82,4.9,0); put('wooden_bucket_01',.2,5.3,1.1); }
 PH.addBox({x:-1.3,y:.77,z:-3.31},{x:1.3,y:.88,z:6.2},()=>planks.visible,"碼頭木板");
 const postTex=dataTex(64,128,(u,v,o)=>{ const n=fbm(u*8,v*30,3), g=sstep(.58,.66,v), w=[34,38,24], dr=[96,80,62];
   for(let k=0;k<3;k++) o[k]=(w[k]+(dr[k]-w[k])*g)*(.7+.6*n); });
@@ -6396,6 +6417,10 @@ rimM.customProgramCacheKey=()=> 'ice-world-rim-v2';
     const ps=cl.geometry.attributes.position; for(let j=0;j<ps.count;j++) ps.setXYZ(j,ps.getX(j)*(1+(Math.random()-.5)*.5),ps.getY(j)*(.5+Math.random()*.3),ps.getZ(j)*(1+(Math.random()-.5)*.5)); cl.geometry.computeVertexNormals();
     cl.position.set(Math.cos(a)*r,.015+s*.25,Math.sin(a)*r); cl.rotation.y=Math.random()*6; cl.castShadow=cl.receiveShadow=true; hole.add(cl); } }
 const holePos=new T.Vector3();
+/* 冰釣營地的真實道具（實物掃描）：折疊木凳、保溫瓶、裝魚的木桶、取暖的鐵桶爐。以冰洞為中心、依玩家朝向擺放：本地 −z 是玩家面向的前方，+x 是右手邊 */
+const camp=new T.Group(); g.add(camp);
+if(typeof realProp==='function'){ const put=(name,x,z,ry,rx)=>realProp(T,name,o=>camp.add(seatProp(T,o,x,.012,z,ry,rx)));
+  put('folding_wooden_stool',.85,1.05,.3); put('modified_thermos',.52,.5,1.0); put('wooden_bucket_01',-.72,.35,.6); put('barrel_stove',-1.7,1.5,.4); }
 // 手搖冰鑽：鑿冰時邊轉邊往下鑽，完成後拔出來
 const auger=new T.Group(); auger.visible=false; g.add(auger);
 let crankRef=null;
@@ -6433,7 +6458,7 @@ function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visib
   if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
       W.addRipple(holePos.x,holePos.z,.15+.2*T2); if(T2>.6){ c.chips&&0; if(c.splash) c.splash(holePos,T2); } } } if(!on){ drilled=false; prog=0; cutHole.value.z=0; return; }
   const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; auger.visible=false; liftT=0; }
-  holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); hole.position.copy(holePos); hole.visible=drilled;
+  holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); hole.position.copy(holePos); camp.position.copy(holePos); camp.rotation.y=h; hole.visible=drilled;
   sheet.position.x=b.x; sheet.position.z=b.z; cutHole.value.set(holePos.x,holePos.z,drilled?.17:0); }
 /* 鑿冰洞：按住約 2 秒，冰屑四濺，完成後冰洞出現 */
 function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); auger.visible=true; auger.position.set(holePos.x,.02-prog*.42,holePos.z); auger.rotation.y+=dt*9; if(c.grind&&Math.random()<dt*10) c.grind(); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; cutHole.value.set(holePos.x,holePos.z,.17); liftT=1.2; if(c.done) c.done(holePos); } return prog; }
@@ -6979,7 +7004,8 @@ function furnish(){ while(decoG.children.length) decoG.remove(decoG.children[0])
   deco('sofa_02',0,0,4.6,Math.PI,2.2,'sofa'); deco('coffee_table_round_01',0,0,3.2,0,.9); deco('Ottoman_01',-1.6,0,3.4,.4,.7,'seat'); deco('Ottoman_01',1.6,0,3.4,-.4,.7,'seat');
   deco('wooden_bookshelf_worn',-HW+.4,0,4.5,Math.PI/2,1.6,'shelf'); deco('wooden_bookshelf_worn',HW-.4,0,4.5,-Math.PI/2,1.6,'shelf');
   deco('potted_plant_01',-HW+.7,0,2.2,0,.7); deco('potted_plant_01',HW-.7,0,2.2,0,.7); deco('potted_plant_01',-HW+.7,0,-len-.8,0,.7); deco('potted_plant_01',HW-.7,0,-len-.8,0,.7);
-  deco('treasure_chest',0,0,-len-1.2,0,1.2,'chest'); deco('side_table_01',1.75,0,4.75,0,.55); deco('vintage_oil_lamp',1.75,.62,4.75,0,.22,'light');
+  deco('treasure_chest',0,0,-len-1.2,0,1.2,'chest');
+  deco('bronze_whale_statue',-3.0,0,1.0,Math.PI/2,1.37); deco('wine_barrel_01',3.0,0,1.0,0,.86); deco('bronze_shark_statue',3.0,.985,1.0,-Math.PI/2,.76);   /* 入口兩側：青銅鯨魚像（落地）、橡木桶上的青銅鯊魚像（實物掃描） */ deco('side_table_01',1.75,0,4.75,0,.55); deco('vintage_oil_lamp',1.75,.62,4.75,0,.22,'light');
   for(let z=0;z>-len;z-=8) deco('lantern_chandelier_01',0,HH-2.2,z,0,1.3,'light');
   for(let z=-2;z>-len;z-=6){ deco('industrial_wall_lamp',-HW+.15,3.4,z,Math.PI/2,.5); deco('industrial_wall_lamp',HW-.15,3.4,z,-Math.PI/2,.5); }
   const S=window.__SAVE||{}, pics=(S.merGift||[]).map(f=>'media/mergift/'+f); const fallback=['env_dawn_full.jpg','env_day_full.jpg','env_night_full.jpg'];
@@ -8494,7 +8520,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261112120435'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261112130418'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

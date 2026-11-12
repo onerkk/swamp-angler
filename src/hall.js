@@ -44,7 +44,8 @@ function furnish(){ while(decoG.children.length) decoG.remove(decoG.children[0])
   deco('sofa_02',0,0,4.6,Math.PI,2.2,'sofa'); deco('coffee_table_round_01',0,0,3.2,0,.9); deco('Ottoman_01',-1.6,0,3.4,.4,.7,'seat'); deco('Ottoman_01',1.6,0,3.4,-.4,.7,'seat');
   deco('wooden_bookshelf_worn',-HW+.4,0,4.5,Math.PI/2,1.6,'shelf'); deco('wooden_bookshelf_worn',HW-.4,0,4.5,-Math.PI/2,1.6,'shelf');
   deco('potted_plant_01',-HW+.7,0,2.2,0,.7); deco('potted_plant_01',HW-.7,0,2.2,0,.7); deco('potted_plant_01',-HW+.7,0,-len-.8,0,.7); deco('potted_plant_01',HW-.7,0,-len-.8,0,.7);
-  deco('treasure_chest',0,0,-len-1.2,0,1.2,'chest'); deco('side_table_01',1.75,0,4.75,0,.55); deco('vintage_oil_lamp',1.75,.62,4.75,0,.22,'light');
+  deco('treasure_chest',0,0,-len-1.2,0,1.2,'chest');
+  deco('bronze_whale_statue',-3.0,0,1.0,Math.PI/2,1.37); deco('wine_barrel_01',3.0,0,1.0,0,.86); deco('bronze_shark_statue',3.0,.985,1.0,-Math.PI/2,.76);   /* 入口兩側：青銅鯨魚像（落地）、橡木桶上的青銅鯊魚像（實物掃描） */ deco('side_table_01',1.75,0,4.75,0,.55); deco('vintage_oil_lamp',1.75,.62,4.75,0,.22,'light');
   for(let z=0;z>-len;z-=8) deco('lantern_chandelier_01',0,HH-2.2,z,0,1.3,'light');
   for(let z=-2;z>-len;z-=6){ deco('industrial_wall_lamp',-HW+.15,3.4,z,Math.PI/2,.5); deco('industrial_wall_lamp',HW-.15,3.4,z,-Math.PI/2,.5); }
   const S=window.__SAVE||{}, pics=(S.merGift||[]).map(f=>'media/mergift/'+f); const fallback=['env_dawn_full.jpg','env_day_full.jpg','env_night_full.jpg'];

@@ -41,6 +41,11 @@ const NPL=46, planks=new T.InstancedMesh(new T.BoxGeometry(2.5,.055,.19), plankM
   plankMat.onBeforeCompile=sh=>{ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute vec2 iOff;').replace('#include <uv_vertex>','#include <uv_vertex>\n#ifdef USE_UV\nvUv += iOff;\n#endif'); };
   plankMat.customProgramCacheKey=()=>'plankOff'; }
 planks.userData.lake=true; scene.add(planks);
+/* 碼頭上的真實道具（實物掃描）：水桶、魚箱和上面的漁夫帽、工具箱、救生圈、橡木桶。都靠邊放，不擋拋竿 */
+if(typeof realProp==='function'){ const dockProps=new T.Group(); dockProps.userData.lake=true; dockProps.visible=planks.visible; scene.add(dockProps); const DY=.88;
+  const put=(name,x,z,ry,rx,y)=>realProp(T,name,o=>dockProps.add(seatProp(T,o,x,y==null?DY:y,z,ry,rx)));
+  put('wooden_bucket_01',-.98,-2.5,.4); put('plastic_crate_01',.98,-1.9,.15); put('fishermans_hat',.98,-1.9,.9,0,DY+.26);
+  put('metal_toolbox',.95,.7,-.2); put('lifebuoy',-.92,1.5,.8,-Math.PI/2); put('wine_barrel_01',.82,4.9,0); put('wooden_bucket_01',.2,5.3,1.1); }
 PH.addBox({x:-1.3,y:.77,z:-3.31},{x:1.3,y:.88,z:6.2},()=>planks.visible,"碼頭木板");
 const postTex=dataTex(64,128,(u,v,o)=>{ const n=fbm(u*8,v*30,3), g=sstep(.58,.66,v), w=[34,38,24], dr=[96,80,62];
   for(let k=0;k<3;k++) o[k]=(w[k]+(dr[k]-w[k])*g)*(.7+.6*n); });

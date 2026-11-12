@@ -64,6 +64,10 @@ rimM.customProgramCacheKey=()=> 'ice-world-rim-v2';
     const ps=cl.geometry.attributes.position; for(let j=0;j<ps.count;j++) ps.setXYZ(j,ps.getX(j)*(1+(Math.random()-.5)*.5),ps.getY(j)*(.5+Math.random()*.3),ps.getZ(j)*(1+(Math.random()-.5)*.5)); cl.geometry.computeVertexNormals();
     cl.position.set(Math.cos(a)*r,.015+s*.25,Math.sin(a)*r); cl.rotation.y=Math.random()*6; cl.castShadow=cl.receiveShadow=true; hole.add(cl); } }
 const holePos=new T.Vector3();
+/* 冰釣營地的真實道具（實物掃描）：折疊木凳、保溫瓶、裝魚的木桶、取暖的鐵桶爐。以冰洞為中心、依玩家朝向擺放：本地 −z 是玩家面向的前方，+x 是右手邊 */
+const camp=new T.Group(); g.add(camp);
+if(typeof realProp==='function'){ const put=(name,x,z,ry,rx)=>realProp(T,name,o=>camp.add(seatProp(T,o,x,.012,z,ry,rx)));
+  put('folding_wooden_stool',.85,1.05,.3); put('modified_thermos',.52,.5,1.0); put('wooden_bucket_01',-.72,.35,.6); put('barrel_stove',-1.7,1.5,.4); }
 // 手搖冰鑽：鑿冰時邊轉邊往下鑽，完成後拔出來
 const auger=new T.Group(); auger.visible=false; g.add(auger);
 let crankRef=null;
@@ -101,7 +105,7 @@ function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visib
   if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
       W.addRipple(holePos.x,holePos.z,.15+.2*T2); if(T2>.6){ c.chips&&0; if(c.splash) c.splash(holePos,T2); } } } if(!on){ drilled=false; prog=0; cutHole.value.z=0; return; }
   const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; auger.visible=false; liftT=0; }
-  holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); hole.position.copy(holePos); hole.visible=drilled;
+  holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); hole.position.copy(holePos); camp.position.copy(holePos); camp.rotation.y=h; hole.visible=drilled;
   sheet.position.x=b.x; sheet.position.z=b.z; cutHole.value.set(holePos.x,holePos.z,drilled?.17:0); }
 /* 鑿冰洞：按住約 2 秒，冰屑四濺，完成後冰洞出現 */
 function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); auger.visible=true; auger.position.set(holePos.x,.02-prog*.42,holePos.z); auger.rotation.y+=dt*9; if(c.grind&&Math.random()<dt*10) c.grind(); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; cutHole.value.set(holePos.x,holePos.z,.17); liftT=1.2; if(c.done) c.done(holePos); } return prog; }
