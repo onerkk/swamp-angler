@@ -441,7 +441,7 @@ function render(){
     h+=tg('imm','沉浸模式','隱藏上方大部分介面，只留設定和動作按鈕',!!save.imm);
     h+='<div class="note">真實魚模型：Barramundi Fish © Microsoft 2017，CC0 授權（Khronos glTF Sample Assets）</div>';
     h+='<div class="note">真實動物與魚類 3D 模型（Sketchfab，CC-BY 4.0）：<br>'+(window.__MDL?window.__MDL.credits():'')+'</div>';
-    h+='<div class="note">釣竿與捲線器模型：「Fishing Rod, Rigged and Animated」by ergin3d.com（Sketchfab，CC BY 4.0）</div>';
+    h+='<div class="note">釣竿與捲線器模型：「Canna Da Pesca」by topfrank2013（Sketchfab，CC BY 4.0）</div>';
     h+='<div class="note">實拍湖景、HDR 光照、碼頭與泥灘材質、枯木樹樁岩石蕨類模型、家具與道具、標本館木料：Poly Haven（CC0）</div>';
     h+=row('重置存檔','金幣、等級、裝備、圖鑑全部清除',`<button class="sbtn danger" data-a="reset">${resetArm?'再按一次確認':'重置'}</button>`);
   }

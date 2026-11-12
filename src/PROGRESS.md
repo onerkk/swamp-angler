@@ -7,6 +7,10 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-13（接續被中斷的那一輪）已上線：
+  · 換地點等新照片（h.js W.photoReady、d.js fadeOutWhenReady）——/tmp/trav1.log 驗證：湖→近海，黑幕等到照片好才拉開，uPhoto 最後是 1
+  · 釣竿改用「Canna Da Pesca」by topfrank2013（CC BY 4.0，uid f8031fbbea9a4a9fbd3ab23ee6334c00，models/rod_real2.glb 4MB，無骨架）。c.js realRod：載入時把每個頂點換成（竿上位置 s、往捲線器側、往旁側），頂點著色器用 uRodPts（＝pts 曲線）擺回去，任何釣竿模型都適用；REEL_S=.185（手握處）。舊的 rod_real.glb（ergin3d，骨架版）已移除
+    已截圖：軟木握把穿過拳頭、捲線器在手旁、彎曲時竿身跟著曲線。未確認：實機上手指與握把的細部貼合、捲線器握把不會轉、裝備升級不再變色
 - 2026-11-13 使用者回報兩件事（都還沒修好上線，嘗試存在分支 wip-rod-photo）：
   1. 海上出現湖邊樹林：根因確定——h.js setPhotoHook 在新地點照片還沒載好時 return null，天空沿用上一個地點的照片；d.js fadeOutWhenReady 只等 3 幀。分支上的修法：W.photoReady(hour)、黑幕最多多等 10 秒、沒載好時 uPhoto=0 先用程式天空。還沒驗證（測試跑到 window.__goSpot(5) 之後沒有輸出，原因未查）
   2. 手沒握在真實釣竿上：骨架連線不是握把中心線。分支上改用頂點算中心線（握把尾端與捲線器上方竿身兩處的中心連線）、捲線器對到 s=.125，結果竿子變得巨大且位置錯——推測蒙皮網格的頂點座標不能只乘 mesh.matrixWorld（要用 SkinnedMesh.boneTransform 取靜止姿勢位置）。下次先在頁面裡印出 tmin/tmax/tReel/k 再調

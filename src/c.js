@@ -296,41 +296,47 @@ const dir=new T.Vector3(), bdir=new T.Vector3(), tmp=new T.Vector3(), tmp2=new T
 const basis=new T.Matrix4();
 function rodAt(s,out){ const f=s*NS, i=Math.min(NS-1,Math.floor(f)); return out.copy(pts[i]).lerp(pts[i+1],f-i); }
 /* ===== 真實釣竿模型 =====
-   「Fishing Rod, Rigged and Animated」by ergin3d.com（Sketchfab，CC BY 4.0）：碳纖竿身、導環、紡車捲線器，附 10 節骨架。
-   彎曲仍然用上面那套算法（pts 這條曲線：越往竿尖越軟）：每一幀把模型的每一節骨頭擺到曲線上對應的位置與方向，竿身就跟著彎；
-   竿尖、導環、線杯的位置（釣線走的路徑）也還是用曲線算，所以拋竿、搏魚、斷線的手感完全不變。
-   模型載入成功才把原本用圓柱拼的竿身、導環、捲線器藏起來；載不到就維持原樣 */
-const realRod={ready:false,cont:null,bones:[],s:[],off:[],rq:[],rs:[],A:new T.Vector3(),D:new T.Vector3(),P0:new T.Vector3(),L:1};
-if(T.GLTFLoader) new T.GLTFLoader().load('models/rod_real.glb',g=>{ try{
-  const root=g.scene, cont=new T.Group(); cont.add(root); cont.updateMatrixWorld(true);
-  const chain=[], boxes=[]; root.traverse(o=>{ if(o.isBone&&/^Bone/i.test(o.name)) chain.push(o);
-    if(o.isMesh){ o.frustumCulled=false; const mn=((o.material&&o.material.name)||'')+' '+o.name; if(/Thread/i.test(mn)){ o.visible=false; return; }
-      if(o.material&&o.material.map) o.material.map.anisotropy=8; if(o.material&&'envMapIntensity' in o.material) o.material.envMapIntensity=.3;   /* 碳纖竿身金屬度高，天空反光太強會整支發白 */
-      if(!o.geometry.boundingBox) o.geometry.computeBoundingBox(); boxes.push([o,o.geometry.boundingBox]); } });
-  if(chain.length<4) return; const P=chain.map(b=>new T.Vector3().setFromMatrixPosition(b.matrixWorld));
-  const A=realRod.A.subVectors(P[P.length-1],P[0]).normalize(); let tmin=1e9,tmax=-1e9; const cs=[], v=new T.Vector3();
-  for(const [o,b] of boxes) for(let k=0;k<8;k++){ v.set(k&1?b.max.x:b.min.x,k&2?b.max.y:b.min.y,k&4?b.max.z:b.min.z).applyMatrix4(o.matrixWorld); const t=v.clone().sub(P[0]).dot(A); tmin=Math.min(tmin,t); tmax=Math.max(tmax,t); cs.push(v.clone()); }
-  realRod.L=tmax-tmin; realRod.P0.copy(P[0]).addScaledVector(A,tmin);
-  // 捲線器掛在竿子的哪一側：離竿身中心線最遠的那個角落的方向
-  let far=0; for(const p of cs){ const d=p.clone().sub(realRod.P0); d.addScaledVector(A,-d.dot(A)); if(d.length()>far){ far=d.length(); realRod.D.copy(d).normalize(); } }
-  chain.forEach((b,i)=>{ const d=P[i].clone().sub(realRod.P0), t=d.dot(A); realRod.s.push(Math.max(0,Math.min(1,t/realRod.L))); realRod.off.push(d.addScaledVector(A,-t));
-    realRod.rq.push(b.getWorldQuaternion(new T.Quaternion())); realRod.rs.push(b.getWorldScale(new T.Vector3())); });
-  realRod.bones=chain; realRod.cont=cont; rodGroup.add(cont); realRod.ready=true;
+   「Canna Da Pesca」by topfrank2013（Sketchfab，CC BY 4.0）：軟木握把、金屬捲線器、碳纖竿身與導環，比例跟真的釣竿一樣。
+   做法（任何釣竿模型都適用，不需要骨架）：載入時把每個頂點換算成「在竿子上的位置 s、往捲線器那一側多遠、往旁邊多遠」存起來；
+   畫的時候由頂點著色器照遊戲原本那條彎曲曲線（pts，越往竿尖越軟）把頂點擺回去。所以竿子怎麼彎、竿尖和導環在哪裡，跟原本完全一致，釣線也對得上。
+   對位：握把尾端與竿身的中心連成中心線穿過手掌，捲線器腳對到手握的位置（s＝REEL_S），竿尖對到 s＝1。
+   模型載入成功才把原本用圓柱拼的竿身、導環、捲線器藏起來；載不到或出錯就維持原樣 */
+const realRod={ready:false,cont:null}, REEL_S=.185 /* 手握在竿子上的位置（原本竿子的前握把中段）：真實模型的捲線器座對到這裡，捲線器就在拳頭正下方 */, rodPtsU={value:[]}; for(let i=0;i<=NS;i++) rodPtsU.value.push(new T.Vector3());
+if(T.GLTFLoader) new T.GLTFLoader().load('models/rod_real2.glb',g=>{ try{
+  const root=g.scene, tmpG=new T.Group(); tmpG.add(root); tmpG.updateMatrixWorld(true);
+  const meshes=[], V=[], v=new T.Vector3(); root.traverse(o=>{ if(o.isMesh&&o.geometry&&o.geometry.attributes.position){ meshes.push(o); const pa=o.geometry.attributes.position, st=Math.max(1,Math.floor(pa.count/3000)); for(let n=0;n<pa.count;n+=st) V.push(v.fromBufferAttribute(pa,n).applyMatrix4(o.matrixWorld).clone()); } });
+  if(!meshes.length||V.length<100) return;
+  // 1. 粗略的長軸：反覆把點投影到目前的方向上再加總（主成分），幾次就收斂
+  const cm=new T.Vector3(); V.forEach(p=>cm.add(p)); cm.multiplyScalar(1/V.length); let A=new T.Vector3(1,.3,.2).normalize();
+  for(let it=0;it<12;it++){ const n=new T.Vector3(); V.forEach(p=>{ const d=p.clone().sub(cm); n.addScaledVector(d,d.dot(A)); }); A=n.normalize(); }
+  const proj=(O,Ax)=>{ let a=1e9,b=-1e9; const t=V.map(p=>{ const x=p.clone().sub(O).dot(Ax); a=Math.min(a,x); b=Math.max(b,x); return x; }); return [t,a,b]; };
+  let [tv,tmin,tmax]=proj(cm,A), Lm=tmax-tmin; const rad=(p,t,O,Ax)=>p.clone().sub(O).addScaledVector(Ax,-t);
+  // 2. 握把那一頭比較粗（還掛著捲線器）：比較兩端哪一半離軸最遠，把方向統一成「握把 → 竿尖」
+  let rLo=0,rHi=0; V.forEach((p,n)=>{ const l=rad(p,tv[n],cm,A).length(); if(tv[n]<tmin+Lm*.5) rLo=Math.max(rLo,l); else rHi=Math.max(rHi,l); }); if(rHi>rLo){ A.negate(); [tv,tmin,tmax]=proj(cm,A); }
+  // 3. 真正的中心線：握把尾端的中心 → 竿身中段（只取貼近軸的點，避開導環）的中心
+  const cen=(a,b,rMax)=>{ const c=new T.Vector3(); let n=0; V.forEach((p,i)=>{ if(tv[i]>=a&&tv[i]<=b&&(rMax==null||rad(p,tv[i],cm,A).length()<rMax)){ c.add(p); n++; } }); return n>2?c.multiplyScalar(1/n):null; };
+  const c0=cen(tmin,tmin+Lm*.03), c1=cen(tmin+Lm*.5,tmin+Lm*.85,Lm*.012)||cen(tmin+Lm*.5,tmin+Lm*.85); if(!c0||!c1) return;
+  A=c1.clone().sub(c0).normalize(); [tv,tmin,tmax]=proj(c0,A); Lm=tmax-tmin;
+  // 4. 捲線器：握把這一半裡離中心線最遠的那一點；它的方向就是「下方」，它在軸上的位置對到手握處
+  let far=0,tReel=tmin+Lm*.12; const Dn=new T.Vector3(0,-1,0); V.forEach((p,n)=>{ if(tv[n]>tmin+Lm*.4) return; const d=rad(p,tv[n],c0,A), l=d.length(); if(l>far){ far=l; tReel=tv[n]; Dn.copy(d); } });
+  Dn.addScaledVector(A,-Dn.dot(A)).normalize(); const Sd=new T.Vector3().crossVectors(A,Dn).normalize(), k=R_LEN*(1-REEL_S)/Math.max(1e-6,tmax-tReel);
+  // 5. 把每個頂點改存成（s, 往下, 往旁）；法線也換到同一組方向
+  const cont=new T.Group(), nm=new T.Matrix3(), nv=new T.Vector3();
+  for(const o of meshes){ const src=o.geometry, pa=src.attributes.position, na=src.attributes.normal, geo=new T.BufferGeometry(), P=new Float32Array(pa.count*3), N=new Float32Array(pa.count*3); nm.getNormalMatrix(o.matrixWorld);
+    for(let n=0;n<pa.count;n++){ v.fromBufferAttribute(pa,n).applyMatrix4(o.matrixWorld).sub(c0); const t=v.dot(A); P[n*3]=REEL_S+(t-tReel)*k/R_LEN; P[n*3+1]=(v.dot(Dn))*k; P[n*3+2]=(v.dot(Sd))*k;
+      if(na){ nv.fromBufferAttribute(na,n).applyMatrix3(nm).normalize(); N[n*3]=nv.dot(A); N[n*3+1]=nv.dot(Dn); N[n*3+2]=nv.dot(Sd); } else N[n*3+1]=1; }
+    geo.setAttribute('position',new T.BufferAttribute(P,3)); geo.setAttribute('normal',new T.BufferAttribute(N,3)); if(src.attributes.uv) geo.setAttribute('uv',src.attributes.uv); if(src.index) geo.setIndex(src.index);
+    const mats=(Array.isArray(o.material)?o.material:[o.material]).map(m0=>{ const m=m0.clone(); if(m.map) m.map.anisotropy=8; if('envMapIntensity' in m) m.envMapIntensity=.45;
+      m.onBeforeCompile=sh=>{ sh.uniforms.uRodPts=rodPtsU;
+        sh.vertexShader='uniform vec3 uRodPts['+(NS+1)+'];\n'+sh.vertexShader
+          .replace('#include <beginnormal_vertex>','float rS=clamp(position.x,0.0,1.0), rF=rS*'+NS+'.0; int rI=int(min('+(NS-1)+'.0,floor(rF)));\n vec3 rA=uRodPts[rI], rB=uRodPts[rI+1], rT=normalize(rB-rA);\n vec3 rC=mix(rA,rB,rF-float(rI))+rT*(position.x-rS)*'+R_LEN.toFixed(3)+';\n vec3 rDn=normalize(vec3(0.0,-1.0,0.0)+rT*rT.y), rSd=normalize(cross(rT,rDn));\n vec3 objectNormal=normalize(rT*normal.x+rDn*normal.y+rSd*normal.z);')
+          .replace('#include <begin_vertex>','vec3 transformed=rC+rDn*position.y+rSd*position.z;'); };
+      m.customProgramCacheKey=()=>'realRodCurve'; m.needsUpdate=true; return m; });
+    const mesh=new T.Mesh(geo,Array.isArray(o.material)?mats:mats[0]); mesh.frustumCulled=false; mesh.castShadow=false; mesh.receiveShadow=false; cont.add(mesh); }
+  realRod.cont=cont; rodGroup.add(cont); realRod.ready=true;
   for(const m of segs) m.visible=false; for(const m of guides) m.visible=false; tipTop.visible=false; reel.visible=false;
 }catch(e){ console.warn('real rod',e); } },undefined,()=>console.warn('real rod: load failed'));
-const rrBm=new T.Matrix4(), rrBg=new T.Matrix4(), rrRot=new T.Quaternion(), rrQ=new T.Quaternion(), rrW=new T.Matrix4(), rrInv=new T.Matrix4(), rrP=new T.Vector3(), rrS=new T.Vector3(), rrT0=new T.Vector3(), rrD0=new T.Vector3(), rrX=new T.Vector3(), rrY=new T.Vector3(), rrZ=new T.Vector3();
-function poseRealRod(){ const R=realRod; if(!R.ready) return; const k=R_LEN/R.L;
-  // 模型的（竿身方向、捲線器方向）對到遊戲裡握把處的（竿子方向、正下方）
-  frameAt(.002); rrT0.copy(tan); rrD0.copy(dn);
-  rrY.copy(R.D).addScaledVector(R.A,-R.D.dot(R.A)).normalize(); rrZ.crossVectors(R.A,rrY); rrBm.makeBasis(R.A,rrY,rrZ);
-  rrZ.crossVectors(rrT0,rrD0).normalize(); rrY.crossVectors(rrZ,rrT0).normalize(); rrBg.makeBasis(rrT0,rrY,rrZ);
-  rrRot.setFromRotationMatrix(rrBg.multiply(rrBm.transpose()));
-  R.cont.quaternion.copy(rrRot); R.cont.scale.setScalar(k); R.cont.position.copy(pts[0]).sub(rrP.copy(R.P0).multiplyScalar(k).applyQuaternion(rrRot)); R.cont.updateMatrixWorld(true);
-  for(let i=0;i<R.bones.length;i++){ const b=R.bones[i], s=R.s[i]; rodAt(s,rrP); frameAt(Math.min(.999,Math.max(.001,s))); rrQ.setFromUnitVectors(rrT0,tan).multiply(rrRot);
-    rrP.add(rrX.copy(R.off[i]).multiplyScalar(k).applyQuaternion(rrQ)); rrS.copy(R.rs[i]).multiplyScalar(k);
-    rrW.compose(rrP,rrX_q.copy(rrQ).multiply(R.rq[i]),rrS).premultiply(rodGroup.matrixWorld);
-    rrInv.copy(b.parent.matrixWorld).invert(); rrW.premultiply(rrInv); rrW.decompose(b.position,b.quaternion,b.scale); b.updateMatrixWorld(true); } }
-const rrX_q=new T.Quaternion();
+function poseRealRod(){ if(!realRod.ready) return; for(let i=0;i<=NS;i++) rodPtsU.value[i].copy(pts[i]); }
 function frameAt(s){ const i=Math.min(NS-1,Math.floor(s*NS)); tan.subVectors(pts[i+1],pts[i]).normalize(); dn.set(0,-1,0).addScaledVector(tan,tan.y).normalize(); sd.crossVectors(tan,dn).normalize(); }
 function updateRod(dt){
   rod.pitch+=(rod.pitchT-rod.pitch)*Math.min(1,dt*9);
