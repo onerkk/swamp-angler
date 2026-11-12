@@ -1,4 +1,4 @@
-/*APPV:20261112141500*/
+/*APPV:20261112144911*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -6980,17 +6980,20 @@ const tl=new T.TextureLoader();
 function woodTex(rep){ const t=tl.load('dock_diff.jpg'); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rep[0],rep[1]); t.encoding=T.sRGBEncoding; return t; }
 const roomG=new T.Group(), fishG=new T.Group(); scene.add(roomG,fishG);
 function buildRoom(){ while(roomG.children.length) roomG.remove(roomG.children[0]);
-  const floorM=new T.MeshStandardMaterial({map:woodTex([4,len/4]),color:0xc8a888,roughness:.7}), wallM=new T.MeshStandardMaterial({map:woodTex([6,len/6]),color:0xb08e6e,roughness:.85}), beamM=new T.MeshStandardMaterial({color:0x3a2818,roughness:.8});
+  /* 實拍木料（Poly Haven CC0，顏色＋法線＋粗糙度三張）：甲板木地板、木板牆、屋頂板、深色實木桁架。以前整間都是同一張碼頭木板貼圖換顏色 */
+  const pbr=(name,rx,ry,extra)=>{ const mk=(f,srgb)=>{ const t=tl.load('models/home/'+name+'_'+f+'.jpg'); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; return t; };
+    return new T.MeshStandardMaterial(Object.assign({map:mk('diff',true),normalMap:mk('nor'),roughnessMap:mk('rough'),roughness:1,metalness:0},extra||{})); };
+  const L=len+8, floorM=pbr('wood_floor_deck',HW*2/2.2,L/2.2), wallM=pbr('wood_plank_wall',L/2.6,HH/2.6,{color:0xcdb9a0}), endM=pbr('wood_plank_wall',HW*2/2.6,HH/2.6,{color:0xcdb9a0}), ceilM=pbr('roof_planks',HW*2/3,L/3), beamM=pbr('dark_wood',4,.25);
   const floor=new T.Mesh(new T.PlaneGeometry(HW*2,len+8),floorM); floor.rotation.x=-Math.PI/2; floor.position.z=-len/2+2; roomG.add(floor);
   for(const s of [-1,1]){ const w=new T.Mesh(new T.PlaneGeometry(len+8,HH),wallM); w.rotation.y=-s*Math.PI/2; w.position.set(s*HW,HH/2,-len/2+2); roomG.add(w); }
-  const end=new T.Mesh(new T.PlaneGeometry(HW*2,HH),wallM); end.position.set(0,HH/2,-len-2); roomG.add(end);
-  const back=new T.Mesh(new T.PlaneGeometry(HW*2,HH),wallM); back.rotation.y=Math.PI; back.position.set(0,HH/2,6); roomG.add(back);
-  const ceil=new T.Mesh(new T.PlaneGeometry(HW*2,len+8),new T.MeshStandardMaterial({color:0x2a1d12,roughness:1})); ceil.rotation.x=Math.PI/2; ceil.position.set(0,HH,-len/2+2); roomG.add(ceil);
+  const end=new T.Mesh(new T.PlaneGeometry(HW*2,HH),endM); end.position.set(0,HH/2,-len-2); roomG.add(end);
+  const back=new T.Mesh(new T.PlaneGeometry(HW*2,HH),endM); back.rotation.y=Math.PI; back.position.set(0,HH/2,6); roomG.add(back);
+  const ceil=new T.Mesh(new T.PlaneGeometry(HW*2,len+8),ceilM); ceil.rotation.x=Math.PI/2; ceil.position.set(0,HH,-len/2+2); roomG.add(ceil);
   // 屋頂桁架：每 4 公尺一道橫梁，標本就吊在下面
   for(let z=4;z>-len-2;z-=4){ const b=new T.Mesh(new T.BoxGeometry(HW*2,.35,.3),beamM); b.position.set(0,HH-.4,z); roomG.add(b); }
   for(const s of [-1,1]) { const rail=new T.Mesh(new T.BoxGeometry(.3,.35,len+8),beamM); rail.position.set(s*(HW-2.5),HH-.75,-len/2+2); roomG.add(rail); }
   // 中央走道的地毯
-  const rugT=tl.load('models/home/fabric_pattern_07_Diffuse.jpg'); rugT.wrapS=rugT.wrapT=T.RepeatWrapping; rugT.repeat.set(1.5,len/2); rugT.encoding=T.sRGBEncoding; const rug=new T.Mesh(new T.PlaneGeometry(2.2,len+4),new T.MeshStandardMaterial({color:0x3e100c,roughness:.95,bumpMap:rugT,bumpScale:.002})); rug.rotation.x=-Math.PI/2; rug.position.set(0,.01,-len/2+2); roomG.add(rug); }
+  const rugT=tl.load('models/home/fabric_pattern_07_Diffuse.jpg'); rugT.wrapS=rugT.wrapT=T.RepeatWrapping; rugT.repeat.set(1.5,len/2); rugT.encoding=T.sRGBEncoding; const rug=new T.Mesh(new T.PlaneGeometry(2.2,len+4),new T.MeshStandardMaterial({color:new T.Color(.05,.006,.006),roughness:1,metalness:0,bumpMap:rugT,bumpScale:.002})); rug.rotation.x=-Math.PI/2; rug.position.set(0,.01,-len/2+2); roomG.add(rug); }
 // 燈光：暖色的頂光加兩側補光，不開陰影（大型魚多也不會卡）
 const hemiL=new T.HemisphereLight(0xfff0dc,0x6a5440,2.1), ambL=new T.AmbientLight(0xffe8d0,.55); scene.add(hemiL,ambL); const key=new T.DirectionalLight(0xfff2e0,1.6); key.position.set(3,10,4); scene.add(key); const fill=new T.DirectionalLight(0xbcd2ff,.45); fill.position.set(-4,6,-10); scene.add(fill);
 function plate(t1,t2){ const cv=document.createElement('canvas'); cv.width=512; cv.height=160; const g=cv.getContext('2d'); g.fillStyle='#c8a050'; g.fillRect(0,0,512,160); g.strokeStyle='#6b4a1a'; g.lineWidth=8; g.strokeRect(6,6,500,148);
@@ -8527,7 +8530,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261112141500'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261112144911'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
