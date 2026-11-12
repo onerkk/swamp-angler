@@ -61,8 +61,11 @@ function layout(){ const S=window.__SAVE||{}, list=((S.home&&S.home.mounts)||[])
   const cur=[-1,-1]; list.forEach((rec,i)=>{ const side=i%2?1:-1, k=side<0?0:1, sp=SP.find(s=>s.id===rec.id); if(!sp) return; const zc=cur[k]-rec.L/2-1.5; cur[k]-=rec.L+3; items.push({rec,sp,side,z:zc}); });
   len=Math.max(24,-Math.min(cur[0],cur[1])+6); buildRoom(); furnish();
   items.forEach(it=>{ const {rec,sp,side,z}=it, x=side*(HW-3.2);
-    const ped=new T.Mesh(new T.BoxGeometry(1.4,1.0,.5),new T.MeshStandardMaterial({map:woodTex([1,1]),color:0x4a3020,roughness:.55})); ped.rotation.y=Math.PI/2; ped.position.set(x-side*1.8,.5,z); fishG.add(ped);
-    const pl=new T.Mesh(new T.PlaneGeometry(1.3,.4),new T.MeshBasicMaterial({map:plate(sp.name,(rec.w<1?Math.round(rec.w*1000)+' g':rec.w>=100?Math.round(rec.w).toLocaleString()+' kg':rec.w.toFixed(1)+' kg')+'・'+Math.round(rec.L*100)+' cm')})); pl.rotation.order='YXZ'; pl.rotation.set(-.35,side<0?Math.PI/2:-Math.PI/2,0); pl.position.set(x-side*2.06,1.02,z); fishG.add(pl);   /* 銅牌朝向走道 */
+    /* 名牌座：真實的橡木酒桶（Poly Haven wine_barrel_01，實物掃描），銅牌斜靠在桶面上。以前是用方塊拼的木箱 */
+    const bx=x-side*1.8; deco('wine_barrel_01',bx,0,z,side<0?Math.PI/2:-Math.PI/2,.86);
+    const pl=new T.Mesh(new T.PlaneGeometry(.8,.25),new T.MeshBasicMaterial({map:plate(sp.name,(rec.w<1?Math.round(rec.w*1000)+' g':rec.w>=100?Math.round(rec.w).toLocaleString()+' kg':rec.w.toFixed(1)+' kg')+'・'+Math.round(rec.L*100)+' cm'),side:T.DoubleSide}));
+    pl.rotation.order='YXZ'; pl.rotation.set(-.5,side<0?Math.PI/2:-Math.PI/2,0); pl.position.set(bx-side*.1,1.1,z); fishG.add(pl);   /* 銅牌朝向走道 */
+    const back=new T.Mesh(new T.BoxGeometry(.02,.2,.5),new T.MeshStandardMaterial({color:0x3a2416,roughness:.7})); back.position.set(bx+side*.02,1.05,z); back.rotation.z=side*.5; fishG.add(back);   /* 撐住銅牌的小木片 */
     it.ready=false; it.x=x; place(it); }); built=true; }
 function place(it){ const M=window.__MDL; if(it.ready||!M) return; if(!M.fishReady(it.sp.id)){ if(M.want) M.want(it.sp.id); return; }
   let f=null; try{ f=M.fish(it.sp); }catch(e){} if(!f||!f.group) return; const g=f.group; g.position.set(0,0,0); g.rotation.set(0,0,0); g.scale.setScalar(1); g.updateMatrixWorld(true);
@@ -79,7 +82,7 @@ function place(it){ const M=window.__MDL; if(it.ready||!M) return; if(!M.fishRea
   enrich(g);
   if(fishG.children.filter(o=>o.isSpotLight).length<10){ const top=HH-.7, dist=top-y, ang=Math.min(1.1,Math.atan((it.rec.L*.62)/Math.max(1,dist))+.12);
     const spl=new T.SpotLight(0xfff0dc,3.2,dist*2.6,ang,.45,1.2); spl.position.set(it.x-it.side*1.2,top,it.z); spl.target.position.set(it.x,y,it.z); fishG.add(spl,spl.target); spl.userData.base=3.2; lightsAll.push(spl);
-    const can=new T.Mesh(new T.CylinderGeometry(.12,.18,.3,12),new T.MeshStandardMaterial({color:0x222222,metalness:.6,roughness:.4,emissive:0x332a1a})); can.position.copy(spl.position); fishG.add(can); }   /* 標本正上方的投射燈 */
+    deco('hanging_industrial_lamp',spl.position.x,HH-.42-1.36,spl.position.z,0,.55); spl.position.y=HH-1.7;   /* 投射燈的燈具：真實的工業吊燈（Poly Haven hanging_industrial_lamp），從桁架垂下來，光從燈罩口打向標本。以前是一個黑色圓筒 */ }   /* 標本正上方的投射燈 */
   it.ready=true; it.y=y; }
 const nmCache=new Map();
 function normalFrom(tex){ if(!tex||!tex.image) return null; if(nmCache.has(tex)) return nmCache.get(tex);
