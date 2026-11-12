@@ -7,6 +7,13 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 遊艇替換（下一輪直接做，座標已量好）：Yacht II by gogiart（agt14032013），CC BY，uid dadc775d1d044aee9f6744fa7b47648e；轉檔：gltf-transform simplify --ratio 0.4 --error 0.0008 → resize 1024 → draco（9.7 萬面、1.2MB；/tmp/sf/yacht.glb，容器重置要重抓）
+  預覽工具：/tmp/simsite/yv.html＋/tmp/yv.py（用遊戲同一套正規化：最長邊縮成 26m、z −4.5～21.5、畫 2m 格線的俯視與側視）
+  量到的（模型原始朝向，正規化後）：原始尺寸 x22.7 y39.3 z105.2（長邊在 z，不用轉 90°）；**船頭在 +z（21.5）、船尾在 −z**，遊戲要船頭在 −z → 要再轉 180°（遊戲座標 z' = 17 − z、x' = −x）
+  外框 x±2.81、y −0.97～8.74；吃水線（黑色船身與米色船底交界）約 y≈0.27 → 下沉量用 H*.13 左右再微調
+  甲板高度（原始朝向，由上往下打）：上層柚木大甲板 y≈3.92（z −3～15，船尾端放著小艇）；駕駛艙屋頂 z 7～13 高 5.0～6.5；前甲板（船頭）z 17～21 高 1.87～2.13；船尾下層甲板被上層蓋住（約 y 1.9，要從 y 3.5 往下打）
+  建議站位（遊戲座標）：釣位＝前甲板右舷 x'≈1.2、z'≈−2（原始 z≈19），甲板約 1.9～2.1，面向右舷；駕駛座＝上層甲板駕駛艙前方 x'=0、z'≈1.7（原始 z≈15.3），甲板約 3.8，面向船頭
+  要改：m.js attachYacht（檔名、轉 180°、下沉量）、yacht-layout.js（站位；甲板高度判斷不能再靠材質名 material_3，改成法線朝上＋可指定起始高度）、marine.js（新船不套 dressYacht、不加甲板五金；道具改放前甲板與駕駛位旁）、m.js RCREDIT 把「Frickie's yacht / dannzjs」換成新作者
 - 2026-11-13（接續被中斷的那一輪）已上線：
   · 換地點等新照片（h.js W.photoReady、d.js fadeOutWhenReady）——/tmp/trav1.log 驗證：湖→近海，黑幕等到照片好才拉開，uPhoto 最後是 1
   · 釣竿改用「Canna Da Pesca」by topfrank2013（CC BY 4.0，uid f8031fbbea9a4a9fbd3ab23ee6334c00，models/rod_real2.glb 4MB，無骨架）。c.js realRod：載入時把每個頂點換成（竿上位置 s、往捲線器側、往旁側），頂點著色器用 uRodPts（＝pts 曲線）擺回去，任何釣竿模型都適用；REEL_S=.185（手握處）。舊的 rod_real.glb（ergin3d，骨架版）已移除
