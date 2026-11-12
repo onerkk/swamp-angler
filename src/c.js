@@ -295,6 +295,42 @@ const AX=new T.Vector3(1,0,0), AY=new T.Vector3(0,1,0), AZ=new T.Vector3(0,0,1);
 const dir=new T.Vector3(), bdir=new T.Vector3(), tmp=new T.Vector3(), tmp2=new T.Vector3(), tan=new T.Vector3(), dn=new T.Vector3(), sd=new T.Vector3();
 const basis=new T.Matrix4();
 function rodAt(s,out){ const f=s*NS, i=Math.min(NS-1,Math.floor(f)); return out.copy(pts[i]).lerp(pts[i+1],f-i); }
+/* ===== 真實釣竿模型 =====
+   「Fishing Rod, Rigged and Animated」by ergin3d.com（Sketchfab，CC BY 4.0）：碳纖竿身、導環、紡車捲線器，附 10 節骨架。
+   彎曲仍然用上面那套算法（pts 這條曲線：越往竿尖越軟）：每一幀把模型的每一節骨頭擺到曲線上對應的位置與方向，竿身就跟著彎；
+   竿尖、導環、線杯的位置（釣線走的路徑）也還是用曲線算，所以拋竿、搏魚、斷線的手感完全不變。
+   模型載入成功才把原本用圓柱拼的竿身、導環、捲線器藏起來；載不到就維持原樣 */
+const realRod={ready:false,cont:null,bones:[],s:[],off:[],rq:[],rs:[],A:new T.Vector3(),D:new T.Vector3(),P0:new T.Vector3(),L:1};
+if(T.GLTFLoader) new T.GLTFLoader().load('models/rod_real.glb',g=>{ try{
+  const root=g.scene, cont=new T.Group(); cont.add(root); cont.updateMatrixWorld(true);
+  const chain=[], boxes=[]; root.traverse(o=>{ if(o.isBone&&/^Bone/i.test(o.name)) chain.push(o);
+    if(o.isMesh){ o.frustumCulled=false; const mn=((o.material&&o.material.name)||'')+' '+o.name; if(/Thread/i.test(mn)){ o.visible=false; return; }
+      if(o.material&&o.material.map) o.material.map.anisotropy=8; if(o.material&&'envMapIntensity' in o.material) o.material.envMapIntensity=.3;   /* 碳纖竿身金屬度高，天空反光太強會整支發白 */
+      if(!o.geometry.boundingBox) o.geometry.computeBoundingBox(); boxes.push([o,o.geometry.boundingBox]); } });
+  if(chain.length<4) return; const P=chain.map(b=>new T.Vector3().setFromMatrixPosition(b.matrixWorld));
+  const A=realRod.A.subVectors(P[P.length-1],P[0]).normalize(); let tmin=1e9,tmax=-1e9; const cs=[], v=new T.Vector3();
+  for(const [o,b] of boxes) for(let k=0;k<8;k++){ v.set(k&1?b.max.x:b.min.x,k&2?b.max.y:b.min.y,k&4?b.max.z:b.min.z).applyMatrix4(o.matrixWorld); const t=v.clone().sub(P[0]).dot(A); tmin=Math.min(tmin,t); tmax=Math.max(tmax,t); cs.push(v.clone()); }
+  realRod.L=tmax-tmin; realRod.P0.copy(P[0]).addScaledVector(A,tmin);
+  // 捲線器掛在竿子的哪一側：離竿身中心線最遠的那個角落的方向
+  let far=0; for(const p of cs){ const d=p.clone().sub(realRod.P0); d.addScaledVector(A,-d.dot(A)); if(d.length()>far){ far=d.length(); realRod.D.copy(d).normalize(); } }
+  chain.forEach((b,i)=>{ const d=P[i].clone().sub(realRod.P0), t=d.dot(A); realRod.s.push(Math.max(0,Math.min(1,t/realRod.L))); realRod.off.push(d.addScaledVector(A,-t));
+    realRod.rq.push(b.getWorldQuaternion(new T.Quaternion())); realRod.rs.push(b.getWorldScale(new T.Vector3())); });
+  realRod.bones=chain; realRod.cont=cont; rodGroup.add(cont); realRod.ready=true;
+  for(const m of segs) m.visible=false; for(const m of guides) m.visible=false; tipTop.visible=false; reel.visible=false;
+}catch(e){ console.warn('real rod',e); } },undefined,()=>console.warn('real rod: load failed'));
+const rrBm=new T.Matrix4(), rrBg=new T.Matrix4(), rrRot=new T.Quaternion(), rrQ=new T.Quaternion(), rrW=new T.Matrix4(), rrInv=new T.Matrix4(), rrP=new T.Vector3(), rrS=new T.Vector3(), rrT0=new T.Vector3(), rrD0=new T.Vector3(), rrX=new T.Vector3(), rrY=new T.Vector3(), rrZ=new T.Vector3();
+function poseRealRod(){ const R=realRod; if(!R.ready) return; const k=R_LEN/R.L;
+  // 模型的（竿身方向、捲線器方向）對到遊戲裡握把處的（竿子方向、正下方）
+  frameAt(.002); rrT0.copy(tan); rrD0.copy(dn);
+  rrY.copy(R.D).addScaledVector(R.A,-R.D.dot(R.A)).normalize(); rrZ.crossVectors(R.A,rrY); rrBm.makeBasis(R.A,rrY,rrZ);
+  rrZ.crossVectors(rrT0,rrD0).normalize(); rrY.crossVectors(rrZ,rrT0).normalize(); rrBg.makeBasis(rrT0,rrY,rrZ);
+  rrRot.setFromRotationMatrix(rrBg.multiply(rrBm.transpose()));
+  R.cont.quaternion.copy(rrRot); R.cont.scale.setScalar(k); R.cont.position.copy(pts[0]).sub(rrP.copy(R.P0).multiplyScalar(k).applyQuaternion(rrRot)); R.cont.updateMatrixWorld(true);
+  for(let i=0;i<R.bones.length;i++){ const b=R.bones[i], s=R.s[i]; rodAt(s,rrP); frameAt(Math.min(.999,Math.max(.001,s))); rrQ.setFromUnitVectors(rrT0,tan).multiply(rrRot);
+    rrP.add(rrX.copy(R.off[i]).multiplyScalar(k).applyQuaternion(rrQ)); rrS.copy(R.rs[i]).multiplyScalar(k);
+    rrW.compose(rrP,rrX_q.copy(rrQ).multiply(R.rq[i]),rrS).premultiply(rodGroup.matrixWorld);
+    rrInv.copy(b.parent.matrixWorld).invert(); rrW.premultiply(rrInv); rrW.decompose(b.position,b.quaternion,b.scale); b.updateMatrixWorld(true); } }
+const rrX_q=new T.Quaternion();
 function frameAt(s){ const i=Math.min(NS-1,Math.floor(s*NS)); tan.subVectors(pts[i+1],pts[i]).normalize(); dn.set(0,-1,0).addScaledVector(tan,tan.y).normalize(); sd.crossVectors(tan,dn).normalize(); }
 function updateRod(dt){
   rod.pitch+=(rod.pitchT-rod.pitch)*Math.min(1,dt*9);
@@ -316,6 +352,8 @@ function updateRod(dt){
   crank.rotation.z=rod.spin;
   rod.tipW.copy(pts[NS]); rodGroup.localToWorld(rod.tipW);
   reel.updateMatrixWorld(true); rod.spoolW.set(.058,-.085,0); reel.localToWorld(rod.spoolW);
+  rodGroup.updateMatrixWorld(true);
+  try{ poseRealRod(); }catch(e){ /* 真實模型擺姿勢出錯：退回原本的竿子，不讓遊戲壞掉 */ console.warn('real rod pose',e); realRod.ready=false; if(realRod.cont) realRod.cont.visible=false; for(const m of segs) m.visible=true; for(const m of guides) m.visible=true; tipTop.visible=true; reel.visible=true; }
 }
 
 /* ---------- 釣線（固定像素寬度的帶狀網格） ---------- */

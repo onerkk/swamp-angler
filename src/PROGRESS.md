@@ -7,6 +7,11 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-12 Sketchfab 下載管道可用：使用者提供 API token（不要寫進倉庫；容器裡放 /tmp/sf/.tok，重置後請使用者再貼一次或重新產生）。
+  用法：GET https://api.sketchfab.com/v3/search?type=models&q=…&downloadable=true，下載 GET /v3/models/{uid}/download，標頭 Authorization: Token <token>，回傳 glb／gltf 的短效網址
+  · 已上線：真實釣竿 models/rod_real.glb（「Fishing Rod, Rigged and Animated」by ergin3d.com，CC BY 4.0，uid 78991bf44cf54acb8660bef317d72c7a；10 節骨頭 Bone001..010 沿 +X）。c.js realRod／poseRealRod：沿用 pts 彎曲曲線，每幀把骨頭擺到曲線上；載入成功才藏掉程序竿，擺姿勢出錯會退回程序竿。
+    已確認：靜止時握在手上、捲線器在手下方。未確認：大彎曲（搏魚）時骨頭有沒有扭、竿色（已把環境反光降到 0.3）、捲線器握把不會轉、裝備升級不再改變竿子顏色
+  · 候選（已看過縮圖，都是 CC BY）：遊艇 Yacht II dadc775d1d044aee9f6744fa7b47648e（21.8 萬面）、Motor Yacht a9bc45ee36c04987b59c029862ee0d3b（60 萬面）；浮標 1228159338c74666aabdc0acd54f8ab6（已轉成 /tmp/sf/float.glb 2MB，未使用：原本的浮標做得很細，換掉效益低）；金屬餌桶 97195a30f56443e18e14729bb3718832；珊瑚礁實景掃描 4f134339…／0051900d…／109f3290…
 - 2026-11-12 真實度（使用者：主要需要真實模型）：
   · 標本館地板、牆、天花板、桁架改用 Poly Haven 實拍木料（models/home/wood_floor_deck／wood_plank_wall／roof_planks／dark_wood 的 _diff／_nor／_rough.jpg；地板、屋頂、桁架原圖偏橘紅，已用 PIL 降彩度壓暗）——截圖確認
   · 水族箱底櫃換真實櫃子：試過 modern_wooden_cabinet（2.44×0.68×0.68，要拉伸深度 1.7 倍），載入後沒有套用上去（場景裡找不到它的網格，也沒有錯誤訊息，原因未查），已還原，沒上線。dining_table 是鋪格子桌布的桌子，不適合
