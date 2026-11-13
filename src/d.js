@@ -504,6 +504,7 @@ function showCard(){
     if(save.catchLog.length>300) save.catchLog.length=300; G.logRec=save.catchLog[0]; }
   persist();
   if(window.__STORY&&!G.fd.item) window.__STORY.onCatch(fd,{zone:(SPOTS[G.spot]||{}).id,loc:G.loc,per:period(G.hour),rain:W.U.uRain.value>.25});
+  if(window.__PROMO&&!G.fd.item&&!G.fd.practice) window.__PROMO.onCatch(fd.sp);   /* 釣魚抽蝦皮折扣碼：由伺服器決定中不中 */
   { const xp=META.onCatch(fd,{perfect:!!(G.f&&G.f.perfect),per:period(G.hour)}), pm=window.__ECO?window.__ECO.priceMul(sp.id):1; $('cXp').textContent='+'+xp+' 經驗　'+(window.__ECO?window.__ECO.lastDrop():'')+(pm>1?'　🔥行情 ×'+pm:''); }
   ui.catch.style.setProperty('--rc',r.col);
   $('cLv').textContent=fd.lvl; $('cName').textContent=sp.name; $('cRar').textContent=r.name+' '+r.en+(fd.grade?'｜'+fd.grade:''); $('cSci').textContent=sp.sci;

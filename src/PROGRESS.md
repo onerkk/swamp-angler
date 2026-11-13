@@ -7,6 +7,8 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-13 釣魚抽蝦皮折扣碼：伺服器在 server/（Node，firebase-admin 驗證 Google 登入、Firestore 交易；集合 promo/state、promoUsers/{uid}；每帳號最多中一次、間隔 12 秒、每天 300 次、高等級魚每天 6 次）。折扣碼只放 Render 環境變數 PROMO_CODES，絕不寫進倉庫。遊戲端 src/promo.js（開始畫面橫幅、右側「剩 N 份」、規則與得獎者名單（名字前兩字＋＊）、中獎全螢幕特效與複製）；d.js 釣到魚時呼叫 __PROMO.onCatch(sp)。a.html window.PROMO_URL='' → 部署後填上網址才會出現。
+  使用者待辦：Render 新增 Web Service（Root Directory＝server）、環境變數 FIREBASE_SA／PROMO_CODES／PROMO_END；確認 Firestore 規則不允許前端讀 promo 與 promoUsers
 - 2026-11-13 女鬼 A 方案（x.js）：白衣女鬼 ghost.glb 加 wetGhost 材質（越往下越濕越暗越亮、髮尾濕、水往下流的反光、去色灰白）、身上 60 顆水滴往下滴進湖起漣漪、浮上來改成一頓一頓。獨立頁 /tmp/simsite/gw.html 確認著色器可編譯。
 - 木船進水：f.js 船艙水線遮罩改成照船身輪廓（水線以上 0～0.32m 的頂點切 28 段取半寬、相鄰取最大、內縮 4cm）做的形狀，取代橢圓。離線量測：艙底 y=-0.18（在水面下）、半寬最寬 .77m
 - 2026-11-13 獨木舟換成木船：models/canoe.glb ＝「Wooden Boat」donnichols CC BY（拿掉兩支槳、貼圖轉 JPEG、draco，875KB；原檔船頭在 +z，載入時轉 π）。f.js 改成等比縮放長 4m（寬約 1.55m），水線遮罩 .62×1.72，碰撞盒 ±.75。z.js 小屋碼頭邊的展示船也用同一檔（等比 2.8m）。貞子：有版權，已婉拒，提供原創幽靈造型（加強現有白衣女鬼或另找原創模型）兩個選項待使用者回覆
