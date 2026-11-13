@@ -1,4 +1,4 @@
-/*APPV:20261113133224*/
+/*APPV:20261113134124*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -4109,7 +4109,7 @@ const canoeCollider=W.fishingPhysics.addBox({x:-.75,y:-.3,z:-2.35},{x:.75,y:.35,
 canoeCollider.update=()=>{const b=ctx.base();canoeCollider.boxes[0].frame={x:b.x,z:b.z,head:ctx.head()};
 };
 /* 木船：「Wooden Boat」by donnichols（Sketchfab，CC BY 4.0），實拍質感的老木划艇（原檔附的兩支槳拿掉了，用遊戲自己的槳）。載入後取代程式做的塑膠艇；船頭朝 −Z */
-if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const source=x.material,mp=source.map; if(mp){ tuneTextureSampling(T,mp,W.renderer.capabilities.getMaxAnisotropy()); } x.material=new T.MeshStandardMaterial({map:mp||null,normalMap:source.normalMap||null,roughnessMap:source.roughnessMap||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.85,metalness:0}); x.castShadow=x.receiveShadow=true; } });
+if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const source=x.material,mp=source.map; if(mp){ tuneTextureSampling(T,mp,W.renderer.capabilities.getMaxAnisotropy()); } x.material=new T.MeshStandardMaterial({map:mp||null,normalMap:source.normalMap||null,roughnessMap:source.roughnessMap||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.85,metalness:0,side:T.DoubleSide});   /* 木船的船殼、艙底只有一層、法線朝外：坐在船裡看到的都是背面，不雙面畫就會整片被剔除，直接看穿到湖水 */ x.castShadow=x.receiveShadow=true; } });
   const w=new T.Group(); w.add(o); w.rotation.y=Math.PI; w.updateMatrixWorld(true); let b=new T.Box3().setFromObject(w); const sz=b.getSize(new T.Vector3()); w.scale.setScalar(4.0/Math.max(sz.z,1e-6));   // 依真實比例等比縮放：長 4 公尺（寬約 1.55、深約 0.6 公尺），不再壓扁
   w.updateMatrixWorld(true); b=new T.Box3().setFromObject(w); const c=b.getCenter(new T.Vector3()); w.position.set(-c.x,-.2-b.min.y,-.35-c.z);
   o.traverse(x=>{ if(x.isMesh) x.renderOrder=-2; });
@@ -4118,7 +4118,7 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene
   /* 遮罩的形狀照船身實際的輪廓算：在水線以上一點點的高度，把船身切成一段段，取每段船舷內側的寬度，連成一圈。
      以前是一個橢圓，木船船頭尖、船尾方，橢圓蓋不到船尾兩角和船頭，湖水和漣漪就從那裡透進船艙 */
   let capGeo=null; try{ w.updateMatrixWorld(true); const inv=new T.Matrix4(), v=new T.Vector3(), bb=new T.Box3().setFromObject(w);   /* w 還沒掛到船上：它的世界座標就是船的座標 */
-    const NZ=28, z0=bb.min.z, z1=bb.max.z, half=new Array(NZ+1).fill(0), yMin=.0, yMax=.32;
+    const NZ=28, z0=bb.min.z, z1=bb.max.z, half=new Array(NZ+1).fill(0), yMin=.1, yMax=.4;
     w.traverse(m=>{ if(!m.isMesh) return; const P=m.geometry.attributes.position, M=new T.Matrix4().multiplyMatrices(inv,m.matrixWorld); for(let i=0;i<P.count;i++){ v.fromBufferAttribute(P,i).applyMatrix4(M); if(v.y<yMin||v.y>yMax) continue; const k=Math.round((v.z-z0)/(z1-z0)*NZ); if(k>=0&&k<=NZ) half[k]=Math.max(half[k],Math.abs(v.x)); } });
     const hs=half.map((h,k)=>Math.max(h,half[k-1]||0,half[k+1]||0));   /* 頂點稀疏的地方取左右兩段的最大值補起來 */
     const pts=[]; for(let k=0;k<=NZ;k++){ const z=z0+(z1-z0)*k/NZ; if(hs[k]>.05) pts.push([Math.max(0,hs[k]-.04),z]); }
@@ -4126,7 +4126,8 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene
       capGeo=new T.ShapeGeometry(sh); capGeo.rotateX(Math.PI/2); } }catch(e){ console.warn('hull cap',e); }
   const fromHull=!!capGeo; if(!capGeo){ capGeo=new T.CircleGeometry(1,40); capGeo.rotateX(-Math.PI/2); }
   const cap=new T.Mesh(capGeo,new T.MeshBasicMaterial({colorWrite:false,depthWrite:true,side:T.DoubleSide}));
-  if(fromHull) cap.position.set(0,.045,0); else { cap.scale.set(.62,1,1.72); cap.position.set(0,.045,-.35); } cap.renderOrder=-1; cap.frustumCulled=false; cap.userData.hullCap=true; boat.add(cap);
+  /* 遮罩高度：湖面有風浪，浪峰會高過水線 10～20 公分。遮罩放在 .045 時浪一來就從遮罩上面透進船裡（漣漪、綠色湖水）。放到 .24（船舷內側，比任何浪都高、比坐著的視線低） */
+  if(fromHull) cap.position.set(0,.24,0); else { cap.scale.set(.62,1,1.72); cap.position.set(0,.045,-.35); } cap.renderOrder=-1; cap.frustumCulled=false; cap.userData.hullCap=true; boat.add(cap);
   boat.children.forEach(ch=>{ if(ch!==padG&&ch!==w&&ch!==cap) ch.visible=false; }); boat.add(w); });   // 只藏舊塑膠艇的船身，槳要留著
 { const yel=new T.MeshStandardMaterial({color:0xf2b705,roughness:.32}), blk=new T.MeshStandardMaterial({color:0x151515,roughness:.6}), gry=new T.MeshStandardMaterial({color:0x33363b,metalness:.5,roughness:.4});
   const hull=new T.Mesh(new T.SphereGeometry(1,48,20),yel); hull.scale.set(.36,.22,1.95); hull.position.set(0,.02,-.15); boat.add(hull);
@@ -8799,7 +8800,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113133224'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113134124'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
