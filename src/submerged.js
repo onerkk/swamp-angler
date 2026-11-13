@@ -23,8 +23,8 @@ function createSubmergedRenderer({renderer:R,scene,camera,U,WU}){
         vSubWorld=(modelMatrix*subVertex).xyz;`);
       s.fragmentShader='varying vec3 vSubWorld;\nuniform float uSubPass,uSubTime,uSubSea,uSubSolid;\nuniform vec3 uSubWind;\n'+waterWaveGLSL()+'\n'+s.fragmentShader.replace(/}\s*$/,`
         float subDepth=waterSample(vSubWorld.xz,uSubTime,uSubWind,uSubSea).y-vSubWorld.y;
-        if(uSubPass<.5){if(subDepth>0.0)discard;}
-        else{
+        if(uSubPass==0.0){if(subDepth>0.0)discard;}
+        else if(uSubPass>.5){
           if(subDepth<=0.0)discard;
           float waterFade=exp(-subDepth*mix(1.05,.5,uSubSea));
           gl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(.025,.09,.075),1.0-exp(-subDepth*.55));

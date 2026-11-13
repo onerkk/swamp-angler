@@ -71,6 +71,8 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 @keyframes pulse{from{transform:scale(1)}to{transform:scale(1.09)}}
 #actSub{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 4px);font-size:12px;color:var(--fg-dim);white-space:nowrap;z-index:5;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 #catch{position:fixed;top:0;right:0;bottom:0;left:0;z-index:7;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;padding:calc(env(safe-area-inset-top,0px) + 66px) 14px calc(env(safe-area-inset-bottom,0px) + 16px)}
+#catchPanel{display:contents}
+#catchView{display:none}
 #tag{align-self:center;display:flex;transform:skewX(-12deg);filter:drop-shadow(0 6px 14px rgba(0,0,0,.5));animation:tagIn .5s cubic-bezier(.2,1.4,.4,1) both}
 .tg .lv{background:#f4f1ea;color:#16191b;padding:6px 13px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .tg .lv>*{transform:skewX(12deg)}
@@ -312,6 +314,35 @@ body.fighting #top,body.fighting #top2,body.fighting #magWin,body.fighting .hotC
   .chip{padding:5px 10px}
   #magWin{top:calc(env(safe-area-inset-top,0px) + 54px)!important}
 }
+@media (orientation:landscape){
+  body[data-fishing-state="land"] :is(#top,#top2,#bCam,#act,#actSub){visibility:hidden}
+  body.catching #bCam{display:none!important}
+  #catch:not(.mermaidCatch){
+    display:grid;grid-template-columns:minmax(0,1fr) min(49%,clamp(220px,42vw,396px));grid-template-rows:minmax(0,1fr);gap:12px;
+    padding:max(10px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(10px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))
+  }
+  #catch:not(.mermaidCatch) #catchView{display:block;grid-column:1}
+  #catch:not(.mermaidCatch) #catchPanel{
+    display:flex;flex-direction:column;align-self:center;gap:8px;max-height:100%;min-width:0;
+    overflow:auto;overscroll-behavior:contain;touch-action:pan-y;pointer-events:auto;padding:2px
+  }
+  #catch:not(.mermaidCatch) #tag{flex:none;max-width:calc(100% - 16px);margin:0 8px}
+  #catch:not(.mermaidCatch) #tag .lv b{font-size:26px}
+  #catch:not(.mermaidCatch) #tag .nm{padding:5px 11px;min-width:0}
+  #catch:not(.mermaidCatch) #tag .nm span{letter-spacing:.03em}
+  #catch:not(.mermaidCatch) .card{display:flex;flex-direction:column;flex:none;width:100%;padding:10px;border-radius:16px;animation:none}
+  #catch:not(.mermaidCatch) .ch{font-size:12px;gap:3px 6px}
+  #catch:not(.mermaidCatch) .stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:7px 0}
+  #catch:not(.mermaidCatch) .stat{padding:5px 2px;border-radius:9px}
+  #catch:not(.mermaidCatch) .stat b{font-size:14px;overflow-wrap:anywhere}
+  #catch:not(.mermaidCatch) .desc{order:1;font-size:12px;line-height:1.45;margin:8px 0 0}
+  #catch:not(.mermaidCatch) .btns{gap:6px}
+  #catch:not(.mermaidCatch) .btn{min-width:0;height:auto;min-height:44px;padding:5px;font-size:14px;border-radius:10px}
+  #catch:not(.mermaidCatch) .btn.ph{flex:0 0 44px}
+  #catch:not(.mermaidCatch) .catch-options{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  #catch:not(.mermaidCatch) .catch-options .btn{flex:1 1 calc(50% - 3px);width:auto;margin:0;font-size:12px}
+  #catch:not(.mermaidCatch) #bShot{flex-basis:100%}
+}
 /* Let the fishing scene carry the view; controls retain their original touch targets. */
 body.underwater #top2,body.underwater #joy,body.underwater #magWin,body.underwater #hotChip,body.underwater #castTag{opacity:0;pointer-events:none}
 body.underwater #top{opacity:.28}
@@ -412,16 +443,20 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:fa
 <div id="mer" class="hidden"><img id="merImg" alt="美人魚"><div id="merTx"></div><button class="btn" id="merX">繼續</button></div>
 <div id="joy" class="hidden" aria-label="划船搖桿"><div id="joyK"></div><span>划船</span></div>
 <div id="catch" class="hidden">
-  <div id="tag" class="tg"><div class="lv"><small>LVL</small><b id="cLv">1</b></div><div class="nm"><b id="cName"></b><span id="cRar"></span></div></div>
-  <div class="card">
-    <div class="ch"><span id="cNew" class="badge hidden">新紀錄</span><span id="cSci"></span><span id="cMedal" class="badge hidden"></span><span id="cXp" class="xpg"></span></div>
-    <div class="stats">
-      <div class="stat"><small>長度</small><b id="cLen"></b></div>
-      <div class="stat"><small>重量</small><b id="cW"></b></div>
-      <div class="stat"><small>價值</small><b id="cVal"></b></div>
+  <div id="catchView" aria-hidden="true"></div>
+  <div id="catchPanel">
+    <div id="tag" class="tg"><div class="lv"><small>LVL</small><b id="cLv">1</b></div><div class="nm"><b id="cName"></b><span id="cRar"></span></div></div>
+    <div class="card">
+      <div class="ch"><span id="cNew" class="badge hidden">新紀錄</span><span id="cSci"></span><span id="cMedal" class="badge hidden"></span><span id="cXp" class="xpg"></span></div>
+      <div class="stats">
+        <div class="stat"><small>長度</small><b id="cLen"></b></div>
+        <div class="stat"><small>重量</small><b id="cW"></b></div>
+        <div class="stat"><small>價值</small><b id="cVal"></b></div>
+      </div>
+      <p class="desc" id="cDesc"></p>
+      <div class="btns"><button class="btn ph" id="bPhoto" aria-label="拍照留念">📸</button><button class="btn" id="bRel">放生</button><button class="btn pri" id="bSell">賣出</button></div>
+      <div class="catch-options"><button class="btn home" id="bHome">🏠 帶回家</button><button class="btn home" id="bGrill">🔥 放進保冷箱，帶回去烤</button><button class="btn" id="bShot" style="background:rgba(255,255,255,.12)">📸 留影（存進魚獲紀錄）</button></div>
     </div>
-    <p class="desc" id="cDesc"></p>
-    <div class="btns"><button class="btn ph" id="bPhoto" aria-label="拍照留念">📸</button><button class="btn" id="bRel">放生</button><button class="btn pri" id="bSell">賣出</button></div><button class="btn home" id="bHome">🏠 帶回家</button><button class="btn home" id="bGrill">🔥 放進保冷箱，帶回去烤</button><button class="btn" id="bShot" style="background:rgba(255,255,255,.12)">📸 留影（存進魚獲紀錄）</button>
   </div>
 </div>
 <div id="sheet" class="hidden"><div class="sheet"><div class="sh-hd"><b id="shT"></b><button class="ib" id="shX" aria-label="關閉">✕</button></div><div id="shB"></div></div></div>

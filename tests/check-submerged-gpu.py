@@ -22,8 +22,9 @@ gen=f('glGenBuffers',None,[C.c_int,C.POINTER(C.c_uint)]);bind=f('glBindBuffer',N
 verts=np.array([[-.8,-.8,0],[.8,-.8,0],[-.8,.8,0],[.8,-.8,0],[.8,.8,0],[-.8,.8,0]],np.float32);data(0x8892,verts.nbytes,verts.ctypes.data,0x88E4);l=at(p,b'position');ena(l);attr(l,3,0x1406,0,0,None)
 viewport=f('glViewport',None,[C.c_int]*4);viewport(0,0,512,384);clr=f('glClearColor',None,[C.c_float]*4);clear=f('glClear',None,[C.c_uint]);draw=f('glDrawArrays',None,[C.c_uint,C.c_int,C.c_int]);read=f('glReadPixels',None,[C.c_int,C.c_int,C.c_int,C.c_int,C.c_uint,C.c_uint,C.c_void_p])
 frames=[]
-for mode in [0,1]:
+for mode in [0,1,-1]:
  u1(loc(p,b'uSubPass'),mode);clr(0,0,0,0);clear(0x4000);draw(4,0,6);a=np.zeros((384,512,4),np.uint8);read(0,0,512,384,0x1908,0x1401,a.ctypes.data);frames.append(a)
 assert frames[0][270,256,3]>250 and frames[0][100,256,3]==0,'submerged body incorrectly appears above the water'
 assert frames[1][270,256,3]==0 and frames[1][100,256,3]>80,'underwater body missing from transmission target'
-print('Immersion masks verified: exposed head only in main pass; submerged body only in water transmission pass.')
+assert frames[2][270,256,3]>250 and frames[2][100,256,3]>250,'held catch should render on both sides of the waterline'
+print('Immersion masks verified for the main, underwater and held-catch passes.')

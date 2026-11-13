@@ -263,7 +263,7 @@ const goldMat=new T.MeshStandardMaterial({color:0xd9b25a, metalness:1, roughness
 const spoolTex=texC(16,128,(g,w,h)=>{ for(let y=0;y<h;y++){ const v=170+Math.round(60*Math.abs(Math.sin(y*1.7))); g.fillStyle=`rgb(${v-30},${v},${v+10})`; g.fillRect(0,y,w,1); } },6,1);
 const blueAno=new T.MeshPhysicalMaterial({color:0xffffff,map:spoolTex,metalness:.2,roughness:.35,clearcoat:.6});   // 線杯上纏滿的透明尼龍線
 const rRad=s=>s<.1?.0155:s<.155?.0105:s<.21?.0128:lerp(.0082,.0021,(s-.21)/.79);
-const rodGroup=new T.Group(); W.head.add(rodGroup);
+const rodGroup=new T.Group(); rodGroup.userData.viewmodel=true; W.head.add(rodGroup);
 const segs=[];
 for(let i=0;i<NS;i++){ const s0=i/NS, s1=(i+1)/NS, sm=(s0+s1)/2;
   const mat=sm<.1?gripMat:sm<.155?chromeMat:sm<.21?gripMat:blankMat;

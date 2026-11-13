@@ -756,24 +756,27 @@ let _shSig='', _shC=new T.Vector3(), _shD=new T.Vector3();
 function shadowSigChanged(){ camera.getWorldPosition(_shC); camera.getWorldDirection(_shD); const sd=U.uSunDir.value;
   const sig=[sd.x,sd.y,sd.z].map(v=>Math.round(v*300)).join(',')+'|'+[_shC.x,_shC.y,_shC.z].map(v=>Math.round(v*5)).join(',')+'|'+[_shD.x,_shD.y,_shD.z].map(v=>Math.round(v*30)).join(',');
   if(sig===_shSig) return false; _shSig=sig; return true; }
-/* ===== 第一人稱圖層（根治手和釣竿穿模）=====
-   手臂、釣竿、捲線器放在獨立的圖層：主畫面畫完之後清掉深度，再單獨畫它們，所以它們永遠畫在最前面，不會跟船舷、座椅、碼頭欄杆互相穿插。
-   這是第一人稱遊戲的標準做法；之前用移動站位閃開，只要船或地點換了、視角一轉就又會穿。
-   釣線、浮標、魚還是在場景裡照遠近正常遮擋。所有燈也要照到這個圖層 */
-const VM=2; let vmTick=0;
-function markViewModel(){ const mark=o=>o.traverse(m=>{ if((m.isMesh||m.isSkinnedMesh||m.isLine||m.isPoints)&&!m.layers.test(vmLayers)) m.layers.set(VM); });
-  /* 鏡頭往上的每一層（頭、身體……）底下掛的東西，都是跟著鏡頭走的第一人稱物件（釣竿、捲線器）；鏡頭本身那一支不算 */
-  for(let p=camera, up=camera.parent; up&&up!==scene; p=up, up=up.parent) up.children.forEach(ch=>{ if(ch!==p) mark(ch); });
-  scene.children.forEach(ch=>{ if(ch.userData&&ch.userData.viewmodel) mark(ch); });
-  scene.traverse(o=>{ if(o.isLight) o.layers.enable(VM); }); }
-const vmLayers=new T.Layers(); vmLayers.set(VM); let W_head=null;
-function renderViewModel(){ if(window.__noVM) return; if(!W_head) W_head=camera.parent; if(vmTick--<=0){ vmTick=30; try{ markViewModel(); }catch(e){} }
-  const bg=scene.background, ac=renderer.autoClear, tone=renderer.toneMapping, enc=renderer.outputEncoding;
-  try{ scene.background=null; renderer.autoClear=false; renderer.setRenderTarget(null); renderer.clearDepth(); camera.layers.set(VM); radiance.render(scene,camera); }
+/* The rod and hands always draw in front of the boat. A held catch joins
+   this pass for presentation and keeps its world and underwater layers. */
+const VM=2; let vmTick=0,heldCatch=null;
+function markViewModel(){
+  for(const parent of [head,scene])for(const root of parent.children){
+    if(root.userData.viewmodel)root.traverse(o=>{if(o.isMesh||o.isLine||o.isPoints)o.layers.set(VM);});
+  }
+  scene.traverse(o=>{if(o.isLight)o.layers.enable(VM);});
+}
+function renderViewModel(){ if(window.__noVM) return; if(vmTick--<=0){ vmTick=30; markViewModel(); }
+  const bg=scene.background, ac=renderer.autoClear, tone=renderer.toneMapping, enc=renderer.outputEncoding,subPass=submerged.pass.value;
+  try{ scene.background=null; renderer.autoClear=false; renderer.setRenderTarget(null); renderer.clearDepth(); camera.layers.set(VM); submerged.pass.value=-1; radiance.render(scene,camera); }
   catch(e){ window.__noVM=true; console.warn('viewmodel off',e); }
-  finally{ camera.layers.set(0); scene.background=bg; renderer.autoClear=ac; renderer.toneMapping=tone; renderer.outputEncoding=enc; } }
+  finally{ submerged.pass.value=subPass; camera.layers.set(0); scene.background=bg; renderer.autoClear=ac; renderer.toneMapping=tone; renderer.outputEncoding=enc; } }
+const catchLayers=new Map();
 function render(){prepareScene(scene);const oldEnv=scene.environment;if(window.__effectBudget?.environment===false)scene.environment=null;const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
- try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz??20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=renderer.shadowMap.enabled&&hz>0&&(!sunLight.shadow.map||now-lastShadow>=1/hz&&(shadowSigChanged()||now-lastShadow>=.5));if(renderer.shadowMap.needsUpdate)lastShadow=now;
+ try{
+  if(heldCatch&&!window.__noVM)heldCatch.traverseVisible(o=>{
+    if(o.isMesh||o.isSprite){catchLayers.set(o,o.layers.mask);o.layers.set(VM);}
+  });
+  const now=U.uTime.value,hz=window.__effectBudget?.shadowHz??20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=renderer.shadowMap.enabled&&hz>0&&(!sunLight.shadow.map||now-lastShadow>=1/hz&&(shadowSigChanged()||now-lastShadow>=.5));if(renderer.shadowMap.needsUpdate)lastShadow=now;
   const shadowNow=renderer.shadowMap.needsUpdate;
   pass('sub',()=>submerged.render());
   if(reflEnabled){try{pass('refl',renderRefl);}catch(e){reflEnabled=false;WU.uReflOn.value=0;console.warn('refl off',e);}}
@@ -784,7 +787,7 @@ function render(){prepareScene(scene);const oldEnv=scene.environment;if(window._
   { const rp=raysParams(); if(rp){ try{ godRays.render(rp); }catch(e){ window.__noRays=true; console.warn('rays off',e); } } }
   renderViewModel();
   passStats.main.shadow=shadowNow;passStats.main.shadowSize=renderer.shadowMap.enabled?sunLight.shadow.mapSize.x:0;passStats.refl.w=reflRT.width;passStats.refl.h=reflRT.height;passStats.sub.w=submerged.target.width;passStats.sub.h=submerged.target.height;passStats.sub.on=WU.uSubmergedOn.value>0;passStats.refl.on=WU.uReflOn.value>0;
- }finally{scene.environment=oldEnv;renderer.shadowMap.autoUpdate=auto;renderer.shadowMap.needsUpdate=request;}
+ }finally{for(const [o,mask] of catchLayers)o.layers.mask=mask;catchLayers.clear();scene.environment=oldEnv;renderer.shadowMap.autoUpdate=auto;renderer.shadowMap.needsUpdate=request;}
 }
 // 每個繪製階段的提交時間與繪製次數，給診斷報告判斷瓶頸在哪一個階段（倒影、水下、主畫面＋陰影）
 const passStats=window.__passStats={sub:{ms:0,calls:0,tris:0},refl:{ms:0,calls:0,tris:0},main:{ms:0,calls:0,tris:0,shadow:false,shadowSize:0}};
@@ -803,5 +806,5 @@ function setWind(x,z,s){ U.uWind.value.set(x,z,s); }
 const WT={d:new T.Vector3(.010,.019,.011),s:new T.Vector3(.018,.045,.026)};
 function setWaterTint(d,s){ WT.d.set(d[0],d[1],d[2]); WT.s.set(s[0],s[1],s[2]); }
 function tintTick(dt){ const k=Math.min(1,dt*.6); WU.uDeep.value.lerp(WT.d,k); WU.uScatter.value.lerp(WT.s,k); }
-return { godRays,raysOn,setEffects,prepareScene,updateEnvironment,resetGraphics,suspendEffects,invalidateEnvironment,interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, render, info };
+return { godRays,raysOn,setEffects,prepareScene,updateEnvironment,resetGraphics,suspendEffects,invalidateEnvironment,interiorReflection,radiance,qualityTextures,setWaterDetail,optics,setShadows,submerged,setWaterTint, tintTick, setIce, setRefl, reflHide:o=>reflHide.push(o), setSea, isSea:()=>seaMode, setPhotoHook, setPhotoActive, setWind, setWeather, renderer, scene, camera, player, head, U, EYE_Y, shoreR, setTime, update, addRipple, swell, resize, setPR, getPR:()=>pr, setHeldCatch:o=>{heldCatch=o;}, render, info };
 }

@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),T=require('../vendor/three.min.js');
-const {FISHING_VIEW,fishingViewPitch,underwaterViewDistance}=require('../src/presentation.js');
+const {FISHING_VIEW,fishingViewPitch,underwaterViewDistance,catchViewPosition}=require('../src/presentation.js');
 test('surface camera keeps the float in the clear central area across lake, sea and ice distances',()=>{
  for(const [eye,d]of [[2.4,8],[2.4,20],[2.4,60],[4.5,15],[4.5,45],[1.6,1.6]]){
   const cam=new T.PerspectiveCamera(FISHING_VIEW.fovPortrait,390/844,.04,2000);cam.position.y=eye;cam.rotation.x=fishingViewPitch('wait',d,eye,eye>3);cam.updateMatrixWorld(true);
@@ -23,5 +23,31 @@ test('underwater close-up fits the whole fish across phone aspect ratios',()=>{
  for(const aspect of [320/640,390/844,430/932,844/390])for(const length of [.12,.48,1.8,4]){
   const fov=aspect<1?54:46,d=underwaterViewDistance(length,aspect,fov,0),width=2*d*Math.tan(fov*Math.PI/360)*aspect;
   assert(length/width<=.741);assert(d>=.7);
+ }
+});
+test('the whole catch projects into the left display area on short landscape screens',()=>{
+ const models=[
+  [[-.53,-.04,-.03],[.52,.07,.08],1.214],
+  [[-.55,-.29,-.18],[.51,.33,.14],4],
+  [[-.54,-.17,-.41],[.48,.09,.43],1.55],
+  [[-.19,-.52,-.22],[.27,.49,.14],.4],
+ ];
+ for(const [width,height,rect]of [
+  [568,262,{left:23,top:10,width:273,height:240}],
+  [768,354,{left:12,top:10,width:409,height:334}],
+  [932,430,{left:47,top:10,width:449,height:389}],
+ ])for(const fov of [43,50,52])for(const [min,max,scale]of models){
+  const camera=new T.PerspectiveCamera(fov,width/height,.04,2500);
+  const bounds=new T.Box3(new T.Vector3(...min),new T.Vector3(...max));
+  const centre=catchViewPosition(new T.Vector3(),camera,bounds,rect,width,height,scale);
+  const screen=new T.Box2();
+  for(const x of [min[0],max[0]])for(const y of [min[1],max[1]])for(const z of [min[2],max[2]]){
+   const p=new T.Vector3(x,y,z).multiplyScalar(scale).add(centre).project(camera);
+   assert(p.z>-1&&p.z<1);
+   screen.expandByPoint(new T.Vector2((p.x+1)*width/2,(1-p.y)*height/2));
+  }
+  assert(screen.min.x>rect.left&&screen.max.x<rect.left+rect.width);
+  assert(screen.min.y>rect.top&&screen.max.y<rect.top+rect.height);
+  assert(Math.max((screen.max.x-screen.min.x)/rect.width,(screen.max.y-screen.min.y)/rect.height)>.45);
  }
 });
