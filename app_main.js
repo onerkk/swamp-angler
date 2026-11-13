@@ -1,4 +1,4 @@
-/*APPV:20261113001822*/
+/*APPV:20261113003421*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -1320,7 +1320,7 @@ function addMarineProps(T,wrap,fittings){ const props=new T.Group(); props.name=
   const deckY=(x,z)=>{ wrap.updateMatrixWorld(true); rc.set(new T.Vector3(x,9,z).applyMatrix4(wrap.matrixWorld),down); inv.copy(wrap.matrixWorld).invert();
     for(const h of rc.intersectObject(wrap,true)){ let skip=false; for(let p=h.object;p;p=p.parent) if(p===fittings||p===props){ skip=true; break; } if(!skip) return h.point.clone().applyMatrix4(inv).y; } return null; };
   const put=(name,x,z,ry,rx)=>realProp(T,name,o=>{ const y=deckY(x,z); if(y==null) return; props.add(seatProp(T,o,x,y,z,ry,rx)); });
-  put('plastic_crate_01',.2,-1.3,.25); put('metal_toolbox',-.75,-.5,-.3); put('wooden_bucket_01',.15,.3,0); }   // 前甲板釣位旁：魚箱、工具箱、水桶（船上本來就有救生圈與小艇）
+  put('plastic_crate_01',-.9,-1.4,.25); put('metal_toolbox',-.9,.1,-.3); put('wooden_bucket_01',-.45,-2.0,0); }   /* 都放在左舷側，不擋在釣位（右舷 x≈.25）的腳邊 */   // 前甲板釣位旁：魚箱、工具箱、水桶（船上本來就有救生圈與小艇）
 function addMarineHardware(T,wrap,deck,materials){
  // Dimensions and fittings are in metres, measured after the hull is normalized.
  const fittings=new T.Group();fittings.name='Marine deck fittings';wrap.add(fittings);
@@ -1353,7 +1353,8 @@ function yachtDeckHeight(T,root,x,z,fallback,top){
  return hit?root.worldToLocal(hit.point.clone()).y:fallback;
 }
 /* 釣位：船頭前甲板的右舷側（開放、離水面近，面向右舷）；駕駛座：上層甲板、駕駛艙正前方（面向船頭，看得到整個前甲板） */
-function yachtStations(T,root){return{fishing:{x:1.0,z:-.5,deck:yachtDeckHeight(T,root,1.0,-.5,1.6),yaw:-Math.PI/2},helm:{x:0,z:2.4,deck:yachtDeckHeight(T,root,0,2.4,3.45),yaw:0}};}
+/* 釣位離舷牆要留 1 公尺以上（舷牆在 x≈1.4）：站太近時第一人稱的手臂和竿子會穿過欄杆 */
+function yachtStations(T,root){return{fishing:{x:.25,z:-.5,deck:yachtDeckHeight(T,root,.25,-.5,1.6),yaw:-Math.PI/2},helm:{x:0,z:2.4,deck:yachtDeckHeight(T,root,0,2.4,3.45),yaw:0}};}
 function yachtAnglerPose(T,boat,station){boat.updateMatrixWorld(true);return{position:boat.localToWorld(new T.Vector3(station.x,station.deck+1.62,station.z)),yaw:station.yaw};}
 if(typeof module!=='undefined'&&module.exports)module.exports={yachtDeckHeight,yachtStations,yachtAnglerPose};
 /* Single beauty pass. Expensive screen-space ray marching has been removed. */
@@ -5593,6 +5594,19 @@ function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene
   // 船身尺寸（船首、船尾、半寬、吃水線）：航行的艏浪、航跡、水花要從船身真正的位置出來
   { wrap.updateMatrixWorld(true); const hb=new T.Box3().setFromObject(wrap); host.userData.hull={bow:hb.min.z,stern:hb.max.z,beam:(hb.max.x-hb.min.x)/2,deckBow:yachtDeckHeight(T,wrap,0,hb.min.z+5,2.6),deckMain:deck}; }
   obj.traverse(m=>{ m.frustumCulled=false; if(m.isMesh) m.castShadow=false; });
+  /* 船身質感：這個模型的材質全部是霧面、沒有金屬、玻璃是一片平的青色，近看像玩具。
+     依每個材質貼圖的平均顏色分類後換成該有的質感：玻璃（深色、會反射天空）、白色船漆（亮面）、黑色船身漆、金屬五金、柚木（緞面） */
+  try{ const cv=document.createElement('canvas'); cv.width=cv.height=4; const cx=cv.getContext('2d'), seen=new Map();
+    const avg=m=>{ if(!m.map||!m.map.image) return [m.color.r,m.color.g,m.color.b]; try{ cx.clearRect(0,0,4,4); cx.drawImage(m.map.image,0,0,4,4); const d=cx.getImageData(0,0,4,4).data; let r=0,g=0,b=0; for(let i=0;i<64;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; } return [r/4080,g/4080,b/4080]; }catch(e){ return [m.color.r,m.color.g,m.color.b]; } };
+    obj.traverse(o=>{ if(!o.isMesh||!o.material||Array.isArray(o.material)) return; let m=seen.get(o.material); if(!m){ const src=o.material; m=src.clone(); seen.set(src,m);
+        const [r,g,b]=avg(src), lum=(r+g+b)/3, mx=Math.max(r,g,b), mn=Math.min(r,g,b), sat=mx>0?(mx-mn)/mx:0; m.metalness=0;
+        if(g>r*1.2&&b>r*1.2&&lum>.45){ m.map=null; m.color.setRGB(.02,.07,.09); m.roughness=.05; m.envMapIntensity=1.7; m.name='yacht glass'; }                    // 玻璃
+        else if(lum>.72&&sat<.18){ m.roughness=.3; m.envMapIntensity=.9; m.name='yacht white paint'; }                                                           // 白漆、欄杆
+        else if(lum<.16){ m.roughness=.26; m.envMapIntensity=.85; m.name='yacht hull paint'; }                                                                    // 黑色船身
+        else if(sat<.14){ m.metalness=.85; m.roughness=.34; m.envMapIntensity=1.1; m.name='yacht metal'; }                                                        // 灰色五金
+        else if(r>g&&g>b&&sat>.2){ m.roughness=.58; m.envMapIntensity=.5; if(m.map) m.map.anisotropy=8; m.name='yacht teak'; }                                    // 柚木
+        else { m.roughness=.5; } m.needsUpdate=true; }
+      o.material=m; }); }catch(e){ console.warn('yacht materials',e); }
   /* 新模型自帶柚木甲板、欄杆、救生圈的貼圖與細節：不再套舊模型用的船用材質與甲板五金，只在釣位旁放幾件實物掃描的道具 */
   try{ addMarineProps(T,wrap,null); }catch(e){ console.warn('marine props',e); }
 
@@ -8582,7 +8596,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113001822'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113003421'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

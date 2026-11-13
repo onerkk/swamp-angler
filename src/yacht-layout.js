@@ -8,6 +8,7 @@ function yachtDeckHeight(T,root,x,z,fallback,top){
  return hit?root.worldToLocal(hit.point.clone()).y:fallback;
 }
 /* 釣位：船頭前甲板的右舷側（開放、離水面近，面向右舷）；駕駛座：上層甲板、駕駛艙正前方（面向船頭，看得到整個前甲板） */
-function yachtStations(T,root){return{fishing:{x:1.0,z:-.5,deck:yachtDeckHeight(T,root,1.0,-.5,1.6),yaw:-Math.PI/2},helm:{x:0,z:2.4,deck:yachtDeckHeight(T,root,0,2.4,3.45),yaw:0}};}
+/* 釣位離舷牆要留 1 公尺以上（舷牆在 x≈1.4）：站太近時第一人稱的手臂和竿子會穿過欄杆 */
+function yachtStations(T,root){return{fishing:{x:.25,z:-.5,deck:yachtDeckHeight(T,root,.25,-.5,1.6),yaw:-Math.PI/2},helm:{x:0,z:2.4,deck:yachtDeckHeight(T,root,0,2.4,3.45),yaw:0}};}
 function yachtAnglerPose(T,boat,station){boat.updateMatrixWorld(true);return{position:boat.localToWorld(new T.Vector3(station.x,station.deck+1.62,station.z)),yaw:station.yaw};}
 if(typeof module!=='undefined'&&module.exports)module.exports={yachtDeckHeight,yachtStations,yachtAnglerPose};

@@ -7,6 +7,10 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-13 使用者回饋新遊艇「根本不真實」「釣魚時穿模」：
+  · 已上線：釣位退到 x=.25（舷牆在 x≈1.4，原本 x=1.0 手臂和竿子穿過欄杆）；m.js attachYacht 依材質貼圖平均色分類換質感（玻璃深色反射、白漆亮面、黑色船身漆、灰色五金金屬、柚木緞面）；道具移到左舷
+  · 根本問題沒解決：Yacht II 是 AC3D 來源的中模，29 個材質都是小色塊貼圖、沒有法線／金屬貼圖，第一人稱近看細節不夠。真正要寫實得換高細節模型
+  · 候選（Sketchfab，CC BY，BoatUS Foundation 的駕船訓練模擬器用模型，甲板與駕駛台細節完整）：285 Conquest Boston Whaler（61e2b2fae81b4e858b401ce7ccc8d8d2，28.6 萬面，釣魚快艇）、2004 17' Scout Center Console（185e7c1dbf254b57b42b1979c45e4117，38 萬面，帶拖車要去掉）、212X Yamaha（df598113531f4c74ac48c6e0a530b6c0）；Riva 木質快艇（91f0f11ba42b4000abf788d54d73b9b1，32.6 萬面）。等使用者選
 - 2026-11-13 新遊艇已上線：models/yacht.glb 換成 Yacht II（gogiart，CC BY 4.0，9.7 萬面、1.2MB；舊的 Frickie's yacht 在 git 歷史裡）。
   m.js attachYacht：obj.rotation.y=π、下沉 H*.128、不再 dressYacht／addMarineHardware，只呼叫 addMarineProps(T,wrap,null)（前甲板：魚箱、工具箱、水桶）
   yacht-layout.js：yachtDeckHeight 改成任何水平面（|n.y|>.8，這個模型甲板面法線朝下）、可指定起始高度；站位 釣位 (1.0,−0.5) 甲板 1.61、駕駛座 (0,2.4) 甲板 3.64

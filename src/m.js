@@ -163,6 +163,19 @@ function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene
   // 船身尺寸（船首、船尾、半寬、吃水線）：航行的艏浪、航跡、水花要從船身真正的位置出來
   { wrap.updateMatrixWorld(true); const hb=new T.Box3().setFromObject(wrap); host.userData.hull={bow:hb.min.z,stern:hb.max.z,beam:(hb.max.x-hb.min.x)/2,deckBow:yachtDeckHeight(T,wrap,0,hb.min.z+5,2.6),deckMain:deck}; }
   obj.traverse(m=>{ m.frustumCulled=false; if(m.isMesh) m.castShadow=false; });
+  /* 船身質感：這個模型的材質全部是霧面、沒有金屬、玻璃是一片平的青色，近看像玩具。
+     依每個材質貼圖的平均顏色分類後換成該有的質感：玻璃（深色、會反射天空）、白色船漆（亮面）、黑色船身漆、金屬五金、柚木（緞面） */
+  try{ const cv=document.createElement('canvas'); cv.width=cv.height=4; const cx=cv.getContext('2d'), seen=new Map();
+    const avg=m=>{ if(!m.map||!m.map.image) return [m.color.r,m.color.g,m.color.b]; try{ cx.clearRect(0,0,4,4); cx.drawImage(m.map.image,0,0,4,4); const d=cx.getImageData(0,0,4,4).data; let r=0,g=0,b=0; for(let i=0;i<64;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; } return [r/4080,g/4080,b/4080]; }catch(e){ return [m.color.r,m.color.g,m.color.b]; } };
+    obj.traverse(o=>{ if(!o.isMesh||!o.material||Array.isArray(o.material)) return; let m=seen.get(o.material); if(!m){ const src=o.material; m=src.clone(); seen.set(src,m);
+        const [r,g,b]=avg(src), lum=(r+g+b)/3, mx=Math.max(r,g,b), mn=Math.min(r,g,b), sat=mx>0?(mx-mn)/mx:0; m.metalness=0;
+        if(g>r*1.2&&b>r*1.2&&lum>.45){ m.map=null; m.color.setRGB(.02,.07,.09); m.roughness=.05; m.envMapIntensity=1.7; m.name='yacht glass'; }                    // 玻璃
+        else if(lum>.72&&sat<.18){ m.roughness=.3; m.envMapIntensity=.9; m.name='yacht white paint'; }                                                           // 白漆、欄杆
+        else if(lum<.16){ m.roughness=.26; m.envMapIntensity=.85; m.name='yacht hull paint'; }                                                                    // 黑色船身
+        else if(sat<.14){ m.metalness=.85; m.roughness=.34; m.envMapIntensity=1.1; m.name='yacht metal'; }                                                        // 灰色五金
+        else if(r>g&&g>b&&sat>.2){ m.roughness=.58; m.envMapIntensity=.5; if(m.map) m.map.anisotropy=8; m.name='yacht teak'; }                                    // 柚木
+        else { m.roughness=.5; } m.needsUpdate=true; }
+      o.material=m; }); }catch(e){ console.warn('yacht materials',e); }
   /* 新模型自帶柚木甲板、欄杆、救生圈的貼圖與細節：不再套舊模型用的船用材質與甲板五金，只在釣位旁放幾件實物掃描的道具 */
   try{ addMarineProps(T,wrap,null); }catch(e){ console.warn('marine props',e); }
 

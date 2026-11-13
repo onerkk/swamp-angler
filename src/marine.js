@@ -45,7 +45,7 @@ function addMarineProps(T,wrap,fittings){ const props=new T.Group(); props.name=
   const deckY=(x,z)=>{ wrap.updateMatrixWorld(true); rc.set(new T.Vector3(x,9,z).applyMatrix4(wrap.matrixWorld),down); inv.copy(wrap.matrixWorld).invert();
     for(const h of rc.intersectObject(wrap,true)){ let skip=false; for(let p=h.object;p;p=p.parent) if(p===fittings||p===props){ skip=true; break; } if(!skip) return h.point.clone().applyMatrix4(inv).y; } return null; };
   const put=(name,x,z,ry,rx)=>realProp(T,name,o=>{ const y=deckY(x,z); if(y==null) return; props.add(seatProp(T,o,x,y,z,ry,rx)); });
-  put('plastic_crate_01',.2,-1.3,.25); put('metal_toolbox',-.75,-.5,-.3); put('wooden_bucket_01',.15,.3,0); }   // 前甲板釣位旁：魚箱、工具箱、水桶（船上本來就有救生圈與小艇）
+  put('plastic_crate_01',-.9,-1.4,.25); put('metal_toolbox',-.9,.1,-.3); put('wooden_bucket_01',-.45,-2.0,0); }   /* 都放在左舷側，不擋在釣位（右舷 x≈.25）的腳邊 */   // 前甲板釣位旁：魚箱、工具箱、水桶（船上本來就有救生圈與小艇）
 function addMarineHardware(T,wrap,deck,materials){
  // Dimensions and fittings are in metres, measured after the hull is normalized.
  const fittings=new T.Group();fittings.name='Marine deck fittings';wrap.add(fittings);
