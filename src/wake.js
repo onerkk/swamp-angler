@@ -26,7 +26,7 @@ function trail(n,life,spreadK,w0,grow,alpha){
   g.boundingSphere=new T.Sphere(new T.Vector3(),1e5);
   const m=new T.Mesh(g,mat); m.frustumCulled=false; m.renderOrder=3; m.userData.flatOnWater=true; m.visible=false; S.add(m);
   return {m,g,pos,uv,al,n,life,spreadK,w0,grow,alpha,pts:[]}; }
-const U={uTime:{value:0},uLight:{value:1},uCam:{value:new T.Vector3()}};
+const U={uTime:{value:0},uLight:{value:1},uCam:{value:new T.Vector3()},uBoatV:{value:new T.Vector3()}};
 const mat=new T.ShaderMaterial({uniforms:U,vertexShader:VS,fragmentShader:FS,transparent:true,depthWrite:false});
 // 左右艏浪：散開速度依克爾文角；船尾航跡：散得慢、寬、留得久
 const arms=[trail(150,11,1,1.1,.32,1),trail(150,11,1,1.1,.32,1)], wash=trail(170,16,.12,1.8,.6,.95);
@@ -41,20 +41,27 @@ const iP=new T.InstancedBufferAttribute(sp,3), iV=new T.InstancedBufferAttribute
 [iP,iV,iL,iS,iT,iL0].forEach(a=>a.setUsage(T.DynamicDrawUsage));
 qg.setAttribute('iP',iP); qg.setAttribute('iV',iV); qg.setAttribute('iL',iL); qg.setAttribute('iS',iS); qg.setAttribute('iT',iT); qg.setAttribute('iL0',iL0); qg.instanceCount=NP; qg.boundingSphere=new T.Sphere(new T.Vector3(),1e5);
 const pm=new T.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,
-  vertexShader:`attribute vec3 iP; attribute vec3 iV; attribute float iL; attribute float iS; attribute float iT; attribute float iL0; varying vec2 vQ; varying float vA; varying float vT;
+  vertexShader:`uniform vec3 uBoatV; attribute vec3 iP; attribute vec3 iV; attribute float iL; attribute float iS; attribute float iT; attribute float iL0; varying vec2 vQ; varying float vA; varying float vT; varying float vSeed;
   void main(){ vQ=position.xy; vT=iT; if(iL<0.0){ gl_Position=vec4(2.0,2.0,2.0,1.0); vA=0.0; return; }
     float age=1.0-iL/max(iL0,.01);
-    vec4 c=viewMatrix*vec4(iP,1.0); vec3 vv=(viewMatrix*vec4(iV,0.0)).xyz; vec2 d=vv.xy; float sp=length(d);
+    vSeed=fract(iL0*13.7+iS*31.3);
+    /* 動態模糊要看「相對於你（在船上）」的速度：以前用世界速度，船以每秒十幾公尺前進時，幾乎靜止在空中的水全被拉成一條條發亮的長線 */
+    vec4 c=viewMatrix*vec4(iP,1.0); vec3 vv=(viewMatrix*vec4(iV-uBoatV,0.0)).xyz; vec2 d=vv.xy; float sp=length(d);
     vec2 ax=sp>.05?d/sp:vec2(0.0,1.0), ay=vec2(-ax.y,ax.x);
     float size=iS*(iT>.5?(1.0+age*1.8):1.0);
     // 水滴：沿速度方向拉長（相當於約 1/25 秒的動態模糊），寬度就是水滴大小；水霧：圓而大
-    float len=iT>.5?size:size+sp*.04, wid=iT>.5?size:size*.45;
+    float len=iT>.5?size:min(size*2.2,size+sp*.012), wid=iT>.5?size:size*.75;
     c.xy+=ax*position.x*len+ay*position.y*wid;
     gl_Position=projectionMatrix*c;
-    vA=(iT>.5?.16*(1.0-age):.55)*smoothstep(0.0,.12,iL)*smoothstep(1.0,.9,age); }`,
-  fragmentShader:`uniform float uLight; varying vec2 vQ; varying float vA; varying float vT;
+    vA=(iT>.5?.3*(1.0-age):.75)*smoothstep(0.0,.08,iL)*smoothstep(1.0,.85,age); }`,
+  fragmentShader:`uniform float uLight; varying vec2 vQ; varying float vA; varying float vT; varying float vSeed;
+  float hh(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+  float nn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hh(i),hh(i+vec2(1,0)),f.x),mix(hh(i+vec2(0,1)),hh(i+vec2(1,1)),f.x),f.y); }
   void main(){ float r=dot(vQ,vQ); if(r>1.0) discard;
-    float a=vA*(vT>.5?exp(-r*2.2):(1.0-r)*(1.0-r));
+    /* 一團水不是一個圓點：邊緣用雜訊撕成不規則的水團、中間厚、外圍碎成細沫；水霧也有濃淡 */
+    vec2 q=vQ*2.6+vSeed*17.0; float n=nn(q)*.6+nn(q*2.3+3.1)*.4;
+    float edge=smoothstep(.15,.85,n+(1.0-r)*.75-.35);
+    float a=vA*(vT>.5?exp(-r*2.0)*(.55+.45*n):edge*(1.0-r*.6));
     // 水本身是透明的：亮處是天光的反射，水滴帶一點海水的藍綠
     vec3 col=mix(vec3(.80,.90,.95),vec3(.97,.99,1.0),vT)*(.3+.8*uLight);
     gl_FragColor=vec4(col,a); }`});
@@ -81,7 +88,7 @@ function build(r,t){ const n=Math.min(r.pts.length,r.n); if(n<2){ r.m.visible=fa
 function update(dt,t,o){
   U.uTime.value=t; U.uLight.value=Math.max(.06,Math.min(1,W.info?W.info.light:1)); W.camera.getWorldPosition(U.uCam.value);
   if(!o||!o.on){ if(wasOn) clear(); wasOn=false; return; } wasOn=true;
-  const fx=-Math.sin(o.head), fz=-Math.cos(o.head), rx=-fz, rz=fx, s=Math.max(0,o.speed);
+  const fx=-Math.sin(o.head), fz=-Math.cos(o.head), rx=-fz, rz=fx, s=Math.max(0,o.speed); U.uBoatV.value.set(fx*s,0,fz*s);
   /* 船的大小：以 26 公尺遊艇為 1。小船的水花矮、窄、量少——17 呎中控台艇滑行時，水是從船頭後方約三分之一處的船舷兩側被壓出來、
      往外貼著水面甩成兩片低低的水簾（約 1 公尺高），不會高過船頭；船尾船外機翻起一條窄的白水，高速時噴出一小道雞尾巴水柱 */
   const Lb=Math.max(3,o.stern-o.bow), sc=Math.min(1,Lb/26), small=sc<.5, hs=Math.sqrt(sc);
@@ -96,15 +103,15 @@ function update(dt,t,o){
   all.forEach(r=>{ while(r.pts.length&&t-r.pts[0].t0>r.life) r.pts.shift(); build(r,t); });
   // 船頭水花：時速超過約 9 節開始被船頭劈開往兩側上方甩
   if(s>4.5){ const k=Math.min(1,(s-4.5)/14); emitAcc+=dt*(40+260*k*k)*(small?.55:1); const sh=o.bow+Math.min(2.6,Lb*(small?.22:.1)), span=small?Lb*.22:3.5;
-    while(emitAcc>=1){ emitAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random(), [x,z]=at(sg*(hullHalf(o,sh+along*span)+.05),sh+along*span), out=(1.5+Math.random()*2.5+s*.12*(1-along*.5))*(small?.8:1), up=(.8+Math.random()*1.4)*(1+2.2*k)*(1-along*.5)*(small?.45:1), fwd=s*(.04+Math.random()*.1);
+    while(emitAcc>=1){ emitAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random(), [x,z]=at(sg*(hullHalf(o,sh+along*span)+.05),sh+along*span), out=(1.5+Math.random()*2.5+s*.12*(1-along*.5))*(small?.8:1), up=(.8+Math.random()*1.4)*(1+2.2*k)*(1-along*.5)*(small?.75:1), fwd=s*(.04+Math.random()*.1);
       // 大顆的是被劈開往外翻的水團，小顆的是被風吹散的細霧
-      const big=Math.random()<.35; emit(x,o.water+(small?.05:.2),z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,(big?.8:1.4)+Math.random()*.6,(big?.28+Math.random()*.3:.08+Math.random()*.12)*(small?.6:1)); } }
+      const big=Math.random()<.35; emit(x,o.water+(small?.05:.2),z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,(big?.8:1.4)+Math.random()*.6,(big?.28+Math.random()*.3:.08+Math.random()*.12)*(small?.9:1)); } }
   // 船頭兩側的白水幕：時速約 18 節以上，船頭把海水劈成兩片往外上方翻起，高過船頭欄杆，
   // 水幾乎留在原地、船衝過去，從駕駛座看是兩片白水沿著船舷兩側往後飛過
-  if(s>9){ curtainAcc+=dt*(s-9)*(small?30:48);
+  if(s>9){ curtainAcc+=dt*(s-9)*(small?52:48);
     while(curtainAcc>=1){ curtainAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random();
-      if(small){ const lz=o.bow+Lb*(.28+along*.25), [x,z]=at(sg*(hullHalf(o,lz)+.04),lz), out=3+Math.random()*2.5+(s-9)*.12, up=.9+Math.random()*1.1+(s-9)*.05, fwd=s*(.55+Math.random()*.2);
-        emit(x,o.water+.02,z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,.7+Math.random()*.5,.12+Math.random()*.22); }
+      if(small){ const lz=o.bow+Lb*(.28+along*.25), [x,z]=at(sg*(hullHalf(o,lz)+.04),lz), out=3+Math.random()*3+(s-9)*.18, up=1.5+Math.random()*1.9+(s-9)*.1, fwd=s*(.55+Math.random()*.2);
+        emit(x,o.water+.02,z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,.8+Math.random()*.6,.2+Math.random()*.35); }
       else { const [x,z]=at(sg*(hullHalf(o,o.bow+1.2+along*4)+.15),o.bow+1.2+along*4), out=2.2+Math.random()*2.6, up=5+Math.random()*3+(s-9)*.16, fwd=s*(.18+Math.random()*.22);
         emit(x,o.water+.3,z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,1.3+Math.random()*.9,.3+Math.random()*.6); } } }
   /* 船外機：滑行時螺旋槳在船尾翻起一道往後上方噴的雞尾巴水柱（小船才有，約 1～2 公尺高） */
@@ -112,8 +119,8 @@ function update(dt,t,o){
       emit(x,o.water,z,fx*(s-back)+rx*side,up,fz*(s-back)+rz*side,.8+Math.random()*.5,.1+Math.random()*.2); } }
   // 破浪：船頭撞進浪裡的瞬間，整片白水被往上掀到甲板以上；水本身幾乎留在原地，船以二十幾公尺的秒速衝過去，
   // 所以從駕駛座看是一片水花越過船頭往你迎面打來，落在甲板上就散掉
-  if(o.slam>0&&s>7){ const n=Math.round((50+90*o.slam)*Math.min(1,(s-7)/10)*(small?.3:1));
-    for(let i=0;i<n;i++){ const sg=Math.random()<.5?-1:1, lz0=o.bow+.5+Math.random()*2.5, lx=sg*(hullHalf(o,lz0)+.1), [x,z]=at(lx,lz0), up=(4.5+Math.random()*4.5)*(.7+.5*o.slam)*(small?.42:1), fwd=s*(.3+Math.random()*.32), side=sg*(.4+Math.random()*1.8);
+  if(o.slam>0&&s>7){ const n=Math.round((50+90*o.slam)*Math.min(1,(s-7)/10)*(small?.6:1));
+    for(let i=0;i<n;i++){ const sg=Math.random()<.5?-1:1, lz0=o.bow+.5+Math.random()*2.5, lx=sg*(hullHalf(o,lz0)+.1), [x,z]=at(lx,lz0), up=(4.5+Math.random()*4.5)*(.7+.5*o.slam)*(small?.65:1), fwd=s*(.3+Math.random()*.32), side=sg*(.4+Math.random()*1.8);
       emit(x,o.water+.4+Math.random()*.6,z,fx*fwd+rx*side,up,fz*fwd+rz*side,1.6+Math.random()*1.1,Math.random()<.45?.6+Math.random()*.7:.18+Math.random()*.25); } }
   let live=0;
   const halfAt=lz=>o.beam*Math.min(1,.35+(lz-o.bow)/8);
