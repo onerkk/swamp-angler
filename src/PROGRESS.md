@@ -7,6 +7,8 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-14 魚王換真實模型：大師挑戰 14 隻中，青魚、石斑、浪人鰺、大眼海鰱換成 ffishAsia CC0 實物掃描（頭朝 −x），巨骨舌魚換成 Sketchfab「Pirarucu」jriver1 CC BY（頭朝 +z）。已是真實模型：鱷雀鱔、鯰魚王、旗魚、大白鯊、黑鮪。仍是 AI 生成（Sketchfab 找不到可用授權的真實模型）：湄公河巨鯰（石佛）、哲羅鮭（冰湖之狼）、劍旗魚（夜行劍客；唯一候選其實是旗魚）、滄淵（神話生物，維持原設計）
+  檢查工具：/tmp/simsite/fv.html?f=模型檔名,...（側視圖＋紅色箭頭＝+x）。注意 /tmp/simsite/models 是連結到倉庫 models/，下載測試檔不要放那裡
 - 2026-11-13 介面：折扣碼小標籤只在一般釣魚畫面出現（面板、小屋、潮間帶、標本館、搏魚、起魚、劇情、水下都藏），位置移到右下拋竿鈕上方；小屋按鈕改成畫面最下緣一條半透明工具列（圖示在上、字在下，橫向 330×61px），提示文字移到上方 6 秒後淡出；新手釣魚提示在小屋／潮間帶／標本館不顯示
 - 2026-11-13 抽獎伺服器上線：Render 服務 swamp-angler-promo（srv-dbrhsfk9v7es73cl54gg，新加坡，Free，Node 20，Root=server）。環境變數：FIREBASE_SA_B64（金鑰 JSON 的 base64，手機貼 JSON 會壞）、PROMO_CODES、PROMO_END。/status 回 open:true remaining:3；沒登入或假 token 抽獎回 401；CORS 只允許 onerkk.github.io；Firestore 規則只開 saves/{uid} 給本人，promo 與 promoUsers 前端讀不到。遊戲 a.html PROMO_URL 已填。
   使用者給的 Render API 金鑰只放 /tmp/sf/.rnd（不進倉庫），活動穩定後請使用者刪除；Firebase 金鑰內容出現在對話中，之後建議換新
