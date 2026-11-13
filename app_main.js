@@ -1,4 +1,4 @@
-/*APPV:20261113015843*/
+/*APPV:20261113024449*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -5600,6 +5600,9 @@ function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene
   try{ const cv=document.createElement('canvas'); cv.width=cv.height=4; const cx=cv.getContext('2d'), seen=new Map();
     const avg=m=>{ if(!m.map||!m.map.image) return [m.color.r,m.color.g,m.color.b]; try{ cx.clearRect(0,0,4,4); cx.drawImage(m.map.image,0,0,4,4); const d=cx.getImageData(0,0,4,4).data; let r=0,g=0,b=0; for(let i=0;i<64;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; } return [r/4080,g/4080,b/4080]; }catch(e){ return [m.color.r,m.color.g,m.color.b]; } };
     obj.traverse(o=>{ if(!o.isMesh||!o.material||Array.isArray(o.material)) return; if(!/^acmat/.test(o.material.name||'')){ if(/glass/i.test(o.material.name||'')&&!o.material.userData.fixed){ const gm=o.material; gm.userData.fixed=1; gm.transparent=true; gm.opacity=.32; gm.color.setRGB(.55,.7,.8); gm.metalness=0; gm.roughness=.04; gm.envMapIntensity=1.6; gm.depthWrite=false; gm.needsUpdate=true; } else if(o.material.map&&!o.material.userData.liner){ const sm=o.material; sm.userData.liner=1; sm.map.anisotropy=8;
+          /* 原檔把船殼、中控台、滅火器都標成「半透明混合」：three.js 會關掉深度寫入、依物件距離排序畫，
+             結果遠的面會蓋過近的面——中控台背面透出前面的 Scout 字樣、零件浮在半空、整艘船發白發平。船體本來就不透明，改回不透明（貼圖的鏤空用 alphaTest） */
+          sm.transparent=false; sm.depthWrite=true; sm.alphaTest=.5; sm.envMapIntensity=1.15; if(sm.normalMap) sm.normalScale.set(1,1);
           /* 這艘船的外殼是單層、兩面都畫：從船內看到的是外殼的背面，船名、註冊號碼、Scout 字樣會左右相反地出現在船內。背面改成內襯的白色 */
           if(/Scout_Base|Scout_Other/.test(sm.name||'')){ const prev=sm.onBeforeCompile; sm.onBeforeCompile=(sh,r)=>{ if(prev) prev(sh,r); sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n if(!gl_FrontFacing){ float lum=dot(diffuseColor.rgb,vec3(.3,.59,.11)); diffuseColor.rgb=mix(vec3(.80,.81,.82),diffuseColor.rgb,step(lum,.35)*.0); }'); }; const key=sm.customProgramCacheKey?sm.customProgramCacheKey.bind(sm):()=>''; sm.customProgramCacheKey=()=>key()+'|liner'; sm.needsUpdate=true; } } return; }
       let m=seen.get(o.material); if(!m){ const src=o.material; m=src.clone(); seen.set(src,m);
@@ -8600,7 +8603,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113015843'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113024449'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
