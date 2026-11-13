@@ -890,18 +890,19 @@ function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
 function enter(){if(on)return;homeWork.setActive(true);try{merArtSync();yaw=yawT=0;pitch=pitchT=-.08;vb=0;pRoom.set(0,EYE,.9);resize();syncTime();syncFish();exitView();syncFurn();updFurnTags();closeFurn();on=true;}catch(err){on=false;homeWork.setActive(false);throw err;}try{if(c.onEnter)c.onEnter();}catch(err){console.error('home welcome',err);}}
 function resetGraphics(){if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}lastHomeShadow=-Infinity;W.interiorReflection.release(scene);}
 function exit(){ on=false;homeWork.setActive(false);resetGraphics();releaseSceneGPU(scene);W.radiance.release(); drag=null; if(GR.on) endGrill(); pickUI.classList.add('hidden'); closeFurn(); if(ACT) endAct(); notePg.classList.add('hidden'); document.body.classList.remove('grilling'); exitDive(); exitView(); }
-let wMoved=0; const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, WF=window.WalkFeel?window.WalkFeel({stride:.7,vol:.16}):{update:()=>({dx:0,dy:0,roll:0,pitch:0})}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
+let wMoved=0, wVel=0; const onRug=(x,z)=>Math.abs(x-(LV.x+.5))<1.4&&Math.abs(z-LV.z)<1.0;   /* 客廳那塊地毯上走是地毯聲，其他地方是木地板 */ const qDive=new T.Quaternion(), pDive=new T.Vector3(), qRoom=new T.Quaternion(), qView=new T.Quaternion(), pRoom=new T.Vector3(0,EYE,.9), bobT={v:0}, WF=window.WalkFeel?window.WalkFeel({stride:.68,vol:.5}):{update:()=>({dx:0,dy:0,roll:0,pitch:0})}, pView=new T.Vector3(), eul=new T.Euler(0,0,0,'YXZ'), lookM=new T.Matrix4();
 let syncT=0;
 const reflectionAnchor=new T.Vector3(0,1.6,0);let lastHomeShadow=-Infinity, lastShadowSig='';
 function render(dt){t+=dt;if(W.prepareScene)W.prepareScene(scene);if(window.__effectBudget?.environment===false)scene.environment=null;else W.interiorReflection.update(scene,reflectionAnchor,W.scene.environment,t); yaw+=(yawT-yaw)*Math.min(1,dt*8); pitch+=(pitchT-pitch)*Math.min(1,dt*8); pan+=(panT-pan)*Math.min(1,dt*6);
   vb+=((mode!=='room'&&mode!=='act'?1:0)-vb)*Math.min(1,dt*4); dYaw+=(dYawT-dYaw)*Math.min(1,dt*6); dPitch+=(dPitchT-dPitch)*Math.min(1,dt*6);
   // 在房間裡用搖桿走動：前進／後退、左右轉；不能走進水族箱、壁爐和牆
-  if(mode==='room'&&c.joy){ const j=c.joy(); if(Math.abs(j.thr)>.05||Math.abs(j.turn)>.05){ yawT-=j.turn*dt*1.7; const sp=1.3*j.thr*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw); let nx=pRoom.x+fx*sp, nz=pRoom.z+fz*sp;
+  if(mode==='room'&&c.joy){ const j=c.joy(); wVel+=((Math.abs(j.thr)>.05?1.4*j.thr:0)-wVel)*Math.min(1,dt*4.5); if(Math.abs(wVel)<.01&&Math.abs(j.thr)<=.05) wVel=0;   /* 起步加速、放開慢慢停，不再一推就等速滑動 */
+    if(Math.abs(wVel)>.01||Math.abs(j.turn)>.05){ yawT-=j.turn*dt*1.7; const sp=wVel*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw); let nx=pRoom.x+fx*sp, nz=pRoom.z+fz*sp;
       nx=Math.max(-ROOM.x+.5,Math.min(ROOM.x-.5,nx)); nz=Math.max(ROOM.zb+1.12,Math.min(ROOM.zf-.5,nz)); if(nx>ROOM.x-1.3&&Math.abs(nz-FP.z)<1.2) nx=ROOM.x-1.3;
       // 撞到家具：先試沿 x、再試沿 z 滑過去，都不行就停住
       if(blocked(nx,nz)){ if(!blocked(nx,pRoom.z)) nz=pRoom.z; else if(!blocked(pRoom.x,nz)) nx=pRoom.x; else { nx=pRoom.x; nz=pRoom.z; } }
       wMoved=Math.hypot(nx-pRoom.x,nz-pRoom.z); pRoom.x=nx; pRoom.z=nz; } }
-  { const wf=WF.update(dt,mode==='room'?wMoved:0); wMoved=0; pRoom.y=EYE+wf.dy; eul.set(pitch+wf.pitch,yaw,wf.roll); }   /* 走路手感：只有真的走動才晃（原地轉身不晃）、腳步聲 */
+  { const wf=WF.update(dt,mode==='room'?wMoved:0,onRug(pRoom.x,pRoom.z)?'carpet':'wood'); wMoved=0; pRoom.y=EYE+wf.dy; eul.set(pitch+wf.pitch,yaw,wf.roll); }   /* 走路手感：只有真的走動才晃（原地轉身不晃）、腳步聲 */
   qRoom.setFromEuler(eul);
   const tk=tanks[viewTank]||tanks.fresh;
   if(tk){ const s=tk.spec, hf=Math.atan(Math.tan(cam.fov*Math.PI/360)*cam.aspect), dist=Math.max(s.h*.75/Math.tan(cam.fov*Math.PI/360),(s.w*.42)/Math.tan(hf))+s.d/2;

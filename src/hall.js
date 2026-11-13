@@ -125,7 +125,7 @@ function focus(i){ if(!items.length){ nameEl.textContent='還沒有一公尺以�
 ui.addEventListener('click',e=>{ const k=e.target.closest('[data-k]'); if(!k) return; const a=k.dataset.k; if(a==='exit') exit(); else focus(idx+(a==='next'?1:-1)); });
 // 拖曳轉頭：在標本館裡攔下畫布的觸控，不讓小屋收到
 const tipEl=ui.querySelector('.ht'); let tipT=null; function tip(t,ms){ tipEl.textContent=t; tipEl.classList.add('on'); clearTimeout(tipT); tipT=setTimeout(()=>tipEl.classList.remove('on'),ms||2800); }
-let camY=1.65, camYT=1.65, seated=false, dim=false; const WF=window.WalkFeel?window.WalkFeel({stride:.75,vol:.2}):{update:()=>({dx:0,dy:0,roll:0,pitch:0})}; const lightsAll=[];
+let camY=1.65, camYT=1.65, seated=false, dim=false, velX=0, velZ=0; const WF=window.WalkFeel?window.WalkFeel({stride:.72,vol:.55}):{update:()=>({dx:0,dy:0,roll:0,pitch:0})}; const lightsAll=[];
 function use(id,o){ const H=window.__HOME, r=(k)=>{ try{ return H&&H.furnUse?H.furnUse(k):null; }catch(e){ return null; } };
   if(id==='sofa'||id==='seat'){ const b=new T.Box3().setFromObject(o), c=b.getCenter(new T.Vector3()); camXT=c.x; camZT=c.z-(id==='sofa'?.1:0); camYT=b.min.y+(id==='sofa'?1.12:1.05); yawT=0; pitchT=.12; seated=true;
     tip(id==='sofa'?'窩進沙發，抬頭看著滿屋子的戰利品……':'坐下來歇一會兒',2600); if(id==='sofa'){ const res=r('sofa'); if(res&&res.msg) setTimeout(()=>tip(res.msg,3400),2700); } return; }
@@ -146,9 +146,15 @@ function enter(){ on=true; music(true); lightsAll.length=0; [hemiL,ambL,key,fill
 function exit(){ on=false; music(false); document.body.classList.remove('inHall'); }
 function render(dt){ if(!on) return; const tt=performance.now()/1000; tagList.forEach(t=>{ if(t.parent) t.position.y+=Math.sin(tt*2+t.userData.ph)*.0015; }); items.forEach(it=>{ if(!it.ready) place(it); });
   if((joy.x||joy.y)&&seated){ seated=false; camYT=1.65; }   /* 推搖桿就站起來 */
-  if(joy.x||joy.y){ const sp=2.6*dt, fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw);
-    camXT=camX=Math.max(-HW+.8,Math.min(HW-.8,camX+(fx*-joy.y+rx*joy.x)*sp)); camZT=camZ=Math.max(-len-1.5,Math.min(5.2,camZ+(fz*-joy.y+rz*joy.x)*sp)); }
-  const k=Math.min(1,dt*3), px=camX, pz=camZ; camX+=(camXT-camX)*k; camZ+=(camZT-camZ)*k; const wf=WF.update(dt,seated?0:Math.hypot(camX-px,camZ-pz));   /* 走路手感：步伐起伏、換腳側晃、腳步聲 */ yaw+=(yawT-yaw)*Math.min(1,dt*6); pitch+=(pitchT-pitch)*Math.min(1,dt*6);
+  /* 移動有慣性、用真人步行速度（約 1.7 m/s）：搖桿是推多少走多快；按上一隻／下一隻是走過去（起步加速、快到時放慢），不再用滑的。
+     走路手感用這一幀「實際移動的距離」算：以前搖桿那段先把位置寫進去才量距離，量到 0，所以自己走反而像飄 */
+  const px=camX, pz=camZ; let tvx=0, tvz=0;
+  if(joy.x||joy.y){ const fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw); tvx=(fx*-joy.y+rx*joy.x)*1.7; tvz=(fz*-joy.y+rz*joy.x)*1.7; }
+  else { const dx=camXT-camX, dz=camZT-camZ, d=Math.hypot(dx,dz); if(d>.01){ const sp=Math.min(1.7,d*1.5+.15); tvx=dx/d*sp; tvz=dz/d*sp; } else { camX=camXT; camZ=camZT; } }
+  const ka=Math.min(1,dt*4.5); velX+=(tvx-velX)*ka; velZ+=(tvz-velZ)*ka; if(!(joy.x||joy.y)&&Math.hypot(camXT-camX,camZT-camZ)<=.01){ velX=velZ=0; }
+  camX=Math.max(-HW+.8,Math.min(HW-.8,camX+velX*dt)); camZ=Math.max(-len-1.5,Math.min(5.2,camZ+velZ*dt)); if(joy.x||joy.y){ camXT=camX; camZT=camZ; }
+  const wf=WF.update(dt,seated?0:Math.hypot(camX-px,camZ-pz),Math.abs(camX)<1.1?'carpet':'wood');   /* 中央走道是地毯，兩側是木地板 */
+  yaw+=(yawT-yaw)*Math.min(1,dt*6); pitch+=(pitchT-pitch)*Math.min(1,dt*6);
   const s=R.getSize(new T.Vector2()); cam.aspect=s.x/s.y; cam.fov=s.x<s.y?72:58; cam.updateProjectionMatrix();
   camY+=(camYT-camY)*Math.min(1,dt*3); cam.position.set(camX+Math.cos(yaw)*wf.dx,camY+wf.dy,camZ-Math.sin(yaw)*wf.dx); cam.rotation.order='YXZ'; cam.rotation.set(pitch+wf.pitch,yaw,wf.roll);
   const prev=R.getRenderTarget(), ex=R.toneMappingExposure, tm=R.toneMapping; R.toneMapping=T.ACESFilmicToneMapping; R.toneMappingExposure=1.25; R.setRenderTarget(null); try{ R.render(scene,cam); } finally { R.toneMappingExposure=ex; R.toneMapping=tm; R.setRenderTarget(prev); } }   /* 標本館自己的曝光，不受外面晝夜影響 */
