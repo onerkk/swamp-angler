@@ -1,4 +1,4 @@
-/*APPV:20261113105418*/
+/*APPV:20261113110525*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -3867,6 +3867,7 @@ function render(){
     h+=tg('imm','沉浸模式','隱藏上方大部分介面，只留設定和動作按鈕',!!save.imm);
     h+='<div class="note">真實魚模型：Barramundi Fish © Microsoft 2017，CC0 授權（Khronos glTF Sample Assets）</div>';
     h+='<div class="note">真實動物與魚類 3D 模型（Sketchfab，CC-BY 4.0）：<br>'+(window.__MDL?window.__MDL.credits():'')+'</div>';
+    h+='<div class="note">泥灘消波塊「Tetrapod」by Akihiko Tarutani、擱淺小船「FishingBoat」by Godot2000、「Old Boat」by donnichols（Sketchfab，CC BY 4.0）</div>';
     h+='<div class="note">釣竿與捲線器模型：「Canna Da Pesca」by topfrank2013（Sketchfab，CC BY 4.0）</div>';
     h+='<div class="note">實拍湖景、HDR 光照、碼頭與泥灘材質、枯木樹樁岩石蕨類模型、家具與道具、標本館木料：Poly Haven（CC0）</div>';
     h+=row('重置存檔','金幣、等級、裝備、圖鑑全部清除',`<button class="sbtn danger" data-a="reset">${resetArm?'再按一次確認':'重置'}</button>`);
@@ -8754,7 +8755,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113105418'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113110525'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9570,7 +9571,7 @@ float sandKf(vec2 p){ float e=34.+th(p*vec2(1.7,1.3))*7.+sin(p.x*.21)*2.5; retur
   float sk=sandKf(vWP2.xz) + (texture2D(tSand,vWP2.xz*.9).r-.5)*.25; sk=clamp(sk,0.,1.);
   vec3 mudC=mix(texture2D(map,uvA).rgb,texture2D(map,uvB).rgb,.35), sandC=mix(texture2D(tSand,uvA*1.1).rgb,texture2D(tSand,uvB).rgb,.3);
   float wet=1.-smoothstep(-.06,.06,vWP2.y+(dot(texture2D(map,vWP2.xz*1.3).rgb,vec3(.33))-.5)*.05);   // 越低越濕越暗（跟水邊一樣加上細微起伏）
-  vec4 texelColor=vec4(mix(pow(mudC,vec3(1.25))*.82*(1.-.25*wet),sandC*(.9-.1*wet),sk),1.);   // 泥比較深、對比高
+  vec4 texelColor=vec4(mix(pow(mudC,vec3(1.15))*1.05*(1.-.22*wet),sandC*(.9-.1*wet),sk),1.);   // 泥比較深、對比高
   texelColor=mapTexelToLinear(texelColor); diffuseColor*=texelColor;
   float macro=th(vWP2.xz*.4)*.5+.5; diffuseColor.rgb*=.85+.2*macro;`)
   .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
@@ -9619,6 +9620,30 @@ pud.material.customProgramCacheKey=()=>'tidePud';   // 舊程式相容用（沙�
 new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.mapping=T.EquirectangularReflectionMapping; t.encoding=T.sRGBEncoding; try{ const pm=new T.PMREMGenerator(W.renderer); const env=pm.fromEquirectangular(t).texture; gmat.envMap=env; gmat.envMapIntensity=.75; pud.material.envMap=env; pud.material.envMapIntensity=1.2; gmat.needsUpdate=pud.material.needsUpdate=true; pm.dispose(); }catch(e){} });
 // 海水：從遠處慢慢漲回來
 const sea=new T.Mesh(new T.PlaneGeometry(400,300).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x4d6a72,roughness:.12,metalness:.3,transparent:true,opacity:.92})); sea.position.set(0,.06,-200); S.add(sea);
+/* ===== 遠景：讓泥灘像真的海邊 =====
+   ・岸邊（身後）沿著海岸一長排消波塊（真實模型「Tetrapod」by Akihiko Tarutani，CC BY）
+   ・往海那邊一片蚵棚：一排排插在泥裡的竹竿，竿頂架著橫竹
+   ・泥灘上擱著兩艘退潮擱淺的小船（「FishingBoat」by Godot2000、「Old Boat」by donnichols，CC BY）
+   都用真實尺寸；遠的東西在霧裡自然變淡 */
+{ const GLL=T.GLTFLoader?new T.GLTFLoader():null; if(GLL&&T.DRACOLoader){ const dl=new T.DRACOLoader(); dl.setDecoderPath('vendor/draco/'); GLL.setDRACOLoader(dl); }
+  const fit=(o,size,axis)=>{ const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()); o.scale.multiplyScalar(size/(axis==='len'?Math.max(sz.x,sz.z):Math.max(sz.x,sz.y,sz.z))); return o; };
+  const ground=(o,x,z,ry,tilt,sink)=>{ const g=new T.Group(); g.add(o); o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), c=b.getCenter(new T.Vector3()); o.position.sub(new T.Vector3(c.x,b.min.y,c.z)); g.rotation.set(tilt||0,ry||0,(tilt||0)*.6); g.position.set(x,hAt(x,z)-(sink||0),z); g.traverse(m=>{ if(m.isMesh){ m.castShadow=m.receiveShadow=true; } }); S.add(g); return g; };
+  if(GLL){
+    GLL.load('models/tide/tetrapod.glb',gl=>{ try{ const src=gl.scene; fit(src,2.6); src.updateMatrixWorld(true); const meshes=[]; src.traverse(m=>{ if(m.isMesh) meshes.push(m); });
+      const N=240; meshes.forEach(m=>{ const geo=m.geometry.clone().applyMatrix4(m.matrixWorld), mat=m.material.clone(); mat.color&&mat.color.multiplyScalar(.85); const im=new T.InstancedMesh(geo,mat,N), q=new T.Quaternion(), e=new T.Euler(), m4=new T.Matrix4(), v=new T.Vector3(), sc=new T.Vector3(1,1,1);
+        let k=0; for(let i=0;i<N;i++){ const x=-130+i*1.1+(Math.random()-.5)*.6, row=i%3, z=58+row*1.6+Math.sin(x*.05)*3+(Math.random()-.5)*.8; e.set(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28); q.setFromEuler(e); v.set(x,.9+row*.9+Math.random()*.4,z); m4.compose(v,q,sc); im.setMatrixAt(k++,m4); }
+        im.castShadow=true; im.receiveShadow=true; S.add(im); }); }catch(e){ console.warn('tetrapod',e); } });
+    GLL.load('models/tide/sampan_blue.glb',gl=>{ try{ const o=fit(gl.scene,6.2,'len'); ground(o,-15,-6,.7,.09,.25); }catch(e){} });
+    GLL.load('models/tide/rowboat_green.glb',gl=>{ try{ const o=fit(gl.scene,4.2,'len'); ground(o,13,3,-1.9,-.12,.18); }catch(e){} }); }
+  // 蚵棚：竹竿（帶節、褪成灰褐）插在泥裡，一排排往海那邊延伸；竿頂有橫竹連起來
+  const poleG=new T.CylinderGeometry(.03,.038,1.7,6); poleG.translate(0,.85,0); const railG=new T.CylinderGeometry(.022,.022,1,5); railG.rotateZ(Math.PI/2); railG.translate(.5,0,0);
+  const poleM=new T.MeshStandardMaterial({color:0x8a7d68,roughness:.85}), rows=[]; for(let r=0;r<9;r++){ const z0=-22-r*2.4, x0=-38+Math.sin(r*1.7)*4; rows.push([x0,z0]); }
+  const NP=rows.length*44, P=new T.InstancedMesh(poleG,poleM,NP), R=new T.InstancedMesh(railG,poleM,NP), m4=new T.Matrix4(), q=new T.Quaternion(), v=new T.Vector3(), sc=new T.Vector3(); let k=0;
+  rows.forEach(([x0,z0])=>{ let px=null,py=0,pz=0; for(let i=0;i<44;i++){ const x=x0+i*1.8+(Math.random()-.5)*.3, z=z0+(Math.random()-.5)*.3, y=hAt(x,z)-.25, lean=(Math.random()-.5)*.08;
+      q.setFromEuler(new T.Euler(lean,0,(Math.random()-.5)*.08)); sc.set(1,.85+Math.random()*.3,1); m4.compose(v.set(x,y,z),q,sc); P.setMatrixAt(k,m4);
+      const top=y+1.45*sc.y; if(px!==null){ const dx=x-px, dz=z-pz, L=Math.hypot(dx,dz); q.setFromEuler(new T.Euler(0,-Math.atan2(dz,dx),Math.atan2(top-py,L))); m4.compose(v.set(px,py,pz),q,sc.set(L,1,1)); R.setMatrixAt(k,m4); } else { m4.makeScale(0,0,0); R.setMatrixAt(k,m4); }
+      px=x; py=top; pz=z; k++; } });
+  P.castShadow=R.castShadow=true; S.add(P); S.add(R); }
 // 撤離路線：竹竿＋褪色的布旗（漲潮警告時亮起），布會隨風飄
 const route=new T.Group(); S.add(route); route.visible=false; const flags=[];
 const bambooM=new T.MeshStandardMaterial({color:0xb59a62,roughness:.6}), nodeM=new T.MeshStandardMaterial({color:0x8d7444,roughness:.7});
