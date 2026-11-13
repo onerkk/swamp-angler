@@ -20,9 +20,9 @@ function hookTiming(fd,difficulty,practice,rnd){
   if(practice) return {duration:4,early:0,perfect:.45};
   const dk=difficulty.win>=1.2?.45:difficulty.win<=.55?1.2:1;   /* 休閒難度試探短很多；專家更長 */
   const early=Math.min(.42,Math.max(.04,(.08+.055*rarity+(win<1?.22*(1-win):0))*(.75+.5*r)*dk));
-  const perfect=Math.max(.1,(.3-.035*rarity)*Math.min(1.25,Math.sqrt(win)));
+  const perfect=Math.max(.12,(.32-.04*rarity)*Math.min(1.25,Math.sqrt(win)));
   return {
-    duration:1.9*win*difficulty.win*(fd.item?1.4:1)*(1-.06*rarity)*(1+early),
+    duration:Math.max(.45,1.25*win*difficulty.win*(fd.item?1.4:1)*Math.pow(.8,rarity)*(1+early)),   /* 最短 0.45 秒：人的反應約 0.25 秒，再短就只能靠運氣 */   /* 越稀有越快：每高一級快 20%（魚王只有一般魚的三分之一時間） */
     early, perfect:Math.min(perfect,1-early-.12)
   };
 }

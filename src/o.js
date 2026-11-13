@@ -101,6 +101,7 @@ const wcss=document.createElement('style'); wcss.textContent=`
 #ledger .seal.go{transform:rotate(-12deg) scale(1);opacity:.85}
 #ledger .rw{position:absolute;left:20px;right:20px;bottom:64px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 #ledger .rw span{padding:6px 12px;border-radius:999px;background:rgba(60,40,15,.85);color:#ffe9a8;font-family:sans-serif;font-weight:800;font-size:14px;opacity:0;transform:translateY(30px) scale(.6);transition:all .45s cubic-bezier(.3,1.5,.5,1)}#ledger .rw span.go{opacity:1;transform:none}
+@media (orientation:landscape){#ledger .book{width:min(78vw,560px);height:calc(100vh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))} #ledger .pg{overflow:auto;padding:16px 22px 64px}} body:has(#ledger) #bCam{display:none!important}
 #ledger .ok{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);padding:10px 22px;border-radius:999px;border:1px solid #8a6532;background:#3b2a16;color:#ffe9a8;font-size:15px;font-family:inherit;opacity:0;transition:opacity .4s}#ledger .ok.go{opacity:1}`;
 document.head.appendChild(wcss);
 function playWin(w){ const b=w.b, idx=BOSS.indexOf(b)+1, el=document.createElement('div'); el.id='ledger';

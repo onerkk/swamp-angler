@@ -1,4 +1,4 @@
-/*APPV:20261113123314*/
+/*APPV:20261113125031*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -4743,9 +4743,9 @@ function hookTiming(fd,difficulty,practice,rnd){
   if(practice) return {duration:4,early:0,perfect:.45};
   const dk=difficulty.win>=1.2?.45:difficulty.win<=.55?1.2:1;   /* 休閒難度試探短很多；專家更長 */
   const early=Math.min(.42,Math.max(.04,(.08+.055*rarity+(win<1?.22*(1-win):0))*(.75+.5*r)*dk));
-  const perfect=Math.max(.1,(.3-.035*rarity)*Math.min(1.25,Math.sqrt(win)));
+  const perfect=Math.max(.12,(.32-.04*rarity)*Math.min(1.25,Math.sqrt(win)));
   return {
-    duration:1.9*win*difficulty.win*(fd.item?1.4:1)*(1-.06*rarity)*(1+early),
+    duration:Math.max(.45,1.25*win*difficulty.win*(fd.item?1.4:1)*Math.pow(.8,rarity)*(1+early)),   /* 最短 0.45 秒：人的反應約 0.25 秒，再短就只能靠運氣 */   /* 越稀有越快：每高一級快 20%（魚王只有一般魚的三分之一時間） */
     early, perfect:Math.min(perfect,1-early-.12)
   };
 }
@@ -6009,6 +6009,7 @@ const wcss=document.createElement('style'); wcss.textContent=`
 #ledger .seal.go{transform:rotate(-12deg) scale(1);opacity:.85}
 #ledger .rw{position:absolute;left:20px;right:20px;bottom:64px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 #ledger .rw span{padding:6px 12px;border-radius:999px;background:rgba(60,40,15,.85);color:#ffe9a8;font-family:sans-serif;font-weight:800;font-size:14px;opacity:0;transform:translateY(30px) scale(.6);transition:all .45s cubic-bezier(.3,1.5,.5,1)}#ledger .rw span.go{opacity:1;transform:none}
+@media (orientation:landscape){#ledger .book{width:min(78vw,560px);height:calc(100vh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))} #ledger .pg{overflow:auto;padding:16px 22px 64px}} body:has(#ledger) #bCam{display:none!important}
 #ledger .ok{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);padding:10px 22px;border-radius:999px;border:1px solid #8a6532;background:#3b2a16;color:#ffe9a8;font-size:15px;font-family:inherit;opacity:0;transition:opacity .4s}#ledger .ok.go{opacity:1}`;
 document.head.appendChild(wcss);
 function playWin(w){ const b=w.b, idx=BOSS.indexOf(b)+1, el=document.createElement('div'); el.id='ledger';
@@ -8352,12 +8353,13 @@ function load(fn){ if(model) return fn(model); if(loading||!GL) return; loading=
         { const g0=hc.mesh.geometry; if(!g0.boundingBox) g0.computeBoundingBox(); const y0=g0.boundingBox.min.y, y1=g0.boundingBox.max.y, prev=mt.onBeforeCompile, key=mt.customProgramCacheKey?mt.customProgramCacheKey.bind(mt):()=>'';
           mt.onBeforeCompile=(sh,r)=>{ if(prev) prev(sh,r); sh.uniforms.uGlowY0={value:y0}; sh.uniforms.uGlowY1={value:y1};
             sh.vertexShader='uniform float uGlowY0,uGlowY1;\nvarying float vGlowH;\n'+sh.vertexShader.replace('#include <skinning_vertex>','#include <skinning_vertex>\n vGlowH=clamp((transformed.y-uGlowY0)/max(uGlowY1-uGlowY0,1e-4),0.,1.);');
-            sh.fragmentShader='varying float vGlowH;\n'+sh.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n totalEmissiveRadiance*=mix(.12,.75,smoothstep(.05,.7,vGlowH))+1.25*smoothstep(.8,.93,vGlowH);'); };
+            sh.fragmentShader='varying float vGlowH;\n'+sh.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n { float face=smoothstep(.84,.95,vGlowH), neck=smoothstep(.7,.86,vGlowH);\n   vec3 Vv=normalize(vViewPosition); float rim=pow(1.-abs(dot(normalize(vNormal),Vv)),3.);\n   totalEmissiveRadiance=totalEmissiveRadiance*(.015+.12*neck+1.9*face)+vec3(.35,.75,.55)*rim*.22*(.3+.7*smoothstep(.2,.8,vGlowH));\n   diffuseColor.rgb=mix(vec3(dot(diffuseColor.rgb,vec3(.3,.59,.11))),diffuseColor.rgb,.35)*mix(.35,.8,face); }   /* 只有臉在發光、脖子漸暗、身體幾乎是暗的，只剩邊緣一圈淡淡冷光；衣服去色 */'); };
           mt.customProgramCacheKey=()=>key()+'|ghostGlowH'; mt.needsUpdate=true; }   /* 綠光用純色疊加：不能用原貼圖當發光圖，否則烘焙在模型上的活人臉會蓋過女鬼臉與表情 */   /* 身上自帶幽幽的綠光：夜裡也看得清楚身體和臉 */
         mats.push(mt); }catch(e){ console.warn('lin rig',e); }
       /* 水面以下交給水下層（跟魚、霜汐同一套）：沉下去時身體在水裡越深越暗、被水面反光蓋住，不再是一刀切掉 */
       if(W.optics) W.optics.add(o); if(W.submerged) W.submerged.add(o,{solid:true});
-      model=new T.Group(); model.add(o); { const gl=new T.PointLight(0x6dffa8,1.6,5,1.6); gl.position.set(0,1.35,.55); model.add(gl); const gl2=new T.PointLight(0x6dffa8,.8,3,2); gl2.position.set(0,.8,-.4); model.add(gl2); }
+      model=new T.Group(); model.add(o); { /* 光只照臉附近（短距離、快速衰減），而且像快熄的燈一樣不規則閃 */ const gl=new T.PointLight(0xa8ffd8,1.1,1.8,2.2); gl.position.set(0,1.62,.32); model.add(gl);
+        const t0=Math.random()*100; o.traverse(m=>{ if(m.isMesh&&!gl.userData.f){ gl.userData.f=1; m.onBeforeRender=()=>{ const t=performance.now()*.001+t0; const n=Math.sin(t*7.3)*Math.sin(t*2.9+1.3)*Math.sin(t*13.1); gl.intensity=1.1*(.72+.28*Math.sin(t*1.7))*(n>.55?.25:1); }; } }); }
       model.visible=false; W.scene.add(model); loading=false; fn(model); },undefined,()=>{ loading=false; }); return; }
   GL.load('models/ghost.glb',g=>{ const o=g.scene; o.traverse(m=>{ if(m.isMesh){ m.frustumCulled=false; const mt=m.material; if(mt){ mt.fog=true; mt.transparent=true; mt.opacity=.88; mt.depthWrite=true; mt.roughness=1; mt.metalness=0; if(mt.map){ mt.emissive=new T.Color(0x8fa0b8); mt.emissiveMap=mt.map; mt.emissiveIntensity=.12; } mats.push(mt); } } });
     o.updateMatrixWorld(true); const b=new T.Box3().setFromObject(o), sz=b.getSize(new T.Vector3()), s=1.68/Math.max(sz.y,1e-6); o.scale.setScalar(s); o.updateMatrixWorld(true);
@@ -8767,7 +8769,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113123314'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113125031'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
