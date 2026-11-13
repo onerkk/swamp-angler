@@ -288,6 +288,12 @@ body.athome #homeUI .hb{flex-wrap:wrap;justify-content:center}#grillUI .gt{font-
 body.grilling #homeUI,body.grilling #joy{display:none!important}
 body.athome #dockPractice,body.attide #dockPractice,body.inHall #dockPractice{display:none!important}   /* 釣魚新手提示只在釣魚時出現，小屋、潮間帶、標本館不要擋畫面 */
 body.athome #homeUI .hb{display:flex;width:auto;max-width:calc(100vw - 16px);overflow-x:auto}body.athome #homeUI .hb .btn{white-space:nowrap}#homeUI .home-shop{color:#f1dfba!important}
+/* 直式小屋：工具列改成整排滿版、五顆按鈕平分寬度（以前從搖桿右邊 136px 開始排，第五顆被切到螢幕外）；搖桿與 FPS 移到工具列上方，不再互相蓋住 */
+@media (orientation:portrait){ body.athome #homeUI{left:8px!important;right:8px!important}
+ body.athome #homeUI .hb{width:100%;max-width:none;box-sizing:border-box;justify-content:space-between;overflow:visible;flex-wrap:nowrap!important}
+ body.athome #homeUI .hb .btn{flex:1 1 0!important;min-width:0!important;padding:4px 2px!important;font-size:11px!important;white-space:nowrap}
+ body.athome #joy{bottom:calc(env(safe-area-inset-bottom,0px) + 100px)} body.athome #joy span{display:none}
+ body.athome #fpsDisplay{left:auto!important;right:10px!important;bottom:calc(env(safe-area-inset-bottom,0px) + 100px)!important} }
 #shopUI{position:fixed;inset:0;z-index:70;background:rgba(5,16,15,.88);display:flex;align-items:center;justify-content:center;padding:12px;backdrop-filter:blur(8px);touch-action:auto}
 #shopUI.hidden{display:none}
 #shopUI .box{width:100%;max-width:560px;max-height:94vh;max-height:94dvh;display:flex;flex-direction:column;overflow:hidden;border:1px solid #9c8453;border-radius:20px;background:#f3eee3;color:#213832;box-shadow:0 24px 80px #0009}
