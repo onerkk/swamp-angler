@@ -1,4 +1,4 @@
-/*APPV:20261113034244*/
+/*APPV:20261113040438*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -2133,6 +2133,22 @@ let _shSig='', _shC=new T.Vector3(), _shD=new T.Vector3();
 function shadowSigChanged(){ camera.getWorldPosition(_shC); camera.getWorldDirection(_shD); const sd=U.uSunDir.value;
   const sig=[sd.x,sd.y,sd.z].map(v=>Math.round(v*300)).join(',')+'|'+[_shC.x,_shC.y,_shC.z].map(v=>Math.round(v*5)).join(',')+'|'+[_shD.x,_shD.y,_shD.z].map(v=>Math.round(v*30)).join(',');
   if(sig===_shSig) return false; _shSig=sig; return true; }
+/* ===== 第一人稱圖層（根治手和釣竿穿模）=====
+   手臂、釣竿、捲線器放在獨立的圖層：主畫面畫完之後清掉深度，再單獨畫它們，所以它們永遠畫在最前面，不會跟船舷、座椅、碼頭欄杆互相穿插。
+   這是第一人稱遊戲的標準做法；之前用移動站位閃開，只要船或地點換了、視角一轉就又會穿。
+   釣線、浮標、魚還是在場景裡照遠近正常遮擋。所有燈也要照到這個圖層 */
+const VM=2; let vmTick=0;
+function markViewModel(){ const mark=o=>o.traverse(m=>{ if((m.isMesh||m.isSkinnedMesh||m.isLine||m.isPoints)&&!m.layers.test(vmLayers)) m.layers.set(VM); });
+  /* 鏡頭往上的每一層（頭、身體……）底下掛的東西，都是跟著鏡頭走的第一人稱物件（釣竿、捲線器）；鏡頭本身那一支不算 */
+  for(let p=camera, up=camera.parent; up&&up!==scene; p=up, up=up.parent) up.children.forEach(ch=>{ if(ch!==p) mark(ch); });
+  scene.children.forEach(ch=>{ if(ch.userData&&ch.userData.viewmodel) mark(ch); });
+  scene.traverse(o=>{ if(o.isLight) o.layers.enable(VM); }); }
+const vmLayers=new T.Layers(); vmLayers.set(VM); let W_head=null;
+function renderViewModel(){ if(window.__noVM) return; if(!W_head) W_head=camera.parent; if(vmTick--<=0){ vmTick=30; try{ markViewModel(); }catch(e){} }
+  const bg=scene.background, ac=renderer.autoClear, tone=renderer.toneMapping, enc=renderer.outputEncoding;
+  try{ scene.background=null; renderer.autoClear=false; renderer.setRenderTarget(null); renderer.clearDepth(); camera.layers.set(VM); radiance.render(scene,camera); }
+  catch(e){ window.__noVM=true; console.warn('viewmodel off',e); }
+  finally{ camera.layers.set(0); scene.background=bg; renderer.autoClear=ac; renderer.toneMapping=tone; renderer.outputEncoding=enc; } }
 function render(){prepareScene(scene);const oldEnv=scene.environment;if(window.__effectBudget?.environment===false)scene.environment=null;const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
  try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz||20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz&&(shadowSigChanged()||now-lastShadow>=.5);if(renderer.shadowMap.needsUpdate)lastShadow=now;
   const shadowNow=renderer.shadowMap.needsUpdate;
@@ -2143,6 +2159,7 @@ function render(){prepareScene(scene);const oldEnv=scene.environment;if(window._
   pass('main',()=>radiance.render(scene,camera));
   { const on=taaOn(); try{ taa.resolve(camera,on); }catch(e){ window.__noTAA=true; console.warn('taa off',e); } }
   { const rp=raysParams(); if(rp){ try{ godRays.render(rp); }catch(e){ window.__noRays=true; console.warn('rays off',e); } } }
+  renderViewModel();
   passStats.main.shadow=shadowNow;passStats.main.shadowSize=sunLight.shadow.mapSize.x;passStats.refl.w=reflRT.width;passStats.refl.h=reflRT.height;passStats.sub.w=submerged.target.width;passStats.sub.h=submerged.target.height;passStats.sub.on=WU.uSubmergedOn.value>0;passStats.refl.on=WU.uReflOn.value>0;
  }finally{scene.environment=oldEnv;renderer.shadowMap.autoUpdate=auto;renderer.shadowMap.needsUpdate=request;}
 }
@@ -6173,7 +6190,7 @@ function setup(g){
     if(!wrist||!root) continue;
     if(other) other.scale.setScalar(1e-4);
     o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ m.renderOrder=2; (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.32; mm.roughness=.95; mm.metalness=0; mm.bumpMap=WEAVE; mm.bumpScale=.0016; mm.needsUpdate=true; }); } });   // 布料不像塑膠：降低環境反光、全霧面，加上細細的布紋凹凸
-    const grp=new T.Group(); grp.add(o); S.add(grp); grp.updateMatrixWorld(true);
+    const grp=new T.Group(); grp.add(o); grp.userData.viewmodel=true; S.add(grp); grp.updateMatrixWorld(true);   /* 第一人稱的手：最後才畫、不跟場景比深度（見 b.js 第一人稱圖層） */
     const wl=new T.Vector3().setFromMatrixPosition(wrist.matrixWorld), rl=new T.Vector3().setFromMatrixPosition(root.matrixWorld);
     const pl=palm?new T.Vector3().setFromMatrixPosition(palm.matrixWorld):wl.clone();
     const ld=new T.Vector3().subVectors(wl,rl), L0=ld.length(); ld.normalize();
@@ -8624,7 +8641,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113034244'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113040438'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

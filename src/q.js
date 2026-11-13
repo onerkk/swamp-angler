@@ -19,7 +19,7 @@ function setup(g){
     if(!wrist||!root) continue;
     if(other) other.scale.setScalar(1e-4);
     o.traverse(m=>{ m.frustumCulled=false; if(m.isMesh){ m.renderOrder=2; (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ mm.envMapIntensity=.32; mm.roughness=.95; mm.metalness=0; mm.bumpMap=WEAVE; mm.bumpScale=.0016; mm.needsUpdate=true; }); } });   // 布料不像塑膠：降低環境反光、全霧面，加上細細的布紋凹凸
-    const grp=new T.Group(); grp.add(o); S.add(grp); grp.updateMatrixWorld(true);
+    const grp=new T.Group(); grp.add(o); grp.userData.viewmodel=true; S.add(grp); grp.updateMatrixWorld(true);   /* 第一人稱的手：最後才畫、不跟場景比深度（見 b.js 第一人稱圖層） */
     const wl=new T.Vector3().setFromMatrixPosition(wrist.matrixWorld), rl=new T.Vector3().setFromMatrixPosition(root.matrixWorld);
     const pl=palm?new T.Vector3().setFromMatrixPosition(palm.matrixWorld):wl.clone();
     const ld=new T.Vector3().subVectors(wl,rl), L0=ld.length(); ld.normalize();
