@@ -7,6 +7,7 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-13 介面：折扣碼小標籤只在一般釣魚畫面出現（面板、小屋、潮間帶、標本館、搏魚、起魚、劇情、水下都藏），位置移到右下拋竿鈕上方；小屋按鈕改成畫面最下緣一條半透明工具列（圖示在上、字在下，橫向 330×61px），提示文字移到上方 6 秒後淡出；新手釣魚提示在小屋／潮間帶／標本館不顯示
 - 2026-11-13 抽獎伺服器上線：Render 服務 swamp-angler-promo（srv-dbrhsfk9v7es73cl54gg，新加坡，Free，Node 20，Root=server）。環境變數：FIREBASE_SA_B64（金鑰 JSON 的 base64，手機貼 JSON 會壞）、PROMO_CODES、PROMO_END。/status 回 open:true remaining:3；沒登入或假 token 抽獎回 401；CORS 只允許 onerkk.github.io；Firestore 規則只開 saves/{uid} 給本人，promo 與 promoUsers 前端讀不到。遊戲 a.html PROMO_URL 已填。
   使用者給的 Render API 金鑰只放 /tmp/sf/.rnd（不進倉庫），活動穩定後請使用者刪除；Firebase 金鑰內容出現在對話中，之後建議換新
 - 2026-11-13 釣魚抽蝦皮折扣碼：伺服器在 server/（Node，firebase-admin 驗證 Google 登入、Firestore 交易；集合 promo/state、promoUsers/{uid}；每帳號最多中一次、間隔 12 秒、每天 300 次、高等級魚每天 6 次）。折扣碼只放 Render 環境變數 PROMO_CODES，絕不寫進倉庫。遊戲端 src/promo.js（開始畫面橫幅、右側「剩 N 份」、規則與得獎者名單（名字前兩字＋＊）、中獎全螢幕特效與複製）；d.js 釣到魚時呼叫 __PROMO.onCatch(sp)。a.html window.PROMO_URL='' → 部署後填上網址才會出現。

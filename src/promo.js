@@ -9,7 +9,9 @@ const css=document.createElement('style'); css.textContent=`
 #promoBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 8px);z-index:40;display:none;max-width:92vw;padding:6px 14px;border-radius:999px;background:linear-gradient(90deg,#ee4d2d,#ff7337);color:#fff;font-weight:800;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:0}
 body:has(#intro:not(.hidden)) #promoBar{display:block}
 #promoChip{position:fixed;right:calc(env(safe-area-inset-right,0px) + 12px);top:calc(env(safe-area-inset-top,0px) + 200px);z-index:30;display:none;padding:6px 10px;border-radius:14px;background:rgba(238,77,45,.9);color:#fff;font-weight:800;font-size:12px;border:0}
-body.promoOn:not(:has(#intro:not(.hidden))) #promoChip{display:block}
+body.promoOn:not(:has(#intro:not(.hidden))):not(.sheetOn):not(.athome):not(.attide):not(.inHall):not(.fighting):not(.catching):not(.cine):not(.underwater):not(.ending) #promoChip{display:block}
+#promoChip{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 132px)}
+@media (orientation:landscape) and (max-height:540px){#promoChip{bottom:calc(env(safe-area-inset-bottom,0px) + 124px);right:calc(env(safe-area-inset-right,0px) + 20px)}}
 #promoBox{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:16px}
 #promoBox.on{display:flex} #promoBox .pc{width:min(420px,92vw);max-height:88vh;overflow:auto;background:#fffaf3;color:#3a2a1a;border-radius:18px;padding:18px 18px 14px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
 #promoBox h3{margin:0 0 6px;font-size:19px;color:#ee4d2d} #promoBox p{margin:6px 0;font-size:14px;line-height:1.6} #promoBox .code{font:800 26px/1.2 ui-monospace,monospace;letter-spacing:.08em;text-align:center;padding:12px;border:2px dashed #ee4d2d;border-radius:12px;margin:10px 0;background:#fff}

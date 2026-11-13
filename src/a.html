@@ -244,6 +244,15 @@ body.sheetOn #bCam{display:none!important}
 .dexbar{display:flex;align-items:center;gap:10px;margin:3px 0}.dexbar span{width:3em;opacity:.7}.dexbar i{flex:1;height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}.dexbar em{display:block;height:100%;background:var(--rc,#e9b949);border-radius:4px}
 #homeUI{display:none;position:fixed;left:0;right:0;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:20;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
 #homeUI .hb{display:flex;gap:10px;pointer-events:auto}#homeUI .hh{color:#fff;opacity:.7;font-size:13px;text-shadow:0 1px 3px #000}
+/* 小屋下方按鈕重新設計：原本是兩三排大按鈕疊在畫面中間，擋住水族箱。改成畫面最下緣一條半透明的工具列，圖示在上、字在下 */
+#homeUI{bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;gap:4px!important}
+#homeUI .hb{gap:6px!important;padding:6px 8px;border-radius:18px;background:rgba(12,18,16,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.12);flex-wrap:nowrap!important}
+#homeUI .hb .btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:auto!important;min-width:60px;height:auto!important;min-height:52px;padding:4px 8px!important;font-size:12px!important;font-weight:700;border-radius:12px!important;background:transparent;border:0;box-shadow:none;color:#f3ead8;flex:0 0 auto}
+#homeUI .hb .btn i{font-style:normal;font-size:20px;line-height:1}
+#homeUI .hb .btn.pri{background:rgba(242,194,48,.92)!important;color:#1d1a10}
+#homeUI .hh{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 64px);font-size:12px!important;opacity:.75;animation:hhFade 1s 6s forwards;pointer-events:none;white-space:nowrap}
+@keyframes hhFade{to{opacity:0}}
+@media (orientation:landscape) and (max-height:540px){ #homeUI .hb .btn{min-height:46px;min-width:56px} #homeUI .hh{top:calc(env(safe-area-inset-top,0px) + 12px)} }
 body.athome #homeUI{display:flex}
 body.sheetOn #homeUI,body.sheetOn #homeView,body.sheetOn #fishCard{display:none!important}
 #homeView{position:fixed;left:12px;top:calc(64px + env(safe-area-inset-top,0px));z-index:21;display:flex;gap:8px}#homeView.hidden,#fishCard.hidden{display:none}
@@ -277,7 +286,8 @@ body.athome #homeUI .hb{flex-wrap:wrap;justify-content:center}#grillUI .gt{font-
 #grillPick{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:22;background:rgba(20,14,10,.85);border:1px solid rgba(255,200,140,.3);border-radius:16px;padding:12px;color:#f3e6d2;max-height:55vh;overflow:auto}
 #grillPick .it{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08)}
 body.grilling #homeUI,body.grilling #joy{display:none!important}
-body.athome #homeUI .hb{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:min(100%,320px);gap:7px}body.athome #homeUI .hb .btn{padding:10px 4px;font-size:12px;white-space:nowrap}#homeUI .home-shop{grid-column:1/-1;background:#163a31;border:1px solid #b99b63;color:#f1dfba;font-size:13px}
+body.athome #dockPractice,body.attide #dockPractice,body.inHall #dockPractice{display:none!important}   /* 釣魚新手提示只在釣魚時出現，小屋、潮間帶、標本館不要擋畫面 */
+body.athome #homeUI .hb{display:flex;width:auto;max-width:calc(100vw - 16px);overflow-x:auto}body.athome #homeUI .hb .btn{white-space:nowrap}#homeUI .home-shop{color:#f1dfba!important}
 #shopUI{position:fixed;inset:0;z-index:70;background:rgba(5,16,15,.88);display:flex;align-items:center;justify-content:center;padding:12px;backdrop-filter:blur(8px);touch-action:auto}
 #shopUI.hidden{display:none}
 #shopUI .box{width:100%;max-width:560px;max-height:94vh;max-height:94dvh;display:flex;flex-direction:column;overflow:hidden;border:1px solid #9c8453;border-radius:20px;background:#f3eee3;color:#213832;box-shadow:0 24px 80px #0009}
@@ -421,7 +431,7 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:fa
 <div id="grillPick" class="hidden"></div>
 <div id="shopUI" class="hidden"></div>
 <div id="homeView" class="hidden"><button class="btn" id="bViewBack">← 返回客廳</button><button class="btn" id="bDive">🤿 潛入缸內</button></div><div id="fishCard" class="hidden"></div>
-<div id="homeUI"><div class="hh">點水族箱可以靠近觀賞・拖曳畫面轉頭</div><div class="hb"><button class="btn" id="bOut">🚪 出門</button><button class="btn" id="bGrillH">🔥 烤魚</button><button class="btn pri" id="bTankM">🏠 管理</button><button class="btn" id="bHall">🏛 標本館</button><button class="btn home-shop" id="bHomeShop">💎 逛水晶小店</button></div></div>
+<div id="homeUI"><div class="hh">點水族箱可以靠近觀賞・拖曳畫面轉頭</div><div class="hb"><button class="btn" id="bOut"><i>🚪</i>出門</button><button class="btn" id="bGrillH"><i>🔥</i>烤魚</button><button class="btn pri" id="bTankM"><i>🏠</i>管理</button><button class="btn" id="bHall"><i>🏛</i>標本館</button><button class="btn home-shop" id="bHomeShop"><i>💎</i>水晶小店</button></div></div>
 <div id="toast"></div>
 <div id="fight" class="hidden">
   <div class="hd"><span id="fName">上鉤了！</span><b id="fDist">0.0 m</b></div>
