@@ -7,7 +7,7 @@ function yachtDeckHeight(T,root,x,z,fallback,top){
  return hit?root.worldToLocal(hit.point.clone()).y:fallback;
 }
 /* 釣位：船尾駕駛艙的右舷側，站在艙底板上面向右舷（舷邊只到膝蓋，不會擋到手和竿子）；
-   駕駛座：中控台後方、靠背座椅前面，面向船頭握方向盤 */
-function yachtStations(T,root){return{fishing:{x:.27,z:1.7,deck:yachtDeckHeight(T,root,.27,1.7,.1),yaw:-Math.PI/2},helm:{x:0,z:.55,deck:yachtDeckHeight(T,root,0,.55,.1,.6),yaw:0}};}
+   駕駛座：站在中控台（背面 z≈.5）與靠背座椅（前緣 z≈.9）之間，面向船頭握方向盤；眼前那根橫桿是擋風玻璃上緣的扶手，實船也在這個高度 */
+function yachtStations(T,root){return{fishing:{x:.27,z:1.7,deck:yachtDeckHeight(T,root,.27,1.7,.1),yaw:-Math.PI/2},helm:{x:0,z:.72,deck:yachtDeckHeight(T,root,0,.72,.1,.6),yaw:0}};}
 function yachtAnglerPose(T,boat,station){boat.updateMatrixWorld(true);return{position:boat.localToWorld(new T.Vector3(station.x,station.deck+1.62,station.z)),yaw:station.yaw};}
 if(typeof module!=='undefined'&&module.exports)module.exports={yachtDeckHeight,yachtStations,yachtAnglerPose};

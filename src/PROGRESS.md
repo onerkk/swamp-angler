@@ -7,6 +7,7 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-13 使用者問駕駛座眼前的橫桿：那是擋風玻璃上緣扶手（高 1.6m），實船也有。真正的錯：駕駛座 z=.55 貼在中控台背面（中控台 z −.3～.5、靠背座椅 z .9～1.4），已改 z=.72；船殼所有材質都是雙面畫，從船內看到外殼背面＝船名、註冊號碼、Scout 字樣左右相反 → Scout_Base／Scout_Other 背面改畫白色內襯（m.js onBeforeCompile，gl_FrontFacing）。夜間截圖確認：中控台儀表在正確的一面、扶手在畫面上緣、沒有反字
 - 2026-11-13 使用者選 B：船換成「2004 17' Scout - Center Console」（BoatUS Foundation，CC BY 4.0，uid 185e7c1dbf254b57b42b1979c45e4117）。
   轉檔：/tmp/gt/strip.mjs 拿掉拖車（材質 Scout_Trailer）→ simplify 0.42 → /tmp/gt/tojpg.mjs（無透明的貼圖轉 JPEG）→ draco：12.3 萬面、3.8MB（models/yacht.glb）
   m.js attachYacht：真實尺寸全長 6m、船身置中原點、吃水線 H*.19；Glass 材質改透明；不再放道具。yacht-layout.js：釣位 (.27,1.7) 船尾右舷、駕駛座 (0,.55) 中控台後，艙底板 y≈.11
