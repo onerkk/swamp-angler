@@ -66,8 +66,18 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene
   o.traverse(x=>{ if(x.isMesh) x.renderOrder=-2; });
   // 船艙水線遮罩：一片只寫深度、不畫顏色的橢圓蓋在船艙水線上，排在船體之後、其他東西之前畫。
   // 船艙比水面低，水面、浮萍、睡蓮、雨圈這些貼在水面的東西才不會畫進船裡（船看起來像沉了）；船板先畫好不受影響
-  const capGeo=new T.CircleGeometry(1,40); capGeo.rotateX(-Math.PI/2); const cap=new T.Mesh(capGeo,new T.MeshBasicMaterial({colorWrite:false,depthWrite:true,side:T.DoubleSide}));
-  cap.scale.set(.62,1,1.72); cap.position.set(0,.045,-.35); cap.renderOrder=-1; cap.frustumCulled=false; cap.userData.hullCap=true; boat.add(cap);
+  /* 遮罩的形狀照船身實際的輪廓算：在水線以上一點點的高度，把船身切成一段段，取每段船舷內側的寬度，連成一圈。
+     以前是一個橢圓，木船船頭尖、船尾方，橢圓蓋不到船尾兩角和船頭，湖水和漣漪就從那裡透進船艙 */
+  let capGeo=null; try{ w.updateMatrixWorld(true); const inv=new T.Matrix4(), v=new T.Vector3(), bb=new T.Box3().setFromObject(w);   /* w 還沒掛到船上：它的世界座標就是船的座標 */
+    const NZ=28, z0=bb.min.z, z1=bb.max.z, half=new Array(NZ+1).fill(0), yMin=.0, yMax=.32;
+    w.traverse(m=>{ if(!m.isMesh) return; const P=m.geometry.attributes.position, M=new T.Matrix4().multiplyMatrices(inv,m.matrixWorld); for(let i=0;i<P.count;i++){ v.fromBufferAttribute(P,i).applyMatrix4(M); if(v.y<yMin||v.y>yMax) continue; const k=Math.round((v.z-z0)/(z1-z0)*NZ); if(k>=0&&k<=NZ) half[k]=Math.max(half[k],Math.abs(v.x)); } });
+    const hs=half.map((h,k)=>Math.max(h,half[k-1]||0,half[k+1]||0));   /* 頂點稀疏的地方取左右兩段的最大值補起來 */
+    const pts=[]; for(let k=0;k<=NZ;k++){ const z=z0+(z1-z0)*k/NZ; if(hs[k]>.05) pts.push([Math.max(0,hs[k]-.04),z]); }
+    if(pts.length>4){ const sh=new T.Shape(); sh.moveTo(pts[0][0],pts[0][1]); for(const [x,z] of pts) sh.lineTo(x,z); for(let i=pts.length-1;i>=0;i--) sh.lineTo(-pts[i][0],pts[i][1]); sh.closePath();
+      capGeo=new T.ShapeGeometry(sh); capGeo.rotateX(Math.PI/2); } }catch(e){ console.warn('hull cap',e); }
+  const fromHull=!!capGeo; if(!capGeo){ capGeo=new T.CircleGeometry(1,40); capGeo.rotateX(-Math.PI/2); }
+  const cap=new T.Mesh(capGeo,new T.MeshBasicMaterial({colorWrite:false,depthWrite:true,side:T.DoubleSide}));
+  if(fromHull) cap.position.set(0,.045,0); else { cap.scale.set(.62,1,1.72); cap.position.set(0,.045,-.35); } cap.renderOrder=-1; cap.frustumCulled=false; cap.userData.hullCap=true; boat.add(cap);
   boat.children.forEach(ch=>{ if(ch!==padG&&ch!==w&&ch!==cap) ch.visible=false; }); boat.add(w); });   // 只藏舊塑膠艇的船身，槳要留著
 { const yel=new T.MeshStandardMaterial({color:0xf2b705,roughness:.32}), blk=new T.MeshStandardMaterial({color:0x151515,roughness:.6}), gry=new T.MeshStandardMaterial({color:0x33363b,metalness:.5,roughness:.4});
   const hull=new T.Mesh(new T.SphereGeometry(1,48,20),yel); hull.scale.set(.36,.22,1.95); hull.position.set(0,.02,-.15); boat.add(hull);
