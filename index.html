@@ -443,7 +443,7 @@ function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classLi
 <script>
 /* 主程式載入器：直接從本站下載（外部 CDN 已停用：倉庫超過 50 MB，jsDelivr 一律拒絕）。
    下載失敗會自動重試三次（間隔拉長），再不行就改用一般的 script 標籤載入；全部失敗才顯示錯誤並提供重試按鈕 */
-(function(){ var V='20261113003421', F=['app_scan.js','app_main.js'];
+(function(){ var V='20261113014404', F=['app_scan.js','app_main.js'];
   var note=function(t){ var e=document.getElementById('loadTip'); if(e&&t) e.textContent=t; };
   function run(code){ var b=new Blob([code],{type:'text/javascript'}), s=document.createElement('script'); s.src=URL.createObjectURL(b); return new Promise(function(ok){ s.onload=ok; s.onerror=ok; document.body.appendChild(s); }); }
   function get(u){ return fetch(u).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }).then(function(t){ if(t.indexOf('/*APPV:'+V+'*/')!==0) throw new Error('版本不符'); return t; }); }

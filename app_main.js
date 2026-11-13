@@ -1,4 +1,4 @@
-/*APPV:20261113003421*/
+/*APPV:20261113014404*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -1343,18 +1343,17 @@ function addMarineHardware(T,wrap,deck,materials){
  fittings.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return fittings;
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={MARINE_PARTS,marinePart,dressYacht};
-/* Metres in the normalized yacht frame: bow -Z, stern +Z, starboard +X.
-   遊艇模型：「Yacht II」by gogiart（Sketchfab，CC BY 4.0）。黑色船身、柚木甲板、駕駛艙、上層甲板（放著小艇）、前甲板。
-   甲板高度：從指定高度往下找第一個「朝上的面」（不看材質名稱；舊模型靠材質名 material_3 判斷，換模型就失效）。
-   top 用來避開上層：例如要找被上層甲板蓋住的下層甲板，就從上層下方開始找 */
+/* Metres in the normalized boat frame: bow -Z, stern +Z, starboard +X, hull centred on the origin, waterline at y=0.
+   船：「2004 17' Scout - Center Console」by BoatUS Foundation（Sketchfab，CC BY 4.0），真實尺寸（連船外機約 6 公尺）。
+   甲板高度：從指定高度往下找第一個水平面（不看材質名稱，換模型也能用）。top 用來避開上方的東西（例如座椅、中控台） */
 function yachtDeckHeight(T,root,x,z,fallback,top){
  root.updateMatrixWorld(true);const o=root.localToWorld(new T.Vector3(x,top==null?100:top,z)),ray=new T.Raycaster(o,new T.Vector3(0,-1,0));
  const hit=ray.intersectObject(root,true).find(h=>{if(!h.face)return false;const n=h.face.normal.clone().transformDirection(h.object.matrixWorld);return Math.abs(n.y)>.8;});   /* 有些模型的甲板面是反向繞的（法線朝下），水平面都算 */
  return hit?root.worldToLocal(hit.point.clone()).y:fallback;
 }
-/* 釣位：船頭前甲板的右舷側（開放、離水面近，面向右舷）；駕駛座：上層甲板、駕駛艙正前方（面向船頭，看得到整個前甲板） */
-/* 釣位離舷牆要留 1 公尺以上（舷牆在 x≈1.4）：站太近時第一人稱的手臂和竿子會穿過欄杆 */
-function yachtStations(T,root){return{fishing:{x:.25,z:-.5,deck:yachtDeckHeight(T,root,.25,-.5,1.6),yaw:-Math.PI/2},helm:{x:0,z:2.4,deck:yachtDeckHeight(T,root,0,2.4,3.45),yaw:0}};}
+/* 釣位：船尾駕駛艙的右舷側，站在艙底板上面向右舷（舷邊只到膝蓋，不會擋到手和竿子）；
+   駕駛座：中控台後方、靠背座椅前面，面向船頭握方向盤 */
+function yachtStations(T,root){return{fishing:{x:.27,z:1.7,deck:yachtDeckHeight(T,root,.27,1.7,.1),yaw:-Math.PI/2},helm:{x:0,z:.55,deck:yachtDeckHeight(T,root,0,.55,.1,.6),yaw:0}};}
 function yachtAnglerPose(T,boat,station){boat.updateMatrixWorld(true);return{position:boat.localToWorld(new T.Vector3(station.x,station.deck+1.62,station.z)),yaw:station.yaw};}
 if(typeof module!=='undefined'&&module.exports)module.exports={yachtDeckHeight,yachtStations,yachtAnglerPose};
 /* Single beauty pass. Expensive screen-space ray marching has been removed. */
@@ -5447,7 +5446,7 @@ const RSETS={lake:['mermaid_v2','fish_bowfin','fish_reba','fish_mandarin','blueg
   tide:['fish_hardclam','fish_gomphina','fish_tellin','fish_razor','fish_ghostcrab','fish_fiddler','fish_mudskip','fish_ragworm','fish_hermit'],
   sea:['mermaid_v2','crust_lobster','fish_wahoo','fish_maori','fish_puffer','fish_amber','fish_barracuda','fish_grouper2','fish_bigeye','fish_stingray','fish_amberjack','fish_knifejaw','fish_halibut','fish_sunfish','fish_mahi','fish_sail','yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','king_v2']};
 const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger Shark','ra_in_coat'],['海豚','Bottlenose Dolphin','popcornbag'],['座頭鯨','Humpback Whale','ostapblendercg'],
-  ['鱷魚','American Alligator','JeremyGrayson'],['白頭海鵰','Bald Eagle','ucdavisterc'],['海鷗','Seagull','Dayvable'],['遊艇','Yacht II','gogiart'],
+  ['鱷魚','American Alligator','JeremyGrayson'],['白頭海鵰','Bald Eagle','ucdavisterc'],['海鷗','Seagull','Dayvable'],['釣魚艇',"2004 17' Scout - Center Console",'BoatUS Foundation'],
   ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
   ['斑點叉尾鮰','Channel catfish','faerbogdan99'],['扁頭鯰','Flathead Catfish','faerbogdan99'],['鱷雀鱔','Alligator Gar','Jay_Tano'],['錦鯉','Koi Fish','7plus'],
   ['石斑','lowpoly freshwater grouper','Arrangemonk9'],['黑鮪魚','Bluefin Tuna','voltairevill'],['旗魚','Blue Marlin','Gotta_go_evi'],['飛魚','Exocoetidae','victorberdug'],
@@ -5586,19 +5585,22 @@ function attach(host,key,o){ const h={host,loaded:false,actions:{},mixer:null,pl
 const cl0=a=>a.getClip().duration||1;
 
 /* 遊艇：分開實際柚木釣位與駕駛甲板，不把艙頂當釣位。 */
-function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene.clone(), wrap=new T.Group(); wrap.add(obj); obj.rotation.y=Math.PI;   /* Yacht II 原檔船頭朝 +z，遊戲裡船頭是 −z */ wrap.updateMatrixWorld(true);
-  const L=26; let b=new T.Box3().setFromObject(wrap), sz=b.getSize(new T.Vector3()); obj.scale.setScalar(L/sz.z); wrap.updateMatrixWorld(true);
+function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene.clone(), wrap=new T.Group(); wrap.add(obj); obj.rotation.y=Math.PI;   /* 原檔船頭朝 +z，遊戲裡船頭是 −z */ wrap.updateMatrixWorld(true);
+  /* 船：「2004 17' Scout - Center Console」by BoatUS Foundation（Sketchfab，CC BY 4.0）——美國船艇安全基金會做駕船訓練用的模型，真實的 17 呎中控台釣魚艇。
+     用真實尺寸：連船外機全長約 6 公尺、寬約 1.85 公尺；船身置中在原點（轉彎時繞著船身中心轉）；吃水線（白色船身與藍色船底漆的交界）對到水面 */
+  const L=6.0; let b=new T.Box3().setFromObject(wrap), sz=b.getSize(new T.Vector3()); obj.scale.setScalar(L/sz.z); wrap.updateMatrixWorld(true);
   b=new T.Box3().setFromObject(wrap); const c=b.getCenter(new T.Vector3()), H=b.max.y-b.min.y;
-  obj.position.x-=c.x; obj.position.z+=-4.5-b.min.z; obj.position.y+=-(b.min.y+H*.128);   /* 吃水線（黑色船身與船底漆的交界）對到水面 */ wrap.updateMatrixWorld(true);
+  obj.position.x-=c.x; obj.position.z-=c.z; obj.position.y+=-(b.min.y+H*.19); wrap.updateMatrixWorld(true);
   host.userData.stations=yachtStations(T,wrap);const deck=host.userData.stations.fishing.deck;
   // 船身尺寸（船首、船尾、半寬、吃水線）：航行的艏浪、航跡、水花要從船身真正的位置出來
-  { wrap.updateMatrixWorld(true); const hb=new T.Box3().setFromObject(wrap); host.userData.hull={bow:hb.min.z,stern:hb.max.z,beam:(hb.max.x-hb.min.x)/2,deckBow:yachtDeckHeight(T,wrap,0,hb.min.z+5,2.6),deckMain:deck}; }
+  { wrap.updateMatrixWorld(true); const hb=new T.Box3().setFromObject(wrap); host.userData.hull={bow:hb.min.z,stern:hb.max.z,beam:(hb.max.x-hb.min.x)/2,deckBow:yachtDeckHeight(T,wrap,0,hb.min.z+(hb.max.z-hb.min.z)*.2,deck+.5),deckMain:deck}; }
   obj.traverse(m=>{ m.frustumCulled=false; if(m.isMesh) m.castShadow=false; });
   /* 船身質感：這個模型的材質全部是霧面、沒有金屬、玻璃是一片平的青色，近看像玩具。
      依每個材質貼圖的平均顏色分類後換成該有的質感：玻璃（深色、會反射天空）、白色船漆（亮面）、黑色船身漆、金屬五金、柚木（緞面） */
   try{ const cv=document.createElement('canvas'); cv.width=cv.height=4; const cx=cv.getContext('2d'), seen=new Map();
     const avg=m=>{ if(!m.map||!m.map.image) return [m.color.r,m.color.g,m.color.b]; try{ cx.clearRect(0,0,4,4); cx.drawImage(m.map.image,0,0,4,4); const d=cx.getImageData(0,0,4,4).data; let r=0,g=0,b=0; for(let i=0;i<64;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; } return [r/4080,g/4080,b/4080]; }catch(e){ return [m.color.r,m.color.g,m.color.b]; } };
-    obj.traverse(o=>{ if(!o.isMesh||!o.material||Array.isArray(o.material)) return; let m=seen.get(o.material); if(!m){ const src=o.material; m=src.clone(); seen.set(src,m);
+    obj.traverse(o=>{ if(!o.isMesh||!o.material||Array.isArray(o.material)) return; if(!/^acmat/.test(o.material.name||'')){ if(/glass/i.test(o.material.name||'')&&!o.material.userData.fixed){ const gm=o.material; gm.userData.fixed=1; gm.transparent=true; gm.opacity=.32; gm.color.setRGB(.55,.7,.8); gm.metalness=0; gm.roughness=.04; gm.envMapIntensity=1.6; gm.depthWrite=false; gm.needsUpdate=true; } else if(o.material.map) o.material.map.anisotropy=8; return; }
+      let m=seen.get(o.material); if(!m){ const src=o.material; m=src.clone(); seen.set(src,m);
         const [r,g,b]=avg(src), lum=(r+g+b)/3, mx=Math.max(r,g,b), mn=Math.min(r,g,b), sat=mx>0?(mx-mn)/mx:0; m.metalness=0;
         if(g>r*1.2&&b>r*1.2&&lum>.45){ m.map=null; m.color.setRGB(.02,.07,.09); m.roughness=.05; m.envMapIntensity=1.7; m.name='yacht glass'; }                    // 玻璃
         else if(lum>.72&&sat<.18){ m.roughness=.3; m.envMapIntensity=.9; m.name='yacht white paint'; }                                                           // 白漆、欄杆
@@ -5608,7 +5610,7 @@ function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene
         else { m.roughness=.5; } m.needsUpdate=true; }
       o.material=m; }); }catch(e){ console.warn('yacht materials',e); }
   /* 新模型自帶柚木甲板、欄杆、救生圈的貼圖與細節：不再套舊模型用的船用材質與甲板五金，只在釣位旁放幾件實物掃描的道具 */
-  try{ addMarineProps(T,wrap,null); }catch(e){ console.warn('marine props',e); }
+  /* 這艘船自帶滅火器、座椅、船外機等細節，不另外放道具 */
 
   host.children.slice().forEach(ch=>{ ch.visible=false; }); host.add(wrap);
   const b3=new T.Box3().setFromObject(wrap); setHull(Math.max(Math.abs(b3.min.x),b3.max.x),b3.min.z,b3.max.z);
@@ -8596,7 +8598,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113003421'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113014404'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
