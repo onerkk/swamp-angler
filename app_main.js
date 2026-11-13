@@ -1,4 +1,4 @@
-/*APPV:20261113095526*/
+/*APPV:20261113104205*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -8754,7 +8754,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113095526'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113104205'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -9552,10 +9552,10 @@ window.__tideH=hAt;
 function gAt(x,z){ const cs=200/GN, fx=(x+100)/cs, fz=(z+100)/cs, i=Math.floor(fx), j=Math.floor(fz), u=fx-i, v=fz-j, X=k=>-100+k*cs;
   const h00=hAt(X(i),X(j)), h10=hAt(X(i+1),X(j)), h01=hAt(X(i),X(j+1)), h11=hAt(X(i+1),X(j+1)); return (h00*(1-u)+h10*u)*(1-v)+(h01*(1-u)+h11*u)*v; }
 const edgeK=(lx,lz)=>{ const e=Math.max(Math.abs(lx),Math.abs(lz))/(.8/2); return 1-Math.min(1,Math.max(0,(e-.7)/.3)); };   // 挖掘面中間用精細高度、邊緣過渡到粗地面高度
-const GN=220, gg=new T.PlaneGeometry(200,200,GN,GN).rotateX(-Math.PI/2), gp=gg.attributes.position;
+const GN=300, gg=new T.PlaneGeometry(200,200,GN,GN).rotateX(-Math.PI/2), gp=gg.attributes.position;
 for(let k=0;k<gp.count;k++) gp.setY(k,hAt(gp.getX(k),gp.getZ(k)));
 gg.computeVertexNormals();
-const gmat=new T.MeshStandardMaterial({color:0xb8aea0,map:mudT,normalMap:mudN,normalScale:new T.Vector2(1.1,1.1),roughness:.42,metalness:0});
+const gmat=new T.MeshStandardMaterial({color:0xb8aea0,map:mudT,normalMap:mudN,normalScale:new T.Vector2(.75,.75),roughness:.42,metalness:0});
 const HOLES=[]; for(let i=0;i<8;i++) HOLES.push(new T.Vector3(0,0,0));
 const GU={uHoles:{value:HOLES},uHoleOn:{value:1},uTW:{value:0},uSkyK:{value:1},uSeepY:{value:-9}}; gmat.userData.sh={uniforms:GU};   /* 地面和挖掘區共用同一組時間／天光參數 */
 gmat.onBeforeCompile=sh=>{ sh.uniforms.tSand={value:sandT}; sh.uniforms.tSandN={value:sandN}; sh.uniforms.uTW=GU.uTW; sh.uniforms.uHoles=GU.uHoles; sh.uniforms.uHoleOn=GU.uHoleOn; sh.uniforms.uSkyK=GU.uSkyK; sh.uniforms.uSeepY=GU.uSeepY;
@@ -9569,16 +9569,17 @@ float sandKf(vec2 p){ float e=34.+th(p*vec2(1.7,1.3))*7.+sin(p.x*.21)*2.5; retur
   vec2 uvA=vWP2.xz*.29, uvB=vec2(vWP2.x*.83-vWP2.z*.55,vWP2.x*.55+vWP2.z*.83)*.071;   // 兩種尺度、旋轉錯開，看不出重複
   float sk=sandKf(vWP2.xz) + (texture2D(tSand,vWP2.xz*.9).r-.5)*.25; sk=clamp(sk,0.,1.);
   vec3 mudC=mix(texture2D(map,uvA).rgb,texture2D(map,uvB).rgb,.35), sandC=mix(texture2D(tSand,uvA*1.1).rgb,texture2D(tSand,uvB).rgb,.3);
-  float wet=1.-smoothstep(-.06,.06,vWP2.y);   // 越低越濕越暗
+  float wet=1.-smoothstep(-.06,.06,vWP2.y+(dot(texture2D(map,vWP2.xz*1.3).rgb,vec3(.33))-.5)*.05);   // 越低越濕越暗（跟水邊一樣加上細微起伏）
   vec4 texelColor=vec4(mix(pow(mudC,vec3(1.25))*.82*(1.-.25*wet),sandC*(.9-.1*wet),sk),1.);   // 泥比較深、對比高
   texelColor=mapTexelToLinear(texelColor); diffuseColor*=texelColor;
   float macro=th(vWP2.xz*.4)*.5+.5; diffuseColor.rgb*=.85+.2*macro;`)
   .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
   { float skR=clamp(sandKf(vWP2.xz),0.,1.); float wetR=1.-smoothstep(-.12,.02,vWP2.y);
-    roughnessFactor=mix(mix(.3,.16,wetR),.88,skR);   // 泥：濕亮（越靠水越像抹了一層水）；沙：乾霧
+    roughnessFactor=mix(mix(.42,.27,wetR),.9,skR);   // 泥：濕亮（越靠水越像抹了一層水）；沙：乾霧
     roughnessFactor+= (texture2D(map,vWP2.xz*1.7).r-.5)*.25; }`)
   .replace('#include <dithering_fragment>',`#include <dithering_fragment>
-  if(uHoleOn>.5){ float wl=-.105, dep=wl-vWP2.y;   /* 只有地面算潮溝積水；挖掘洞裡的水由滲水處理 */                                            // 水深
+  if(uHoleOn>.5){ float micro=(dot(texture2D(map,vWP2.xz*1.3).rgb,vec3(.33))-.5)*.05+(sin(vWP2.x*9.1+sin(vWP2.z*5.3)*2.)+sin(vWP2.z*8.3-vWP2.x*3.1))*.006;
+    float wl=-.105, dep=wl-(vWP2.y+micro);   /* 水邊依細微高低差彎曲，不再沿著地形網格走直線 */   /* 只有地面算潮溝積水；挖掘洞裡的水由滲水處理 */                                            // 水深
     if(dep>-.02&&uHoleOn>.5){ vec3 V=normalize(cameraPosition-vWP2);   /* 挖掘面不套用潮溝積水（洞底原本被當成水面、反射天空變灰白） */ 
       vec2 p=vWP2.xz; float t=uTW; vec3 n=normalize(vec3((sin(p.x*3.1+p.y*1.3+t*1.6)+sin(p.x*7.9-p.y*6.1+t*3.3)*.4+sin(p.x*17.-p.y*13.+t*5.)*.25)*.07,1.,(cos(p.x*2.3-p.y*3.7-t*1.4)+cos(p.x*5.3+p.y*2.9+t*2.6)*.5+cos(p.x*15.+p.y*19.-t*4.)*.25)*.07));
       float fr=.03+.97*pow(1.-max(dot(n,V),0.),5.);                            // 斜看反射多、正看透明
@@ -9590,7 +9591,7 @@ float sandKf(vec2 p){ float e=34.+th(p*vec2(1.7,1.3))*7.+sin(p.x*.21)*2.5; retur
 };
 gmat.customProgramCacheKey=()=>'tideGround';
 const ground=new T.Mesh(gg,gmat); S.add(ground);
-gmat.envMapIntensity=.45;
+gmat.envMapIntensity=.75;   /* 濕泥主要反射天空（陰天的大片灰白），而不是陽光的亮點 */
 // 積水：一片略高於最低處的水面，只在低窪地方露出來；反射天空
 const pud=new T.Mesh(new T.PlaneGeometry(200,200).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x9aa6a8,roughness:.04,metalness:.9,transparent:true,opacity:.75}));
 pud.position.y=-.105; pud.visible=false; S.add(pud);   /* 水改在地面著色器裡算（水邊柔和），這片平面不再顯示 */
@@ -9615,7 +9616,7 @@ pud.material.onBeforeCompile=sh=>{ sh.uniforms.uT={value:0}; pud.userData.sh=sh;
   { vec2 p=vWQ.xz; float a=sin(p.x*3.1+p.y*1.3+uT*1.6)+sin(p.x*-1.7+p.y*4.3-uT*2.1)*.7+sin(p.x*7.9-p.y*6.1+uT*3.3)*.3;
     float b=cos(p.x*2.3-p.y*3.7-uT*1.4)+cos(p.x*5.3+p.y*2.9+uT*2.6)*.5; normal=normalize(normal+vec3(a*.035,0.,b*.035)); }`); };
 pud.material.customProgramCacheKey=()=>'tidePud';   // 舊程式相容用（沙地已併入地形）
-new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.mapping=T.EquirectangularReflectionMapping; t.encoding=T.sRGBEncoding; try{ const pm=new T.PMREMGenerator(W.renderer); const env=pm.fromEquirectangular(t).texture; gmat.envMap=env; gmat.envMapIntensity=.45; pud.material.envMap=env; pud.material.envMapIntensity=1.2; gmat.needsUpdate=pud.material.needsUpdate=true; pm.dispose(); }catch(e){} });
+new T.TextureLoader().load('sky_ovc_light.jpg',t=>{ t.mapping=T.EquirectangularReflectionMapping; t.encoding=T.sRGBEncoding; try{ const pm=new T.PMREMGenerator(W.renderer); const env=pm.fromEquirectangular(t).texture; gmat.envMap=env; gmat.envMapIntensity=.75; pud.material.envMap=env; pud.material.envMapIntensity=1.2; gmat.needsUpdate=pud.material.needsUpdate=true; pm.dispose(); }catch(e){} });
 // 海水：從遠處慢慢漲回來
 const sea=new T.Mesh(new T.PlaneGeometry(400,300).rotateX(-Math.PI/2),new T.MeshStandardMaterial({color:0x4d6a72,roughness:.12,metalness:.3,transparent:true,opacity:.92})); sea.position.set(0,.06,-200); S.add(sea);
 // 撤離路線：竹竿＋褪色的布旗（漲潮警告時亮起），布會隨風飄
