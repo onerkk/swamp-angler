@@ -778,9 +778,9 @@ function updateKayak(dt){
   let thr=KY.thr, turn=KY.turn;
   if(keys.KeyW) thr=1; if(keys.KeyS) thr=-.6; if(keys.KeyA) turn=-1; if(keys.KeyD) turn=1;
   if(!can){ thr=0; turn=0; if(s.yacht){KY.v=0;KY.w=0;} }
-  Snd.engine(!!s.yacht&&G.boatStation==='helm'&&G.state!=='travel',Math.abs(KY.v)/22,Math.abs(thr));   /* 遊艇引擎聲：站上駕駛座發動，船速越快越響 */
+  Snd.engine(!!s.yacht&&G.boatStation==='helm'&&G.state!=='travel',Math.abs(KY.v)/16.5,Math.abs(thr));   /* 遊艇引擎聲：站上駕駛座發動，船速越快越響 */
   if(!s.kayak&&!s.yacht){ KY.v=0; KY.w=0; G.boatV=0; G.boatW=0; WL.paddle(dt,0); stowRod(WL.padOn()); return; }
-  KY.v+=(thr*(s.yacht?13.2:1.5)-KY.v*(s.yacht?.6:.65))*dt;   /* 遊艇雙引擎全速約每秒 22 公尺（約 43 節，運動型釣魚遊艇的極速），約 4 秒內衝到八成；獨木舟約 2.3 公尺 */ KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
+  KY.v+=(thr*(s.yacht?9.9:1.5)-KY.v*(s.yacht?.6:.65))*dt;   /* 17 呎中控台釣魚艇＋90 匹船外機：極速約每秒 16.5 公尺（約 32 節），約 4 秒衝到八成 */   /* 遊艇雙引擎全速約每秒 22 公尺（約 43 節，運動型釣魚遊艇的極速），約 4 秒內衝到八成；獨木舟約 2.3 公尺 */ KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
   WL.paddle(dt,s.yacht?0:clamp(Math.max(Math.abs(thr),Math.abs(turn)*.7),0,1),AT.ring);   // 遊艇靠引擎，不划槳
   stowRod(s.yacht&&G.boatStation==='helm'?1:WL.padOn());
   G.boatV=KY.v; G.boatW=KY.w;   /* 遊艇的姿態（抬頭、轉彎側傾）與艏浪、航跡依船速計算 */

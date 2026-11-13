@@ -1,4 +1,4 @@
-/*APPV:20261113024449*/
+/*APPV:20261113031744*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -1072,9 +1072,9 @@ const pm=new T.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,
     vec3 col=mix(vec3(.80,.90,.95),vec3(.97,.99,1.0),vT)*(.3+.8*uLight);
     gl_FragColor=vec4(col,a); }`});
 const pts=new T.Mesh(qg,pm); pts.frustumCulled=false; pts.renderOrder=4; pts.userData.flatOnWater=true; pts.visible=false; S.add(pts);
-let pHead=0, curtainAcc=0, emitAcc=0, sampleT=0, wasOn=false;
+let pHead=0, curtainAcc=0, emitAcc=0, tailAcc=0, sampleT=0, wasOn=false;
 // 船殼在水線的半寬：船頭尖、往後 8 公尺內漸寬到最寬
-const hullHalf=(o,lz)=>o.beam*Math.min(1,.35+(lz-o.bow)/8);
+const hullHalf=(o,lz)=>o.beam*Math.min(1,.35+(lz-o.bow)/Math.max(1.5,(o.stern-o.bow)*.31));
 function put(x,y,z,vx,vy,vz,life,size,type){ const i=pHead; pHead=(pHead+1)%NP; sp[i*3]=x; sp[i*3+1]=y; sp[i*3+2]=z; sv[i*3]=vx; sv[i*3+1]=vy; sv[i*3+2]=vz; sl[i]=life; sl0[i]=life; ssz[i]=size; sty[i]=type; }
 function emit(x,y,z,vx,vy,vz,life,size){
   if(size>.25){ put(x,y,z,vx*.6,vy*.6,vz*.6,life*1.3,size*1.1,1);
@@ -1095,32 +1095,42 @@ function update(dt,t,o){
   U.uTime.value=t; U.uLight.value=Math.max(.06,Math.min(1,W.info?W.info.light:1)); W.camera.getWorldPosition(U.uCam.value);
   if(!o||!o.on){ if(wasOn) clear(); wasOn=false; return; } wasOn=true;
   const fx=-Math.sin(o.head), fz=-Math.cos(o.head), rx=-fz, rz=fx, s=Math.max(0,o.speed);
+  /* 船的大小：以 26 公尺遊艇為 1。小船的水花矮、窄、量少——17 呎中控台艇滑行時，水是從船頭後方約三分之一處的船舷兩側被壓出來、
+     往外貼著水面甩成兩片低低的水簾（約 1 公尺高），不會高過船頭；船尾船外機翻起一條窄的白水，高速時噴出一小道雞尾巴水柱 */
+  const Lb=Math.max(3,o.stern-o.bow), sc=Math.min(1,Lb/26), small=sc<.5, hs=Math.sqrt(sc);
+  arms.forEach(r=>{ r.w0=small?.42:1.1; r.grow=small?.2:.32; }); wash.w0=small?.38:1.8; wash.grow=small?.42:.6;
   const at=(lx,lz)=>[o.x+rx*lx-fx*lz, o.z+rz*lx-fz*lz];
   // 每 0.1 秒在水上留一個泡沫點：船頭兩肩（左右艏浪）與船尾中央（螺旋槳翻起的白水）
   sampleT-=dt; if(sampleT<=0&&s>1.2){ sampleT=.1; const k=Math.min(1,(s-1.2)/9);
-    const sh=o.bow+Math.min(3.5,(o.stern-o.bow)*.14);
+    const sh=o.bow+Math.min(3.5,(o.stern-o.bow)*(small?.08:.14));
     for(const [r,sg] of [[arms[0],-1],[arms[1],1]]){ const [x,z]=at(sg*o.beam*.42,sh); const nx=rx*sg*.94-fx*.34, nz=rz*sg*.94-fz*.34, l=Math.hypot(nx,nz);
       r.pts.push({x,z,nx:nx/l,nz:nz/l,fx,fz,s,t0:t,k}); if(r.pts.length>r.n) r.pts.shift(); }
-    const [x,z]=at(0,o.stern+.6); wash.pts.push({x,z,nx:0,nz:0,fx,fz,s,t0:t,k:Math.min(1,s/6)}); if(wash.pts.length>wash.n) wash.pts.shift(); }
+    const [x,z]=at(0,o.stern+(small?.15:.6)); wash.pts.push({x,z,nx:0,nz:0,fx,fz,s,t0:t,k:Math.min(1,s/6)}); if(wash.pts.length>wash.n) wash.pts.shift(); }
   all.forEach(r=>{ while(r.pts.length&&t-r.pts[0].t0>r.life) r.pts.shift(); build(r,t); });
   // 船頭水花：時速超過約 9 節開始被船頭劈開往兩側上方甩
-  if(s>4.5){ const k=Math.min(1,(s-4.5)/14); emitAcc+=dt*(40+260*k*k); const sh=o.bow+Math.min(2.6,(o.stern-o.bow)*.1);
-    while(emitAcc>=1){ emitAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random(), [x,z]=at(sg*(hullHalf(o,sh+along*3.5)+.1),sh+along*3.5), out=1.5+Math.random()*2.5+s*.12*(1-along*.5), up=(.8+Math.random()*1.4)*(1+2.2*k)*(1-along*.5), fwd=s*(.04+Math.random()*.1);
+  if(s>4.5){ const k=Math.min(1,(s-4.5)/14); emitAcc+=dt*(40+260*k*k)*(small?.55:1); const sh=o.bow+Math.min(2.6,Lb*(small?.22:.1)), span=small?Lb*.22:3.5;
+    while(emitAcc>=1){ emitAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random(), [x,z]=at(sg*(hullHalf(o,sh+along*span)+.05),sh+along*span), out=(1.5+Math.random()*2.5+s*.12*(1-along*.5))*(small?.8:1), up=(.8+Math.random()*1.4)*(1+2.2*k)*(1-along*.5)*(small?.45:1), fwd=s*(.04+Math.random()*.1);
       // 大顆的是被劈開往外翻的水團，小顆的是被風吹散的細霧
-      const big=Math.random()<.35; emit(x,o.water+.2,z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,(big?.8:1.4)+Math.random()*.6,big?.28+Math.random()*.3:.08+Math.random()*.12); } }
+      const big=Math.random()<.35; emit(x,o.water+(small?.05:.2),z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,(big?.8:1.4)+Math.random()*.6,(big?.28+Math.random()*.3:.08+Math.random()*.12)*(small?.6:1)); } }
   // 船頭兩側的白水幕：時速約 18 節以上，船頭把海水劈成兩片往外上方翻起，高過船頭欄杆，
   // 水幾乎留在原地、船衝過去，從駕駛座看是兩片白水沿著船舷兩側往後飛過
-  if(s>9){ curtainAcc+=dt*(s-9)*48;
-    while(curtainAcc>=1){ curtainAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random(), [x,z]=at(sg*(hullHalf(o,o.bow+1.2+along*4)+.15),o.bow+1.2+along*4), out=2.2+Math.random()*2.6, up=5+Math.random()*3+(s-9)*.16, fwd=s*(.18+Math.random()*.22);
-      emit(x,o.water+.3,z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,1.3+Math.random()*.9,.3+Math.random()*.6); } }
+  if(s>9){ curtainAcc+=dt*(s-9)*(small?30:48);
+    while(curtainAcc>=1){ curtainAcc-=1; const sg=Math.random()<.5?-1:1, along=Math.random();
+      if(small){ const lz=o.bow+Lb*(.28+along*.25), [x,z]=at(sg*(hullHalf(o,lz)+.04),lz), out=3+Math.random()*2.5+(s-9)*.12, up=.9+Math.random()*1.1+(s-9)*.05, fwd=s*(.55+Math.random()*.2);
+        emit(x,o.water+.02,z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,.7+Math.random()*.5,.12+Math.random()*.22); }
+      else { const [x,z]=at(sg*(hullHalf(o,o.bow+1.2+along*4)+.15),o.bow+1.2+along*4), out=2.2+Math.random()*2.6, up=5+Math.random()*3+(s-9)*.16, fwd=s*(.18+Math.random()*.22);
+        emit(x,o.water+.3,z,rx*sg*out+fx*fwd,up,rz*sg*out+fz*fwd,1.3+Math.random()*.9,.3+Math.random()*.6); } } }
+  /* 船外機：滑行時螺旋槳在船尾翻起一道往後上方噴的雞尾巴水柱（小船才有，約 1～2 公尺高） */
+  if(small&&s>6){ tailAcc+=dt*(s-6)*22; while(tailAcc>=1){ tailAcc-=1; const [x,z]=at((Math.random()-.5)*.25,o.stern+.25), back=s*(.45+Math.random()*.25), up=1.6+Math.random()*1.8+(s-6)*.06, side=(Math.random()-.5)*1.4;
+      emit(x,o.water,z,fx*(s-back)+rx*side,up,fz*(s-back)+rz*side,.8+Math.random()*.5,.1+Math.random()*.2); } }
   // 破浪：船頭撞進浪裡的瞬間，整片白水被往上掀到甲板以上；水本身幾乎留在原地，船以二十幾公尺的秒速衝過去，
   // 所以從駕駛座看是一片水花越過船頭往你迎面打來，落在甲板上就散掉
-  if(o.slam>0&&s>7){ const n=Math.round((50+90*o.slam)*Math.min(1,(s-7)/10));
-    for(let i=0;i<n;i++){ const sg=Math.random()<.5?-1:1, lz0=o.bow+.5+Math.random()*2.5, lx=sg*(hullHalf(o,lz0)+.1), [x,z]=at(lx,lz0), up=(4.5+Math.random()*4.5)*(.7+.5*o.slam), fwd=s*(.3+Math.random()*.32), side=sg*(.4+Math.random()*1.8);
+  if(o.slam>0&&s>7){ const n=Math.round((50+90*o.slam)*Math.min(1,(s-7)/10)*(small?.3:1));
+    for(let i=0;i<n;i++){ const sg=Math.random()<.5?-1:1, lz0=o.bow+.5+Math.random()*2.5, lx=sg*(hullHalf(o,lz0)+.1), [x,z]=at(lx,lz0), up=(4.5+Math.random()*4.5)*(.7+.5*o.slam)*(small?.42:1), fwd=s*(.3+Math.random()*.32), side=sg*(.4+Math.random()*1.8);
       emit(x,o.water+.4+Math.random()*.6,z,fx*fwd+rx*side,up,fz*fwd+rz*side,1.6+Math.random()*1.1,Math.random()<.45?.6+Math.random()*.7:.18+Math.random()*.25); } }
   let live=0;
   const halfAt=lz=>o.beam*Math.min(1,.35+(lz-o.bow)/8);
-  const deckAt=lz=>(lz<o.bow+9?(o.deckBow||2.6):(o.deckMain||2.0))+(o.y||0);
+  const deckAt=lz=>(lz<o.bow+Lb*.35?(o.deckBow||2.6):(o.deckMain||2.0))+(o.y||0)+(small?.75:0);
   for(let i=0;i<NP;i++){ if(sl[i]<0) continue; sl[i]-=dt; sv[i*3+1]-=9.8*dt; { const dr=sty[i]>.5?2.2:.3; sv[i*3]*=1-dt*dr; sv[i*3+2]*=1-dt*dr; if(sty[i]>.5) sv[i*3+1]=sv[i*3+1]*(1-dt*1.8)+9.8*dt*.85; } sp[i*3]+=sv[i*3]*dt; sp[i*3+1]+=sv[i*3+1]*dt; sp[i*3+2]+=sv[i*3+2]*dt;
     // 落到船身範圍內、低於甲板：打在甲板上散掉（不會穿過船身）
     const dx=sp[i*3]-o.x, dz=sp[i*3+2]-o.z, lz=-(dx*fx+dz*fz), lx=dx*rx+dz*rz;
@@ -1351,9 +1361,9 @@ function yachtDeckHeight(T,root,x,z,fallback,top){
  const hit=ray.intersectObject(root,true).find(h=>{if(!h.face)return false;const n=h.face.normal.clone().transformDirection(h.object.matrixWorld);return Math.abs(n.y)>.8;});   /* 有些模型的甲板面是反向繞的（法線朝下），水平面都算 */
  return hit?root.worldToLocal(hit.point.clone()).y:fallback;
 }
-/* 釣位：船尾駕駛艙的右舷側，站在艙底板上面向右舷（舷邊只到膝蓋，不會擋到手和竿子）；
+/* 釣位：船尾駕駛艙中線，面向右舷（第一人稱的手肘會低過舷緣，站太靠邊手臂會穿過舷緣與插竿座）；
    駕駛座：站在中控台（背面 z≈.5）與靠背座椅（前緣 z≈.9）之間，面向船頭握方向盤；眼前那根橫桿是擋風玻璃上緣的扶手，實船也在這個高度 */
-function yachtStations(T,root){return{fishing:{x:.27,z:1.7,deck:yachtDeckHeight(T,root,.27,1.7,.1),yaw:-Math.PI/2},helm:{x:0,z:.72,deck:yachtDeckHeight(T,root,0,.72,.1,.6),yaw:0}};}
+function yachtStations(T,root){return{fishing:{x:0,z:1.75,deck:yachtDeckHeight(T,root,0,1.75,.1),yaw:-Math.PI/2},helm:{x:0,z:.72,deck:yachtDeckHeight(T,root,0,.72,.1,.6),yaw:0}};}
 function yachtAnglerPose(T,boat,station){boat.updateMatrixWorld(true);return{position:boat.localToWorld(new T.Vector3(station.x,station.deck+1.62,station.z)),yaw:station.yaw};}
 if(typeof module!=='undefined'&&module.exports)module.exports={yachtDeckHeight,yachtStations,yachtAnglerPose};
 /* Single beauty pass. Expensive screen-space ray marching has been removed. */
@@ -5599,10 +5609,14 @@ function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene
      依每個材質貼圖的平均顏色分類後換成該有的質感：玻璃（深色、會反射天空）、白色船漆（亮面）、黑色船身漆、金屬五金、柚木（緞面） */
   try{ const cv=document.createElement('canvas'); cv.width=cv.height=4; const cx=cv.getContext('2d'), seen=new Map();
     const avg=m=>{ if(!m.map||!m.map.image) return [m.color.r,m.color.g,m.color.b]; try{ cx.clearRect(0,0,4,4); cx.drawImage(m.map.image,0,0,4,4); const d=cx.getImageData(0,0,4,4).data; let r=0,g=0,b=0; for(let i=0;i<64;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; } return [r/4080,g/4080,b/4080]; }catch(e){ return [m.color.r,m.color.g,m.color.b]; } };
-    obj.traverse(o=>{ if(!o.isMesh||!o.material||Array.isArray(o.material)) return; if(!/^acmat/.test(o.material.name||'')){ if(/glass/i.test(o.material.name||'')&&!o.material.userData.fixed){ const gm=o.material; gm.userData.fixed=1; gm.transparent=true; gm.opacity=.32; gm.color.setRGB(.55,.7,.8); gm.metalness=0; gm.roughness=.04; gm.envMapIntensity=1.6; gm.depthWrite=false; gm.needsUpdate=true; } else if(o.material.map&&!o.material.userData.liner){ const sm=o.material; sm.userData.liner=1; sm.map.anisotropy=8;
+    obj.traverse(o=>{ if(!o.isMesh||!o.material||Array.isArray(o.material)) return; if(!/^acmat/.test(o.material.name||'')){ if(seen.has(o.material)){ o.material=seen.get(o.material); return; }   /* 同一個材質給多個零件用：第二個以後直接換成已經做好的那一份 */ if(/glass/i.test(o.material.name||'')&&!o.material.userData.fixed){ const gm=o.material; gm.userData.fixed=1; gm.transparent=true; gm.opacity=.32; gm.color.setRGB(.55,.7,.8); gm.metalness=0; gm.roughness=.04; gm.envMapIntensity=1.6; gm.depthWrite=false; gm.needsUpdate=true; } else if(o.material.map&&!o.material.userData.liner){ const sm=o.material; sm.userData.liner=1; sm.map.anisotropy=8;
           /* 原檔把船殼、中控台、滅火器都標成「半透明混合」：three.js 會關掉深度寫入、依物件距離排序畫，
              結果遠的面會蓋過近的面——中控台背面透出前面的 Scout 字樣、零件浮在半空、整艘船發白發平。船體本來就不透明，改回不透明（貼圖的鏤空用 alphaTest） */
           sm.transparent=false; sm.depthWrite=true; sm.alphaTest=.5; sm.envMapIntensity=1.15; if(sm.normalMap) sm.normalScale.set(1,1);
+          if(/Scout_Base|Scout_Other_01/.test(sm.name||'')){ const pm=new T.MeshPhysicalMaterial(); T.MeshStandardMaterial.prototype.copy.call(pm,sm);
+            /* 船殼是亮面膠衣：加一層清漆反射（天空、海面、太陽亮點會映在船身與甲板上），貼圖原本的粗糙度只壓低一半，止滑區還是比較霧 */
+            pm.clearcoat=.85; pm.clearcoatRoughness=.07; pm.roughness=Math.min(sm.roughness,1)*.55; pm.envMapIntensity=1.45; pm.color.multiplyScalar(.9); pm.userData=sm.userData; pm.name=sm.name;
+            pm.onBeforeCompile=sm.onBeforeCompile; pm.customProgramCacheKey=sm.customProgramCacheKey; o.material=pm; seen.set(sm,pm); }
           /* 這艘船的外殼是單層、兩面都畫：從船內看到的是外殼的背面，船名、註冊號碼、Scout 字樣會左右相反地出現在船內。背面改成內襯的白色 */
           if(/Scout_Base|Scout_Other/.test(sm.name||'')){ const prev=sm.onBeforeCompile; sm.onBeforeCompile=(sh,r)=>{ if(prev) prev(sh,r); sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n if(!gl_FrontFacing){ float lum=dot(diffuseColor.rgb,vec3(.3,.59,.11)); diffuseColor.rgb=mix(vec3(.80,.81,.82),diffuseColor.rgb,step(lum,.35)*.0); }'); }; const key=sm.customProgramCacheKey?sm.customProgramCacheKey.bind(sm):()=>''; sm.customProgramCacheKey=()=>key()+'|liner'; sm.needsUpdate=true; } } return; }
       let m=seen.get(o.material); if(!m){ const src=o.material; m=src.clone(); seen.set(src,m);
@@ -8603,7 +8617,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113024449'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113031744'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -10918,9 +10932,9 @@ function updateKayak(dt){
   let thr=KY.thr, turn=KY.turn;
   if(keys.KeyW) thr=1; if(keys.KeyS) thr=-.6; if(keys.KeyA) turn=-1; if(keys.KeyD) turn=1;
   if(!can){ thr=0; turn=0; if(s.yacht){KY.v=0;KY.w=0;} }
-  Snd.engine(!!s.yacht&&G.boatStation==='helm'&&G.state!=='travel',Math.abs(KY.v)/22,Math.abs(thr));   /* 遊艇引擎聲：站上駕駛座發動，船速越快越響 */
+  Snd.engine(!!s.yacht&&G.boatStation==='helm'&&G.state!=='travel',Math.abs(KY.v)/16.5,Math.abs(thr));   /* 遊艇引擎聲：站上駕駛座發動，船速越快越響 */
   if(!s.kayak&&!s.yacht){ KY.v=0; KY.w=0; G.boatV=0; G.boatW=0; WL.paddle(dt,0); stowRod(WL.padOn()); return; }
-  KY.v+=(thr*(s.yacht?13.2:1.5)-KY.v*(s.yacht?.6:.65))*dt;   /* 遊艇雙引擎全速約每秒 22 公尺（約 43 節，運動型釣魚遊艇的極速），約 4 秒內衝到八成；獨木舟約 2.3 公尺 */ KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
+  KY.v+=(thr*(s.yacht?9.9:1.5)-KY.v*(s.yacht?.6:.65))*dt;   /* 17 呎中控台釣魚艇＋90 匹船外機：極速約每秒 16.5 公尺（約 32 節），約 4 秒衝到八成 */   /* 遊艇雙引擎全速約每秒 22 公尺（約 43 節，運動型釣魚遊艇的極速），約 4 秒內衝到八成；獨木舟約 2.3 公尺 */ KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
   WL.paddle(dt,s.yacht?0:clamp(Math.max(Math.abs(thr),Math.abs(turn)*.7),0,1),AT.ring);   // 遊艇靠引擎，不划槳
   stowRod(s.yacht&&G.boatStation==='helm'?1:WL.padOn());
   G.boatV=KY.v; G.boatW=KY.w;   /* 遊艇的姿態（抬頭、轉彎側傾）與艏浪、航跡依船速計算 */
