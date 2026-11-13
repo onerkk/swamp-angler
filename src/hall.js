@@ -76,7 +76,7 @@ function place(it){ const M=window.__MDL; if(it.ready||!M) return; if(!M.fishRea
   let b=new T.Box3().setFromObject(g), sz=b.getSize(new T.Vector3()); const longX=sz.x>=sz.z; g.scale.setScalar(it.rec.L/Math.max(.01,longX?sz.x:sz.z));
   // 頭朝走道深處（−z），身體側面朝走道，讓人站在走道上看到整條魚的側面
   g.rotation.y=longX?Math.PI/2:0; g.updateMatrixWorld(true); b=new T.Box3().setFromObject(g); const c=b.getCenter(new T.Vector3()), h=b.max.y-b.min.y;
-  const y=Math.max(1.4+h/2,Math.min(HH-1.2-h/2,3.2+h*.15)); g.position.set(it.x-c.x,y-c.y,it.z-c.z); fishG.add(g); g.traverse(o=>{ if(o.isMesh) o.frustumCulled=false; });
+  const y=Math.max(1.25+h/2,Math.min(HH-1.2-h/2,1.95+h*.3));   /* 吊在眼睛高度附近（視線 1.65m），站在走道上平視就看得到整條；以前掛到 3.2m 以上，鏡頭只拍到魚肚 */ g.position.set(it.x-c.x,y-c.y,it.z-c.z); fishG.add(g); g.traverse(o=>{ if(o.isMesh) o.frustumCulled=false; });
   // 兩條吊繩接到屋頂桁架
   // 兩條吊繩：從屋頂桁架垂直往下，打到魚身真正的表面才停（以前停在半空，跟魚沒接上）
   g.updateMatrixWorld(true); const ropeM=new T.MeshStandardMaterial({color:0x8a7a5a,roughness:.9}), rc=new T.Raycaster();
@@ -117,7 +117,10 @@ joyEl.addEventListener('pointermove',e=>{ if(joy.id===e.pointerId) joyAt(e); });
 const joyEnd=e=>{ if(joy.id!==e.pointerId) return; joy.id=null; joy.x=joy.y=0; knob.style.transform=''; }; joyEl.addEventListener('pointerup',joyEnd); joyEl.addEventListener('pointercancel',joyEnd);
 function focus(i){ if(!items.length){ nameEl.textContent='還沒有一公尺以上的標本'; camZT=-4; camXT=0; yawT=0; pitchT=0; return; } idx=(i+items.length)%items.length; const it=items[idx];
   // 站在走道上、正對那一隻的側面，距離依魚長拉開到整條看得到
-  const d=Math.max(3,Math.min(HW*2-4.5,it.rec.L*1.35+1.5)); camXT=it.x-it.side*d; camZT=it.z; yawT=it.side<0?Math.PI/2:-Math.PI/2; pitchT=.18;
+  /* 依螢幕實際的水平視角算距離，讓整條魚放得進畫面；最遠只退到對面那排酒桶前，不會退到對面標本後面被擋住 */
+  const sz=R.getSize(new T.Vector2()), asp=sz.x/Math.max(1,sz.y), vf=(asp<1?72:58)*Math.PI/360, hf=Math.atan(Math.tan(vf)*asp);
+  const d=Math.max(3,Math.min(HW-3.2+2.6,it.rec.L*.62/Math.tan(hf)+1.2)); camXT=it.x-it.side*d; camZT=it.z; yawT=it.side<0?Math.PI/2:-Math.PI/2;
+  pitchT=Math.max(-.1,Math.min(.35,Math.atan2((it.y||2.2)-1.65,d))); if(seated){ seated=false; camYT=1.65; }
   nameEl.textContent=`${idx+1}／${items.length}　${it.sp.name}　${Math.round(it.rec.L*100)} cm`; }
 ui.addEventListener('click',e=>{ const k=e.target.closest('[data-k]'); if(!k) return; const a=k.dataset.k; if(a==='exit') exit(); else focus(idx+(a==='next'?1:-1)); });
 // 拖曳轉頭：在標本館裡攔下畫布的觸控，不讓小屋收到

@@ -1,4 +1,4 @@
-/*APPV:20261113220625*/
+/*APPV:20261113221619*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -7334,7 +7334,7 @@ function place(it){ const M=window.__MDL; if(it.ready||!M) return; if(!M.fishRea
   let b=new T.Box3().setFromObject(g), sz=b.getSize(new T.Vector3()); const longX=sz.x>=sz.z; g.scale.setScalar(it.rec.L/Math.max(.01,longX?sz.x:sz.z));
   // 頭朝走道深處（−z），身體側面朝走道，讓人站在走道上看到整條魚的側面
   g.rotation.y=longX?Math.PI/2:0; g.updateMatrixWorld(true); b=new T.Box3().setFromObject(g); const c=b.getCenter(new T.Vector3()), h=b.max.y-b.min.y;
-  const y=Math.max(1.4+h/2,Math.min(HH-1.2-h/2,3.2+h*.15)); g.position.set(it.x-c.x,y-c.y,it.z-c.z); fishG.add(g); g.traverse(o=>{ if(o.isMesh) o.frustumCulled=false; });
+  const y=Math.max(1.25+h/2,Math.min(HH-1.2-h/2,1.95+h*.3));   /* 吊在眼睛高度附近（視線 1.65m），站在走道上平視就看得到整條；以前掛到 3.2m 以上，鏡頭只拍到魚肚 */ g.position.set(it.x-c.x,y-c.y,it.z-c.z); fishG.add(g); g.traverse(o=>{ if(o.isMesh) o.frustumCulled=false; });
   // 兩條吊繩接到屋頂桁架
   // 兩條吊繩：從屋頂桁架垂直往下，打到魚身真正的表面才停（以前停在半空，跟魚沒接上）
   g.updateMatrixWorld(true); const ropeM=new T.MeshStandardMaterial({color:0x8a7a5a,roughness:.9}), rc=new T.Raycaster();
@@ -7375,7 +7375,10 @@ joyEl.addEventListener('pointermove',e=>{ if(joy.id===e.pointerId) joyAt(e); });
 const joyEnd=e=>{ if(joy.id!==e.pointerId) return; joy.id=null; joy.x=joy.y=0; knob.style.transform=''; }; joyEl.addEventListener('pointerup',joyEnd); joyEl.addEventListener('pointercancel',joyEnd);
 function focus(i){ if(!items.length){ nameEl.textContent='還沒有一公尺以上的標本'; camZT=-4; camXT=0; yawT=0; pitchT=0; return; } idx=(i+items.length)%items.length; const it=items[idx];
   // 站在走道上、正對那一隻的側面，距離依魚長拉開到整條看得到
-  const d=Math.max(3,Math.min(HW*2-4.5,it.rec.L*1.35+1.5)); camXT=it.x-it.side*d; camZT=it.z; yawT=it.side<0?Math.PI/2:-Math.PI/2; pitchT=.18;
+  /* 依螢幕實際的水平視角算距離，讓整條魚放得進畫面；最遠只退到對面那排酒桶前，不會退到對面標本後面被擋住 */
+  const sz=R.getSize(new T.Vector2()), asp=sz.x/Math.max(1,sz.y), vf=(asp<1?72:58)*Math.PI/360, hf=Math.atan(Math.tan(vf)*asp);
+  const d=Math.max(3,Math.min(HW-3.2+2.6,it.rec.L*.62/Math.tan(hf)+1.2)); camXT=it.x-it.side*d; camZT=it.z; yawT=it.side<0?Math.PI/2:-Math.PI/2;
+  pitchT=Math.max(-.1,Math.min(.35,Math.atan2((it.y||2.2)-1.65,d))); if(seated){ seated=false; camYT=1.65; }
   nameEl.textContent=`${idx+1}／${items.length}　${it.sp.name}　${Math.round(it.rec.L*100)} cm`; }
 ui.addEventListener('click',e=>{ const k=e.target.closest('[data-k]'); if(!k) return; const a=k.dataset.k; if(a==='exit') exit(); else focus(idx+(a==='next'?1:-1)); });
 // 拖曳轉頭：在標本館裡攔下畫布的觸控，不讓小屋收到
@@ -8849,7 +8852,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113220625'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113221619'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
