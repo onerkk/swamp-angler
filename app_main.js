@@ -1,4 +1,4 @@
-/*APPV:20261113110525*/
+/*APPV:20261113114346*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -8217,7 +8217,7 @@ function updGrill(dt){ if(!GR.on) return; GR.t+=dt;
   GR.uA.value=GR.a; GR.uB.value=GR.b;
   const top=GR.face===0?GR.a:GR.b, oth=GR.face===0?GR.b:GR.a;
   document.getElementById('gA').style.left=Math.min(100,top*82)+'%'; document.getElementById('gB').style.left=Math.min(100,oth*82)+'%';
-  document.getElementById('gHint').textContent=top>1.05?'冒黑煙了！快翻面！':top>.78?'這面完美了，可以翻面':top>.55?'魚皮開始金黃…':top>.25?'滋滋作響，魚肉漸漸變白':'等魚皮慢慢變色…';
+  document.getElementById('gHint').textContent=top>1.05?'冒黑煙了！快翻面！':top>.78?'這面完美了，可以翻面':top>.55?'表面開始金黃…':top>.25?'滋滋作響，肉漸漸變熟':'等表面慢慢變色…';   /* 烤的不只魚，也有文蛤、竹蟶：不寫「魚皮」 */
   // 煙：熟度越高越多，焦了變黑煙
   GR.smT-=dt; if(GR.smT<=0&&top>.15){ GR.smT=top>1?.06:.18; const s=smokes.find(x=>!x.m.visible); if(s){ s.m.visible=true; s.t=0; s.life=1.6+Math.random()*1.2; s.m.position.copy(GP).add(tv.set((Math.random()-.5)*.1,.03,(Math.random()-.5)*.35)); s.dark=top>1; s.m.material.color.set(top>1?0x2a2420:0xd8d4cc); } }
   smokes.forEach(s=>{ if(!s.m.visible) return; s.t+=dt; const k=s.t/s.life; if(k>=1){ s.m.visible=false; return; } s.m.position.y+=dt*.35; s.m.position.x-=dt*.05; const sc=.12+k*.45; s.m.scale.set(sc,sc,1); s.m.material.opacity=(s.dark?.55:.32)*Math.sin(k*Math.PI); });
@@ -8755,7 +8755,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113110525'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113114346'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

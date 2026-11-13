@@ -313,6 +313,15 @@ body.fighting #top,body.fighting #top2,body.fighting #magWin,body.fighting .hotC
   #top2{top:calc(env(safe-area-inset-top,0px) + 48px);flex-wrap:wrap;max-width:46vw}
   .chip{padding:5px 10px}
   #magWin{top:calc(env(safe-area-inset-top,0px) + 54px)!important}
+  /* 橫向：烤魚、選烤什麼、擺家具這幾個底部面板，直向是整排滿版；橫向會蓋掉半個畫面（看不到火和烤的東西）。改成靠右的窄面板、字和按鈕縮小 */
+  #grillUI,#grillPick,#furnPick{left:auto;right:calc(env(safe-area-inset-right,0px) + 10px);width:min(420px,48vw);bottom:calc(env(safe-area-inset-bottom,0px) + 8px);padding:8px 12px;max-height:calc(100vh - 64px);overflow:auto;border-radius:14px}
+  #grillUI .gt{font-size:15px;margin-bottom:2px}
+  #grillUI .gb{margin:4px 0}
+  #grillUI .gb span{font-size:12px}
+  #grillUI .gh{font-size:12px;margin:4px 0}
+  #grillUI .gbtns .btn,#grillPick .btn,#furnPick .btn{min-height:38px;height:auto;padding:6px 8px;font-size:15px}
+  /* 開始畫面：標題與說明在左邊，遊戲的狀態列、天賦、大師挑戰、拋竿鈕先藏起來（原本疊在標題上） */
+  body:has(#intro:not(.hidden)) :is(#top2,#talBtn,#bossBtn,#act,#actSub,#bCam,#joy){visibility:hidden}
 }
 @media (orientation:landscape){
   body[data-fishing-state="land"] :is(#top,#top2,#bCam,#act,#actSub){visibility:hidden}
@@ -404,7 +413,7 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:fa
 <div id="grillUI" class="hidden"><div class="gt" id="gTitle">烤魚</div>
 <div class="gb"><span>靠火這面</span><div class="bar"><i id="gA"></i><b></b></div></div>
 <div class="gb"><span>另一面</span><div class="bar"><i id="gB"></i><b></b></div></div>
-<div class="gh" id="gHint">等魚皮慢慢變金黃…</div>
+<div class="gh" id="gHint">等表面慢慢變金黃…</div>
 <div class="gbtns"><button class="btn" id="gQuit">放棄</button><button class="btn pri" id="gFlip">翻面</button><button class="btn" id="gDone">起鍋</button></div></div>
 <div id="grillPick" class="hidden"></div>
 <div id="shopUI" class="hidden"></div>
