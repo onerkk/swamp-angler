@@ -1,4 +1,4 @@
-/*APPV:20261113114346*/
+/*APPV:20261113123314*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -4732,16 +4732,27 @@ const ITEMS=[
  {id:'hairpin',name:'褪色的髮簪',file:'item_hairpin.glb',w:.05,val:0,size:.22,rare:3,p:0,desc:'銀質髮簪，花瓣已經褪色。背面刻著一個「蘅」字。釣起來的時候，水面安靜得不像話。'}];
 const ITEM_SP={id:'item',name:'物品',rar:0,len:[30,30],k:1,price:0,sh:{H:.1,W:.1},f:{pow:.7,spd:.4,agi:.3,jump:0,stam:.6,win:1.5},time:{},desc:''};
 
-function hookTiming(fd,difficulty,practice){
-  const rarity=fd.sp.rar||0;
+/* 起鉤時機（每種魚不一樣）：
+   浮標下沉後，魚先「含著餌試探」（太早揚竿＝把餌從牠嘴裡扯走），接著吞餌的那一瞬間是完美時機，之後還能上鉤，再晚牠就吐餌了。
+   ・試探多久：越稀有、越警戒（咬口窗短 f.win<1）的魚試探越久；每次咬也有快慢差異（±25%）
+   ・完美時機多寬：越稀有越窄
+   ・整段多長：照魚種的咬口窗、難度、稀有度
+   以前浮標一沉就按＝必定完美，所有魚一樣，等於沒有難度 */
+function hookTiming(fd,difficulty,practice,rnd){
+  const rarity=Math.min(5,fd.sp.rar||0), win=fd.sp.f.win||1, r=rnd==null?Math.random():rnd;
+  if(practice) return {duration:4,early:0,perfect:.45};
+  const dk=difficulty.win>=1.2?.45:difficulty.win<=.55?1.2:1;   /* 休閒難度試探短很多；專家更長 */
+  const early=Math.min(.42,Math.max(.04,(.08+.055*rarity+(win<1?.22*(1-win):0))*(.75+.5*r)*dk));
+  const perfect=Math.max(.1,(.3-.035*rarity)*Math.min(1.25,Math.sqrt(win)));
   return {
-    duration:practice?4:1.9*(fd.sp.f.win||1)*difficulty.win*(fd.item?1.4:1)*(1-.06*Math.min(5,rarity)),
-    perfect:practice?.45:Math.max(.22,.38-.025*rarity)
+    duration:1.9*win*difficulty.win*(fd.item?1.4:1)*(1-.06*rarity)*(1+early),
+    early, perfect:Math.min(perfect,1-early-.12)
   };
 }
 function hookResult(seconds,timing){
   if(seconds>=timing.duration)return 'miss';
-  return seconds<timing.duration*timing.perfect?'perfect':'good';
+  const e=timing.early||0, f=seconds/timing.duration;
+  return f<e?'early':f<e+timing.perfect?'perfect':'good';
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={hookTiming,hookResult};
 
@@ -4761,12 +4772,13 @@ function drawHook(){
 }
 function hookStart(fd){
   hk.on=true;hk.t=0;hk.timing=hookTiming(fd,c.D(),fd.practice);
-  const boundary=(1-hk.timing.perfect)*100+'%';
-  $('hz1').style.height=boundary;$('hz2').style.bottom=boundary;
+  /* 量表由上往下：紅＝還在試探（太早）、藍＝完美、黃＝上鉤 */
+  const e=hk.timing.early||0, p=hk.timing.perfect, z0=$('hz0');
+  if(z0) z0.style.height=e*100+'%'; $('hz2').style.top=e*100+'%'; $('hz2').style.bottom=(1-e-p)*100+'%'; $('hz1').style.height=(1-e-p)*100+'%';
   drawHook();hookEl.classList.remove('hidden');
 }
 function hookPress(){ if(!hk.on)return 'miss';const r=hookResult(hk.t,hk.timing);hookEnd();
-  pop(r==='perfect'?'完美起鉤！':r==='good'?'上鉤！':'錯過', r); return r; }
+  pop(r==='perfect'?'完美起鉤！':r==='good'?'上鉤！':r==='early'?'太早了':'錯過', r==='early'?'miss':r); return r; }
 function hookEnd(){ hk.on=false; hookEl.classList.add('hidden'); }
 function advanceHook(elapsed){
   if(!hk.on)return false;
@@ -8755,7 +8767,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113114346'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113123314'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -10969,7 +10981,7 @@ function actDown(){
     case 'wait': if(G.snag){ break; }
       if(G.practiceCast){toast('先等浮標下沉，看到「起鉤」再點。','',1600);break;}
       startRetrieve(G.prawnDrag>0?'太早了：蝦還抱著餌在走，等浮標停下來、輕輕往下沉再揚竿':G.dip>0?'太早了：剛剛只是魚在試咬，要等浮標整個沉下去再揚竿':'收線','warn'); break;
-    case 'bite': { const r=FUN.hookPress(); if(r==='miss') missBite(); else hook(r==='perfect'); } break;
+    case 'bite': { const r=FUN.hookPress(); if(r==='early'){ missBite(); toast('太早了：牠還含著餌在試探，等量表進到藍色再起鉤','warn',2000); } else if(r==='miss') missBite(); else hook(r==='perfect'); } break;
   }
 }
 function actUp(){ G.held=false; ui.act.classList.remove('held'); if(G.state==='lure') LURE.release(); if(G.state==='charge') cast(); }
@@ -11510,7 +11522,7 @@ function update(dt,elapsed=dt){
       G.biteT+=elapsed; bob.position.set(G.to.x+Math.sin(G.biteT*3)*.15,G.bottom?-1.2:y-.13-.04*Math.sin(G.biteT*12),G.to.z+G.biteT*.2); if(G.bottom){ rod.bendT=.55+.08*Math.sin(G.biteT*14); rod.pitchT=-.02; }
       { const q=PH.move(new T.Vector3(G.to.x,y,G.to.z),bob.position,.065); setPoint(bob.position,q.pos); }
       P.shadow.material.opacity=0;
-      setAct('起鉤','藍色區按下＝完美，黃色區＝上鉤',true);
+      setAct('起鉤','紅色＝還在試探別拉・藍色＝完美・黃色＝上鉤',true);
       if(FUN.advanceHook(elapsed)){FUN.pop('錯過','miss');missBite();}
     }
     lineEnd=bob.position; slack=.35;

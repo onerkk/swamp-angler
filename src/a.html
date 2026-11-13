@@ -46,7 +46,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 .ib{position:relative;pointer-events:auto;width:38px;height:38px;border-radius:50%;border:1px solid var(--stroke);background:var(--glass);color:var(--fg);font-size:18px;display:grid;place-items:center;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);cursor:pointer;padding:0}
 .ib:active{transform:scale(.93)}
 .ib:focus-visible,.btn:focus-visible,#actBtn:focus-visible,#startBtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-#toast{position:fixed;left:50%;top:21%;transform:translate(-50%,-8px);padding:10px 18px;border-radius:14px;background:var(--glass-strong);border:1px solid var(--stroke);font-size:16px;font-weight:800;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:30;text-align:center;max-width:86vw}
+#toast{z-index:160;position:fixed;left:50%;top:21%;transform:translate(-50%,-8px);padding:10px 18px;border-radius:14px;background:var(--glass-strong);border:1px solid var(--stroke);font-size:16px;font-weight:800;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:30;text-align:center;max-width:86vw}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #toast.good{color:var(--good)}#toast.bad{color:var(--bad)}#toast.warn{color:var(--warn)}
 #fight{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 134px);width:min(88vw,420px);padding:10px 14px 6px;border-radius:16px;background:var(--glass);border:1px solid var(--stroke);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);z-index:4}
@@ -173,7 +173,8 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #hook .hg{position:relative;width:26px;height:100%;border-radius:13px;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.7);overflow:visible}
 #hook .z{position:absolute;left:2px;right:2px}
 #hz1{bottom:0;background:linear-gradient(#ffe24a,#f5d020);border-radius:0 0 11px 11px}
-#hz2{top:0;background:linear-gradient(#7fd4ff,#3aa0e8);border-radius:11px 11px 0 0}
+#hz2{top:0;background:linear-gradient(#7fd4ff,#3aa0e8)}
+#hz0{top:0;background:linear-gradient(#ff7a6a,#d8402e);border-radius:11px 11px 0 0}
 #hgM{position:absolute;left:28px;transform:translateY(50%);font-size:22px;filter:drop-shadow(0 1px 2px #000)}
 #hook[data-result=perfect] #hgM{filter:drop-shadow(0 0 5px #7fd4ff)}
 #pop{position:fixed;left:50%;top:34%;transform:translate(-50%,-50%) rotate(-12deg) scale(.6);font-size:46px;font-weight:900;letter-spacing:.06em;opacity:0;pointer-events:none;z-index:7;transition:transform .18s cubic-bezier(.2,1.6,.4,1),opacity .18s;-webkit-text-stroke:2px rgba(255,255,255,.85);text-shadow:0 4px 0 rgba(0,0,0,.35)}
@@ -436,7 +437,7 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:fa
   <button id="actBtn"><span id="actLbl">按住<br>蓄力</span></button>
 </div>
 <div id="actSub"></div>
-<div id="hook" class="hidden"><div class="ht"><i id="htF"></i></div><div class="hg"><i class="z" id="hz1"></i><i class="z" id="hz2"></i><b id="hgM">🐟</b></div></div>
+<div id="hook" class="hidden"><div class="ht"><i id="htF"></i></div><div class="hg"><i class="z" id="hz0"></i><i class="z" id="hz1"></i><i class="z" id="hz2"></i><b id="hgM">🐟</b></div></div>
 <div id="dockPractice" class="hidden"><span role="status"></span><button class="btn" type="button">略過練習</button></div>
 <div id="pop"></div>
 <div id="scene" class="hidden"></div>

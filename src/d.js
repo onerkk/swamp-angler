@@ -592,7 +592,7 @@ function actDown(){
     case 'wait': if(G.snag){ break; }
       if(G.practiceCast){toast('先等浮標下沉，看到「起鉤」再點。','',1600);break;}
       startRetrieve(G.prawnDrag>0?'太早了：蝦還抱著餌在走，等浮標停下來、輕輕往下沉再揚竿':G.dip>0?'太早了：剛剛只是魚在試咬，要等浮標整個沉下去再揚竿':'收線','warn'); break;
-    case 'bite': { const r=FUN.hookPress(); if(r==='miss') missBite(); else hook(r==='perfect'); } break;
+    case 'bite': { const r=FUN.hookPress(); if(r==='early'){ missBite(); toast('太早了：牠還含著餌在試探，等量表進到藍色再起鉤','warn',2000); } else if(r==='miss') missBite(); else hook(r==='perfect'); } break;
   }
 }
 function actUp(){ G.held=false; ui.act.classList.remove('held'); if(G.state==='lure') LURE.release(); if(G.state==='charge') cast(); }
@@ -1133,7 +1133,7 @@ function update(dt,elapsed=dt){
       G.biteT+=elapsed; bob.position.set(G.to.x+Math.sin(G.biteT*3)*.15,G.bottom?-1.2:y-.13-.04*Math.sin(G.biteT*12),G.to.z+G.biteT*.2); if(G.bottom){ rod.bendT=.55+.08*Math.sin(G.biteT*14); rod.pitchT=-.02; }
       { const q=PH.move(new T.Vector3(G.to.x,y,G.to.z),bob.position,.065); setPoint(bob.position,q.pos); }
       P.shadow.material.opacity=0;
-      setAct('起鉤','藍色區按下＝完美，黃色區＝上鉤',true);
+      setAct('起鉤','紅色＝還在試探別拉・藍色＝完美・黃色＝上鉤',true);
       if(FUN.advanceHook(elapsed)){FUN.pop('錯過','miss');missBite();}
     }
     lineEnd=bob.position; slack=.35;

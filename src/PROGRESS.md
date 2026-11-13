@@ -7,6 +7,7 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-13 起鉤難度（使用者：現在怎麼拉都會中、應依魚種不同）：另一個工作階段（372c503）把起鉤改成「浮標一沉就按＝必定完美」。i.js hookTiming 加「試探期」early（稀有度、警戒 f.win<1、難度、每次 ±25%）、完美窗隨稀有度變窄；hookResult 回傳 early（太早＝錯過並提示）；量表多一段紅色 #hz0。tests/hook-timing.test.js 改寫（5 項通過）。範例（標準難度）：吳郭魚 試探 .15s 完美 .60s；鯉魚 .26s／.17s；魚王 .41s／.10s
 - 2026-11-13 泥灘遠景（tide.js「遠景」區塊）：消波塊 240 個（models/tide/tetrapod.glb，Akihiko Tarutani CC BY，InstancedMesh，岸邊 z≈58～62）、蚵棚竹竿 9 排×44 支＋橫竹（InstancedMesh，z −22～−41）、擱淺小船兩艘（sampan_blue.glb Godot2000、rowboat_green.glb donnichols，CC BY）；泥色調亮。作者標示還沒加到設定頁。
   未驗證：測試站裡 window.__TIDE 改成延遲建立（另一個工作階段的提交 372c503），舊的 __TIDE.enter() 測試方法失效，畫面沒看到
 - 2026-11-13 泥灘：上下拖曳改成抬頭低頭（pitch −1.15～.45），走路改用左下 #tdWalk 前進／後退按住鈕；地形退回 220 格（300 格 FPS 59→18）；天空穹頂與霧最低亮度 .22／.2（傍晚不再一片炭灰）。

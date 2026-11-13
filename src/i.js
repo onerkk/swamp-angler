@@ -9,16 +9,27 @@ const ITEMS=[
  {id:'hairpin',name:'褪色的髮簪',file:'item_hairpin.glb',w:.05,val:0,size:.22,rare:3,p:0,desc:'銀質髮簪，花瓣已經褪色。背面刻著一個「蘅」字。釣起來的時候，水面安靜得不像話。'}];
 const ITEM_SP={id:'item',name:'物品',rar:0,len:[30,30],k:1,price:0,sh:{H:.1,W:.1},f:{pow:.7,spd:.4,agi:.3,jump:0,stam:.6,win:1.5},time:{},desc:''};
 
-function hookTiming(fd,difficulty,practice){
-  const rarity=fd.sp.rar||0;
+/* 起鉤時機（每種魚不一樣）：
+   浮標下沉後，魚先「含著餌試探」（太早揚竿＝把餌從牠嘴裡扯走），接著吞餌的那一瞬間是完美時機，之後還能上鉤，再晚牠就吐餌了。
+   ・試探多久：越稀有、越警戒（咬口窗短 f.win<1）的魚試探越久；每次咬也有快慢差異（±25%）
+   ・完美時機多寬：越稀有越窄
+   ・整段多長：照魚種的咬口窗、難度、稀有度
+   以前浮標一沉就按＝必定完美，所有魚一樣，等於沒有難度 */
+function hookTiming(fd,difficulty,practice,rnd){
+  const rarity=Math.min(5,fd.sp.rar||0), win=fd.sp.f.win||1, r=rnd==null?Math.random():rnd;
+  if(practice) return {duration:4,early:0,perfect:.45};
+  const dk=difficulty.win>=1.2?.45:difficulty.win<=.55?1.2:1;   /* 休閒難度試探短很多；專家更長 */
+  const early=Math.min(.42,Math.max(.04,(.08+.055*rarity+(win<1?.22*(1-win):0))*(.75+.5*r)*dk));
+  const perfect=Math.max(.1,(.3-.035*rarity)*Math.min(1.25,Math.sqrt(win)));
   return {
-    duration:practice?4:1.9*(fd.sp.f.win||1)*difficulty.win*(fd.item?1.4:1)*(1-.06*Math.min(5,rarity)),
-    perfect:practice?.45:Math.max(.22,.38-.025*rarity)
+    duration:1.9*win*difficulty.win*(fd.item?1.4:1)*(1-.06*rarity)*(1+early),
+    early, perfect:Math.min(perfect,1-early-.12)
   };
 }
 function hookResult(seconds,timing){
   if(seconds>=timing.duration)return 'miss';
-  return seconds<timing.duration*timing.perfect?'perfect':'good';
+  const e=timing.early||0, f=seconds/timing.duration;
+  return f<e?'early':f<e+timing.perfect?'perfect':'good';
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={hookTiming,hookResult};
 
@@ -38,12 +49,13 @@ function drawHook(){
 }
 function hookStart(fd){
   hk.on=true;hk.t=0;hk.timing=hookTiming(fd,c.D(),fd.practice);
-  const boundary=(1-hk.timing.perfect)*100+'%';
-  $('hz1').style.height=boundary;$('hz2').style.bottom=boundary;
+  /* 量表由上往下：紅＝還在試探（太早）、藍＝完美、黃＝上鉤 */
+  const e=hk.timing.early||0, p=hk.timing.perfect, z0=$('hz0');
+  if(z0) z0.style.height=e*100+'%'; $('hz2').style.top=e*100+'%'; $('hz2').style.bottom=(1-e-p)*100+'%'; $('hz1').style.height=(1-e-p)*100+'%';
   drawHook();hookEl.classList.remove('hidden');
 }
 function hookPress(){ if(!hk.on)return 'miss';const r=hookResult(hk.t,hk.timing);hookEnd();
-  pop(r==='perfect'?'完美起鉤！':r==='good'?'上鉤！':'錯過', r); return r; }
+  pop(r==='perfect'?'完美起鉤！':r==='good'?'上鉤！':r==='early'?'太早了':'錯過', r==='early'?'miss':r); return r; }
 function hookEnd(){ hk.on=false; hookEl.classList.add('hidden'); }
 function advanceHook(elapsed){
   if(!hk.on)return false;
