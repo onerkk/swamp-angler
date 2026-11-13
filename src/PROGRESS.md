@@ -7,6 +7,12 @@
 - 大師挑戰 Lv 28～60 共 9 隻（漁獲簿頁面）、潮心石、強化 +15、新裝備
 
 ## 進行中
+- 2026-11-13 新遊艇已上線：models/yacht.glb 換成 Yacht II（gogiart，CC BY 4.0，9.7 萬面、1.2MB；舊的 Frickie's yacht 在 git 歷史裡）。
+  m.js attachYacht：obj.rotation.y=π、下沉 H*.128、不再 dressYacht／addMarineHardware，只呼叫 addMarineProps(T,wrap,null)（前甲板：魚箱、工具箱、水桶）
+  yacht-layout.js：yachtDeckHeight 改成任何水平面（|n.y|>.8，這個模型甲板面法線朝下）、可指定起始高度；站位 釣位 (1.0,−0.5) 甲板 1.61、駕駛座 (0,2.4) 甲板 3.64
+  tests/yacht-layout.test.js 已改成新船的正規化與站位（保留「站著往外看 15 公尺內不會被船擋住」的檢查，通過）
+  已截圖：釣位（前甲板右舷，看得到舷牆、白色欄杆、柚木甲板）、駕駛座（上層甲板往船頭看，前甲板、繫纜樁、魚箱）
+  未確認：從外面看的吃水線、航行時艏浪與航跡的位置、引擎聲與破浪水花是否對得上新船身、抄網起魚的位置（舷牆比舊船高）
 - 遊艇替換（下一輪直接做，座標已量好）：Yacht II by gogiart（agt14032013），CC BY，uid dadc775d1d044aee9f6744fa7b47648e；轉檔：gltf-transform simplify --ratio 0.4 --error 0.0008 → resize 1024 → draco（9.7 萬面、1.2MB；/tmp/sf/yacht.glb，容器重置要重抓）
   預覽工具：/tmp/simsite/yv.html＋/tmp/yv.py（用遊戲同一套正規化：最長邊縮成 26m、z −4.5～21.5、畫 2m 格線的俯視與側視）
   量到的（模型原始朝向，正規化後）：原始尺寸 x22.7 y39.3 z105.2（長邊在 z，不用轉 90°）；**船頭在 +z（21.5）、船尾在 −z**，遊戲要船頭在 −z → 要再轉 180°（遊戲座標 z' = 17 − z、x' = −x）

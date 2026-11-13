@@ -16,7 +16,7 @@ const RSETS={lake:['mermaid_v2','fish_bowfin','fish_reba','fish_mandarin','blueg
   tide:['fish_hardclam','fish_gomphina','fish_tellin','fish_razor','fish_ghostcrab','fish_fiddler','fish_mudskip','fish_ragworm','fish_hermit'],
   sea:['mermaid_v2','crust_lobster','fish_wahoo','fish_maori','fish_puffer','fish_amber','fish_barracuda','fish_grouper2','fish_bigeye','fish_stingray','fish_amberjack','fish_knifejaw','fish_halibut','fish_sunfish','fish_mahi','fish_sail','yacht','gwhite','dolphin','whale','gull','grouper','tuna','marlin','ribbon','tigershark','flyfish','king_v2']};
 const RCREDIT=[['大白鯊','Great White Shark','SealifeFan3'],['虎鯊','Tiger Shark','ra_in_coat'],['海豚','Bottlenose Dolphin','popcornbag'],['座頭鯨','Humpback Whale','ostapblendercg'],
-  ['鱷魚','American Alligator','JeremyGrayson'],['白頭海鵰','Bald Eagle','ucdavisterc'],['海鷗','Seagull','Dayvable'],['遊艇',"Frickie's yacht",'dannzjs'],
+  ['鱷魚','American Alligator','JeremyGrayson'],['白頭海鵰','Bald Eagle','ucdavisterc'],['海鷗','Seagull','Dayvable'],['遊艇','Yacht II','gogiart'],
   ['藍鰓太陽魚','Low-Poly Bluegill Fish','TepidGames'],['黑斑刺蓋太陽魚','Black Crappie','dgeraci'],['大口黑鱸','Largemouth bass','faerbogdan99'],['小口黑鱸','Smallmouth bass','faerbogdan99'],
   ['斑點叉尾鮰','Channel catfish','faerbogdan99'],['扁頭鯰','Flathead Catfish','faerbogdan99'],['鱷雀鱔','Alligator Gar','Jay_Tano'],['錦鯉','Koi Fish','7plus'],
   ['石斑','lowpoly freshwater grouper','Arrangemonk9'],['黑鮪魚','Bluefin Tuna','voltairevill'],['旗魚','Blue Marlin','Gotta_go_evi'],['飛魚','Exocoetidae','victorberdug'],
@@ -155,15 +155,16 @@ function attach(host,key,o){ const h={host,loaded:false,actions:{},mixer:null,pl
 const cl0=a=>a.getClip().duration||1;
 
 /* 遊艇：分開實際柚木釣位與駕駛甲板，不把艙頂當釣位。 */
-function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene.clone(), wrap=new T.Group(); wrap.add(obj);
+function attachYacht(host,setHull,spots){ onReady('yacht',g=>{ const obj=g.scene.clone(), wrap=new T.Group(); wrap.add(obj); obj.rotation.y=Math.PI;   /* Yacht II 原檔船頭朝 +z，遊戲裡船頭是 −z */ wrap.updateMatrixWorld(true);
   const L=26; let b=new T.Box3().setFromObject(wrap), sz=b.getSize(new T.Vector3()); obj.scale.setScalar(L/sz.z); wrap.updateMatrixWorld(true);
   b=new T.Box3().setFromObject(wrap); const c=b.getCenter(new T.Vector3()), H=b.max.y-b.min.y;
-  obj.position.x-=c.x; obj.position.z+=-4.5-b.min.z; obj.position.y+=-(b.min.y+H*.1); wrap.updateMatrixWorld(true);
+  obj.position.x-=c.x; obj.position.z+=-4.5-b.min.z; obj.position.y+=-(b.min.y+H*.128);   /* 吃水線（黑色船身與船底漆的交界）對到水面 */ wrap.updateMatrixWorld(true);
   host.userData.stations=yachtStations(T,wrap);const deck=host.userData.stations.fishing.deck;
   // 船身尺寸（船首、船尾、半寬、吃水線）：航行的艏浪、航跡、水花要從船身真正的位置出來
   { wrap.updateMatrixWorld(true); const hb=new T.Box3().setFromObject(wrap); host.userData.hull={bow:hb.min.z,stern:hb.max.z,beam:(hb.max.x-hb.min.x)/2,deckBow:yachtDeckHeight(T,wrap,0,hb.min.z+5,2.6),deckMain:deck}; }
   obj.traverse(m=>{ m.frustumCulled=false; if(m.isMesh) m.castShadow=false; });
-  const marine=createMarineMaterials(T);dressYacht(T,obj,marine);addMarineHardware(T,wrap,deck,marine);
+  /* 新模型自帶柚木甲板、欄杆、救生圈的貼圖與細節：不再套舊模型用的船用材質與甲板五金，只在釣位旁放幾件實物掃描的道具 */
+  try{ addMarineProps(T,wrap,null); }catch(e){ console.warn('marine props',e); }
 
   host.children.slice().forEach(ch=>{ ch.visible=false; }); host.add(wrap);
   const b3=new T.Box3().setFromObject(wrap); setHull(Math.max(Math.abs(b3.min.x),b3.max.x),b3.min.z,b3.max.z);

@@ -40,18 +40,15 @@ function realProp(T,name,cb){ if(!T.GLTFLoader) return; const use=g=>{ try{ cons
   (REALPROP[name]||(REALPROP[name]=new Promise(ok=>new T.GLTFLoader().load('models/home/'+name+'.glb',ok,undefined,()=>console.warn('prop load',name))))).then(use); }
 function seatProp(T,o,x,y,z,ry,rx){ const inner=o, g=new T.Group(); inner.rotation.x=rx||0; g.add(inner); g.rotation.y=ry||0; g.updateMatrixWorld(true); const b=new T.Box3().setFromObject(g); g.position.set(x-(b.min.x+b.max.x)/2,y-b.min.y,z-(b.min.z+b.max.z)/2); return g; }
 /* 遊艇上的真實道具：每一件都從上方往下找到甲板真正的表面再放上去（跟甲板五金同一個做法），會跟著船身一起動。
-   船頭在 −z、船尾在 +z：駕駛座在 z≈10（飛橋），釣位在 z≈15 右舷 */
+   船頭在 −z、船尾在 +z：釣位在前甲板（z≈−0.5 右舷），駕駛座在上層甲板駕駛艙前（z≈2.4） */
 function addMarineProps(T,wrap,fittings){ const props=new T.Group(); props.name='Marine deck props'; wrap.add(props); const rc=new T.Raycaster(), down=new T.Vector3(0,-1,0), inv=new T.Matrix4();
   const deckY=(x,z)=>{ wrap.updateMatrixWorld(true); rc.set(new T.Vector3(x,9,z).applyMatrix4(wrap.matrixWorld),down); inv.copy(wrap.matrixWorld).invert();
     for(const h of rc.intersectObject(wrap,true)){ let skip=false; for(let p=h.object;p;p=p.parent) if(p===fittings||p===props){ skip=true; break; } if(!skip) return h.point.clone().applyMatrix4(inv).y; } return null; };
   const put=(name,x,z,ry,rx)=>realProp(T,name,o=>{ const y=deckY(x,z); if(y==null) return; props.add(seatProp(T,o,x,y,z,ry,rx)); });
-  put('binoculars',-.45,9.0,.5); put('portable_searchlight',.5,8.9,Math.PI);                 // 駕駛台上：望遠鏡、手提探照燈
-  put('lifebuoy',1.1,.6,.4,-Math.PI/2);                                                        // 前甲板：平放的救生圈
-  put('plastic_crate_01',1.2,16.2,.25); put('metal_toolbox',1.15,13.6,-.3); put('wooden_bucket_01',1.5,17.0,0);   // 釣位旁：魚箱、工具箱、水桶
-  put('life_jacket',-1.2,15.2,.6,-Math.PI/2); put('lifebuoy',-1.25,16.6,1.2,-Math.PI/2); }   // 後甲板：救生衣、救生圈
+  put('plastic_crate_01',.2,-1.3,.25); put('metal_toolbox',-.75,-.5,-.3); put('wooden_bucket_01',.15,.3,0); }   // 前甲板釣位旁：魚箱、工具箱、水桶（船上本來就有救生圈與小艇）
 function addMarineHardware(T,wrap,deck,materials){
  // Dimensions and fittings are in metres, measured after the hull is normalized.
- const fittings=new T.Group();fittings.name='Marine deck fittings';wrap.add(fittings); try{ addMarineProps(T,wrap,fittings); }catch(e){ console.warn('marine props',e); }
+ const fittings=new T.Group();fittings.name='Marine deck fittings';wrap.add(fittings);
  function screw(x,y,z){const head=new T.Mesh(new T.CylinderGeometry(.009,.009,.003,12),materials.steel);head.position.set(x,y,z);fittings.add(head);const slot=new T.Mesh(new T.BoxGeometry(.011,.0015,.002),new T.MeshStandardMaterial({color:0x262b2e,roughness:.6}));slot.position.set(x,y+.002,z);fittings.add(slot);}
  const rc=new T.Raycaster(),down=new T.Vector3(0,-1,0);
  for(const [x,z]of[[-.7,-3.0],[.7,-3.0]]){
