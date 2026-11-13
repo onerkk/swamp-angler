@@ -1,12 +1,11 @@
 /* Effect costs are controlled independently from framebuffer resolution. */
-/* 畫質分兩層：tier（高／中／低）決定材質用哪些貼圖與光澤，整段遊戲固定不變，避免著色器重新編譯造成卡頓；
-   level（0～7）只調數量、更新頻率與解析度，所有特效在每一級都保留，只是用較省的版本。 */
+/* Material features follow the chosen tier. The lowest level can skip whole render passes. */
 function effectTier(mode,mobile){return mode==='high'||mode==='mid'||mode==='low'?mode:mobile?'mid':'high';}
 function effectBudget(level,tier){level=Math.max(0,Math.min(7,Math.round(Number(level)||0)));tier=tier||(typeof window!=='undefined'&&window.__effectTier)||'high';
  const pick=a=>a[level];
- return{tier,cullStatic:level<2,normalMaps:false,surfaceMaps:true,physicalCoat:tier!=='low',environment:true,probes:true,probeHz:pick([1,1,2,2,4,6,10,15]),caustics:true,waterDetail:true,
-  rainLines:pick([160,220,320,420,600,800,1100,1400]),rainOverlay:true,lensFlare:true,rainRings:true,ssr:false,
-  transmissionHz:pick([12,15,20,30,45,60,120,120]),reflectionHz:pick([15,15,20,24,30,40,60,60]),shadowHz:pick([8,10,12,15,20,20,24,30]),particleScale:pick([.4,.5,.6,.7,.85,1,1,1])};}
+ return{tier,cullStatic:level<2,normalMaps:tier==='high',surfaceMaps:true,physicalCoat:tier!=='low',environment:level>0,probes:level>0,probeHz:pick([0,1,2,2,4,6,10,15]),caustics:level>=2,waterDetail:level>=2,
+  rainLines:pick([0,120,240,420,600,800,1100,1400]),rainOverlay:level>=2,lensFlare:level>=2,rainRings:level>=2,ssr:false,
+  transmissionHz:pick([8,12,20,30,45,60,90,120]),reflectionHz:pick([0,0,20,24,30,40,60,60]),shadowHz:pick([0,8,12,15,20,20,24,30]),particleScale:pick([.35,.5,.6,.7,.85,1,1,1])};}
 function createMaterialQuality(){
  const states=new WeakMap(),objects=new WeakMap(),sources=new Map(),keys=['envMap','normalMap','bumpMap','roughnessMap','metalnessMap','aoMap','clearcoatMap','clearcoatNormalMap','clearcoatRoughnessMap'];let budget=effectBudget(7,'high');
  const remember=t=>{if(t?.uuid)sources.set(t.uuid,typeof WeakRef==='function'?new WeakRef(t):{deref:()=>t});};

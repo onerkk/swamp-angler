@@ -2,7 +2,7 @@
 function recoverMobileGraphics(save,touch,dpr){if(!touch||dpr<2.5||save.gfx!=='high'||save.gfxRecoveryVersion)return false;save.gfx='auto';save.gfxRecoveryVersion=1;return true;}
 /* Raw RAF timing, independent of the simulation's capped timestep. */
 function graphicsProfiles(cap){
- const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[.16,.2,.24,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
+ const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['off','low','mid','mid','auto','high','high','ultra'],refl=[0,0,.24,.32,.5,.65,.85,1],water=[.38,.48,.6,.7,.8,.9,1,1];
  return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:i<2?Math.min(cap,i===0?.65:.85):Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
 }
 function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null,initialLevel=4}){
@@ -28,7 +28,7 @@ function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null,initialL
   if(fps<50||jank>.28||(probe!==null&&fps<56)){if(level===0){bad=0;reason='已達最低畫質';return;}bad++;fast=0;if(bad>=2){if(probe!==null){blocked=level;blockedUntil=clock+45;const previous=probe;probe=null;commit(Math.min(level-1,previous),'升級後變慢，退回穩定畫質');}else commit(level-1,'持續掉幀，降低畫質');}return;}
   bad=0;
   // 60 Hz displays cannot report >60: sustained near-60 frames permit a guarded probe.
-  if(fps>=58&&jank<.08){fast++;const stable=fps>60.5?3:4;if(fast>=stable&&level<7&&(level+1!==blocked||clock>=blockedUntil)){probe=level;commit(level+1,'幀率穩定，提升畫質');}}
+ if(fps>=58&&jank<.08){fast++;const stable=fps>60.5?3:4;if(fast>=stable&&level<status().maxLevel&&(level+1!==blocked||clock>=blockedUntil)){probe=level;commit(level+1,'幀率穩定，提升畫質');}}
   else fast=0;
  }
  return{configure,sample,pause,status,refresh:()=>apply(status())};

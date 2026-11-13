@@ -45,5 +45,5 @@
   show();
  };
  // 預覽網址：?mermaid=1 直接播終幕回禮（只播放、不發獎勵、不改存檔）
- if(typeof location!=='undefined'&&/[?&]mermaid=1(&|$)/.test(location.search)){ const wait=()=>{ if(window.__REALDONE&&window.__playMermaidInvite) setTimeout(()=>window.__mermaidReward({title:'海之友',xp:20000,coins:12000},null,false),800); else setTimeout(wait,500); }; setTimeout(wait,1500); }
+ if(typeof location!=='undefined'&&/[?&]mermaid=1(&|$)/.test(location.search)){ const wait=()=>{ if(window.__GAME_READY&&window.__playMermaidInvite) setTimeout(()=>window.__mermaidReward({title:'海之友',xp:20000,coins:12000},null,false),800); else setTimeout(wait,500); }; setTimeout(wait,1500); }
 })();

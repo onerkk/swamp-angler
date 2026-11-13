@@ -4,6 +4,17 @@
    ・挖掘：刮開濕沙→黏泥→碎貝殼層，每層聲音與震動不同；碰到硬殼要放慢清周圍，刮太快會刮破；竹蟶會往下縮、沙蟹會想逃
    ・泥面上還有招潮蟹、彈塗魚、寄居蟹在活動，點牠們可以抓
    ・挖到的放進桶子，離開時可以全部賣掉，或放進保冷箱帶回家烤（文蛤、赤嘴蛤、海瓜子、竹蟶、沙蟹）；沙蠶變成魚餌 ===== */
+const LOW_TIDE_WINDOWS=[[3,8],[15,20]];
+function tideWindow(hour,assist=false){
+  if(assist)return [hour,hour+24];
+  const h=((hour%24)+24)%24,day=hour-h;
+  const window=LOW_TIDE_WINDOWS.find(([start,end])=>h>=start&&h<end);
+  return window?[day+window[0],day+window[1]]:null;
+}
+function nextLowTide(hour){
+  const h=((hour%24)+24)%24;
+  return hour-h+(LOW_TIDE_WINDOWS.find(([start])=>h<start)?.[0]??27);
+}
 function createTide(W,c){
 'use strict';
 const T=THREE, rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -172,9 +183,8 @@ function spawnRoamers(){ roamers.forEach(r=>S.remove(r.g)); roamers=[];
     roamers.push({id,g:f.group,uni:f.uni,h:rand(0,6.28),t:rand(0,3),hop:0,L,flee:0}); } }
 /* ---------- 狀態 ---------- */
 let on=false, yaw=0, pitch=-.32, pos=new T.Vector3(0,1.6,18), bag=[], warned=0, evac=false, endH=0;
-const LOW=[[3,8],[15,20]];   /* 退潮 5 小時；在泥灘上時間走得比較慢（見 d.js），實際可以玩約 20 分鐘 */
-function lowWin(h){ if(easy()) return [h,h+24]; for(const w of LOW) if(h>=w[0]&&h<w[1]) return w; return null; }
-function nextLow(h){ for(const w of LOW) if(h<w[0]) return w[0]; return LOW[0][0]+24; }
+const lowWin=h=>tideWindow(h,easy());
+const nextLow=nextLowTide;
 /* ---------- HUD ---------- */
 const hud=document.createElement('div'); hud.id='tideHud'; hud.innerHTML=`<button id="tdCageB">🧺 拖籠</button><button id="tdStomp">👣 跺腳</button><div id="tdClock"></div><div id="tdBag"></div><div id="tdShore"><span id="tdArr">⬆</span> 岸邊 <b id="tdDist"></b></div><div id="tdHint">看泥面的痕跡判斷底下是什麼，點痕跡開挖・拖曳轉頭・兩指或上下拖曳前進</div><button id="tdExit">⬅ 回岸上</button>`;
 document.body.appendChild(hud);

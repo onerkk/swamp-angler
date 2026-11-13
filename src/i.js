@@ -9,24 +9,47 @@ const ITEMS=[
  {id:'hairpin',name:'褪色的髮簪',file:'item_hairpin.glb',w:.05,val:0,size:.22,rare:3,p:0,desc:'銀質髮簪，花瓣已經褪色。背面刻著一個「蘅」字。釣起來的時候，水面安靜得不像話。'}];
 const ITEM_SP={id:'item',name:'物品',rar:0,len:[30,30],k:1,price:0,sh:{H:.1,W:.1},f:{pow:.7,spd:.4,agi:.3,jump:0,stam:.6,win:1.5},time:{},desc:''};
 
+function hookTiming(fd,difficulty,practice){
+  const rarity=fd.sp.rar||0;
+  return {
+    duration:practice?4:1.9*(fd.sp.f.win||1)*difficulty.win*(fd.item?1.4:1)*(1-.06*Math.min(5,rarity)),
+    perfect:practice?.45:Math.max(.22,.38-.025*rarity)
+  };
+}
+function hookResult(seconds,timing){
+  if(seconds>=timing.duration)return 'miss';
+  return seconds<timing.duration*timing.perfect?'perfect':'good';
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={hookTiming,hookResult};
+
 function createFun(W,P,AT,c){
 'use strict';
 const T=THREE, $=id=>document.getElementById(id), G=c.G;
 const clamp=(x,a,b)=>x<a?a:x>b?b:x, rand=(a,b)=>a+Math.random()*(b-a);
 
-/* ---------- 起鉤計時（仿參考影片的直立量表） ---------- */
-const hk={on:false,t:0,win:1.8,w:3.5,ph:0,good:.3,perf:.22};
+/* 起鉤標記每次都從藍區開始，接著滑入黃色區。 */
+const hk={on:false,t:0,timing:null};
 const hookEl=$('hook'), hgM=$('hgM'), htF=$('htF');
-function hookStart(fd){ const r=fd.sp.rar||0, D=c.D();
-  hk.on=true; hk.t=0; hk.win=1.9*(fd.sp.f.win||1)*D.win*(fd.item?1.4:1)*(1-.06*Math.min(5,r)); hk.w=(2.8+.7*r)*(.85+.25*D.jit); hk.ph=rand(0,6.28);
-  hk.good=.3; hk.perf=Math.max(.1,.24-.025*r);
-  $('hz2').style.bottom=(hk.good*100)+'%'; $('hz2').style.height=(hk.perf*100)+'%'; $('hz3').style.bottom=((hk.good+hk.perf)*100)+'%';
-  hookEl.classList.remove('hidden'); }
-const hpos=()=>.5+.5*Math.sin(hk.t*hk.w+hk.ph);
-function hookPress(){ if(!hk.on) return 'miss'; const p=hpos(); hookEnd(); const r=p<hk.good?'good':p<hk.good+hk.perf?'perfect':'miss';
+function drawHook(){
+  const remaining=clamp(1-hk.t/hk.timing.duration,0,1)*100+'%';
+  const result=hookResult(hk.t,hk.timing);
+  hgM.style.bottom=remaining;htF.style.height=remaining;
+  hookEl.dataset.result=result;
+}
+function hookStart(fd){
+  hk.on=true;hk.t=0;hk.timing=hookTiming(fd,c.D(),fd.practice);
+  const boundary=(1-hk.timing.perfect)*100+'%';
+  $('hz1').style.height=boundary;$('hz2').style.bottom=boundary;
+  drawHook();hookEl.classList.remove('hidden');
+}
+function hookPress(){ if(!hk.on)return 'miss';const r=hookResult(hk.t,hk.timing);hookEnd();
   pop(r==='perfect'?'完美起鉤！':r==='good'?'上鉤！':'錯過', r); return r; }
 function hookEnd(){ hk.on=false; hookEl.classList.add('hidden'); }
-const hookExpired=()=>hk.on&&hk.t>=hk.win;
+function advanceHook(elapsed){
+  if(!hk.on)return false;
+  hk.t+=elapsed;drawHook();
+  return hk.t>=hk.timing.duration;
+}
 /* ---------- 大字提示 ---------- */
 const popEl=$('pop'); let popT=0;
 function pop(txt,cls){ popEl.textContent=txt; popEl.className='show '+(cls||''); clearTimeout(popT); popT=setTimeout(()=>{ popEl.className=''; },1100); }
@@ -214,12 +237,11 @@ function merMeet(){ S.mer=S.mer||{n:0}; S.mer.n++; S.mer.last=Date.now(); const 
 $('stX').addEventListener('click',()=>$('story').classList.add('hidden'));
 setTimeout(goalsDot,500);
 let dotT=0;
-function update(dt){
+function update(dt,elapsed=dt){
   dotT-=dt; if(dotT<=0){ dotT=3; goalsDot(); }
-  if(hk.on){ hk.t+=dt; hgM.style.bottom=(hpos()*100)+'%'; htF.style.height=(clamp(1-hk.t/hk.win,0,1)*100)+'%'; }
-  updHot(dt); updTour(dt);
+  updHot(dt); updTour(elapsed);
 }
 // 落點和魚群的關係：砸在正中間會把魚群嚇散；落在魚群前方最好
 function hotHit(p){ if(!hot.on) return null; const d=Math.hypot(p.x-hot.x,p.z-hot.z); if(d<1.6){ hot.on=false; hot.t=0; hotEl.classList.add('hidden'); return 'center'; } return d<5?'in':null; }
-return {hotHit,items:ITEMS,spawnHot,goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,hookExpired,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
+return {hotHit,items:ITEMS,spawnHot,goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,advanceHook,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
 }

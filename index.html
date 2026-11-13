@@ -5,7 +5,7 @@
 /* 載入卡住時的錯誤顯示：任何程式錯誤或下載失敗，直接寫在畫面最下方（手機沒有開發者工具也看得到），方便截圖回報 */
 (function(){ var box=null, n=0; function show(t){ try{ if(++n>6) return; if(!box){ box=document.createElement('div'); box.id='errBox'; box.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:999999;background:rgba(120,0,0,.88);color:#fff;font:12px/1.4 monospace;padding:8px 10px;border-radius:10px;max-height:40vh;overflow:auto;white-space:pre-wrap;word-break:break-all'; (document.body||document.documentElement).appendChild(box); }
   box.textContent+=(box.textContent?'\n':'')+'⚠️ '+t; }catch(e){} }
-  window.addEventListener('error',function(e){ if(e&&e.target&&e.target!==window&&(e.target.src||e.target.href)){ show('載入失敗：'+(e.target.src||e.target.href)); return; } show((e.message||'錯誤')+' @'+String(e.filename||'').split('/').pop()+':'+(e.lineno||'')+':'+(e.colno||'')); },true);
+  window.addEventListener('error',function(e){ if(e&&e.target&&e.target!==window&&(e.target.src||e.target.href)){ if(e.target.dataset&&'optionalAsset' in e.target.dataset)return;show('載入失敗：'+(e.target.src||e.target.href)); return; } show((e.message||'錯誤')+' @'+String(e.filename||'').split('/').pop()+':'+(e.lineno||'')+':'+(e.colno||'')); },true);
   window.addEventListener('unhandledrejection',function(e){ var r=e&&e.reason; show('非同步錯誤：'+String(r&&r.message||r).slice(0,200)); });
   window.__showErr=show; })();
 </script>
@@ -110,6 +110,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 #intro p{color:var(--fg-dim);font-size:14px;line-height:1.75;margin:14px 0 18px;max-width:34em}
 #intro p b{color:var(--fg)}
 #startBtn{height:56px;border-radius:16px;border:0;background:var(--accent);color:#1d1606;font-family:inherit;font-size:18px;font-weight:900;letter-spacing:.1em;cursor:pointer;max-width:480px}
+#startBtn:disabled{opacity:.65;cursor:wait}
 #loadNote{margin-top:10px;font-size:13px;color:var(--fg-dim);text-align:center;max-width:480px}
 #err{position:fixed;top:0;right:0;bottom:0;left:0;z-index:20;display:grid;place-items:center;padding:30px;text-align:center;background:var(--bg);font-size:16px;line-height:1.7}
 .fly{position:fixed;z-index:9;font-weight:900;color:var(--accent);font-size:20px;pointer-events:none;text-shadow:0 2px 6px rgba(0,0,0,.7);animation:fly .9s ease-in forwards}
@@ -169,13 +170,16 @@ body.immersive #top>.chip,body.immersive #bMap,body.immersive #bShop,body.immers
 #hook .ht i{position:absolute;left:0;right:0;bottom:0;height:100%;background:#4cd964}
 #hook .hg{position:relative;width:26px;height:100%;border-radius:13px;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.7);overflow:visible}
 #hook .z{position:absolute;left:2px;right:2px}
-#hz1{bottom:0;height:30%;background:linear-gradient(#ffe24a,#f5d020);border-radius:0 0 11px 11px}
-#hz2{background:linear-gradient(#7fd4ff,#3aa0e8)}
-#hz3{top:0;background:linear-gradient(#ff4fa0,#d23c8a);border-radius:11px 11px 0 0}
+#hz1{bottom:0;background:linear-gradient(#ffe24a,#f5d020);border-radius:0 0 11px 11px}
+#hz2{top:0;background:linear-gradient(#7fd4ff,#3aa0e8);border-radius:11px 11px 0 0}
 #hgM{position:absolute;left:28px;transform:translateY(50%);font-size:22px;filter:drop-shadow(0 1px 2px #000)}
+#hook[data-result=perfect] #hgM{filter:drop-shadow(0 0 5px #7fd4ff)}
 #pop{position:fixed;left:50%;top:34%;transform:translate(-50%,-50%) rotate(-12deg) scale(.6);font-size:46px;font-weight:900;letter-spacing:.06em;opacity:0;pointer-events:none;z-index:7;transition:transform .18s cubic-bezier(.2,1.6,.4,1),opacity .18s;-webkit-text-stroke:2px rgba(255,255,255,.85);text-shadow:0 4px 0 rgba(0,0,0,.35)}
 #pop.show{opacity:1;transform:translate(-50%,-50%) rotate(-12deg) scale(1)}
 #pop.miss{color:#6b2fb3}#pop.good{color:#2b8a3e}#pop.perfect{color:#e09a00}
+#dockPractice{position:fixed;z-index:8;top:calc(var(--hudY,105px) + 12px);left:50%;transform:translateX(-50%);width:min(400px,calc(100% - 32px));display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 10px 8px 14px;border:1px solid var(--stroke);border-radius:14px;color:var(--fg);background:var(--glass-strong);font-size:14px;pointer-events:none}
+#dockPractice button{pointer-events:auto;flex:none;min-height:36px;font-size:13px}
+body.sheetOn #dockPractice,body.catching #dockPractice{display:none}
 #castTag{position:fixed;right:12px;top:calc(var(--hudY,150px) + 10px);z-index:4;text-align:right;font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000}
 #castTag b{display:block;margin-top:3px;background:#f2c230;color:#1d1606;font-size:22px;font-weight:900;padding:2px 10px;transform:skewX(-10deg)}
 #combo{position:fixed;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 140px);z-index:4;text-align:right;color:#ffd75e;font-weight:900;font-size:15px;text-shadow:0 2px 4px #000}
@@ -392,7 +396,8 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:fa
   <button id="actBtn"><span id="actLbl">按住<br>蓄力</span></button>
 </div>
 <div id="actSub"></div>
-<div id="hook" class="hidden"><div class="ht"><i id="htF"></i></div><div class="hg"><i class="z" id="hz1"></i><i class="z" id="hz2"></i><i class="z" id="hz3"></i><b id="hgM">🐟</b></div></div>
+<div id="hook" class="hidden"><div class="ht"><i id="htF"></i></div><div class="hg"><i class="z" id="hz1"></i><i class="z" id="hz2"></i><b id="hgM">🐟</b></div></div>
+<div id="dockPractice" class="hidden"><span role="status"></span><button class="btn" type="button">略過練習</button></div>
 <div id="pop"></div>
 <div id="scene" class="hidden"></div>
 <div id="qte" class="hidden" role="button" aria-label="猛拉閃避"><b>🦈 猛拉閃避！</b><small>連點 7 下</small><span class="qb"><i id="qteBar"></i></span></div>
@@ -425,31 +430,58 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:fa
 <div id="intro">
   <h1>濕地垂釣</h1>
   <div class="en">SWAMP ANGLER</div>
-  <p><b>按住</b>按鈕蓄力，在力道最滿時放開拋竿。浮標被拉進水裡時<b>立刻點擊</b>提竿。拉扯時<b>按住收線</b>；魚衝刺就放手，並往魚游走的<b>反方向滑動</b>拉竿，別讓張力爆表。船釣時把魚帶到船頭或近側船邊，等牠停止衝刺後點「抄網」起魚；不用把魚硬拉到船底。拖曳畫面可以轉向瞄準。先觀察倒木、睡蓮與礁岩，避開障礙物拋投；卡住時先放手，再向側邊拖曳改變拉線角度，持續硬拉會斷線。</p>
-  <button id="startBtn">開始釣魚</button>
+  <p>按住蓄力，放開拋竿。浮標下沉時看起鉤量表，魚進入藍色或黃色區就點一下。上鉤後按住收線，張力太高時先放手。</p>
+  <button id="startBtn" disabled>正在載入遊戲…</button>
   <script>
 // 錯誤直接顯示在載入畫面上（手機看不到主控台）：有問題時截圖就能看出原因
 window.__ERRS=[]; window.addEventListener('error',e=>{ try{ const m=(e.message||'')+' @'+((e.filename||'').split('/').pop())+':'+(e.lineno||''); window.__ERRS.push(m); const t=document.getElementById('loadErr'); if(t){ t.style.display='block'; t.textContent='⚠️ 發生錯誤：'+window.__ERRS.slice(-3).join(' ｜ '); } }catch(x){} });
 window.addEventListener('unhandledrejection',e=>{ try{ const r=e.reason, m=(r&&(r.message||r.code))||String(r); window.__ERRS.push('promise: '+m); }catch(x){} });
 </script>
-<div id="loadBox"><div id="loadNote">正在載入真實場景…</div><div id="loadBar"><i></i></div><div id="loadTip"></div><div id="loadErr" style="display:none;margin-top:6px;font-size:12px;color:#ff9a8a;word-break:break-all"></div></div>
-<style>#loadBox{margin-top:14px;width:min(320px,84vw)}#loadBar{height:6px;border-radius:99px;background:rgba(255,255,255,.15);overflow:hidden;margin-top:6px}#loadBar i{display:block;height:100%;width:3%;background:linear-gradient(90deg,#ffcf66,#ffe9b0);border-radius:99px;transition:width .4s}
-#loadTip{font-size:12px;line-height:1.6;opacity:.75;margin-top:8px}#loadBox.done #loadBar{display:none}#loadBox.done #loadTip{display:none}</style>
+<div id="loadNote" role="status">正在下載遊戲主程式…</div>
+<div id="loadErr" style="display:none;margin-top:6px;font-size:12px;color:#ff9a8a;word-break:break-all"></div>
 </div>
 <div id="err" class="hidden"></div>
 <script>
 function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classList.remove('hidden');}
 </script>
 <script>
-/* 主程式載入器：直接從本站下載（外部 CDN 已停用：倉庫超過 50 MB，jsDelivr 一律拒絕）。
-   下載失敗會自動重試三次（間隔拉長），再不行就改用一般的 script 標籤載入；全部失敗才顯示錯誤並提供重試按鈕 */
-(function(){ var V='20261113040438', F=['app_scan.js','app_main.js'];
-  var note=function(t){ var e=document.getElementById('loadTip'); if(e&&t) e.textContent=t; };
-  function run(code){ var b=new Blob([code],{type:'text/javascript'}), s=document.createElement('script'); s.src=URL.createObjectURL(b); return new Promise(function(ok){ s.onload=ok; s.onerror=ok; document.body.appendChild(s); }); }
-  function get(u){ return fetch(u).then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); }).then(function(t){ if(t.indexOf('/*APPV:'+V+'*/')!==0) throw new Error('版本不符'); return t; }); }
-  function tag(f){ return new Promise(function(ok,no){ var s=document.createElement('script'); s.src=f+'?v='+V+'&t='+Date.now(); s.onload=ok; s.onerror=function(){ no(new Error('連不上伺服器')); }; document.body.appendChild(s); }); }
-  function one(f,n){ n=n||0; return get(f+'?v='+V+(n?'&r='+n:'')).then(run).catch(function(e){ if(n<3){ note('網路不穩，重新下載中…（第 '+(n+1)+' 次）'); return new Promise(function(ok){ setTimeout(ok,[800,2500,6000][n]); }).then(function(){ return one(f,n+1); }); } return tag(f); }); }
-  note('正在下載遊戲主程式…'); one(F[0]).then(function(){ return one(F[1]); }).catch(function(e){ var x=document.getElementById('loadErr'); if(x){ x.style.display='block'; x.innerHTML='⚠️ 主程式下載失敗（'+(e&&e.message||e)+'）。請確認網路後 <button onclick=\"location.reload()\" style=\"padding:6px 14px;border-radius:999px;border:0;background:#efc04c;font-weight:800\">重新載入</button>'; } });
+(async function(){
+  const version='20261113085751', note=document.getElementById('loadNote');
+  for(let attempt=0;attempt<4;attempt++){
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),18000);
+    let scriptURL;
+    try{
+      const retry=attempt?'&r='+Date.now():'';
+      const response=await fetch('app_main.js?v='+version+retry,{signal:controller.signal});
+      if(!response.ok)throw new Error('HTTP '+response.status);
+      const code=await response.text();
+      if(!code.startsWith('/*APPV:'+version+'*/'))throw new Error('遊戲版本不符');
+      scriptURL=URL.createObjectURL(new Blob([code],{type:'text/javascript'}));
+      await new Promise((resolve,reject)=>{
+        const script=document.createElement('script');
+        script.src=scriptURL;
+        script.onload=()=>{script.remove();resolve();};
+        script.onerror=()=>{script.remove();reject(new Error('主程式無法執行'));};
+        document.body.appendChild(script);
+      });
+      return;
+    }catch(error){
+      if(attempt===3){
+        note.textContent='遊戲主程式載入失敗，請檢查網路後重試。';
+        const button=document.getElementById('startBtn');
+        button.textContent='重新載入';
+        button.disabled=false;
+        button.addEventListener('click',()=>location.reload(),{once:true});
+        return;
+      }
+      note.textContent='正在重新下載遊戲主程式…（第 '+(attempt+1)+' 次）';
+      await new Promise(resolve=>setTimeout(resolve,[700,1600,3200][attempt]));
+    }finally{
+      clearTimeout(timeout);
+      if(scriptURL)URL.revokeObjectURL(scriptURL);
+    }
+  }
 })();
 </script>
 </body></html>

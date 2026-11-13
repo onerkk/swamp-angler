@@ -556,13 +556,28 @@ const seaGrid = new T.Mesh(makeWaterGrid(T), seaMat); seaGrid.visible=true; seaG
 const sunLight = new T.DirectionalLight(0xffffff, 0.9); scene.add(sunLight); scene.add(sunLight.target);
 renderer.shadowMap.type=T.PCFSoftShadowMap;sunLight.castShadow=true;sunLight.shadow.bias=-.00018;sunLight.shadow.normalBias=.012;sunLight.shadow.radius=2;
 Object.assign(sunLight.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.2,far:130});sunLight.shadow.camera.updateProjectionMatrix();
-// 陰影一律開著：關掉再打開會讓全場材質重新編譯而卡一下；低畫質改用小張陰影圖、較低更新頻率
-function setShadows(q){renderer.shadowMap.enabled=true;const n=q==='ultra'?Math.min(window.__resourcePolicy?.mobile?2048:4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='auto'?1024:q==='mid'?1024:512;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
+function setShadows(q){
+  const enabled=q!=='off';
+  renderer.shadowMap.enabled=enabled;
+  const size=q==='ultra'?Math.min(window.__resourcePolicy?.mobile?2048:4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='auto'||q==='mid'?1024:512;
+  if(!enabled||sunLight.shadow.mapSize.x!==size){
+    if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}
+    sunLight.shadow.mapSize.set(size,size);
+  }
+}
 const hemi = new T.HemisphereLight(0xffffff, 0x223322, 0.55); scene.add(hemi);
 
 const materialQuality=createMaterialQuality();let materialScanTimes=new WeakMap();
-// 換畫質等級只調數量與頻率；材質種類由固定的 tier 決定，所以這裡不會讓著色器重新編譯，也不再釋放再重建反射與陰影（以前低畫質來回切換會一直重建而卡頓）
-function setEffects(level,tier){U.uWaterLOD.value=tier==='high'?0:tier==='mid'?1:2;const prev=materialQuality.tier;materialQuality.set(level,tier);materialQuality.tier=tier;U.uDetail.value=1;if(prev!==tier){materialQuality.apply(scene);if(window.__HOME_SCENE)materialQuality.apply(window.__HOME_SCENE);materialScanTimes=new WeakMap();}}
+function setEffects(level,tier){
+  const budget=materialQuality.set(level,tier),key=[tier,budget.environment,budget.cullStatic].join(':');
+  U.uWaterLOD.value=level<2?2:tier==='high'?0:tier==='mid'?1:2;
+  U.uDetail.value=budget.waterDetail?1:0;
+  materialQuality.tier=tier;
+  if(materialQuality.key!==key){
+    materialQuality.key=key;materialScanTimes=new WeakMap();
+    prepareScene(scene);if(window.__HOME_SCENE)prepareScene(window.__HOME_SCENE);
+  }
+}
 function prepareScene(root){const now=performance.now();if(now<(materialScanTimes.get(root)||0))return;materialScanTimes.set(root,now+1000);materialQuality.apply(root);}
 function qualityTextures(root){materialQuality.apply(root);const max=Math.min(renderer.capabilities.getMaxAnisotropy(),window.__resourcePolicy?.anisotropy||16);root.traverse(m=>{if(!m.isMesh)return;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))if(mat)for(const key of['map','normalMap','roughnessMap','metalnessMap','bumpMap','emissiveMap'])tuneTextureSampling(T,mat[key],max,!!(mat.userData&&mat.userData.packedAtlas));});}
 let waterDetail='mid';function setWaterDetail(q){if(q===waterDetail)return;let [rings,segments]=waterDetailSettings(q);if(rings*segments>65535&&!renderer.capabilities.isWebGL2&&!renderer.extensions.get('OES_element_index_uint'))[rings,segments]=waterDetailSettings('high');const old=seaGrid.geometry;seaGrid.geometry=makeWaterGrid(T,150,rings,segments);old.dispose();waterDetail=q;}
@@ -654,7 +669,7 @@ function seaH(x,z,t){ return sampleWater(x,z,t,U.uWind.value,true).height; }
 function swell(x,z,t){return sampleWaterHeight(x,z,t,U.uWind.value,seaMode);}
 
 // 環境光探針依畫質放慢更新頻率（不關閉），把每秒的工作量壓低
-let envAcc=0;function envTick(dt){envAcc+=dt;const hz=window.__effectBudget?.probeHz||15;if(envAcc<1/hz)return;envAcc=0;envJobs.update(dt);}
+let envAcc=0;function envTick(dt){const hz=window.__effectBudget?.probeHz??15;if(!hz)return;envAcc+=dt;if(envAcc<1/hz)return;envAcc=0;envJobs.update(dt);}
 function updateEnvironment(dt,t){U.uTime.value=t;U.uLightK.value=Math.min(1,Math.max(0,info.light));envTick(window.__frameSeconds||dt);const w=U.uWind.value,k=(.002+.01*w.z)*dt;U.uCloudOff.value.x+=w.x*k;U.uCloudOff.value.y+=w.y*k;}
 function update(dt, t){
   {const target=new T.Vector3();camera.getWorldPosition(target);target.y=0;sunLight.target.position.copy(target);sunLight.position.copy(target).addScaledVector(U.uSunDir.value,60);sunLight.target.updateMatrixWorld();}
@@ -673,7 +688,11 @@ const reflCam=new T.PerspectiveCamera(), reflTM=new T.Matrix4();
 WU.uRefl={value:reflRT.texture}; WU.uReflMat={value:reflTM}; WU.uReflOn={value:0};
 const _rp=new T.Vector3(), _cp=new T.Vector3(), _rm=new T.Matrix4(), _la=new T.Vector3(), _tg=new T.Vector3(), _n=new T.Vector3(0,1,0), _vw=new T.Vector3();
 const _pl=new T.Plane(), _cpl=new T.Vector4(), _q=new T.Vector4(), _sz=new T.Vector2(); let reflScale=.35, reflEnabled=true, reflHide=[];
-function setRefl(on,scale){ reflEnabled=on; if(scale) reflScale=scale; WU.uReflOn.value=0; }
+function setRefl(on,scale){
+  if(reflEnabled===on&&reflScale===scale)return;
+  reflEnabled=on;reflScale=scale;WU.uReflOn.value=0;lastRefl=-Infinity;
+  if(!on&&(reflRT.width>4||reflRT.height>4))reflRT.setSize(4,4);
+}
 let lastRefl=-Infinity, reflCamKey='';
 // 倒影只畫水面以上的東西：整個在水面以下或平貼水面的物件（荷葉、碎葉、沉在水裡的東西、魚）在倒影裡看不到，卻佔掉大量繪製；每 1.5 秒重新整理一次名單
 let lowList=[], lowScan=-1e9; const _lowBS=new T.Sphere();
@@ -724,18 +743,8 @@ const frameGrab=(()=>{ let tex=null,w=0,h=0,stamp=-1,no=0; const size=new T.Vect
     release(){ if(tex){ tex.dispose(); tex=null; } w=h=0; stamp=-1; }, copies:0 }; })();
 const introEl=document.getElementById('intro'); const introOn=()=>!!(introEl&&!introEl.classList.contains('hidden'));   /* 開始畫面還蓋著的時候，後處理效果看不出來，不用算 */
 const taa=createTAA({renderer,grab:()=>frameGrab.get()});
-/* 暖身：任何新載入的模型／貼圖，載完立刻送上顯示卡。以前要等它第一次出現在畫面上才上傳（診斷裡「幾何上傳 +79、貼圖上傳 +36」那種 0.5 秒卡頓）。
-   做法：把物件暫時放進一個只有它的小場景，用 4×4 的畫布畫一次（只上傳幾何，幾乎不花填色時間），貼圖用 initTexture 先上傳；畫完放回原位 */
-const warmScene=new T.Scene(), warmRT=new T.WebGLRenderTarget(4,4), warmCam=new T.PerspectiveCamera(60,1,.01,1000), warmBasic=new T.MeshBasicMaterial();
-warmScene.overrideMaterial=warmBasic;
-window.__WARM=function(obj){ if(!obj||!renderer.initTexture) return; const parent=obj.parent, idx=parent?parent.children.indexOf(obj):-1, vis=obj.visible, cul=[];
-  try{ obj.traverse(o=>{ if(o.isMesh||o.isSkinnedMesh||o.isInstancedMesh){ cul.push([o,o.frustumCulled]); o.frustumCulled=false; const ms=Array.isArray(o.material)?o.material:[o.material]; for(const m of ms){ if(!m) continue; for(const k in m){ const t=m[k]; if(t&&t.isTexture&&t.image) try{ renderer.initTexture(t); }catch(_){} } } } });
-    obj.visible=true; warmScene.add(obj); warmCam.position.set(0,0,5); warmCam.lookAt(0,0,0);
-    const prev=renderer.getRenderTarget(), ac=renderer.autoClear; renderer.setRenderTarget(warmRT); renderer.autoClear=true; renderer.render(warmScene,warmCam); renderer.setRenderTarget(prev); renderer.autoClear=ac; }
-  catch(e){ console.warn('warm',e); }
-  finally{ warmScene.remove(obj); if(parent){ parent.add(obj); if(idx>=0&&idx<parent.children.length-1){ parent.children.splice(parent.children.indexOf(obj),1); parent.children.splice(idx,0,obj); } } obj.visible=vis; for(const [o,c] of cul) o.frustumCulled=c; } };
-function taaOn(){ return materialQuality.tier==='high'&&!window.__noTAA&&!(window.__SAVE&&window.__SAVE.taa===false)&&!introOn(); }   /* 時間抗鋸齒：高畫質才開，設定裡可關 */
-function raysOn(){ return materialQuality.tier==='high'&&!window.__noRays&&!(window.__SAVE&&window.__SAVE.rays===false)&&!introOn(); }   /* 設定裡可以關掉 */
+function taaOn(){ return materialQuality.tier==='high'&&(window.__gfxStatus?.level??7)>=4&&!window.__noTAA&&!(window.__SAVE&&window.__SAVE.taa===false)&&!introOn(); }
+function raysOn(){ return materialQuality.tier==='high'&&(window.__gfxStatus?.level??7)>=4&&!window.__noRays&&!(window.__SAVE&&window.__SAVE.rays===false)&&!introOn(); }
 function raysParams(){ if(!raysOn()) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
   if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); const st=Math.min(.7,vis*(.08+.62*low*low)); if(st<.1) return null;   /* 弱到看不出來（太陽仰角高於約 30 度、或陰天）就不算 */ return {dir:_grDir,color:_grCol,strength:st,thresh:.6}; }
   const mk=U.uMoonK?U.uMoonK.value:0; if(mk>.05&&U.uMoonDir){ _grDir.copy(U.uMoonDir.value).normalize(); _grCol.setRGB(.62,.72,.95); if(mk*.45<.1) return null; return {dir:_grDir,color:_grCol,strength:mk*.45,thresh:.16}; }
@@ -764,7 +773,7 @@ function renderViewModel(){ if(window.__noVM) return; if(!W_head) W_head=camera.
   catch(e){ window.__noVM=true; console.warn('viewmodel off',e); }
   finally{ camera.layers.set(0); scene.background=bg; renderer.autoClear=ac; renderer.toneMapping=tone; renderer.outputEncoding=enc; } }
 function render(){prepareScene(scene);const oldEnv=scene.environment;if(window.__effectBudget?.environment===false)scene.environment=null;const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
- try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz||20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz&&(shadowSigChanged()||now-lastShadow>=.5);if(renderer.shadowMap.needsUpdate)lastShadow=now;
+ try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz??20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=renderer.shadowMap.enabled&&hz>0&&(!sunLight.shadow.map||now-lastShadow>=1/hz&&(shadowSigChanged()||now-lastShadow>=.5));if(renderer.shadowMap.needsUpdate)lastShadow=now;
   const shadowNow=renderer.shadowMap.needsUpdate;
   pass('sub',()=>submerged.render());
   if(reflEnabled){try{pass('refl',renderRefl);}catch(e){reflEnabled=false;WU.uReflOn.value=0;console.warn('refl off',e);}}
@@ -774,7 +783,7 @@ function render(){prepareScene(scene);const oldEnv=scene.environment;if(window._
   { const on=taaOn(); try{ taa.resolve(camera,on); }catch(e){ window.__noTAA=true; console.warn('taa off',e); } }
   { const rp=raysParams(); if(rp){ try{ godRays.render(rp); }catch(e){ window.__noRays=true; console.warn('rays off',e); } } }
   renderViewModel();
-  passStats.main.shadow=shadowNow;passStats.main.shadowSize=sunLight.shadow.mapSize.x;passStats.refl.w=reflRT.width;passStats.refl.h=reflRT.height;passStats.sub.w=submerged.target.width;passStats.sub.h=submerged.target.height;passStats.sub.on=WU.uSubmergedOn.value>0;passStats.refl.on=WU.uReflOn.value>0;
+  passStats.main.shadow=shadowNow;passStats.main.shadowSize=renderer.shadowMap.enabled?sunLight.shadow.mapSize.x:0;passStats.refl.w=reflRT.width;passStats.refl.h=reflRT.height;passStats.sub.w=submerged.target.width;passStats.sub.h=submerged.target.height;passStats.sub.on=WU.uSubmergedOn.value>0;passStats.refl.on=WU.uReflOn.value>0;
  }finally{scene.environment=oldEnv;renderer.shadowMap.autoUpdate=auto;renderer.shadowMap.needsUpdate=request;}
 }
 // 每個繪製階段的提交時間與繪製次數，給診斷報告判斷瓶頸在哪一個階段（倒影、水下、主畫面＋陰影）

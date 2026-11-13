@@ -125,7 +125,7 @@ body.cine>*:not(#cinBox):not(canvas):not(#toast){visibility:hidden!important}
 #cinBox .ct{font-size:13px;letter-spacing:4px;color:#d9c08a;opacity:0;animation:cinIn 1s ease forwards}#cinBox h2{margin:6px 0 4px;font-size:24px;color:#ffe3a3;opacity:0;animation:cinIn 1.2s ease forwards;font-family:serif}
 #cinBox .tn{font-size:13px;color:#c9d2dc;opacity:0;animation:cinIn 1s ease forwards}
 @keyframes cinIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}`; document.head.appendChild(ccss);
-let cinOn=false;
+let cinOn=false,playing=false;
 function showIntro(){ const step=2.6; cinOn=true;
   cin.innerHTML='<button class="sk" data-c="end">略過 ›</button>'+OPEN.map((t,i)=>`<p class="${i===4?'gold':''}" style="animation-delay:${(1+i*step).toFixed(1)}s">${t}</p>`).join('')+
     `<button class="go" data-c="end" style="animation-delay:${(1+OPEN.length*step).toFixed(1)}s">開始</button>`;
@@ -140,11 +140,13 @@ function showCard(ch){ cinOn=true; const i=SPOT_IDS.indexOf(ch.spot), here=c.cur
 cin.addEventListener('click',e=>{ const b=e.target.closest('[data-c]'); if(!b) return; const a=b.dataset.c;
   if(a==='end') endIntro(); else { cin.classList.add('hidden'); document.body.classList.remove('cine'); cinOn=false; if(c.pan) c.pan(false); cardAt=performance.now()+1500; if(a==='go') c.goSpot(+b.dataset.v); } });
 let cardAt=performance.now()+3000;   // 用真實時間計時，不受每幀時間差上限影響
-function tryCard(){ if(cinOn||!st.intro) return; const now=performance.now(); if(now<cardAt) return; cardAt=now+2000;
+function tryCard(){ if(!playing||cinOn||c.practice?.())return;
+  if(!st.intro){if(!c.idle||c.idle())showIntro();return;}
+  const now=performance.now(); if(now<cardAt) return; cardAt=now+2000;
   if(!box.classList.contains('hidden')||!document.getElementById('endBox').classList.contains('hidden')) return;
   if(c.idle&&!c.idle()) return; const ch=active().find(x=>st.seen.indexOf(x.id)<0); if(ch) showCard(ch); }
 let moonClock=0; function tick(dt){ tryCard(); moonClock-=dt; if(moonClock>0) return; moonClock=2; if(S.moon&&S.moon.done) bump(t=>t.t==='moon'?1:0);bump(t=>t.t==='scene'&&t.id!=='lantern'&&(S.scenes?.[t.id]||0)>0?1:0); }
-const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>{ if(!st.intro) setTimeout(showIntro,700); });
+const sb=document.getElementById('startBtn'); if(sb)sb.addEventListener('click',()=>{playing=true;cardAt=performance.now()+1800;},{once:true});
 /* 手記面板 */
 const btn=document.createElement('button'); btn.className='chip sm'; btn.id='storyBtn'; btn.setAttribute('aria-label','老漁人的手記'); btn.textContent='📜';
 const t2=document.getElementById('top2'); if(t2) t2.appendChild(btn);

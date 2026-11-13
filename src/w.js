@@ -928,12 +928,20 @@ function render(dt){t+=dt;if(W.prepareScene)W.prepareScene(scene);if(window.__ef
   { const rk=c.rain?Math.min(1,c.rain()*1.6):0; rainGlass.tick(dt,window.__effectBudget?.rainOverlay===false?0:rk); viewM.color.setScalar((.35+.65*daylight())*(1-.35*rk)); }   // 下雨：窗上有水珠、水痕往下滑，外面變暗變霧
   sparkles.forEach(q=>{ const k=Math.max(0,Math.sin(t*1.7+q.ph)); q.sp.material.opacity=Math.pow(k,8); q.sp.scale.setScalar(.03+.05*Math.pow(k,4)); if(k<.02&&Math.random()<.02) q.sp.position.set((Math.random()-.5)*1.5,(Math.random()-.5)*1.2,.0); });   // 水晶閃光
   updTanks(dt);for(const k of ['fresh','sea'])if(tanks[k]&&tanks[k].optics)tanks[k].optics.update();
-  const shadowSize=window.__gfxStatus&&window.__gfxStatus.shadow==='ultra'?4096:window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
+  const useShadows=window.__gfxStatus?.shadow!=='off';
+  const shadowSize=window.__gfxStatus?.shadow==='ultra'?(window.__resourcePolicy?.mobile?2048:4096):window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;
+  if(!useShadows||sun.shadow.mapSize.x!==shadowSize){
+    if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}
+    sun.shadow.mapSize.set(shadowSize,shadowSize);
+  }
   const exposure=R.toneMappingExposure,shadows=R.shadowMap.enabled,shadowType=R.shadowMap.type,shadowAuto=R.shadowMap.autoUpdate,shadowRequest=R.shadowMap.needsUpdate;
   try{
-    R.shadowMap.autoUpdate=false;{ const sig=Math.round(sun.position.x*20)+'|'+Math.round(sun.position.y*20)+'|'+Math.round(sun.position.z*20)+'|'+Math.round(sun.intensity*50)+'|'+mountSig;
+    R.shadowMap.autoUpdate=false;R.shadowMap.enabled=useShadows;R.shadowMap.needsUpdate=false;
+    if(useShadows){const sig=Math.round(sun.position.x*20)+'|'+Math.round(sun.position.y*20)+'|'+Math.round(sun.position.z*20)+'|'+Math.round(sun.intensity*50)+'|'+mountSig;
       /* 小屋大部分東西不動：陰影只在太陽位置／亮度改變、標本換了、或每 2 秒（缸裡的魚會游）才重算；以前每秒 20～30 次 */
-      R.shadowMap.needsUpdate=!sun.shadow.map||sig!==lastShadowSig||t-lastHomeShadow>=Math.max(2,1/(window.__effectBudget?.shadowHz||20)); if(R.shadowMap.needsUpdate){ lastHomeShadow=t; lastShadowSig=sig; } }R.toneMappingExposure=.88;R.shadowMap.enabled=true;R.shadowMap.type=T.PCFSoftShadowMap;
+      R.shadowMap.needsUpdate=!sun.shadow.map||sig!==lastShadowSig||t-lastHomeShadow>=2;if(R.shadowMap.needsUpdate){lastHomeShadow=t;lastShadowSig=sig;}
+    }
+    R.toneMappingExposure=.88;R.shadowMap.type=T.PCFSoftShadowMap;
     R.setRenderTarget(null);W.radiance.render(scene,cam);
     // 白天陽光從左牆窗戶斜射進來：畫面裡看得到窗戶時，從窗口拉出光柱（跟著時段變亮變暗；關燈時更明顯）
     if(W.godRays&&W.raysOn&&W.raysOn()){ const dl=daylight(); if(dl>.05){ try{ W.godRays.render({camera:cam,point:winPt,color:winRayCol,strength:dl*(lightsOff()?.9:.6),thresh:.45}); }catch(e){ window.__noRays=true; } } }

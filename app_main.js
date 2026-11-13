@@ -1,4 +1,4 @@
-/*APPV:20261113040438*/
+/*APPV:20261113085751*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -183,14 +183,13 @@ function poseCrust(r,dt){ const P=r.crust, u=r.uni.uSwim.value, a=r.uni.uAmp.val
  for(const S of P.swim){ S.j.rotation.z=Math.sin(u*2.6-S.i*.9)*Math.min(.7,.15+paddle*.5); } }
 if(typeof module!=='undefined'&&module.exports) module.exports={CRUST,buildCrust,poseCrust,crustMeasure};
 /* Effect costs are controlled independently from framebuffer resolution. */
-/* 畫質分兩層：tier（高／中／低）決定材質用哪些貼圖與光澤，整段遊戲固定不變，避免著色器重新編譯造成卡頓；
-   level（0～7）只調數量、更新頻率與解析度，所有特效在每一級都保留，只是用較省的版本。 */
+/* Material features follow the chosen tier. The lowest level can skip whole render passes. */
 function effectTier(mode,mobile){return mode==='high'||mode==='mid'||mode==='low'?mode:mobile?'mid':'high';}
 function effectBudget(level,tier){level=Math.max(0,Math.min(7,Math.round(Number(level)||0)));tier=tier||(typeof window!=='undefined'&&window.__effectTier)||'high';
  const pick=a=>a[level];
- return{tier,cullStatic:level<2,normalMaps:false,surfaceMaps:true,physicalCoat:tier!=='low',environment:true,probes:true,probeHz:pick([1,1,2,2,4,6,10,15]),caustics:true,waterDetail:true,
-  rainLines:pick([160,220,320,420,600,800,1100,1400]),rainOverlay:true,lensFlare:true,rainRings:true,ssr:false,
-  transmissionHz:pick([12,15,20,30,45,60,120,120]),reflectionHz:pick([15,15,20,24,30,40,60,60]),shadowHz:pick([8,10,12,15,20,20,24,30]),particleScale:pick([.4,.5,.6,.7,.85,1,1,1])};}
+ return{tier,cullStatic:level<2,normalMaps:tier==='high',surfaceMaps:true,physicalCoat:tier!=='low',environment:level>0,probes:level>0,probeHz:pick([0,1,2,2,4,6,10,15]),caustics:level>=2,waterDetail:level>=2,
+  rainLines:pick([0,120,240,420,600,800,1100,1400]),rainOverlay:level>=2,lensFlare:level>=2,rainRings:level>=2,ssr:false,
+  transmissionHz:pick([8,12,20,30,45,60,90,120]),reflectionHz:pick([0,0,20,24,30,40,60,60]),shadowHz:pick([0,8,12,15,20,20,24,30]),particleScale:pick([.35,.5,.6,.7,.85,1,1,1])};}
 function createMaterialQuality(){
  const states=new WeakMap(),objects=new WeakMap(),sources=new Map(),keys=['envMap','normalMap','bumpMap','roughnessMap','metalnessMap','aoMap','clearcoatMap','clearcoatNormalMap','clearcoatRoughnessMap'];let budget=effectBudget(7,'high');
  const remember=t=>{if(t?.uuid)sources.set(t.uuid,typeof WeakRef==='function'?new WeakRef(t):{deref:()=>t});};
@@ -543,6 +542,14 @@ function createFrameLimiter(limit=GAME_FPS_LIMIT,start=0){
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={GAME_FPS_LIMIT,createFrameLimiter};
 
+/* Keep game timers on elapsed foreground time and give physics bounded steps. */
+function gameplayElapsed(seconds){return Number.isFinite(seconds)?Math.max(0,Math.min(1,seconds)):0;}
+function stepFishingPhysics(seconds,step){
+ const span=Math.min(.25,seconds), count=Math.ceil(span/.05);
+ for(let i=0;i<count;i++)if(step(span/count)===false)break;
+}
+if(typeof module!=='undefined'&&module.exports)Object.assign(module.exports,{gameplayElapsed,stepFishingPhysics});
+
 /* Count completed game frames, update text twice per second, and never intercept input. */
 function createFPSDisplay(doc=document,enabled=true){
  const el=doc.createElement('div');el.id='fpsDisplay';el.setAttribute('data-screenshot-ignore','');el.setAttribute('aria-label','遊戲 FPS');el.style.cssText='position:fixed;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:155;pointer-events:none;padding:4px 8px;border-radius:8px;background:rgba(0,0,0,.65);color:#b6f5cc;font:600 12px monospace;font-variant-numeric:tabular-nums';el.textContent='FPS —';el.hidden=!enabled;doc.body.appendChild(el);
@@ -555,7 +562,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports.createFPSDisplay=c
 function recoverMobileGraphics(save,touch,dpr){if(!touch||dpr<2.5||save.gfx!=='high'||save.gfxRecoveryVersion)return false;save.gfx='auto';save.gfxRecoveryVersion=1;return true;}
 /* Raw RAF timing, independent of the simulation's capped timestep. */
 function graphicsProfiles(cap){
- const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['low','low','mid','mid','auto','high','high','ultra'],refl=[.16,.2,.24,.32,.5,.65,.85,1],water=[.45,.5,.6,.7,.8,.9,1,1];
+ const scales=[.3,.4,.5,.62,.75,.88,1,1],effects=['low','low','mid','mid','high','high','high','high'],shadows=['off','low','mid','mid','auto','high','high','ultra'],refl=[0,0,.24,.32,.5,.65,.85,1],water=[.38,.48,.6,.7,.8,.9,1,1];
  return scales.map((k,i)=>({level:i,name:['極省效能','省效能','流暢','均衡','細緻','高','極高','最高'][i],effect:effects[i],shadow:shadows[i],pr:i<2?Math.min(cap,i===0?.65:.85):Math.max(Math.min(.55,cap),cap*k),reflection:refl[i],water:water[i],geometry:i<2?'low':i<4?'mid':i<6?'high':'ultra'}));
 }
 function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null,initialLevel=4}){
@@ -581,7 +588,7 @@ function createAdaptiveGraphics({cap,apply,onSample=()=>{},profile=null,initialL
   if(fps<50||jank>.28||(probe!==null&&fps<56)){if(level===0){bad=0;reason='已達最低畫質';return;}bad++;fast=0;if(bad>=2){if(probe!==null){blocked=level;blockedUntil=clock+45;const previous=probe;probe=null;commit(Math.min(level-1,previous),'升級後變慢，退回穩定畫質');}else commit(level-1,'持續掉幀，降低畫質');}return;}
   bad=0;
   // 60 Hz displays cannot report >60: sustained near-60 frames permit a guarded probe.
-  if(fps>=58&&jank<.08){fast++;const stable=fps>60.5?3:4;if(fast>=stable&&level<7&&(level+1!==blocked||clock>=blockedUntil)){probe=level;commit(level+1,'幀率穩定，提升畫質');}}
+ if(fps>=58&&jank<.08){fast++;const stable=fps>60.5?3:4;if(fast>=stable&&level<status().maxLevel&&(level+1!==blocked||clock>=blockedUntil)){probe=level;commit(level+1,'幀率穩定，提升畫質');}}
   else fast=0;
  }
  return{configure,sample,pause,status,refresh:()=>apply(status())};
@@ -1273,7 +1280,8 @@ function auditSceneLighting(scene){
 function createInteriorReflection(T,R){
  const pmrem=new T.PMREMGenerator(R),cube=new T.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter,type:R.capabilities.isWebGL2&&R.extensions.has('EXT_color_buffer_float')?T.HalfFloatType:T.UnsignedByteType}),camera=new T.CubeCamera(.08,40,cube),records=new WeakMap();let failed=false,work=null;
  function update(scene,position,outdoor,time){
-  const level=typeof window!=='undefined'&&window.__gfxStatus?window.__gfxStatus.level:4;let rec=records.get(scene);
+  const graphics=typeof window!=='undefined'?window.__gfxStatus:null;
+  const level=graphics?.effectLevel??graphics?.level??4;let rec=records.get(scene);
   if(failed||level<3){scene.environment=outdoor;return;}
   scene.environment=rec?rec.rt.texture:outdoor;
   if(rec&&time-rec.time<30)return;
@@ -1942,13 +1950,28 @@ const seaGrid = new T.Mesh(makeWaterGrid(T), seaMat); seaGrid.visible=true; seaG
 const sunLight = new T.DirectionalLight(0xffffff, 0.9); scene.add(sunLight); scene.add(sunLight.target);
 renderer.shadowMap.type=T.PCFSoftShadowMap;sunLight.castShadow=true;sunLight.shadow.bias=-.00018;sunLight.shadow.normalBias=.012;sunLight.shadow.radius=2;
 Object.assign(sunLight.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.2,far:130});sunLight.shadow.camera.updateProjectionMatrix();
-// 陰影一律開著：關掉再打開會讓全場材質重新編譯而卡一下；低畫質改用小張陰影圖、較低更新頻率
-function setShadows(q){renderer.shadowMap.enabled=true;const n=q==='ultra'?Math.min(window.__resourcePolicy?.mobile?2048:4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='auto'?1024:q==='mid'?1024:512;if(sunLight.shadow.mapSize.x!==n){sunLight.shadow.mapSize.set(n,n);if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}}}
+function setShadows(q){
+  const enabled=q!=='off';
+  renderer.shadowMap.enabled=enabled;
+  const size=q==='ultra'?Math.min(window.__resourcePolicy?.mobile?2048:4096,renderer.capabilities.maxTextureSize):q==='high'?2048:q==='auto'||q==='mid'?1024:512;
+  if(!enabled||sunLight.shadow.mapSize.x!==size){
+    if(sunLight.shadow.map){sunLight.shadow.map.dispose();sunLight.shadow.map=null;}
+    sunLight.shadow.mapSize.set(size,size);
+  }
+}
 const hemi = new T.HemisphereLight(0xffffff, 0x223322, 0.55); scene.add(hemi);
 
 const materialQuality=createMaterialQuality();let materialScanTimes=new WeakMap();
-// 換畫質等級只調數量與頻率；材質種類由固定的 tier 決定，所以這裡不會讓著色器重新編譯，也不再釋放再重建反射與陰影（以前低畫質來回切換會一直重建而卡頓）
-function setEffects(level,tier){U.uWaterLOD.value=tier==='high'?0:tier==='mid'?1:2;const prev=materialQuality.tier;materialQuality.set(level,tier);materialQuality.tier=tier;U.uDetail.value=1;if(prev!==tier){materialQuality.apply(scene);if(window.__HOME_SCENE)materialQuality.apply(window.__HOME_SCENE);materialScanTimes=new WeakMap();}}
+function setEffects(level,tier){
+  const budget=materialQuality.set(level,tier),key=[tier,budget.environment,budget.cullStatic].join(':');
+  U.uWaterLOD.value=level<2?2:tier==='high'?0:tier==='mid'?1:2;
+  U.uDetail.value=budget.waterDetail?1:0;
+  materialQuality.tier=tier;
+  if(materialQuality.key!==key){
+    materialQuality.key=key;materialScanTimes=new WeakMap();
+    prepareScene(scene);if(window.__HOME_SCENE)prepareScene(window.__HOME_SCENE);
+  }
+}
 function prepareScene(root){const now=performance.now();if(now<(materialScanTimes.get(root)||0))return;materialScanTimes.set(root,now+1000);materialQuality.apply(root);}
 function qualityTextures(root){materialQuality.apply(root);const max=Math.min(renderer.capabilities.getMaxAnisotropy(),window.__resourcePolicy?.anisotropy||16);root.traverse(m=>{if(!m.isMesh)return;for(const mat of(Array.isArray(m.material)?m.material:[m.material]))if(mat)for(const key of['map','normalMap','roughnessMap','metalnessMap','bumpMap','emissiveMap'])tuneTextureSampling(T,mat[key],max,!!(mat.userData&&mat.userData.packedAtlas));});}
 let waterDetail='mid';function setWaterDetail(q){if(q===waterDetail)return;let [rings,segments]=waterDetailSettings(q);if(rings*segments>65535&&!renderer.capabilities.isWebGL2&&!renderer.extensions.get('OES_element_index_uint'))[rings,segments]=waterDetailSettings('high');const old=seaGrid.geometry;seaGrid.geometry=makeWaterGrid(T,150,rings,segments);old.dispose();waterDetail=q;}
@@ -2040,7 +2063,7 @@ function seaH(x,z,t){ return sampleWater(x,z,t,U.uWind.value,true).height; }
 function swell(x,z,t){return sampleWaterHeight(x,z,t,U.uWind.value,seaMode);}
 
 // 環境光探針依畫質放慢更新頻率（不關閉），把每秒的工作量壓低
-let envAcc=0;function envTick(dt){envAcc+=dt;const hz=window.__effectBudget?.probeHz||15;if(envAcc<1/hz)return;envAcc=0;envJobs.update(dt);}
+let envAcc=0;function envTick(dt){const hz=window.__effectBudget?.probeHz??15;if(!hz)return;envAcc+=dt;if(envAcc<1/hz)return;envAcc=0;envJobs.update(dt);}
 function updateEnvironment(dt,t){U.uTime.value=t;U.uLightK.value=Math.min(1,Math.max(0,info.light));envTick(window.__frameSeconds||dt);const w=U.uWind.value,k=(.002+.01*w.z)*dt;U.uCloudOff.value.x+=w.x*k;U.uCloudOff.value.y+=w.y*k;}
 function update(dt, t){
   {const target=new T.Vector3();camera.getWorldPosition(target);target.y=0;sunLight.target.position.copy(target);sunLight.position.copy(target).addScaledVector(U.uSunDir.value,60);sunLight.target.updateMatrixWorld();}
@@ -2059,7 +2082,11 @@ const reflCam=new T.PerspectiveCamera(), reflTM=new T.Matrix4();
 WU.uRefl={value:reflRT.texture}; WU.uReflMat={value:reflTM}; WU.uReflOn={value:0};
 const _rp=new T.Vector3(), _cp=new T.Vector3(), _rm=new T.Matrix4(), _la=new T.Vector3(), _tg=new T.Vector3(), _n=new T.Vector3(0,1,0), _vw=new T.Vector3();
 const _pl=new T.Plane(), _cpl=new T.Vector4(), _q=new T.Vector4(), _sz=new T.Vector2(); let reflScale=.35, reflEnabled=true, reflHide=[];
-function setRefl(on,scale){ reflEnabled=on; if(scale) reflScale=scale; WU.uReflOn.value=0; }
+function setRefl(on,scale){
+  if(reflEnabled===on&&reflScale===scale)return;
+  reflEnabled=on;reflScale=scale;WU.uReflOn.value=0;lastRefl=-Infinity;
+  if(!on&&(reflRT.width>4||reflRT.height>4))reflRT.setSize(4,4);
+}
 let lastRefl=-Infinity, reflCamKey='';
 // 倒影只畫水面以上的東西：整個在水面以下或平貼水面的物件（荷葉、碎葉、沉在水裡的東西、魚）在倒影裡看不到，卻佔掉大量繪製；每 1.5 秒重新整理一次名單
 let lowList=[], lowScan=-1e9; const _lowBS=new T.Sphere();
@@ -2110,18 +2137,8 @@ const frameGrab=(()=>{ let tex=null,w=0,h=0,stamp=-1,no=0; const size=new T.Vect
     release(){ if(tex){ tex.dispose(); tex=null; } w=h=0; stamp=-1; }, copies:0 }; })();
 const introEl=document.getElementById('intro'); const introOn=()=>!!(introEl&&!introEl.classList.contains('hidden'));   /* 開始畫面還蓋著的時候，後處理效果看不出來，不用算 */
 const taa=createTAA({renderer,grab:()=>frameGrab.get()});
-/* 暖身：任何新載入的模型／貼圖，載完立刻送上顯示卡。以前要等它第一次出現在畫面上才上傳（診斷裡「幾何上傳 +79、貼圖上傳 +36」那種 0.5 秒卡頓）。
-   做法：把物件暫時放進一個只有它的小場景，用 4×4 的畫布畫一次（只上傳幾何，幾乎不花填色時間），貼圖用 initTexture 先上傳；畫完放回原位 */
-const warmScene=new T.Scene(), warmRT=new T.WebGLRenderTarget(4,4), warmCam=new T.PerspectiveCamera(60,1,.01,1000), warmBasic=new T.MeshBasicMaterial();
-warmScene.overrideMaterial=warmBasic;
-window.__WARM=function(obj){ if(!obj||!renderer.initTexture) return; const parent=obj.parent, idx=parent?parent.children.indexOf(obj):-1, vis=obj.visible, cul=[];
-  try{ obj.traverse(o=>{ if(o.isMesh||o.isSkinnedMesh||o.isInstancedMesh){ cul.push([o,o.frustumCulled]); o.frustumCulled=false; const ms=Array.isArray(o.material)?o.material:[o.material]; for(const m of ms){ if(!m) continue; for(const k in m){ const t=m[k]; if(t&&t.isTexture&&t.image) try{ renderer.initTexture(t); }catch(_){} } } } });
-    obj.visible=true; warmScene.add(obj); warmCam.position.set(0,0,5); warmCam.lookAt(0,0,0);
-    const prev=renderer.getRenderTarget(), ac=renderer.autoClear; renderer.setRenderTarget(warmRT); renderer.autoClear=true; renderer.render(warmScene,warmCam); renderer.setRenderTarget(prev); renderer.autoClear=ac; }
-  catch(e){ console.warn('warm',e); }
-  finally{ warmScene.remove(obj); if(parent){ parent.add(obj); if(idx>=0&&idx<parent.children.length-1){ parent.children.splice(parent.children.indexOf(obj),1); parent.children.splice(idx,0,obj); } } obj.visible=vis; for(const [o,c] of cul) o.frustumCulled=c; } };
-function taaOn(){ return materialQuality.tier==='high'&&!window.__noTAA&&!(window.__SAVE&&window.__SAVE.taa===false)&&!introOn(); }   /* 時間抗鋸齒：高畫質才開，設定裡可關 */
-function raysOn(){ return materialQuality.tier==='high'&&!window.__noRays&&!(window.__SAVE&&window.__SAVE.rays===false)&&!introOn(); }   /* 設定裡可以關掉 */
+function taaOn(){ return materialQuality.tier==='high'&&(window.__gfxStatus?.level??7)>=4&&!window.__noTAA&&!(window.__SAVE&&window.__SAVE.taa===false)&&!introOn(); }
+function raysOn(){ return materialQuality.tier==='high'&&(window.__gfxStatus?.level??7)>=4&&!window.__noRays&&!(window.__SAVE&&window.__SAVE.rays===false)&&!introOn(); }
 function raysParams(){ if(!raysOn()) return null; const sd=U.uSunDir.value, vis=U.uSunVis?U.uSunVis.value:1;
   if(sd.y>-.04&&vis>.05){ const low=1-Math.min(1,Math.max(0,(sd.y-.08)/.5)); _grDir.copy(sd).normalize(); _grCol.setRGB(1,.86,.64); if(U.uLightCol) _grCol.lerp(new T.Color(U.uLightCol.value.x,U.uLightCol.value.y,U.uLightCol.value.z).multiplyScalar(.6),.35); const st=Math.min(.7,vis*(.08+.62*low*low)); if(st<.1) return null;   /* 弱到看不出來（太陽仰角高於約 30 度、或陰天）就不算 */ return {dir:_grDir,color:_grCol,strength:st,thresh:.6}; }
   const mk=U.uMoonK?U.uMoonK.value:0; if(mk>.05&&U.uMoonDir){ _grDir.copy(U.uMoonDir.value).normalize(); _grCol.setRGB(.62,.72,.95); if(mk*.45<.1) return null; return {dir:_grDir,color:_grCol,strength:mk*.45,thresh:.16}; }
@@ -2150,7 +2167,7 @@ function renderViewModel(){ if(window.__noVM) return; if(!W_head) W_head=camera.
   catch(e){ window.__noVM=true; console.warn('viewmodel off',e); }
   finally{ camera.layers.set(0); scene.background=bg; renderer.autoClear=ac; renderer.toneMapping=tone; renderer.outputEncoding=enc; } }
 function render(){prepareScene(scene);const oldEnv=scene.environment;if(window.__effectBudget?.environment===false)scene.environment=null;const auto=renderer.shadowMap.autoUpdate,request=renderer.shadowMap.needsUpdate;
- try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz||20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=now-lastShadow>=1/hz&&(shadowSigChanged()||now-lastShadow>=.5);if(renderer.shadowMap.needsUpdate)lastShadow=now;
+ try{const now=U.uTime.value,hz=window.__effectBudget?.shadowHz??20;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=renderer.shadowMap.enabled&&hz>0&&(!sunLight.shadow.map||now-lastShadow>=1/hz&&(shadowSigChanged()||now-lastShadow>=.5));if(renderer.shadowMap.needsUpdate)lastShadow=now;
   const shadowNow=renderer.shadowMap.needsUpdate;
   pass('sub',()=>submerged.render());
   if(reflEnabled){try{pass('refl',renderRefl);}catch(e){reflEnabled=false;WU.uReflOn.value=0;console.warn('refl off',e);}}
@@ -2160,7 +2177,7 @@ function render(){prepareScene(scene);const oldEnv=scene.environment;if(window._
   { const on=taaOn(); try{ taa.resolve(camera,on); }catch(e){ window.__noTAA=true; console.warn('taa off',e); } }
   { const rp=raysParams(); if(rp){ try{ godRays.render(rp); }catch(e){ window.__noRays=true; console.warn('rays off',e); } } }
   renderViewModel();
-  passStats.main.shadow=shadowNow;passStats.main.shadowSize=sunLight.shadow.mapSize.x;passStats.refl.w=reflRT.width;passStats.refl.h=reflRT.height;passStats.sub.w=submerged.target.width;passStats.sub.h=submerged.target.height;passStats.sub.on=WU.uSubmergedOn.value>0;passStats.refl.on=WU.uReflOn.value>0;
+  passStats.main.shadow=shadowNow;passStats.main.shadowSize=renderer.shadowMap.enabled?sunLight.shadow.mapSize.x:0;passStats.refl.w=reflRT.width;passStats.refl.h=reflRT.height;passStats.sub.w=submerged.target.width;passStats.sub.h=submerged.target.height;passStats.sub.on=WU.uSubmergedOn.value>0;passStats.refl.on=WU.uReflOn.value>0;
  }finally{scene.environment=oldEnv;renderer.shadowMap.autoUpdate=auto;renderer.shadowMap.needsUpdate=request;}
 }
 // 每個繪製階段的提交時間與繪製次數，給診斷報告判斷瓶頸在哪一個階段（倒影、水下、主畫面＋陰影）
@@ -2683,7 +2700,7 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/rod_real2.glb',g=>{ try{
     const mats=(Array.isArray(o.material)?o.material:[o.material]).map(m0=>{ const m=m0.clone(); if(m.map) m.map.anisotropy=8; if('envMapIntensity' in m) m.envMapIntensity=.45;
       m.onBeforeCompile=sh=>{ sh.uniforms.uRodPts=rodPtsU;
         sh.vertexShader='uniform vec3 uRodPts['+(NS+1)+'];\n'+sh.vertexShader
-          .replace('#include <beginnormal_vertex>','float rS=clamp(position.x,0.0,1.0), rF=rS*'+NS+'.0; int rI=int(min('+(NS-1)+'.0,floor(rF)));\n vec3 rA=uRodPts[rI], rB=uRodPts[rI+1], rT=normalize(rB-rA);\n vec3 rC=mix(rA,rB,rF-float(rI))+rT*(position.x-rS)*'+R_LEN.toFixed(3)+';\n vec3 rDn=normalize(vec3(0.0,-1.0,0.0)+rT*rT.y), rSd=normalize(cross(rT,rDn));\n vec3 objectNormal=normalize(rT*normal.x+rDn*normal.y+rSd*normal.z);')
+          .replace('#include <beginnormal_vertex>','float rS=clamp(position.x,0.0,1.0), rF=rS*'+NS+'.0; int rI=int(min('+(NS-1)+'.0,floor(rF)));\n vec3 rA=uRodPts[rI], rB=uRodPts[rI+1], rT=normalize(rB-rA);\n vec3 rC=mix(rA,rB,rF-float(rI))+rT*(position.x-rS)*'+R_LEN.toFixed(3)+';\n vec3 rDn=normalize(vec3(0.0,-1.0,0.0)+rT*rT.y), rSd=normalize(cross(rT,rDn));\n vec3 objectNormal=normalize(rT*normal.x+rDn*normal.y+rSd*normal.z);\n#ifdef USE_TANGENT\n vec3 objectTangent=normalize(rT*tangent.x+rDn*tangent.y+rSd*tangent.z);\n#endif')
           .replace('#include <begin_vertex>','vec3 transformed=rC+rDn*position.y+rSd*position.z;'); };
       m.customProgramCacheKey=()=>'realRodCurve'; m.needsUpdate=true; return m; });
     const mesh=new T.Mesh(geo,Array.isArray(o.material)?mats:mats[0]); mesh.frustumCulled=false; mesh.castShadow=false; mesh.receiveShadow=false; cont.add(mesh); }
@@ -3268,7 +3285,7 @@ function buildMermaid(sp){
 }
 const fishCache={};
 /* ---------- 真實掃描魚模型（Barramundi Fish, Microsoft 2017, CC0） ---------- */
-const SCAN={ready:false};
+const SCAN={ready:false,loading:false,retryAt:0};
 const SCANMAP={
  barra:{tk:0},
  lmbass:{back:'#5d7a3a',belly:'#e6e2c6',tk:.75},
@@ -3281,19 +3298,40 @@ const SCANMAP={
  ghost:{back:'#6fb0e0',belly:'#e8f8ff',tk:.9,ghost:true},
  amber:{back:'#6a6a4a',belly:'#f0eee6',tk:.55,sy:.85},
  grouper:{back:'#5a4a30',belly:'#d8c8a8',tk:.8,sy:1.1,barN:5,barK:.35}};
-(function initScan(){
-  if(typeof SCAN_DATA==='undefined') return;
+function loadScanData(){
+  if(typeof SCAN_DATA==='undefined')throw new Error('掃描魚資料未載入');
   const dec=(s,Ty)=>{ const b=atob(s), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return new Ty(u.buffer); };
   const geo=new T.BufferGeometry();
   geo.setAttribute('position',new T.BufferAttribute(dec(SCAN_DATA.pos,Float32Array),3));
   geo.setAttribute('normal',new T.BufferAttribute(dec(SCAN_DATA.nrm,Float32Array),3));
   const uv=new T.BufferAttribute(dec(SCAN_DATA.uv,Float32Array),2); geo.setAttribute('uv',uv); geo.setAttribute('uv2',uv);
   geo.setIndex(new T.BufferAttribute(dec(SCAN_DATA.idx,SCAN_DATA.i32?Uint32Array:Uint16Array),1));
-  const tl=new T.TextureLoader(); let left=3;
-  const done=()=>{ if(--left===0){ SCAN.ready=true; for(const id in fishCache) if(SCANMAP[id]) delete fishCache[id]; } };
-  const ld=(u,srgb)=>{ const t=tl.load(u,done,undefined,()=>{}); t.flipY=false; if(srgb) t.encoding=T.sRGBEncoding; t.anisotropy=4; return t; };
-  SCAN.geo=geo; SCAN.tex={col:ld(SCAN_DATA.col,true),mr:ld(SCAN_DATA.mr,false),nm:ld(SCAN_DATA.nm,false)};
-})();
+  const tl=new T.TextureLoader(),textures={};let left=3,broken=false;
+  const done=()=>{if(--left===0&&!broken){
+    Object.assign(SCAN,{geo,tex:textures,ready:true,loading:false});
+    for(const id in fishCache)if(SCANMAP[id]&&!fishCache[id].real)delete fishCache[id];
+  }};
+  const failed=()=>{if(broken)return;broken=true;geo.dispose();Object.values(textures).forEach(t=>t.dispose());scanFailed();};
+  for(const [key,srgb] of [['col',true],['mr',false],['nm',false]]){
+    const t=tl.load(SCAN_DATA[key],done,undefined,failed);
+    t.flipY=false;if(srgb)t.encoding=T.sRGBEncoding;t.anisotropy=4;textures[key]=t;
+  }
+}
+function scanFailed(){SCAN.loading=false;SCAN.retryAt=Date.now()+15000;}
+function initScan(){
+  if(SCAN.ready||SCAN.loading||Date.now()<SCAN.retryAt)return;
+  SCAN.loading=true;
+  const useData=()=>{try{loadScanData();}catch(e){scanFailed();}};
+  if(typeof SCAN_DATA!=='undefined'){useData();return;}
+  const script=document.createElement('script');
+  const stop=()=>{clearTimeout(timeout);script.onload=script.onerror=null;script.remove();};
+  const timeout=setTimeout(()=>{stop();scanFailed();},12000);
+  script.src='app_scan.js?v=85abccb8eec8';
+  script.dataset.optionalAsset='';
+  script.onload=()=>{stop();useData();};
+  script.onerror=()=>{stop();scanFailed();};
+  document.head.appendChild(script);
+}
 function buildScan(sp,cfg){
   const uni={uSwim:{value:0},uAmp:{value:0}}, g=new T.Group(), tx=SCAN.tex;
   const m=new T.MeshPhysicalMaterial({map:tx.col,roughnessMap:tx.mr,metalnessMap:tx.mr,aoMap:tx.mr,normalMap:tx.nm,roughness:1,metalness:cfg.metal||1,clearcoat:.55,clearcoatRoughness:.25,envMapIntensity:1.25});
@@ -3308,6 +3346,11 @@ function buildScan(sp,cfg){
   return {group:g,uni,sp,scan:true};
 }
 function getFish(sp){
+  const models=window.__MDL;
+  if(SCANMAP[sp.id]&&!models?.fishReady(sp.id)){
+    if(!models||models.fishUnavailable(sp.id))initScan();
+    models?.want(sp.id);
+  }
   const fc=fishCache[sp.id];
   if(fc&&(fc.real||!(window.__MDL&&window.__MDL.fishReady(sp.id)))) return fc;
   if(window.__MDL){ const r=window.__MDL.fish(sp); if(r) return (fishCache[sp.id]=r); }
@@ -4505,7 +4548,7 @@ function update(dt,t){
 return {update,ring};
 }
 /* ===== 真實場景：360° 實拍環境、HDR 光照、掃描 3D 模型（素材：Poly Haven，CC0） ===== */
-function createReal(W,P,cb){
+function createReal(W,P,initialSet){
 'use strict';
 const T=THREE, U=W.U;
 const clamp=(x,a,b)=>x<a?a:x>b?b:x, sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
@@ -4514,13 +4557,9 @@ const SETS={
  lake:{pre:'env_',mask:'env_mask.png',meta:{dawn:{u:.3633,el:6.33,exp:.252,lc:[1.0,.72,.52],li:1.2,light:.7},day:{u:.3496,el:5.62,exp:1.0,lc:[1.0,.86,.7],li:2.4,light:1},night:{u:.6865,el:44.3,exp:.14,lc:[.55,.62,.85],li:.5,light:.3}}},
  ice:{pre:'ice_',mask:'ice_mask.png',meta:{dawn:{u:.6191,el:17.05,exp:.9,lc:[.9,.93,.97],li:1.4,light:.85},day:{u:.5996,el:28.3,exp:1.0,lc:[1.0,.96,.9],li:2.5,light:1},night:{u:.6191,el:17.05,exp:.9,lc:[.55,.62,.85],li:.5,light:.3}}},
  sea:{pre:'sea_',mask:'sea_mask.png',meta:{dawn:{u:.3623,el:4.92,exp:.305,lc:[1.0,.72,.5],li:1.3,light:.7},day:{u:.3447,el:48.16,exp:.568,lc:[1.0,.95,.88],li:2.6,light:1},night:{u:.3486,el:17.23,exp:1.343,lc:[.6,.68,.9],li:.45,light:.35}}}};
-let SET='lake', META=SETS.lake.meta, started=false, shownSet='lake', photoOn=1;
+let SET='', META=SETS.lake.meta, started=false, shownSet='', photoOn=1;
 const YAW=.25; U.uYaw.value=YAW;
-let total=0, errors=0;
 const mgr=new T.LoadingManager();
-mgr.onProgress=(u,l,t)=>{ window.__LASTURL=(u||'').split('/').pop(); window.__LOADN=l+'/'+t; total=t; if(cb) cb(l/t,false,errors); };
-mgr.onError=(u)=>{ if(window.__CDN&&u&&u.indexOf(window.__CDN.base)===0) return;   /* CDN 失敗的檔案會自動改從本站重抓，不算失敗（原本只要有一個就整個退回簡化畫面） */
-  errors++; if(cb) cb(0,false,errors); };
 const tl=new T.TextureLoader(mgr);
 const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter=T.LinearFilter; t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; return t; };
 const tex={}, env={}, masks={};
@@ -4531,14 +4570,34 @@ function hazeStrip(img){ const N=256, H=img.height, y0=Math.round(H*(1-.300)), y
   for(let x=0;x<N;x++) for(let y=0;y<cv.height;y++) for(let c=0;c<3;c++) col[x*3+c]+=d[(y*N+x)*4+c]/cv.height;
   const out=new Uint8Array(N*4), R=12; for(let x=0;x<N;x++){ for(let c=0;c<3;c++){ let s=0; for(let k=-R;k<=R;k++) s+=col[((x+k+N)%N)*3+c]; out[x*4+c]=Math.round(s/(2*R+1)); } out[x*4+3]=255; }
   const t=new T.DataTexture(out,N,1,T.RGBAFormat); t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; t.minFilter=t.magFilter=T.LinearFilter; t.needsUpdate=true; return t; }
-function loadKey(k){ const id=SET+'_'+k; if(tex[id]) return; const o={ready:false,n:0}; tex[id]=o; const fin=()=>{ if(++o.n===2) o.ready=true; }, p=SETS[SET].pre;
-  o.band=prep(tl.load(`${p}${k}_band.jpg`,t=>{ try{ o.hz=hazeStrip(t.image); }catch(e){ console.warn('haze strip',e); } fin(); })); o.full=prep(tl.load(`${p}${k}_full.jpg`,fin)); }
-function loadEnv(k){ const id=SET+'_'+k; if(env[id]!==undefined) return; env[id]=null; if(!T.RGBELoader) return;
-  new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(`${SETS[SET].pre}${k}.hdr`,t=>{ env[id]=t;W.invalidateEnvironment(); }); }
-function useSet(name){ SET=name; META=SETS[name].meta; if(!masks[name]) masks[name]=prep(tl.load(SETS[name].mask)); U.uMask.value=masks[name];
-  for(const id in tex){ if(!id.startsWith(name+'_')){ tex[id].band.dispose(); tex[id].full.dispose(); if(tex[id].hz) tex[id].hz.dispose(); delete tex[id]; } }
-  ['day','dawn','night'].forEach(k=>{ loadKey(k); loadEnv(k); });W.invalidateEnvironment(); }
-useSet('lake');
+function disposePhoto(photo){photo.band?.dispose();photo.full?.dispose();photo.hz?.dispose();}
+function loadKey(k){
+  const id=SET+'_'+k,previous=tex[id];
+  if(previous&&(!previous.retryAt||Date.now()<previous.retryAt))return;
+  if(previous)disposePhoto(previous);
+  const photo=tex[id]={ready:false,n:0},prefix=SETS[SET].pre;
+  const failed=()=>{if(tex[id]===photo)photo.retryAt=Date.now()+5000;};
+  const done=()=>{if(++photo.n===2)photo.ready=true;};
+  photo.band=prep(tl.load(prefix+k+'_band.jpg',t=>{
+    if(tex[id]!==photo)return;
+    try{photo.hz=hazeStrip(t.image);}catch(error){console.warn('haze strip',error);}
+    done();
+  },undefined,failed));
+  photo.full=prep(tl.load(prefix+k+'_full.jpg',done,undefined,failed));
+}
+const envRetry={};
+function loadEnv(k){
+  const id=SET+'_'+k;
+  if(env[id]!==undefined||!T.RGBELoader||Date.now()<(envRetry[id]||0))return;
+  env[id]=null;
+  new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(SETS[SET].pre+k+'.hdr',t=>{
+    env[id]=t;W.invalidateEnvironment();
+  },undefined,()=>{delete env[id];envRetry[id]=Date.now()+5000;});
+}
+function useSet(name){ if(name===SET)return;SET=name; META=SETS[name].meta; if(!masks[name]) masks[name]=prep(tl.load(SETS[name].mask)); U.uMask.value=masks[name];
+  for(const id in tex){if(!id.startsWith(name+'_')){disposePhoto(tex[id]);delete tex[id];}}
+  W.invalidateEnvironment(); }
+useSet(initialSet||'lake');
 
 function sched(h){
   const H=((h%24)+24)%24;
@@ -4556,12 +4615,15 @@ const sunDir=(m,o)=>{ const th=(m.u-YAW)*Math.PI*2, e=m.el*Math.PI/180; return o
 W.photoReady=h=>{ try{ const [a,b]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b]; return !!(A&&A.ready&&B&&B.ready); }catch(e){ return true; } };
 W.setPhotoHook((h,wx)=>{
   { const k=Math.min(1,Math.max(0,(wx.cloud-.35)/.4)+wx.rain*.6); U.uOvcK.value+=(k-U.uOvcK.value)*.08; }
-  const [a,b,m]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b];
+  const [a,b,m]=sched(h);
+  loadKey(a);loadKey(b);
+  if(window.__effectBudget?.environment!==false){loadEnv(a);loadEnv(b);}
+  const A=tex[SET+'_'+a], B=tex[SET+'_'+b];
   /* 新地點的實拍照片還沒下載好：以前直接沿用上一個地點的照片，所以剛到海上會看到湖邊的樹林（還被拉得糊糊的）。
      現在還沒好就先用程式算的天空頂著，照片一到再換上；換地點的黑幕也會等照片好了才拉開（見 d.js fadeOutWhenReady） */
   if(!A||!A.ready||!B||!B.ready){ if(shownSet&&shownSet!==SET&&started){ U.uPhoto.value=0; shownSet=''; } return null; }
   if(shownSet!==SET){ shownSet=SET; if(started) U.uPhoto.value=photoOn; }
-  if(!started){ started=true; W.setPhotoActive(); photoOn=U.uPhoto.value||1; if(cb) cb(1,true,errors); }
+  if(!started){ started=true; W.setPhotoActive(); photoOn=U.uPhoto.value||1; }
   U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m; U.uHzA.value=A.hz||A.band; U.uHzB.value=B.hz||B.band;
   U.uRadianceA.value=env[SET+'_'+a]||null;U.uRadianceB.value=env[SET+'_'+b]||null;U.uRadianceReady.value=U.uRadianceA.value&&U.uRadianceB.value?1:0;
   const MA=META[a], MB=META[b], L=(x,y)=>x+(y-x)*m;
@@ -4654,24 +4716,47 @@ const ITEMS=[
  {id:'hairpin',name:'褪色的髮簪',file:'item_hairpin.glb',w:.05,val:0,size:.22,rare:3,p:0,desc:'銀質髮簪，花瓣已經褪色。背面刻著一個「蘅」字。釣起來的時候，水面安靜得不像話。'}];
 const ITEM_SP={id:'item',name:'物品',rar:0,len:[30,30],k:1,price:0,sh:{H:.1,W:.1},f:{pow:.7,spd:.4,agi:.3,jump:0,stam:.6,win:1.5},time:{},desc:''};
 
+function hookTiming(fd,difficulty,practice){
+  const rarity=fd.sp.rar||0;
+  return {
+    duration:practice?4:1.9*(fd.sp.f.win||1)*difficulty.win*(fd.item?1.4:1)*(1-.06*Math.min(5,rarity)),
+    perfect:practice?.45:Math.max(.22,.38-.025*rarity)
+  };
+}
+function hookResult(seconds,timing){
+  if(seconds>=timing.duration)return 'miss';
+  return seconds<timing.duration*timing.perfect?'perfect':'good';
+}
+if(typeof module!=='undefined'&&module.exports)module.exports={hookTiming,hookResult};
+
 function createFun(W,P,AT,c){
 'use strict';
 const T=THREE, $=id=>document.getElementById(id), G=c.G;
 const clamp=(x,a,b)=>x<a?a:x>b?b:x, rand=(a,b)=>a+Math.random()*(b-a);
 
-/* ---------- 起鉤計時（仿參考影片的直立量表） ---------- */
-const hk={on:false,t:0,win:1.8,w:3.5,ph:0,good:.3,perf:.22};
+/* 起鉤標記每次都從藍區開始，接著滑入黃色區。 */
+const hk={on:false,t:0,timing:null};
 const hookEl=$('hook'), hgM=$('hgM'), htF=$('htF');
-function hookStart(fd){ const r=fd.sp.rar||0, D=c.D();
-  hk.on=true; hk.t=0; hk.win=1.9*(fd.sp.f.win||1)*D.win*(fd.item?1.4:1)*(1-.06*Math.min(5,r)); hk.w=(2.8+.7*r)*(.85+.25*D.jit); hk.ph=rand(0,6.28);
-  hk.good=.3; hk.perf=Math.max(.1,.24-.025*r);
-  $('hz2').style.bottom=(hk.good*100)+'%'; $('hz2').style.height=(hk.perf*100)+'%'; $('hz3').style.bottom=((hk.good+hk.perf)*100)+'%';
-  hookEl.classList.remove('hidden'); }
-const hpos=()=>.5+.5*Math.sin(hk.t*hk.w+hk.ph);
-function hookPress(){ if(!hk.on) return 'miss'; const p=hpos(); hookEnd(); const r=p<hk.good?'good':p<hk.good+hk.perf?'perfect':'miss';
+function drawHook(){
+  const remaining=clamp(1-hk.t/hk.timing.duration,0,1)*100+'%';
+  const result=hookResult(hk.t,hk.timing);
+  hgM.style.bottom=remaining;htF.style.height=remaining;
+  hookEl.dataset.result=result;
+}
+function hookStart(fd){
+  hk.on=true;hk.t=0;hk.timing=hookTiming(fd,c.D(),fd.practice);
+  const boundary=(1-hk.timing.perfect)*100+'%';
+  $('hz1').style.height=boundary;$('hz2').style.bottom=boundary;
+  drawHook();hookEl.classList.remove('hidden');
+}
+function hookPress(){ if(!hk.on)return 'miss';const r=hookResult(hk.t,hk.timing);hookEnd();
   pop(r==='perfect'?'完美起鉤！':r==='good'?'上鉤！':'錯過', r); return r; }
 function hookEnd(){ hk.on=false; hookEl.classList.add('hidden'); }
-const hookExpired=()=>hk.on&&hk.t>=hk.win;
+function advanceHook(elapsed){
+  if(!hk.on)return false;
+  hk.t+=elapsed;drawHook();
+  return hk.t>=hk.timing.duration;
+}
 /* ---------- 大字提示 ---------- */
 const popEl=$('pop'); let popT=0;
 function pop(txt,cls){ popEl.textContent=txt; popEl.className='show '+(cls||''); clearTimeout(popT); popT=setTimeout(()=>{ popEl.className=''; },1100); }
@@ -4859,14 +4944,13 @@ function merMeet(){ S.mer=S.mer||{n:0}; S.mer.n++; S.mer.last=Date.now(); const 
 $('stX').addEventListener('click',()=>$('story').classList.add('hidden'));
 setTimeout(goalsDot,500);
 let dotT=0;
-function update(dt){
+function update(dt,elapsed=dt){
   dotT-=dt; if(dotT<=0){ dotT=3; goalsDot(); }
-  if(hk.on){ hk.t+=dt; hgM.style.bottom=(hpos()*100)+'%'; htF.style.height=(clamp(1-hk.t/hk.win,0,1)*100)+'%'; }
-  updHot(dt); updTour(dt);
+  updHot(dt); updTour(elapsed);
 }
 // 落點和魚群的關係：砸在正中間會把魚群嚇散；落在魚群前方最好
 function hotHit(p){ if(!hot.on) return null; const d=Math.hypot(p.x-hot.x,p.z-hot.z); if(d<1.6){ hot.on=false; hot.t=0; hotEl.classList.add('hidden'); return 'center'; } return d<5?'in':null; }
-return {hotHit,items:ITEMS,spawnHot,goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,hookExpired,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
+return {hotHit,items:ITEMS,spawnHot,goalsDot,merMeet,ITEM_SP,hookStart,hookPress,hookEnd,advanceHook,pop,castTag,combo,medalLv,medalBadge,inHot,rollItem,itemFish,itemCard,itemEffect,tourCatch,vision,mermaidScene,update};
 }
 /* ===== 出海與美景：遊艇、海豚、鯨魚、鯊魚、飛魚、彩虹、鳥群、流星雨、黃金時刻 ===== */
 const SCENES={rainbow:'彩虹',flock:'歸鳥成群',meteor:'流星雨',golden:'黃金時刻',dolphin:'海豚群',whale:'鯨魚',shark:'鯊魚巡游',flyfish:'飛魚掠海'};
@@ -5492,9 +5576,12 @@ function createModels(W){
 'use strict';
 const T=THREE, loader=new T.GLTFLoader(), files={}, waiters={}, mixers=[];
 const ang=a=>({'+x':0,'-z':Math.PI/2,'-x':Math.PI,'+z':-Math.PI/2})[a];
-function load(f){ if(files[f]) return; const e=files[f]={g:null};
-  const ok=g=>{ e.g=g; (waiters[f]||[]).forEach(fn=>{ try{ fn(g); }catch(err){ console.warn('real',f,err); } }); waiters[f]=[]; };
-  loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{ e.err=1; }); }
+function load(f){
+  if(files[f]?.g||files[f]?.loading||Date.now()<(files[f]?.retryAt||0))return;
+  const e=files[f]={g:null,loading:true};
+  const ok=g=>{e.g=g;e.loading=false;(waiters[f]||[]).forEach(fn=>{try{fn(g);}catch(err){console.warn('real',f,err);}});delete waiters[f];};
+  loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{e.loading=false;e.retryAt=Date.now()+5000;});
+}
 const ready=f=>files[f]&&files[f].g;
 function onReady(f,fn){ if(ready(f)) fn(files[f].g); else (waiters[f]=waiters[f]||[]).push(fn); }
 function preload(set){ (RSETS[set]||[]).forEach(load); }
@@ -5555,6 +5642,7 @@ function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.dele
 function cloneSafe(grp){ grp.clone=function(){ const g=new T.Group(), inv=new T.Matrix4(); this.updateMatrixWorld(true); inv.copy(this.matrixWorld).invert(); this.traverse(ch=>{ if(!ch.isMesh) return; const mats=(Array.isArray(ch.material)?ch.material:[ch.material]).map(m=>{ const k=m.clone(); k.skinning=false; k.onBeforeCompile=()=>{}; k.needsUpdate=true; return k; });
     const m=new T.Mesh(ch.geometry,Array.isArray(ch.material)?mats:mats[0]); m.frustumCulled=false; if(!ch.isSkinnedMesh){ m.matrixAutoUpdate=true; new T.Matrix4().multiplyMatrices(inv,ch.matrixWorld).decompose(m.position,m.quaternion,m.scale); } g.add(m); }); g.position.copy(this.position); g.quaternion.copy(this.quaternion); g.scale.copy(this.scale); g.visible=this.visible; return g; }; }
 const fishReady=id=>!!(RFISH[id]&&ready(RFISH[id][0]));
+const fishUnavailable=id=>!RFISH[id]||!!files[RFISH[id][0]]?.retryAt;
 function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0]); if(!g) return null; const opt=c[2]||{};
   const sc=g.scene; sc.updateMatrixWorld(true); let ms=[]; sc.traverse(o=>{ if(o.isMesh) ms.push(o); });
   if(!ms.length) return null;
@@ -5666,7 +5754,7 @@ const want=id=>{ if(RFISH[id]) load(RFISH[id][0]); };   // 圖鑑詳細頁要看
 function glowTick(){ const lt=W.info?W.info.light:1, k=Math.max(0,.6-lt); GLOW.forEach(n=>n.emissiveIntensity=.12+k*1.0); }
 // 水族箱在小屋裡沒有跑戶外的 update，自己逐隻驅動甲殼類的骨架
 const poseRig=(g,dt)=>{ let r=null; g.traverse(o=>{ if(!r&&o.userData&&o.userData.rig) r=o.userData.rig; }); if(r) poseFish(r,dt); };
-return {glowTick,preload,want,fish,fishReady,attach,attachYacht,update,credits,poseRig};
+return {glowTick,preload,want,fish,fishReady,fishUnavailable,attach,attachYacht,update,credits,poseRig};
 }
 /* 耶魯亮星星表 BSC5（Hoffleit & Warren, NASA ADC / CDS V/50），星等≤6.0 */
 const STAR_B64='8gDj96U+AwENE7s2HQEbU8coHwE1usAfJQFMW73/YgH+38YIbgFR0MBDfQFfKWX6eQF088c+oQEfVGoUmwHmGbw+qQEz2LkZrAHxvpM9yAHZD7v81QGFQa8Y1QGK+MQ6yAERi7Y/5wEc7sQ8AAIB6qwdDgJ32LlQFQIJzrUaKQJ+5rVYWgKYFXjzZgJcOsESbwL+2sZdmAK8HKpekgLw9LJhXgIgh8JnmgIT5aFjqQKLDMISpgJk8sH83gJI079RAwOCV8E0DAMwRMX7CQMDN6UDQgNQNKMDUAPSLMQAdAN084tJkQO9o5sioAP/K8X6sAPOLsJfqQOlC7hQwQP/NbMZqwP8nLv90wPJ1rM83gN647Jt0QPjkcdUUAT7Sb35aATvV7kAdgRxS8H9hATCAsIzkwQiknglrATWw21BqATiwZQK1wSr28c9/ARyGbBjBAUjP7MB9wQP0apiDgU8x7ldZAVMVcYAWgVPKrQOVwVg+sFdZgUs3rMHaQVuu8AVlgXCL8REpgWKTaj6ogUlS75FlQWYuqkBmwV3pp/8nAV0pqMJ3QWAWZoIywXcHLhAwgXkCb8A5QUSTsY+0QVcprEC/QX31bxMIAaFtb0cRAbk+rQhUQZI/8YabAYJTbH6ewbLVcIRWAa8u7saiQZFP7JgkgamTI30jgb0L5/4igapFcX3owZYMrs0owbH3L0r2gavKZ809gYwRrli/QbjK4NM/wY4HsQzGQd9HrhFMwdnUGlGPAfQ+cVCTwceOLc1MAdyq8UhegcSXsM+egfWR6r6WAd2vqQ6bQelr8AMugfgQq0KlwdMqsdPjAflorgevwds5mU95gcSRL/5tQdHrp8AHQilar8D8werRKP82wfq8Kk82wdcycVFDQiITrkC9Ae14LUT/QdPw8YQfQhyarn8IghgvMMmNgj537s6RggCFrhjjwhbZ8Q8XAgHEbs6agiDIpdDbAiWCcc4ewhR5sBOugg5UogiiQgc4b39lQhhCsZCmQiCB8E0rgh8SKz6pwjJCqBatQgXGLAe2whrOqP3yQi37L1OwAit3cU5BAlfW7gd6Qjd8LMeowhzlbBSwQkLd74FAgl9t7QVbwntVqofXQnd3bpKbAlg/qlexwneU6pItAlKG8EAiAmWpsBdxQmaIbo85wmO9cRbFApZVm/3EgoqVKU5GArYVbz89Qn777ZbFgrANpIHxwkfnbpBKwpNIaA4ZwpdXsf/SAo7KblAWgpIMMc8cArR7746awpA1p33OAysepxI5gqoyL1GLgvMOscJKgs7Lbv9TwvcVsYdGQsh07sEMAs4C505NQsg+blCbwuUV8QgYguqSsdYKgsEvrg2iAsLCMhakgtBFcAYrQuJHrf/rQuHHr38vwsC8r0AIwwbTrMpvwuPvYQ1Fwx+Pq8GLwzcUsIAFAx+HbwHDAwW8sMZJwwICLwUDQwAxbQJ9wslqLg02QxPcb8AMQyF8YhFWwwvQ5z8jwzQYbb/ZQyoMmVeKAxvsZT8aQz1G7wpfwzYO78kgAw0JMNYsgxOW7z8owxuTp4Kvgx3XL37iwx6A8ZapwymNcP6pAyxLLMNswzqHaY9vQzKKqJBwAzN/MZU7wwqysYQHA32IqY+Gw3FCrUTLQ3xFsf8OQ289LIbTQ2e/sAZXQ1Av64ing1y/Lk2eA0Mnqsc1A0jBbMEPA7QUq4oIA7GJqkBLw5H/8Qmaw7eKLRTow7AQKxA4A6jNb0P1A4cHcdmRg/kYKg/2A7+08Rg7w5d9Iw/QQ+qVXUH/g4r9sUYDQ/+xLk+WA/OPccdOA8966xJVQ9EG7gXaQ9cG7tClQ+TQKoZIA91pMZdcQ9v7b8VdQ+40cJ//RrzfmQkNxDtY8MctQ9lwodeBBDaQrU87Q8+4bIBCBC8CKtSERC72sZQQxDTFYw6nBDzUsBbOBA2upQ7ThDv1MNAshA9VKc8hRCTy7s9whD1NMX8qRAD9sIm2xBBGsVb0hC16b4EJRFKRcZIgxHgZ7Y5DRHLGMMkNRHiOpggEBEa6rlIcRF0Ur1SFxF41cATQhFEEb0VaxEoRYtMqREfP641gBENzMY/XxGarj33kxG/4b0UuBFUF8dD5RGTPb4M4RG1Oa37MRLEYL38TBJwZLP+GBKaPK0lEhK7Ksc8vREUsMQ2vREVsMI0CBLNB6FRJBIgMr/8XhIdVsL/FhLl78EaOBLTHLUybRIWSJf+KBIH0rU/JBKfy8EAQxLB+q5SGBKMqcBMOBKTs7wfgBJW6YkrvBIGDZw5JxPPWr4waBH/icQk1xLZ97dbyBJf3LYX3BK7t7tg3BLis7ACUBP5NcY6OxMdGMT/UhN9LsIhUxFyh8A4bBMeRMMRRhM9BcU6uRPbScUZlBOtH8QsexPO8KYT6BNtTrz2tRO0D8YS8BM8SML80BNO8Y9EtxOauMYIVhSMWob3IxTsOblPGhQRKocdLhRxG6okLhRwG6j+EBTt58MQnxSuYa76LxSIBKU4YRSXHXQHNBQnvqBfmhQENcVhphT6NL8/VBSQw7H9mBSHIcFH3BRWGbE37RSKJ8NgvRT336tVnRSbto4zRBXnW7UAExX6RcA89hSOIakQbhTMn6c51BSdvKo0rhXXZKMJQhXyHcQ98RX/ZpUAPhbobbgSXBVnBMUlShVj4rljVRUH4pZe2BVNXMgBaRXh87tbRRU6xL0/3hWSW70WvRV9TbD8HRVwqHkQUBY/bLQ5jRVW1bc0shXuA7QkshXuA54B3BVVL7sByhUqE8ZfohVpwLJZBhYzPGpSBxYzPKsB+xXiJL4g5hUuALkJ3BU86sQ6AhaF/8Y0/BUq+r5fIRZW1qf2gBY1IK8GmxZeIWRF4BYWU78k1xbXNaoHBxfCMX0IAhfkJK4TRBeFN77/OBe7G8Bj9RYdwsRHWRcwDL4hZRdo/cY6iBcYK60urhfnPqpYkxdeIsdSwBefSLY3mxcqHrUZpxe7FcBdpBeUDJ81mxeZ/LwipRcj4sQ8oBdP1Lb/KhhxL7YAIhirJMIaIBidI70d6hd1xcU6XRisMKskiBhYUsFGixjMUcc/aRgjMJYBWhje9rs53ReFn7xdjhhNHL4AwhhiQ7YAiRh/Ar0kRBi+tov5sxi8KK8CFRion8BOxRjE+35VDxlTR735ThlsT7MWZBnfOsMQ3xhwsMNdOxmQALZjRxm+/rkSPxmt8LoVQhni5sRJrBkeR7M6Vxkh3rQk4xmBR6dbZxlXt8YNvhkXD7r6MxlbnpgBgBrbX6MH8hmG7qz/9Bkv6sMJNxo6LbxDDxp/48VLwhk6qrcXZhlEl69BVxoxKrYkVhoIDJ39dBqRKsUiIRopvJz4UBrrz7IGwxrjI8YYzBpcAMgKChtoM7JY7ho5A7VMLRsgMcNADBuI/rc9CRtS6qgbGByPZ7M0OBu5zsU/BByAXcJdqxsQNcBTWRva16z9sRtUMbdjgBvT9MFUvxvLCcM6tRv0B6s05xsVN8Uc6xu6MLZduxvd9Lxf2BuzEcAd1hv+CsM+whtG1cE9CBws+7896BvTzsInOxw7H7kJ1B3Vc8JO9hp/j7Y6JBwP1cMc+xtHtbYQWhx3AJfzXRwe76sbkBx8JrYFehyP8sIf/BxeTsL5+RwfTMRD1xwpOawjaBwBw6gDqRwD/8AfTR11YMYG3Rx1HMD/kBxSx5g9uBxP68cZMB0CRpkdKx3/Prk2Dh1nJ6b5jxxssrQYBx2aBIgFXxzqnpj9QB3GFcIA5hzBt7khLR1L7Jz4Ux2zEbMOUh1iDpwSWR2X5aEc2R2YKaJC9h0AGsNIkh74YcMmAB7SI8T8ah1npcE3WB5+T5BkGB7WGLT9bR3Xn6sDOB7EJoz6Ux5+NpsUDx7q0aE7hR6eQsU1fR7cMaNdNB5E2LgBfB5zFbv7Qx4HzcY2aB4h4qg2Vx5EzbpLDB6uprUG+h4JS5Qs4R6FNrcYRx9+V70b3B4u4MY+2x5WycYaQR8SGsVY6R4NuZZ+XR+hGb4ZVB/rC8ccTh4+lahPhB9qLbEAXR9Z85NCZh+5+rMEqB9kHcMYxx9oOKcDFiHycLte1R8JMq1JiR8R3roN+B8oQ7o18B9bOsVW2x9ZHqUC2x9ZHqUCqR9u3sRPJyB0Srb9xB8L/LQA8h+rDKf5sB+uxoMIsR+vxp4E8R9//L387R8P3MAYISB1D8ZfViCiJcUIFCLdc8YJNCAb9cE/yR/ipK4HayAwBr76ZyDQBXFiVyDW8cNCSSAN2MUv2iAYTHsqeiAS9bc4/CClUKk9bCBn3pgJ6yA8N4ZjTCEaW8X/wiAx9bUMhSAyvcNOIiHBEr5AHyLNaasBpCALq7EUKiFY97VgcyE/Omf9nCGPRpcjZiC+mbz4sCHLP5E6tSFaKcEHASJVOKVC5CHiEMf9ESIOHJ49LCLDJsL5YSKERMU6NiJ5Cb1AnSONbroLRSJN/rAiJSLH1pIfziJDUcIrvyXCeL43NSLUwMYa4SJxSK9FuiJ1K7wApiLtHawAOyJ7rsF/ViGqj70SKSOcPrr90CJ186oNjSNeXav3KCPeN8cETyNsR7L9ZiM+R6/9VCOrMKpZRCOu/rg+NSMM18UTQyP936w2iiN/JsUzcSPLBKooUiOb5cAWGSMXvMRKnSNPKaFd4yPJRcYZzyOfPa0CeCMP4Y5heiOy3b5jxSMTHrb8KCMCp7wmwCM6BcA6iiPAwpwqYiTaW7R8PCMbp7UkICT9Rbb88iNDJ7xCCyR/HbFKzSNj3rw0UiTpRl4cWiSxL77/UiQpI7tH1iLxkbwaaSTXDIw1/CTGRa77KiU+VZsYISXkRr3+1CTXDY/7USW8U6MhCSUUML4BOCVpRqb7sCQn2cY4VSXcTrED+iTz78FCcSVpRMP+byVCRJ9R5SRCzcBNRSVT9sc9ZyUfELL/QiX67b0KtiVMRLr6jSRlnccZkiU2J8ckfCVlEphDdyXNCMY5xCWAQbYYcSXJ+Kj7+yUvTscGziVuMsX9USVew8IN+CW+OMMGyyVUDcL8cSWgvMcGOCV+pqgY2iWN8o80HybKIsYHfCaJRJv9ASY84Zz6yiVbuMBCfCVxocP9ZCYV8L02iibVAMA3cyYp57T5jSaSAJ0ififnWbFhmCa5xqQ+ciwye8QW1yZ99cQ6VCWSkMA37yYA+Mc3lydJVcJmTydyNb38FSdYBL04OSeX+Lz3oSf2Q335iCdNMK4ALiiSX8MVhScEHMAALygWWqow4CfrLZED6ifaM70DgieU0q/3CCiNPJAZsCce8oo3wCjKZLoFvicX8b4N9ieLIrr+LCj3QL/8+idLIo76nSfvyqRIByhTI7/8CSjLIp366SdZ/rX68yhyZaUBJSinIpL8/SeU/7xVKSjrIsL+HiiaCLf5zSgwXaFwPCgPIpr90SgFWsQKNCisCcU7MyjL7qBhcChIInn7CyimvME5QihH1sUHmChPIbr8Uyjw3psZlCjZD7D52yfWo5JD5ijzP78tzigPL7EEvSg1Ioz7vihTIrH8eCgM3rUEpShSAMVJhSgZ1bw6oyhG4sNi8ShgJLUMoyh/yrkAoyiAyqj/OSndMMIAjClzUsMKyiiFzJo5iSkwRcI/PilLCb8DcymkGMcUXSlh+Lv6nylYLXkHNSqzWa/7KCroVq9X8ykURLj8ZShsloNhECoZSLYYpinN+6k4jCkA3ab5iSmbzrH5CirkMbv/hSlQvcZK0ynL7sgTGyr3H74SqymbxsAkSCrmOHr2eyrmMpcAcyzEcrEhUCrK7Htfdyo5+MM8kyof7r5YzyrfGcUTySrDEYj5pyrZ3ab5vSusYcRcdSshVLAe+io3Dr8B8CrM/bb3ySqj1MYCcSquqKRhISuf/7geOiuECJMBcStIIrozVCu6B7f8XSuoC7oWgCtnH59AaCsFBLge1iubR50BnStMH8Ul0yqap6JjcSvP7b5A5Sojqa5V1ytAJ7T56Ss+KbQUNCzbQ5f/qiut2L0SMiwZNrsbFiypGMVaSyzjG7tARSwOE8YDnizEL8FWlyypJbkUUSyz6Lj3ri8wd735giwo9ro4rizaB8EVlSx188A/xixH9pcTuiwN48IKlyxIxK0TUC3YRJk5/y+Gdro0qy32V8D4UC2TOac8Ey35CrYVJC0sDaswti1JUsBBoy0+TLMDQy08DrT6eS/ycrlGOS1q8atGbS2lDJ396C2HR6UCYS0e9aAxJy3aw5JCVy6kXLUwvC1EHa0PFS4tR7oN7y2wHr8Qvi3M9sZAQS5rSLwAii5gVrhZOi0np4U2Qy51O8Y4gy3HtpwSHi4RHrf8TC2Op7pCJy73Hrj4jS5cUMUkSy4oMa046S2K4shkLy45Fo072C3vz4v5SC7lJq1Ffy4hQqv/Ni71E70QmC2qq6FAVC53FbUNVy64CMI3WS409cT5Fy4LwbdAei7d/8RPVi6m4rj/li4FFMETri5zJLj9pS6cHcVjzi0LpsT8vi7yGJA62S7XHccB1C7cF78SBC+KMMH9Cy9LMMIY8y7OGKoJ6C50DbIE4C6t+rMExS6a3MNaGi8UG8cWLS+0H5sHLy+SH7YPMi9/GZ0DTi+2LLY6Vy9xIJ0P8C6gz5VZWS82FqIPji7bpbU5ZS/sFKc6hC+0ILz6nzAmZ8YSjS/yD8UDpS+/HsEQuC9EF65Dti/2FMUTwC9HG4o8vi+zFpI5wi+SFocKyi+OEq8NvS/2Abz6IC/pqMZcXDCrTMIKwi9U5MdJBjA9Fr0T1y9y7b7z3S3sjcAyGTAHF6kKHTBRFrsPHDCEE7kPmi8Wp8E8VTDx/6xPHjBMzcc8IzFkW8b/dzBw+8P4JTASwLD1rjAcFaYP0jAwKcX9vDDrB8ADsTBr9sH5vjBM9LFmvjA/87VYnzCr1aI6MDGvOpxJZC77i8IVDTF6F0dcATFzDpwKHzE8+5T0/DCJ1JE6tTC4sYP6xTEMTLcTwjF9S7BASDFrAbb5dzFqHcb9czHNFsISczHKEZwHWTF8/LQQojCopsI+oDF4FrAJpTGjFqcJnjExC7gPdDGp65JBBjKxRL//lDHD7q8EyTFYEbr5qDGV67o/GjJwNsciAzKyKML/MzG3p7leXzISR8QBSzKsPbYAzDEv3b032zEG5J5gLTKmIJ354DF3xKEUJDIty7AWkDLaD7kPgDLp88X6VjI/1MBUMzO4ULYPgzJ05bwB+TJUOcc3RTI1uLY62TKlELgLwTJg+5b3rTK84cFYZDV4c7BM7DNQWrpebjNYLsQOajO1LL1DjDINq7UMITPr57sliTNQNaxWwjNRRb87TjPv98IlSzPH6MIhUjIgm7z5RjRZXp0BhjPmCYEbqTOoDJ8AzDPLGrEMljPw6K86DTSQPMAGBTQyNKlUxDP4B472DDSsJ8cWczSWTrwCATREFKhu0DNczsQEETQ/+J8PpDQwS8EGJzSRA7ditzP4s74TTzR4A4/22TRxTKH/ZzQ/ELMHbDRvDqYFaDQQC7dJajSqAMf5lzRjFcP8zDQrL3VbdjQy6MA5rzQ4E5dFfzSn6ME0sTSm+Lv53TRlGLtO8TQPIsJCKTZWacckATWgI8MAMzXjNa0CYzUGOMYYEzVwAqFU8DX1VZY3KDW26L8ZrjVTPnwgTTVo8bgwUTUs7qkPxTVqOo9JljXN9ar1qDUGAcZM4TW0HqYJljV846z9bDbeU7H80jUE+sRItzWi2q9AejRulbpb0jWV38FIwTXR0sZGhDZhSa8TJTboFaf9fTakOoH2iDcqabn5BjZR3b4G1TUaurgZHTaKzaNITTYw4IFXRDbP2sFGqDaEGq8niDZi+bL9uDYJHbYFxjaCIrsDvTbeHsULNzZ+ua9ZuzYWDLcTpjY97sckujbF+HcHPDfJQsAZ0Dau88L9/Tb6DbkO4jaq+bIaTzZErqgfDjcuFqoT0DWUmrY89TaN85z1kjgzaMEkaTfRFrNZVzmucLAcWDd2/MUbuDe7NqsKbDd5AcUnWzcm78BXrTbWpbRjhDcf76H6mzdj98U5sjcRBKFHoTf06IT6rzeZ7Z/6Ejh8Lq8NTDhqQTQw8zdVB7tSOzjMMMcN6jdW9DX/IDW3isQ3MDghEL3+9DgaWb5p6DfWzMI8lDjbPLtjEjiv2bD6kDh1L6NMvDgHOacltTj/L7n1djhF9oz6eTjG7Ls37jhuOrwGwjhsH6035DhLMK8QcDhgzqo8xzd0oKpMvjixA7cYrjg45sciNTl0O7T3gDnWUbb/GjkNKsIDzzhD7Z3x4jh97rb5xzgU2cf+ZDlZOrwH9zjM4af9MTn8C8P5KDlp/8D5Mzl1/6j2xjgIuLoeZDkKBa/3MznF3LAotzkrNa5VtjlKLMYCeTkI9MX/rDm4GK4fiznG/8D0gjky7LX0ljnm9Jk5rzm8/rE5rzmY/Ib2uzmgAq30zDkHCVrzATqvKFv5rjnc578AfjmSx8BhGTrpMMYIyDlQ8b5dsjqxWblmKDr2KsEJPzoHMbBUKTqLGbn6PjoyH6z3GjpnBKT09Dn+48UYRDqTFrsAUDqEGMJhiTrEI7r+zzr3OshCJTrGxcQNWjp64nkxjjoa+8JFvjrYFcYIpjqLAsL0njpz/qdeWzoOy70BAzo4rLI8zjp1CJv44jquBLr2JjvILakUDztxGp98EDtCGLr+3TpV4rwABTuU/2nzAjue9aXxsToNvbolSjteGsAAJDu9/bf14TqOzZJEXDtYFL/4Jjuo5nIM1jtoTcFhSjtc/rf28zqwvsRRbTtbBbgDYzvp/cZdojswIrj7hTt+DaD3LDs7ybtJlDsgDor2lDshDr4CODsHzsJAmDuQDr4Hjjt197/zkDt396nxnzsf+aT1mjtW+LIBnztN+LH7oTuZ93fyqzsZ+bUO7ztKJsP8xTtL/lz16zs7GLwN5Ds2DZg57DuxD8ZemTv10MJDBjwRHn311jtg98HzMzxdK7kb4DxvXb5KMjuppLc+Fzy5CsX8Tzshp5AxUTyMKccJZTzUJLP3ODxO/JHyMzyn9sfzTDzcBaT6Cjwz17YbPjy+9aoHWzzv+sgQrDyDF6v5NzwcxsP7lDw9/WX0lDw9/Zsklzxl/q30ADtuk7NDozx6AMYSYTyLz3T5aTyZ0bo34jwYAqxGgjshl8Jm1zwv4MQGmT3OT8YKfj3cRroB2Dyzzrb9Cj2c5cEAPD0U4IwcpT2AFsj9qj2KDcI0nT2pAcYuuj2aFMECwz02GbsS0D3EE7b2Ez64N6M4gj0O0rPwrj3s6ooG3T0tCbUNCz7wIqs80j1A8mX2+D0u+scmlz27vbY+JD79Eaz8Zz4ONahhfD6tN5VDZD7GJ706Oj4JDsM0Sj2Eop4MTj5YFLw8Qj5KBsdRvT1gt5IKJj5n67s08DuPjb8kTz7hAsc2Mz5V38QDGj8sVbQBsj48MMdgFT85T64Ddj5P9bf0pD4nFL390D5EJ6T/dD5P4pE7pz6jAqlSmT4l88cGZD4izYBFMD4fsKJCGz8VLcUIAD/WHKAjYD7ltbM7GT8WHMb2rD58yr4+xj7uz6v3ED9gAchQJD+ICj5vQT+xHLk7Mz7boLH4Dz9C779bMz9w+cRGoz63rsYnXj+GDcf8bz9iEMRC6j8zTY884j8AR8VJFj8tx71apD/pJKr9XD/a644TVD+F38dCMj82y65C6j/sP2EB/D9UQZxnWT9f07skFD8ltbYS8z/sNHP8zT83EsA1tz+cAsUMLEAgRMEA8z5HpqY/yj/JALQATUChRcdXjz/TzZ/21T9p8q8LNEAjLMcEAkCh+6NJwT9hwcNA2D8cw5VEbEC4DZkJRT4jj7r8U0Du8K35nEAAHLL6OUDGz7xe5UAgPcQSu0AVIZoxskCjHKUQJUAqt78MlECf2rBQwEB29rT9K0G6NrgP4UC1B78+4kDqBb4+4kCP6K0OxUA/0r/190Bv8cQWxkHRU7hBLkEK+rj5F0HD6qYD1EDkv8YdWEEAFaD290B/zcMBKUEi37oEFEGu1cMDSEJ2XbdQPEH74MJiXUG/5LZksUGOH8ZhQUE0z8P5ukHfIMEMl0GNA8EEVkEFy6/6l0Eb4LsAZkENxLsAs0FD671FDEK6IsNCvUGd38AaMUJ+LsJjIkIlHMH8F0EVosD/QEGbp7BLJELwFq34H0I1FKL24UFi2cFAyUJUVbdQzkGdxr1kG0Kw9rD0WUOVYqoB1EHUsarzkkJ3GcUNLkN8V65tpEICIINgeEKu+sM4u0LzKZ49o0I+G7QajUEYnrD8sEKyE8XzvUL1Frb4mEKB+cP2o0IU95VPzELZEbf/xEJG/78ewEID+ccFfEPsU6IA7EJ0EbAZsEIs48VPt0K65cc/zEJ+7K/8/0G5oq9hCkMjDrgG3UJe6Mb2EUNAB8Ak8UIHzp8860NwVMYkJUMW6LJO0UGxlbEr8kIpyMgJBkNVyrxE3kMETLgZDEMFy8QIPUOb47z2WUOm8rhKkUPWFMBgX0M+4sP3gEPg9LX1jUPQ+6xgf0MVz8L8nEM/1X31zkNC77//BUVQZMckFEQEIHpiBETgEcgkqUNxz7z1bEQYRqx2skQMUL8OxEQUU7RbCER35mPz7kNz0JI0OUSIBqEKS0Sb77RKe0QTCsdJQESg275dfUSo/sQhRETMy74+E0TVr74OM0TLtcc+vUTc/cQEQUQPtSAJeEW3UsU4E0VdK7wo3EQiBLw+1kRsALRG2ESc/7xSV0VlQsVWJUW+HJn5+EQ7+bD2TkRFqsMAkkR8u8L9BUR5nL1aH0UA9qX6H0X/9bn8H0X/9b4kFkUp58JDAUWr0aL2MkfsbsFYF0X30cH2XUWq8cZSz0SDrcNMxEUoLsQIp0VrELQJh0TknLg6lEVh7rJMeEWC2Mb3qEVm9LlSvkXnBsQ7TEWOuLUY2UVtCqIAwUWo974PqUWy3p7yjEXbzcQwPUUmr7RB+EUhFLxCs0ZvV8Y1+kVE/rH4NEcKZsZHzUVz0sD2QUbaJ7X/wEVkyrU8kEVMtr4gN0gncboesEbcUMQkf0atNrZ/RUY0DsVaREZEAcMAA0Z5zLlWrkVxrMD9O0ZY36P9JUZ50b78gEaX+Lz830YFOMBR5ka/OLT8tEZSF2IAd0Z35cAzSkayy7340kY4KcIA/UZtPKlJiUYP7cddhUae5JQ/N0aptJ//vEYR5qBFnkZly8D5t0YC0rVGEkd2EscD+0bi66patkaSwoH6SEcSDqbxqEdSP69YD0er1MBETUe0AML63UZtu600iUcYGbQDdEf38rNbN0iJVKsEz0e9I3xUUkhOUbc50UfPEqJFwkeXBcX/9EczKbpXTkj5PbUhDEhWEoYZeEhjRbRDDkkZYLL2Bkg76A0A50fQ07T5RUg2DMb2LEj26rcEEUjJ0sYcF0j908P1Skih8b/9aUhuC6lUU0h867b+gUhuA6FCdkg087Bsi0n4YbL51UhfLsBNlkgg/sEQKEh3tcNbBklrO69MakgPyrX820gLF8T5b0mLVLcnwkjF/MH6tEh36rj6VUgYt7lQ9kgTE79QaEgEsb5brUp5baNRKUnyHrX/CUk8/8IXPkmQIb9X80i158JW3EjF0ZXzYklMMIwG9Ejp0sAI30i1vbIbC0kgz65SkEjpp4MMY0nrC8IP4EgFuHtI3Ei+s6A3MEl6zMcKHkcSjb8MLkoWU54ztkm9EqYSeknv5L8QDErPQcT91EkWJMEihEk946r0q0lm/roKHkpsQsRAoUni7pdVn0mc3ZJn6EqzZMBPPUohQKwBIkrmL8U0yEn84sEEB0ooDsb840ld46cW+UkI7K9G6klg37b2+km/55/8fkodNshJJUkUm7n6O0r53LoVAEq2uq1l3VHCe7BhekofBcc/tkrdFsBjakrc2733a0rM1lf0Ykp9z7D3vEoM9Mf8GEtwIrM4GEtAGcZhEkvPFcEkHku2F8NkAkvd97Rk3Eok3L72SUu5KcYk+EpG2IhnQEv/DMcHLkv5+a70T0uTD7JTZUtBHZAvWkvpEcde0UrmtrJgNEsb3n38ZEtu+L5NVUvF6Zn5xEsHMbw2o0pqn7NUq0sQDcJb+UteMMVaYkvKw7QMXkv8wbwmW0t8ua0HPkvXq7v62kvx77gDDkygCsFGbktLr7P+J0yoFro9DkoNj7oD+ksZ3sD67kvYxcL2KEx32mAovEzrN6xXpUwDK6BL80sYtsc8sEwxJsIGe0z6+a09PUybx6r2C00kSbpkZEwe3MD34ExQIsQVsEyT/7oRgEzn2Lo8xkxN/5kAfk3QVLRAvkxN4sT+Ck37Fq9j1Uwb28b2lUxpurJKe00vQ70i/0wA8MJaR01kI8Nd30wHzMf42ExoxrYDQE07Eb48Nk1sBLdHL010+sFeM03b8cVbNky+m8AYOEy9m5A+yU0jSsZLgE2sJ8Bh5UyAvaITMFA0da5jM02G2qb1BE2+v6z/ck1YC8NgEk2EwLFdTE3t2ZL2Tk2N2b1J9U1ZRrAEdU3z8MZG300kOsIKZE1c1Lj2jU3W6boEUk0Wxcb3Sk1gvcH6RE1au6n64U2FF4sGnk3Y3qlmnU1a2KZgZE1XtcdCmk2BycP5qE32y6/2jk17vb9Wtk0+y3Vhc05SQMITPk5DH4oUHE7lA8VAL04oCsUf/E0T3a73/U2D3KD3u06eTrokBE4x2rY5603Cy6b6IE6v6MAV4E1ywcT5+k2/y7H39009yLUAlU5HNLJAkU4THbFbZE6U67o6lk5AAMf8aU4u28RiqE1bn5UvGk/KScNg9U7XObNJ1k6gI682pk5+98MVnU715K7+VU7ttbj8B09OJ8IUak/8Rab/wU6a0rn3Gk+YELYGPU+IJ5A9105r2Lhb2U400rj2DU/26Lf98k5U1m/8OU8xDa48J1BeYb9CIk9y7MIZQk/K98c3D0/E0rdAdE/PHMYSL08j3ML6y0+GRMH6fU/KC3r7mE9/HrQX/E+kRrgbpk/fCbUN1080LZoTfU+Y5r4TrE+xDJ5Vdk8r3775aU9zz8X24U/9J7AGnk+R78Iil09+38b790+zJ69CWk9yt7E/pE+K1rz89k8TEaNM4E9L/b1a5U9D9cQc4k9R8cFh1U9E08L1+U9C36sN1k/OyLn3UVBMGLlD3E9rwoNaX1C5ArUNH1D406Y3X1Bf88Ug/08ftcQ8o1CCFrUDkVCtBL0S0VBZLXoC0VBZLWMBF1CjssddNFFLT8ZD6VAILLc8l1Bl5L9Dj1Dc3MQKwVDLBMP/rFBZ665UKFGtQb9dDVFAJpdcuFBL4KEew1Ce3sMaxFCe3sQkrlBTzLz9Z1FdRcYN0FCW2cI/K1FWCMUkOE+Ej7xME1Fk68D59FCo16b6hFHYMb03SlEo+rIaL1H748H1oFEvMawYAVFKta1U0VGINsFhT1FFzqP7rlEiGbBd/VFzRL08MlGOusH9p1FuBzsZeVHu26f6T1J/U64EkVHj2aL2kVHi2aUk81G8IMVejVEZzMP3eVHiusAn2FFL6q1d0VEK5MZFrlGFyav1ulHDycH5vVGXycL8G1IrE8JkD1InBcb+JFI0FL1ixVGPysj+gFK5R7UA/1Fr8pQ9XVITKZ1D9lIXXcZGAFIzybn3glKrJLZckVKyIos3RlKH2r87uFLbJ048Z1KZ16RhWFK7zL75dFLT1pUKTVLCv7Au9VJbNbNeb1LJxbNC3VJTGqxXllLp3L71hFK3zMMS5FJQD7YAllIKysX6HFOFL7Jg2VJf9rtS1VJK67ATtVIByoxnxFJnz7gk31IOysX6DlP638X1GVK+mJQ+MFOp7rscNlMd26L9GFM7ybH6HVO3vbT4YVOT3Lctf1OA57NMbVOm3IVKQlMNvac/lVPx8r5Wa1Phzcb9e1Op0L5g5lN7G8dDa1MNvpj2alNdvcT421ODArL5ZVPHr71D3lM97LMkZFSlQ7pXLVQQJq4F21Pk4b45alNFqsIZoFMruMVBDVRI+MIY91Pj6sAWXVUfablV9FOlzq8a8lNMxo8+f1PcocL+LlYIcbn9BlS7yKL1GVRJzLlFj1RHHLf+iVSaDMQV/1OvssD3GVRxuaXzJFSXu5z4TFT6zLv1zFR0FsJMxlR235srEVV+F8dYbFSCrr5OklX5U8IXCVUpA7Y36lTc1KkJylQjwrf22lRFwbH2wlSntIj2rVTsqcFd81Qvv7NMSFXF+q1IK1Xa3rFDf1UcJMM9eFWdGLxPBFX3uaD2TlXW5aUEmVVnF8f/jFXwBr8AKFWyv8f48FQ9qr4iPVUdyLUXjFUG/qdZvFVRA59LIFWAqcP79VWHJ61DRFXWqbNonlX6ysYIelX9ssT4ZFWZpar24FXV0cNJ0lVAxbz3O1anErIA+FUcx2rxdFYxIMdjF1aI0bZy1VZASasDHlfWUsZTtlaxHrYlK1YOuMZIO1Z5tLxQnFdhYbc+oVbF4rgGrFZw3XgZhFagv7Ba3FbC+546MFdGJMEw71ai5KD3BFfl6MD2yldIUMQ8Oldh7Lwd9VbEusD5CVdAwbT1BFervJzzBleuvF7zgFcZGb4gVVee7ag5Ylfz9Lg1D1fUu7T0q1ctKr/8zli9a7w2CFc9sL8M71bSqKkZvVZqnp76WVeox6FhXVfewqgKUlcVu8P3s1eM6a5Ad1eqvcIjgFi4VL8JAVn5Zsdcu1fyzKn60FdYzLH13FeHzcI91FefxqFGwFcsvbL4wljlWMA1vleduLtgRFgQDYpY5FfRvsP091gfUsUXmlgJ7sctC1iGprMF5li1JrIc81iBHcNDlViVzb1K+1gpIsf/oVjey6ENZFlrPZxdkFmwS7sGIFly470ulliworBFOln+5sE/Iln+0KpXIFkdzLT1fFkSGsYKZ1lG9cdkZFmI2sUWGVmOrcf7VlkKu6r3s1mr+r4baFnftcQA2lhLmrj941hPmr/6n1q1X8U6CVqrJ71U4Vn9AsFb8FnCCrI4VVleq2BMw1kT38AD5Fly+pP/yVnO3bZYoFickpcXFVr/Ebtg8FnF6scKCFpV+r0NxFktw8f2tlpaVoYyFFot7rxH7lkNxLr33llvtrP3a1o1FMYLQVmdl7YAAFnOkZ5FdVoj8sgZTloQzsH37VkhpMc56FnyoZBDPVqAtLEPe1ulXLoK7lo/IsEQglozwcL38lq7GbddgFrXu7f4kVplwK73L1sQNsVCwFpE0r9Zn1ocvsf3JVsSHbdL71op5Ln9LlpRnLz/gVvLM8ICU1vDBsRAYVvx/MMACFtTtMAiT1vAyMf4TFx4XL8lqFntjMA9tFtqCccfo1um9MH/J1zyS785o1vT2ccWe1x8W6VG7Vu7DcUFgVv5uK9PUVz3SsVGJFymLsZDBlwcCJoAtVuDt8P5nFuBras8mVsyrbX4OFzABKFIEFyq2rX+n1wvQbg7BlzdwpkGSVzG37ArclxD7q5V91udpro9ZFz21aw2dlzKzZU4gFy9xrQAVVwAtLv3v1xU6aw/b1yMtLP4jFy7v8BjjVypvZIqfly9tIz2flybtL74Bl2IHqYBA10IEr8XqFy1vKkHolxtusX0BF3VBJ30ylxrv7QMjVwDq576GF239aUyR1zmm7QARl3RGZRA2FyZu7v2SV1WDr/62lx8tLz331x3tKv2FF3O0I72ol3mKJY8GF0lubP0OV1Zw5c0hF0X/cBCTl0sy8L3rF04EcQGpV0gCYYok1287J42R10ysmMCu11O/bYCg12GvpMA8V1NCJ/+mV21vroQvl1cvsEhol1Er6L2G14b+7b7rVy0j7r60l4fWMEQkV4vPrI6nF5xQMdLm168O8dLMl5i0bQ0Ol4a1sQ5KF6pxrsDUF6Y2JZMrV4vLr8NL16Rv60Drl5KKMY0gF7L9bwJSF4kxMj6UV7UvbH0Zl/gW70z+V59K7g/t17uyMNagV4Jrr36Ul4DobcZ/F5G+MgosF46u8X3Ol+3J7Q8fl3vjsJgb1/lQMFBYF8sOcUVLV90CH88Rl+IELlX515rvLcPJV8P5sFPdF/NLroHM1+i2KwG5V4rqsL8gl/KFbQJY1896MdckV8oFr8M219SRIALJV/VscAcHl/BqZL6ul/dEJwIWF8Ftaf56l8aLrQ3c2AuYKlbxV8P6cQfHGBsO5UadV/Eq631oV/susRAP2DeLcMAzF/TvLMPA2BVxaEntWAzTcEBpGAQQ4wAfGDGIrr+WWBR/79F5F/5q7MZfGBhCsRCPGB3xLz49WAERcYbImBNqcJITmDItbT5fWEbX7JaM2BSnsVhKGGvNqQ+D2E9B65JvGAFvY9IbmCToZYI2GF6X6odk2FkSaIQa2EsKrk1YGEsD7X68GFTWqYVkmEvMMYkj2HfJccnqWFaH7I6bWE626Rfi2HJ8779a2E8wmljoWFt7sI4nGHv5cEA5GEILMZktGGB87o8AGGvm6f36WC/mKIkw2HR1L0L0mK+Z8cKjGJaV7Iic2J2Pbf4IGLr48E692ExwK8NE2IryMj6DWLAvcL08mEkrIj10GKyULVdOGL6wb364GLUTKoLAGJgp5X2tWJBMcczjWJKA5P9tGI/FbdPaWKuvMb9gmI4wcT5S2KBq7wzj2KGwrX4HGOVQscCqGKGysQxaF8shrkSimL5sLU792L39rVGxmImya1C92KR87r7zGLLyqUbWGLanFwARmNLMsEkCmNH68Q/WWNWNJED6WIMwbJkA2P3x7dG4WIrrp5h3GOiULpgCWO0q2oKN2Nmt7X8eWN86cJNvWPpMIBdg2P57qk3UmOstsQgo2Np8qo3EmNQnrgZ0WMT26hhGGN9lbYBGmO3lcT/4WP+w71huGNAp6o4+2OEvsE3YWQ8JaFJ4WMNsb4LH2T/1qc37mPEsXD2g2S5+L1bSGRUqMc/GGXaQLk652Sw82NW2mQ64KdE72Re97gml2apc51YhWTmp8IJrGQWtLH6DmXhDLkkEGWlC8A+mmWvWY0TLmUQ/KUbMGV+4r9gdWXdL8Q/MmXfzKJWM2awZsEcm2XsMbhbUGUw2rtRIGZPY6QuZmXZ6cRIo2WqIJ1c1mV+SYEbHWVwp8ZC0WQsmrpArmXRDbBSrWUREK4/EWUkocUAWGW8trr6dGVzxowVr2VR/qQGmmWt0sYPm2U1zcRNZmUArcVmSmQcjbgbv2Vp5MEIMGYGSqIAFWbDM6M32mXH7MZajGXkroBdvmUxxrc25mX54a89O2ZZOKo78WV838UBI2aX971FVmbtMrku/2VPurL5EWYct6/2hmZRLL1fnWURmLpdA2esX8ZbH2bEq5gAlWZgF8BLnWa4Ca8/0WY6ObUNk2YH3MBDm2Y90r491WacBqdPqGarzMdDi2bPuZ4Kgmd3YsBEomfBZrM+nGats7oJwmaUwrs8FWdg/pNPKWee67D3ZGd7LMVgd2eKOL45UGcRDood/mbIqKP8Vmdz3qn5BWbkjLH4vWehKr8HgWf93a0fPGeKrbcMS2eSrsNBxWfwE7dhbWd6scj5RWg/UbRh22eC2KkeJmjPIXwwxGdcs73+NGiKCcJiPmjLEL5ZP2iKAr8UomhzQbElCmgbp45JRGhawLz2EGn2U5ERX2h1o30Qymgey8dKQ2njTKQB4Gj2vrH6OGmxIrcNPGjQkro1Jmnj6pk3A2lBvcFAYGn8JJNJVWl69LACH2lOvr5GL2nNvaRIGWl9q8JRDWnEpr1PjGl5CMZj52naRrUEYGqlZ8NEomkf26xJLGqoUcY1wGn45K1ekWlDt8b3pmmav8D6B2q0DMRDwGmMuMEAQGpjOrIbD2p60MRIWWqyEbX+o2rLULtXG2pmsor8mGopKsE/dmr1zLQSs2pwC6dg2GpmLbgnKms3H7/1e2ukTMEcBWsTqsYPYmtC5sT9cGt33cASk2ts7aX7/GsfMqIK92vWF4r/w2uivLE08Gug575aEmw3Dp9XE2x5/6L+J2wEEVP6y2oUi7wBd2wL9MUBQWxRtqv5dWzG7bYVqGwxNcRNjGxv7ow8NmxnorY6m2wI9L9OVGx4qL5gjmytxMdKWmxSnsMB8WyQBsJGwmxurcH8HG2fxsVIC20kt7YPD21ltsIISG0ZxJIDjW2vKbcAEW2cobMM3m2YXMMHmm1sIccooW1NIYgSom0VJMRItG0IPYgBoW2GE7lgbG2wwr5bG21lnIX8u23cIMMezG2H9LUSH27URMg9aG7FYccM423F1rcOs23HqIdcUG4bTchDLG6wG6kbF24v7sgP8m2+xMf9N243HHNFN243HJEk+W00sMMc8W/Sd7skJm6+saRhDm4FpL8DRW4qvL9km26iOsIgom4FO35f9G4/Xa79Ym5MsKL5xW45MMUIom7FxKpD9W70L7tG1W41+sf6MHBpdbUW127yybcPJ29+DL5hv27boK75RW8QMKgPPW/29b1bTW8P6JFYG2+yrMYTn280NJs2AG+3lpYVfW/R05xXbm/1sb1diW8HrqYeHHCdT6sfBHBbN8IEn293rJES528b/LT96G/R1b1V7G951L3+DHAZ/7H4zG+9pLZvLHCt7L3+VHAMLsUG53Cta6s5Y3AbFLpkknB+OagNf3A8DZL4PXCcs6weWHDpv8H3n3DCMb0BDnCdmagCdHCMwMU3W3BGqIX76nAuUbMULnDel61khXAova8+fnCRrMgTtnA73rFg2nDjCbE45HBNDL8D7HC9x7h/KXGc7sAf/XAlrqFhSHEE2axhV3H47Kp/IHFKq7FGnXFTTLxMjHF5LacwS3Fru5ISnnHqNcQiUnF5rLoehnEA6Kw3bXGTrsX4+HA1kJheGHJWYcFOjXHVq6ZYH3J1XbJImHFbrMZjp3HtsJ0+UnI9Yq9Sz3Fro7z3cHJYUcP/UHJwJbsKaHK1QbMTYnL6ILECX3LABsJGQnJ50b8ArXLeX8h/LHJSpKr4QHLJq7gPTXJspHfzZ3LeqaRm0XKiK7X9dnKhpMIAgXIKpar5G3KJjsf86nLdGrtD6nIvFLs2/3Jn57kG+nK4uXU25HJApLf67nKcpLT8A3NIr7T8/nJwpKv3UXM3/cZgPXPv0sUBa3P/DrcBNnPJqsgQtnKPjbo5fHP56H9LgXP98cRAzXJ2jaH1w3N4UL9DzXNdVL1Em3NZ88IJi3ORz74CcnOiq8UAv3Ob+8ZYLXRYY8Y7MHShTbFRJHSoMJE+QnRsPaf9AHSYrrUJLHRc47UcN3T5/Lo5UXRv7L8xb3RnMME8LHRNrJA5k3SnL69CjXQyI6IANnRtm8f/kXQMAcUZWnQTqMZpn3TLCMNXfnTwqcZAv3Qvy6U90nTOt8UKPHV/ObAkQHVUM8hfYHW/QLpYMXUG0MAWPnW+6MVhSnX65ZhBe3XEN7EOXXX568VabnUlBatFVHWzwcP8W3Xzw58GdnWtCK4JqHUvUG3/qHV4/KhhvnWyHKAD/nXSV15A6HXt77s4+XUAAMZJInZiNsgJOXZuCqUTInYyvL8ONHYVzbkBR3Yw2a0VZHYy2cD9j3bHArw6fnY5p6U9oHZdw7IBi3Yzm7395nYRI8AD/HajM8Fa4nYR2LoEDHdIP31EC3dyPcVe23YhrJNJ2nbnp7INFnf40cMCZ3eK36IBkHcsurgKknc4qqUhr3fmwMNjmXe+pLT9x3fn/7n/1ncwHXIH03d2C8JD3HfxFYUAwndMtMJPu3c2q8H6CHjYIKVjJnjsErdITHhdRsVAS3jP+qEMZ3jbArNbkHjXLKskkHjXLKAjnXgQL4lUu3hONqkHsXhYAsU+xXj86otDwngnpMcbFnmTCJf9EHmBspP3Y3nXPa47fHlL5bEZdXmSzK9XcXlAr8IAlXn5DpQYmnkAArg4fHmgo7H8tHmP8KpdxXlBEMNSwXna5pgMoXk9mb0D8XltT8Ek4nlnF70V3Hm3zLQ733lRysVc53kFpbMeDnoWqbb8KHpu7sYdGHpmtMMfTHoPBK08gHrcV8MVf3rxN7YAaXpQw7H/nHrrFcFPmXo23cIEwXpmPcYduHq7+6lcwHouGrw/6nqZYpJhFHveVrse+np3q7JA/Hpcq7IdEXti1sMfEXtj1r8fKXvf9MZSKXt/xr9eFHvFoMVDLnvK07BeMnuy0oo4T3tIxrgHcHtaBMIbgHvjF8b3kXvqTb49dntP0ccwgnvUsqX8vXuWYrQ8i3sfurs+l3uhvMBjyHuCJ8MNt3s/vLUPsXtgpoD+2nsQ8qf81XtC0ME95nvV/p08zHstqcP76XvZqLJDAnwZvLpKJXwLPr0T9HsQlL8VK3yRC7heDXzVn8c9G3wTqLL/NHw67bsfWnz/orMwe3yXzqf8lXxeHrU6oXykMLcrkXxAs8djmXyzp61FuHwmLcEZrXy2wrwkwHzI0bRY4XzsXrZMDn0cy8dXEX0hp68wSn3n5ag6YX2+C6sKe31JCZZahH3zQ45Gdn0Gv7b5cH0aoY0JrH0dT7VMmX3/qJg2mX1nxqwnvn3zrblk3H3BHKMh2X26C7cB6H37oKhc+n1QFMUR/3322bFgDX65FGcFKn6tMcAbKn5JpZ73NX4hnK5UWH6CAowhTX7npsAPZ35r+L8/bH7Cv6FOhX4m1MQhjH5Eo6z6m371rr0EvH7Hz5365n5dTG4ADn9v27Y0Hn8CDL04G38CpsULOn9AFrwGOn+B18ZaSH9+UMRCSn+c57P/lX8wp733sH/pr7r8yH+ApL4K338rL8dF7n/CkKz9/X8yBbgAIYAl8bwuJ4BoCaYHJoAL5LX0SoBCM708X4A3PbQPd4CZncX8iYD2pZ4QpoCnw7IYwoCEHsQNxIArpqj80oDTnrcA2IAuk7BZ4IBLqcdk7IBrDJk67oBfbcM8OIEcpJkUY4HRlLNOb4H0t6H3doHBurcAe4Het3L5foHV3JYTlIH2wMEOlIFdxbv8uIGyAsZDyYFCCMEVzIHV331P94Fv3roDEYKGtZX39IE0dMhhGoLKJL9UKII2Hb05MoJ6psYRKoJibrITYoKjyML5YoKYDsQQfoL5vrZVqYJc4sM/sIJzrHjzsILWY8BHvYIcUYQEzoIO53L614IwFbED3YLTOb9d54INIq067oIEL69EH4NZn5heG4OlS8NOHIMnKcAJQoM1j5z5RoP6pJf2UYPi/sUKX4OUsa9fWIPkarj/iYMO/5MBhYOqRbZjlYN34McxnIPbJbxBnYO2BK5Fp4No4LT6roNNGag8t4O27LI/y4MaqotVtINKUrxV5oPUr8Ze7oP5n7IL8YPbnsE+DoT6rbj6/4PBJKodJoSt3MBFMYSjzbf8OISqyML8RIRUSao0UYQdJbMEeoR978YBgYT2zcH9c4S/UMNhl4R9N685toQ7pqv5uoRDplPyuoRDpl3xtoTUtqr4sYTHJq0QxYRQ0bwA3oRIpcgEyYQzKJ9Dy4QmJq8E4oQbrLtX+4SRuJP15oQ7T8BdCoV6yLr8I4XaJLb9O4VJIrsZUIWdr8NdSIW3HcAEToWE6Hv9YoVN3r5kUoUQU7cMiYXHrlpfWYVqYq1hgoXwIroDoIV+q7slt4UumMVCrIWvpcYQxYVqmZL3s4X46J0Wy4VL7MEY94XB7b0zAIaP8rv/+oVIL7k8/4XROpwjHIa63nQ184VAY5L5KoZ4wMIqMYYuIKoAPoYiGq9FPoYeH8RJWoapxbINLIaVY61OZoZNx8MAm4aunXX0iYa198QEd4aZVLskkoZNGMBUs4b4upIDs4Zo2boT0YajAsBg4oYM5sgR8Ya81MVI+Yah9KZJ84b0Hbo5Focix6b8WodgvsRbYIdfumgAVYd+7ccZdIceq63+Z4fx/Y0VZ4fx/Y4kcYeODqwFdIeuCb0AnYdSprYQkYeVuqZBq4ccsMj8wYfC/cYz0oe417tQHIhHqac/OYgkn372/4fcN8YhBYifQK5/G4jpCrQTPoiqr6b3PoiRDb87T4if0MRQSoiTF7JRe4gdq1HzaIhJWcUknIjB2L8514igmbxGdIj8XrldsYgVFMABpYjJVcQbwogvJ8IBxYnxhro9DonutMEHAommz6z+64hbNcUJHok0qsEWO4mSx8f6MIkqJ60obonascZOfIk0qsITcIllup5Sf4ncxpwMkIkjqsUMuoiidsT9v4igdrb/eYk2Hqw2tonjq6X3tImvrpb2tImzrrP5p4lv78gEqYlw8qlgxYk2wcUmmomVT17/1Yn4wrpkC4pXmcZD8Yksr7cAw4kfQ8Rd4onUBIZeJIowt7P99Il9Nr4U9Yl+Nnr53IkQXbUQAYrwTMMLeYrCGKldmoqV+sIKEYs/moxGtorIK6xGxYo2+8dDpoq2XrdN3opaGMc5y4opUK0VDYuVD3g4S4uRuasB+4p3WsgYVYu74r0hx4sUu6f41YvbxL0/5IsHuZz1r4vpMrX8+4vfqscctYthQL5Dy4sVHscXzIsqIL5fBYz5s8D8G4wgo7v/8ItJJ6pYEYy68LNELow587xGRowg360/TYxADsI8ZoxQ8cZZZ4z2F8VXbowg+J8AxYyInMUZcIzuGLQbcIzuGLQkpYzww8Ifc4zANsURsIxTwrU/2YzJqqX8NI1wkMRA8YzRocUDzow9yqsqzoz36LAbxoylJ5wiC43mt8X/5YxvEMJaMI2LrMVAMo3yq60cYI1yn6r8L42o47c0R41gusU/Go0aOa0/P40dEL9agY2k47Q9uY0GoatabY0aOsILqo0y07E5uo11wcQMpY1nDbQju41yE7dOy43HB6pkyI2zOagS74325agqB44M33038o1+MMNR6I2oRrL8VY78tLv5U47Ky3YCZI5UvcJDRo4ZOb5IsI5EqaP5n47KtcMHhY73AsADmo5UB8QH7o44pKMzIY+AlbBCwY7H5rg7z44A+cVVJo9LpLYYQY+Pm7//B4+o+MEZ6o4dTmoB644bTpQHJI8h8ErzII/sIcIDT492x7FIUo9O/scLc4/8xMBYJo8zTpYJao/u7bVbVY91QcU6i49J6alB5Y88t7AEt4+YE64qT4/0ZsJh8o/k3q5g249iD78/8JEAhr0KuI9AVbkALpD1x5NGdI/Yb8IuWJAb96dhdZAy18ACgZAn6rxJhpCM8bQ5u5A0Ba0B1JA17cUB1ZAo/4YGu5C3Tr7/2ZDhNK4Y+pBU+ME5ypC1RacHR5FEqL4eQpE5wcc4NZFS2sINT5H5vcX5PZEBI8FdUpGeM6oNi5H21cMYzpEppMIXwZH3s2vzxpH3uMhavZEKx75Os5FID70TRpFRZbtIIpJlrLj/FZJosq/9sJFDS7oG5ZFhHMEA9ZH+H748D5Kg869hTJJFr8j86JHETaZiS5Ifxcc9bZItxMf8UZIIBbhCQpLCMcczCpIwXMQEk5L+6L4wxpLc2sMByZIC0ZsW9ZLbtqY51JJU7rs2ApNyzLL/GpOKuMURIpNwuLpR4ZJvOsQM5pLCNsY4GJOa5rlh+JKNJMYdP5IFb8U8EZPTGKIcBJPQNrs98pJpTcD8jpRwisZXd5O3xIfzHZMhRmD1dJMCz5pafJOZw37235NNncFnT5NbLL48h5M25q4/dZN3FpdbgJM9HqxVM5Kwdcc83pNOvcL37JPltLX74JMU0aT5gpNyV8c5wpNMMcRhNpQYtMUAaJTKn8BZ35P8MKhjH5SY0qj4L5RIzbwaH5SAGcAyzpMMXKZeHZS+KMUMepTStcD8iZTAvHHzY5Td/bJAYpQqGnUit5Q0ssguPJRpTMD9rZS9vcNE6ZRupadCs5R+AcUMuJQZJ69VBpUhxJH0GJVJwJL0EZV93LL6NJVeuMU5fJXCoccVF5XVFMhWF5XbHsL/VJVv3MIco5Ulv54kR5bJkrtdkZWmDMcFn5UyApwGwZX+2LtQ8ZUOsMZJApYkqkHzZ5ZwxZ/1dpYO2oNDhJZHzGU8hpbC8roUHJaNW439CJfBtsj9F5cAtKg4vZZePrVfzZZWRrVjQpfR6KxnkpjLjKwPLZevI6ogsJeus71WmZc72bFFgpdtA6/5n5dk8ZpP/ZfRrrD8w5fN/sUc8peAxL43SphNocH955ZJbqpR1ZduErwgupenSaMM+JddDrY8EZge5rn/eZe+YrVeT5kTjrD6LZh495gfHZoDiZ5OHZhHGzFJMJjlGscP3JjcqLQRNJgNSagMPpiLQZoEb5i1FcNmx5iAvor2pJhi5cUAtphK28Qex5hgy8YE8ZjPr54Hupj87KMHh5iAMqo/6pjEwr03A5m9v6kSwZh+ErkWzpjI/LI9/Jgfypf/15gwF6tJWpndrK0zTJmHzr37bZnPx6D2y5kEn74dkJlgtMhCb5mI2KlOfJkDDLL/mZm5C8YDvZm53Lc5JppkosRaoZlGCLEH+pmwv6T3/Jl3v54ZKppkvsMSz5m9SZceCJpYG7gNVpoP1q785Jqyn8M8WJrV/Koqbpow9rlZsJqMv7v8uZqUubgDopotAcYJ35q5yMc/a5rjRr0zIZs+uKD1S5vJscQcSZsVtcRB/ZoxK4tOOZqna5xWHZuoH8YVCJt7Nn0LpZv1xMT8pJsMxGv1HJvJTsJayZs8vrxYf5tNKqEV3JvQxsH595tkvrk8fps1RsFdEJy2uZf3Xpx8qTEqX5x8qVM0IJwGGsVC45yYo4EOH5wRPsBYn5ydzL/8IZzUTMQAPJwmP7gAyZybvGv01p2Wj5FVypxBypb2kZw/E8UMkpxZF63/kpxZF8UOpZyGE6okpZyGE6ADvJybC6s8v5yVEL04YZ2VprgRBJ1z3MEAF537zZdR/Jz095MWVJ30za0ADJ26JapjG52KOcFTmJ2IvMEEsJ2BtbQ6gp3R260Vh50T38M6/p1LocX8a50FAcD/X50gGKU6VJ2BJrIkVJ2BJnU6s52MycZPjZ2xAo8Ahp2FFb5ewJ2P274k0Z3n2rU4250b2sL/y57ql74xGJ6D3cBOGZ7h67YEU6Cjib85RZ492KBUrZ5BpcQrgp4Iwp73V55A6bIYYJ4w6XYJN56yKMMDGJ6VQcEcRJ4BIsQhZp67/K06Kp5KRcAcnp/5krdXTp4BNbs9up49yq/3d54qG6Mt2KDoib9ONp+CqrRFCKBEksY//Z713LZPC5+l0MNVap+3prEAeZ5TVLpR/54V78M6Vp/mtLgH+qFrh8X9PZ/az7cCYZ/pu7/+WJ52aWZYbJ/G77pZU5+LFML9jJ+M4cFCf5/S+aITvJ+ownXzkJ/E/7xDf59OF8A42Z8fxID0wp+r2L8OWp+URr4ezZ8n8MRL459/BsZgNqDgycVKK6Dj860A7Z/XN78SkZ/EXaVfO6AV/LxkX6AY2MQJ2aDwpLM3UaDN/8Bbh6CU0br5R55Ydb8oX6CQI6pag6D5AqA+V6BxOYk6uKAM3IRm6KAWvaj46KAWvaok8aCZxbI8QaCfVcYFjKARMrs9yaBSJqNKUaExusI3q6DFQ6knKaEI1Mf8r6GZoMIpLKHi6LRedKFJxsL4iaEJw8T6kaGbv5f29qB6RL0AS6FeI60ZHaGWTbU5zKHVyMckAKJKsbxEfaFnJb9KhqG1I8NK1KGN2sI/i6JWnMN/HqKwupL9H6KuusAILqLotYc3R6K3wKr2K6Lb46P8JKL8GsVbd6LA2sREmKIt06wW86JjqcH80qKiu8YMAqNPqbH9IqOJpatL2qL/xLMiHKNgrJcFW6NUnnoAgaI1LcdbsqIGB7dBkqJ6KbUB6KIl4LtSz6KHAL4KV6P3qbr6wKJhL4g5SqPqu5z8BaOo8nP6KqMg1Z5CXaP+xb36RqNZ/8VamaLHX7IfRaNCHcA6bqOCArAgzKMyxoLz7qPXu68e36NJu78nHqS9qb8cJ6Sjq6IL36NvzItcwKO497w+B6RywIb2lKMeKrs9vKMEAbdHHaSVy6P3qaTbnsU9CaMlZq9SkaPkSb8G36PWLrj8ZaSHx7j6PaRp7sE+TKRS8a0agKTqyKUA5aQ6pMBiBKRKOLtfH6QTK70isafhh70GmaWhl7v5BKQ+WMf/WaQoNZ0SrqMpZn4D2aS2y7r3BaQVWsJMlaTxFbNjq6TUMLpUOaWKvbVoBaU66L9dbaTcU4RFFqWeArMN8aRkKY4Qc6Vh6MM/86RIVsVWy6UH5LwKf6USOq9f2aUJ6Lv4C6YFx8NkhqawoZhG26VR/rtBpaUqOq8EJ6Yd2LJOPqZ1xXf0Eqaw8aU82qWZLJn5Hqbx8rP7YKYQwKP2K6eMl7/+bqbdwLlafqVQW8I5cqfNk8b+UKb46pM8L6b8DpEPL6b9DpEPKqb+JWn/lKb914tSw6Z3w55V5qaFtboAQ6Z6N7FifKY8DrU5GafNqsYce6bsFsYRt6YX38JCzaYd4sRARKavTMdG3qan1Y326qaN5LgzY6axTcEkEacQz6Y7uKZjObU0KKch3q5PUad8wKYYlaUBbq5eq6aFTcRAzaaOQsEV/6YaNMgk/6YaNLD52qa2R8Qxk6fHyrU6dKcE5Khelaejzqj4Yqf5G6MCbadFErcCsKaIYr5RcqdCGsMM4qeHxMYA1ae26bkNmKdlJZIA06eTA8Uo3qcjCXRG0ac+Lr0/nad3Srv8Eai/B70CTqitzr76Mahw/bn/NajuFY0DQah1CqAk6KhUtML8Z6gTFMAF4KhxusQEFam0scEDkaicE8hLsqiS+rwHR6jlTsZTqajMGZhhoagLKMQu0agg+4r+Dqku0JT+D6lh26b9S6gHWbMCd6jBTsQP8KgfA7Q90KgSJaUw3KlwnrFDCKleBo4JAqmFFbQkHKmb+7EHzKnLpXkRHKnVHalc3qlrqsIVGqm2Mqo8eqlS468A1Kejbp4Ch6n726T8+Kn8qcIDlKkd3bj/lann3bn+kKk26Jk9tqka3MT9XKlfPKUhxqlw5MYA3amm2r4Je6qCo8H9SqllT8M5s6niHLpfHKqyz7IHHaqzz74DHKp01pP0MaqKzMM8talZPbhjCKpGFpIcQKop4sQB6qn3NboT3amJPMH6LKp/FLxEV6qy66z6aaqw3Ln7k6qixK48dard2nr1PKo5JplJr6plyYfzuarU32z5uKp96Loft6sJmcBGeqodNL5Zk6rcJGQGzqoK9LwDRardTa0PSqvWraUOPKv9uaY30KpLBsM84qpXGbI7RKsayaz42apdL7kkQqs4269J66p0Kq78EqtuIKoEe6snysUYcKvU77AkcKvU76kc0avCv6gNCatBS8ZYKat4Qan6QasYNMMhoavW43P8oavX463//6pKU5Yf1auqy5v2v6tu3sb89au7y8ER36ub4pX+Uaycrb3++6tT4p4yG6yQ2rhjBKzg7cIAN6xR3sUBBawRDr4Ma6xL0Lz6Gaw+GK85K6wjDMFgQqzpBMVYTKwSCcc8rKyGxcQQaawS+7hXoKwr1rJDQqzlM6k8Cq0DscMUR64VkKdlTK4gkLVUBq2ss8N1OaznP5z8D61Psq0+yqtwYLr/y6xT5JYC2axJ2KT32KyW178AaK1upZJCzKyw8a0F0azZ87kHSqs2bb0ks61hn8EJu6xpIcBdeq2krb4IOK0O0cY9YK2hvLL5w6zNM75QBa0kB7tYIK0r77RVwqxDPMRXoq15s7pnNq2/+nZesK3MuK4wcK0Z9LsnRq0nML8eaq2/GsBD6q1P16kBGK5Qw7oGMK6suJZAS66VscI6pK10KcIE661U+YM5I64M1LscC67a6sZblqzpa7v6Va6h3aMyqK6Aubf+bq6b23oHqa6NwcVFu637VLlhQK1haMcEE669RcVSNK55OLoYLK7dQZP3lq52AaoU765DyLklj649G48Qua9UnKwhBq+Uyrn6nLDMj5M2l67vK6s68q6B46I8DK/C1cQjo64RMLRgqa7uL7hboq/mpLUV9q7hCcQANq+o3q8ONq+o3sYkr6+qrMAAf69fvKH8xq28a60WLq/1E6QAd6/B5aAQr68gy8JCLq8uNbwKJLBZqLRJiq5JYrVDAa+CTsEAl68y9bRnm68Z9KUK5K6+V7858a88vrch7a57V3Y25K9p2kptw7ALm7tJvq/yALhX9a9P68AxCLBJ3Kn6TLCIxLcTPrClzpv3wa+QO7BbM7Bg6J03CbCPHnc4KLDSApEABLHborw3GLAgHbVNYLB54aEHNrCQH8JgubBdwa0DdbDaB779dbBWEKtZo6/MYa/9ULDZQL8HUrLCkZw/IbENw7oYC7Hg13jxIbHdzZpeurBaPJsAbbCAVsYBILGy/MExBbLfnsX8PK9McL0Pf7FIwsP/RbH58HIBnLESy8UAGLFKQsI+GbE7S7z8GrFES7H+A7Knur8HErJjub//FrLd0MQn47EABsL/DrLF5q5Ca7GqT7ZAjbGVRaxdHLKq470Z9bKPoLL8FLKuAcETmrJptMdLALLxLHgnD7JHJsYYnLLsxcD557LNrMH7ULPVnWJWE7MIrb38SrJaN4o3+7IAyLs6drJoMMcR8LHbW6pJu7JkFr1jz7I0DLJbg7MJrJBeKLN2B7X/t7LBUKsWlLM7z2tFFLMSPMRghbOr8KYc1LNdxbQEerPcEsUB4rPkyX/0nLNOCrsGQ7SlrcZf97PvyYv0arNlQaoFzbO6AbsDNrTHwsdnq7NjKsFgRLSMxLoLQ7TBw6gdV7SXw8UmU7I9bscZKbT44sUo3bMQI7BLXrTCw4xSb7R6xcIJtLSltcb8QLV9ncL6FLQVLbcRXrRA97VAQ7R0Dp/8FbVgsIBgI7RvQ8hPbbTOHbk61LSz0LtfB7X7t7wBwrQU373/gbQ3GrdUQbVmtJdXWbVbsr8L6rRVDYJFabXRusg0UrVR3MRhW7V23MEYcLXmzMdF47VKtLYcn7SiXKwcqrVK0q/6hLX/+apYHbbtrcH61rKrdJs1YbX7K5QAgLUvIL9PA7a+ycUWnbW9L7UBvbVGJME9MLZ5z6sP47UKFK5g+rVZE8YAdbYPy8cEULa8/r8JSbYeEqwHc7ZoH71OzLb15sc85LbD1McPsbdwoMU/R7Z3TcMkR7Z3TcMcO7eiwLEzZrd/usRuErcJ8b0fwrYbM7gSLLej6W4DfbeCwoUYg7fRx78CB7f+ObFMi7cND7df5LZ1XYH5DbhK0LwAGrgdycciD7gr2rEzD7gs2rAzDrhD68dC77d3FIlW77d3FLgkvrgbq8VSXbiN0bweALhTI4AEQrlGnLn+RLi4AcUDSLhe/6hEt7iuvbswPbmfn6lIAbhZNIFWHrjEIcdOrLg+wcL9j7drWb0MiLh23bRCs7g+zsU+7LoBjcVkabgSL6r2i7ihGMgAo7hzD69deLgJNaYDZ7mArcVAmbmZpsD4cLmdr8M8rLj9KL86mbgyN8Y8ELn64Z8XCLm77Z4Bp7m3qcL8d7l+vLX68biuGa9hPrlz3IPz6rhRJLgBZ7kRy8ZAC7nXIrL/ALksLrgle7n617ddorkywbL91LkHsXlX2LnTr4X58rjDQb1e87n+t7Q/MbnZOLsouLmC4cQ3l7mXDMJLGrrOvrb8Krr/t8YEMrn5S79YnbmnIMEMsLkuF8AETbqgtcFGirnUNLokirnTNKP/BLqf3ZoQbLqKscZCMbqH1Z0YELrF+KMXPbq61cgA77kPGMdhC7rjBZ5a27qzqYz6GbqOHLz56LoNr8b8FrpXMcYAdLp4ALoNzLr2ynXzFbqiRMQH/boSuXv25blmVb8Bu7p+/rYr6rrs3aoAOLtyxcQD57rfA70yy7oiJaBWTrs8y1rz07pQLL450bj3ccFa/bpmKL4ASbvV974KgLuq0cACvbphSnc6q7vdvaT/Q7tiG78cULs0F8A8g7sE8LwB07sOyZ1B/bvPuMZCe7uiDcMBGrx+srUMOLunOsFB97vawmAYDLt7TqwPEbt3TqsQirvcEWYJA7wa6ooPA7zb6cYWA7vmYLBADrx19KUGHbx28MFJgry5uakYALySIsIGqrxFvcIAjbv/V7Qk17sYRbhF4rx/yG7zsbyx7ZwEdb30o4xH8rx1y7xdLb1JtrIqWLxtQZH2t7z6CMZLy7yvFrwWDb0q4asc5rvJYaoZRr08w8QJ4bzvIrxXD71+BndF77sLZ8Q8r7yxScc/Cb2ZIsAnyr3vxn0eyb1s2KMwJr2DTMEAy70P68YDTb7Bs8b8lr1sJ4ctgL5wqsI8tb0rGcEAEr7q0qr+2L3ZA48CMb5Sy4JGQL78xqoPybybZqQZyryeZsIf770/HcA4fr4ExsdfAr5wJLJFnb6DzsX6or4Oz8RDSb6zKbs/XL68H8ckDb44SK8B0r5gzr5E6r6UzscArr7bAcZeAr/8zscAy76tCMIZbb/wwKtIzr7mOLNGaL8X2MMMV7+E6cUDmr+txKxjV7/0AMMFLr8MJboUbb8y+rpFQr/yH71K2L7iUI9Geb8YAMcGzr+Vy8E21b/61LNqVL/6NJJR0r8a8oU79b8i3qn+H750bbAdmb+YKY44ZL85SWlb7b8l+cRdu7/vKqAXFcDB+qUWxL+bM8g4C8A2Bqb/AcDSF6ZLHMArBJUBVsCb38IAvMlpg7ZMT8DbAaEBgcB43bcfJL9nZroSGsA8L8da/L+2QL9eQ8C2HrM5Q8C2Hq4H/8ESlMRKi8Be9MYki8Be9LUWr8Bb3ccAa8ChHbb728DyzMhF48Dv1acuLcHDuI38hcF0pZ4NB8G81Hw8IsHHzMYlNsE/wsINNsE/wsIkO8I6l8Qb98CNA5YzFcEq9MQMG8E/+cI52sHTp7siEcGZH7Beb8GI16Q4CMHWLcBFYsGb57xCS8FrDKY5TcGZDY8HPsF2K7AfVsHnKJH/ysFN1Lw6Y8EeJcQHY8EdJcUI/sGmvqM8+MEvxcQRjcGaHZ/3Drske58BU8HPPa82bcHEM7tGk8GCHLEJssGtBcEWwcFvBMAc5MG6BLtHFMJL3q4/WMI3xbr2yMJTpr43xcHcM702BsDHccAezrqve8IPccIN4pINFsKRL8UAHMKpLK5jiMIf4bpb3sE0TcY40cIiwbo5CsNUsLf9s8KG4rgEs8IC48YBMcRHlboBIcO4y39dNcXmjcZFDcNL58Fe/8K6+8g1NMOL2aZjx8L1O736d8KVW68WOMPJGccBIMSMqJ9YZ8NTCrhAlMN96bhYusOV1XVSaMPEIrVb9sMGybFZzMMu5cE4tsLIYcY/tMPNBKs2h8MwKsdNm8M7H61fycPh+4M4EMTay7f4h8NKM55GK8R3zLw9UcRFwbX1uMN2Kr4Mu8MOKbIMS8Qaz2D/H8Tq7sEA78MdIblgA8QbEcUCM8RM86c5DcRaGbVMcsRD1L5E08PcRbBjx8SSu7oyNcT1HpJGgMTK4qpOysSgvon22cXPlsU6jsRsC783TcQvOLIBH8U3upk98cSZ1cYfUsUyrsI6DsWLyL8H+MTZ23g+k8Vup6b6ncRsKsMD1cRHALQer8N0ZZv6UcXZvMBLP8SfU64EvcNwZ4sd+MTPCMH/MMVJ66cDSsVE68f+XcVe5b8/pMW0vq76RsUu/bg5hcUW0bcJrMUgwsFQscXtvrD4v8WJx7MEQsXxIcX6lsXU5bIAncQ+XapHlcWm8MEO9MXTw6Y87sXtyL/9hcUTGMICrcWT/sYJ0MXc6rt2CMYM0bb6BcbT3btr+sXh6sIC0sWWIcRX1cV0K7v6OcZk8LI3QcZH9JJPQcbjGcIAycUhUakkT8aSIb48pcdrmpZECMZ0SrhBesb5DLgW+cbeu8QNg8Z9CboWvMaS4cYL18aT3sMBCMeVwrhkrsaQ/8EEgcaZL7n66cYQ4sQokMYoNzIAwMczpMI5ScVJbr9GHMfs9MRdE8i+o6kMrMbsWMH9g8ch86gVx8eAybIFFsc7Ssj84MdQzav2/ceQx7k0u8c89KxD98dv3MMDpMhzo8EOHcie2YH698fuAq/9y8dnLcAUPMgo4LhiFMjSB8MCk8f8TrD7fMiKxrUu4cdqOLAJ48dWOLIL48dWOLgkTcia8cAj9Md7NZ8L9sd3NcEQQsii/sUHHcg4HZobrsjiwbsHYshA+ZtCMMjrJapIysjavsM2cMjj97RYz8g7wr78W8jbGZ8HR8mPp5v438fSVsc508gZ47VU1MiY98dgTchbS8X7sMh9G8UBW8nltbM4Usm8vbxhD8ka8sMk2MiqLsX33chLLrUE5shyL4gAH8pioKEqSsl4Hrv8mMmg4cBJoMmo36pUIshcabU3ucnQ6bEKy8nC365P0sma2mTzAMpDw7g8KslXS7syPchHa7cDGcl1VKZH3cm26MIVaspjqrJS9MkM38b/Esrlyrj4jMmUNL33osmxJ75Rusk0IKQuY8q3tKv928loCb0+dckdSK02r8l6NJ1k/cn6BaUK/sn5Ba4MMMqg4rEHwMkqO7o9+Mm/GcBBJMqw96pAQsr84YlGb8o6y6sYvMl8RcIZ1cl/PpdfLcqbA70ASMs4nsUhIsrKLrQjWsqwGLgwjsq+7bz+csrHE8UPgMpfE7QfUMprNsX2Fco5Ur9FmMpuFZZAecp9LoP9qsllZapFnspNJbVKB8rPXL45N8sjxKj/Xctyt8ZKqsq3La1Y9srX95ZBIMuC1XIEGcuq3L9JP8uZycET5MpkJcD8Lsu++rkAtMreR7j2csvZ07sBysuQtbMfSsuWAsMK68q/Qq8Lf8sV4ZA8ysonT7sza8yxnrc25ctQu8f/i8tF+rlDzctLy60fzctLy64fjuF9gboQrMu76cf/5cum2IVHoMu3E3wAxssP+Yj7i8slLb1cJcxpxqRB58u+D7H8IsyR5Lz62Mt9IsIFicvwS7gA18u3KLwRWMwYypgCb8xsxMX8cswNyJhI+8s5LrQU9stXM7b6Zswa4noVQ8yjCLQVKcyOSsNBA80o28NSuM0zobwK6sy29LcHRc27v8Y2Bc2J7rtWwcx9LMf858ynHsYBGc1DA7L8ks1Xv7lRbc0V3KshvczdULI8HM2sN5/3Vs27HMg0Y81zFb1AYc0yHr8GZ81pK8Rkmc3gBr0EzM0M5a49i81rHqn9ls2vFL7/I80RUq5F5cw6YH48SszhbLISks07Np9L1M19ELYMKM6gzb350M2/ILkB9c2LAbFFqc3XQsgaVM4k4L0QtM3mS5A5uc6asrABKM6ZEbwPUc5N+K83U868/rv+sM7GwJb6hM6f5pQNhs5Q6aUGys5KwJ0UjM735cQ/6M49xpX6o86l/8NBbc1TaKFLRM77UcVeuc5ZJbP5Hs9S1sZLKM8l3a8NMs/s3blVLM897MBVm8++ssBUVs51XaQB884gKq76Gs/8ELMuV88I4b1JMs9uBIYTUc+Y6sEBdM+01b8A6860PcQ3NNCtnsdiMc8oHLM6YM97AKYkW8+FEsEcU8+VHL4AXs9KHMNd4883wsANUM+mM7L5s88qBMQA+c+g2bxD0s/GAsMExM8TI6Faz885I8M94s/CFL0/is9oSsEAg9BdtMESHdAJ/K9pmNCev77+INDDJ39DIdDFJ7H68c+RSZAIPdDaJcQ3u9ARx8UF7NCZu6xBT9D/MKj4O9CLR7xLudB+CqFG6ND88LJDEdHZ3L8Lz9AfHK/7MNGd3KX829DmKbghp9APRsdiQNET5r9L1NBRPLcDONEC9q0AMdEs/p/8xNDeSMEcV9Gq67oeONEIEMc0YdFk+boZatASY6cvStFpF789LNGQP7M3JNFsR6IWy9Gv3sc+odGtB7MBqdHiKqc6ytGeGZ8u59Ee/78GrNHlPLn8itEuTsMa9tHaGJ8/ONIS6bAT7NG+QLAYaNIA6rsbO9LRELUic9PkmLkNQ9IdLsYGGNLbR8cmb9KmJLs32NKf0rwBM9PYr7cMcNJoO8Re59Lm46s3iNIfNaw5yNLTCsUK49IYD3ZbqNIvQHn/r9PSq7kE6tL3L64cFtNbGpFUl9NevMZmKdMZJMY7GdOfNsL9UtPNEMEkitKcYsYDXtM5G68GBNTTscE34dNLx7f9sNOy8LgWsdOcDEUNvNPQDrEh8dPr5MY6p9PPLpttvtMnIK34p9MSN7JlqdO9OcD+/dNuAZM16dOLI70qJNST+78MqdNbS69MGNWjncENfNR1xJlAOtPuY5E1SdTP88Ji0NQ8rLUA59PhQr78b9VPmJX/7dMqRMX2KtQ+IqT9X9RN9MD8TtQIDKc/ZdRjAL4Gl9SZ2qctW9SWIrz/f9QcCY4zZdXKoMI+ydRd2aNXaNSdNMItI9TPUbL5n9SoF7goqdQ/ELYAqdXMoLZJmNS8Nq3899T46a8DrNTlMZM9JNW/2qo2jdSTSq0H7tTgF7z9SNXVzZ/3TdWozrYKo9WPq7Jb1tRpObr6YNViysY8edXYv8MQY9US0L8dmtSwU65fG9W4G4heStXX8cUiFtUQLLv9LtXaIL8kV9XpGLhkNtUYQcYJUNWuNLP2gdUrDMVbrtWc7MAEzdWY2KRj9tULyqlUhtV4J6YKD9VbWscFo9VFI8X5sNV3I7QVGdZp0q5IktVCR7BC6dVPGsdV89XMFr/64dbhoYstHNb+/sBOENZZCrw/+dWEKsArD9ZGGMMkpNbMtK1hl9UvXLVdJdbSLb8gP9ZuHLE/1NWHYKJPjtaVIbD2dtYoM7gzwdYK/8c9cNacS8QXUNYrWLhGUtepzLc0AddkNK35VtfV/oL8NddDJrwE4Ndqtb9aitcP7sQcbdcgJrtUd9eoJcb6rteR/rpVDNiO2cE03tedFa0EY9dJWMEcsdeUQqoF3NfPKLMKwNd5QpBM6ddYNK4IC9hlJKn2ttdzUJ0GFthuIbI+udc9VsJYEdj4L782ItiOJ6NLd9g27pxAiNj84MQ86daEbp/9FNjbQ5VbUNgWI7c5itgp7os4LdjSQMUWVthnObVjx9jQ5LZUfdgWNqoZjNjtOcQGndieNL0DpdjAMbMnANnb7an94thEE8YSENn76n8vUtkzxL0A8thOGcNZmtjITsIGcdgUX8YiP9vbjMJEk9mrw78MQNnEIrz949lRr2L00diKWMH9c9mZB7Y6SNlAOWkoQdkgQb1AYNlYOsZg2tk918RC59j1YbxfGNn9WsBdktnHLaBPjNlMNcX05NlyHr83JNxljMVmL9oa5rX8ddqr5qkWO9qrNr4DI9o7RsAPpdqT5cYEmdrm+6xFjtowK5YYi9rYM8UfkNq9T8X+rNqeRa37Ftv98b8pXNuxwLE8p9vYqakQltqWWZsM5doARrpdPNsTEJb5XduGErgEA9x/qKwZztypk8gaW9siMqVgAty/vH88W9toQsL3m9veFKcG29tg/KxgctzkqbIf7tqZarQE69uiJb38ydwOobL9AdzBFIwaDdwuELkDJdxu/p45T9y86rT5LdwmHqr/N9zvEsFbf9x10LpDLtxMIrD4MNytIcU6SdxYDrArVtyxALM/R9yGFsf4c9w15rFjWdrMc7o9Q9wkK8BBidwS6cM8YNyhFpD9kdpTc8c3sNwQ08JbUt3ZoYcJqty9FMdKc9zOPcZHKN0ptqIQoNzyLbs0stxlQFEFydxUO7/5Dt1wFaAT1dyXR7j6kd1ByLv6GN4xnrlDht0Q3JkZid1o4cYCTt3wI6xGct2wK5s/891xwbEVN91WUMJkAd3MXr0Nn93uFrIdn93uFpw+i91PMG89zt1/8pAA0d3a+KBjIN5Cvqxb1N2LCL3/ZN3jUaIgt93iMK1PYd3yV4c3F95W28T8wt3lM6P6Nt72z6w8fN6btrBD1N0GRL1XZt4VyrxSJ97XEccZV94p7sVAB96VQasYit642Zhied4A+McbO96pPrAMmd4s+Lz8Et/frI1L395jx7dPet4tKMIrsN4686gTmN6JJqQxEt+D5sJDy94gP6n45txfdcEAzt5BQLpC6d6NL7pbB9/nJ69YN9+DE7NDON/fEb0HbN+b2sAect828rtYyN2PcrhDld806cQKQd9vQ78c1eB2krIdY9/kP8cDXN8lSMMSXN/3RcU+D+AYt8Icft+MOpQBt99qD7s3sN/AH7ZU1N8bBrQbst8/P7w6AuCwCscPOeAg0qY1ut/ER773FOB9G79gbuA0ycZC99+VQ6j9huAQybYY5N+IVLtUNuA8M8c6NOCkQbj07eAssrNIuOC498Uox+DE46sKqeHwl8AjYeCYUMP8z+DTB75jI+ElxbxREeEp1cA9hOEVpcJGDeF+55cAIuEC0rNC9uB5CMYgq+DIS8U73+B5Po9jQ+Fw3KJgJ+FZLMMhOeEaN7RGhOHc4bYAK+HDQ6NeXuJFnK9es+HU76I4iOH1Kr361eFoDqcPIeGWZcQYK+K7xsMbUeLvx7Ua0uEtTMH5XeIzzMc6W+K52LlV+OAcb8X8zOJBtMELS+L8KoI7GOJPVb8GkuI7DqIexuKi4rVGy+Jt6rZioOIbNo8Xz+J2B5QfL+M/0qcDMONs5rn5h+P9s58LOuOT+cP5F+MGOJsHlOP5v8h/LuOhMaD6WePuD8djD+NaT8dXr+P3xaoBRuN/Pq8AcONhNsMevuOE+cQ3deNpRsL3TOMCWW4NvuN1CsNja+NfU79SvuPtIb0/s+MnLsBA8+MP6J02yeKGbcZacONCXLP+FuTD375h7OMqHJhCE+S/8sdcEeSvCbMDVuSvxcL9suQKo5sdSuRZ4rlF6OM9RsBCTOSw7bsRQuSFIsATeuQj8sAMG+UnnbddXeQ5JcASfeTy+rtXr+Q0yr5HzeR+w7sXvOQh4I881+Tb4cJWf+RvQr4TlOQlNMb8GuX94KI23OTJNLb4xeRzRbYE6uRDJ7kC/+TULcMTJuWLH8ZbUuWeIaRh7uQDX7r6O+UwQrU6s+VwxbZCuuW6z8cDm+UU+Hox7uU4wL0+F+VZZILzaeSFcsc3geX7VbwHMeZw48AY2uUTR8H/ReZW+sJCCebXQJY1bebI2sENXufxkZA8LebNNqxAluZR5Kf2Z+aHQLxetebV9KcKkOZ5Oa8KteZ5G7oS2OY1CL8P7ubSHMQTB+cwA7E+H+dO6I4TvOZKWKgSC+lcirYt7ObCUb4MYucG7LMnI+eLPbFgd+fr3rU5fufTAb9WlOcs5ag0gucTCLZip+eG68UPh+drOsAAeufNSKb50ucH68cM/OcJ0Z79qOeHOrtft+dyNr8A2ucLDm1b2OfgKKgc/+cW87FC6OesGJ5G6ecCFcYj7ud4JJkZu+eYU5h/cudqZaRCOOjP8shjROjW770AL+ijILZUW+gR6XkRk+i6vL0kp+faZrM/e+gP1K8C+ufUWMYSZOjRA78A4uj4o749Bun6nLxSE+jsVp0fUOggRpv5behQVrxb2+jpKrD/6eiVGLYWKukyHML6eOm77LEWzun9p8UXlendyn35VOnzKLwZbuneJLH2PulaT8D5h+n4G8AAoOns+cBGBeoFy7oES+rLsaAQwemCUMMrHuosEbwD3enlXMT9iepmybs8Neu/k8YXEep8Wqxqr+qNCcj5z+qJ17n7Qus+r6c/d+orWcZk2+rcAL1M2+qoEr4U3uq+C79Wh+oTaK8aPuu69rw5QOvw/Kf9/eo1S8L6QOsxEMP8COt8Ur0DL+uAP77/e+vb2cf4s+swq75Xg+u2/rYNwOvEx6FSrOsxB6tWsOuM/3w6levvJcJLWuvEWbZeVuvpW50UzutH7Jz8p+sxKcD9vOsEQLJeIOw3vV35jetKWbVUlOuSWLEE6OsLJJAaJ+wW0aIDKeyWz65Y/uuyG8EkDuzdHsL6Quyq5cP2beygz7gOd+y20a0cTewtL708eezQCIoEjeyO77r5cOwvL50bjeyIEMJexezQFsY5pexHSLkJl+zFUoVe0ex7I8ZaaOzhZqk3tex/VLAPG+0x3L0d1e3EkbsSw+zVULUejuy9Y7sW8Ow2MbdDNe2D2Ln3zexpVrdGNO0I4rcwOe6ajbFYFu2vKMVF3OwCWsJkIe17OKJTcO0zxakwHu2fQLwClu3NxLE3SO0WPcAAVe0gUZoQpu3B7bdEgO2vNZlXp+3v9Jo6qe0l88JF6O28s7gk8+1NqnlTtO1X+ME0SPC+hcI9lu1gUcU3C+4U7cY/5u1RWcFLQO7h9Lj9TO47CLj/Ce8+mbYngO5J4bJAg+4H/pL9fe5bEa/5dO5KKKoAZu4uQqT6xu6vvr4VI+/Wm8IW1+7J3Lw72O7F9cY8GO/Orbco8+4f+cL+Au/D7MI62e5HSqA9KO/1Aab/he+co6L/Be9dRqQFAe12erX/wO8FoLwMZe8/BsEfne+tBqk/we9ZyLo5me9ILcdX3e8lwpU9Se+mZLpIye/5/6Qkyu/5/6AW9O/IwZheeu+hXLoW1+/7DL1d9O9z2cYT2e8PJsJL/e9NBrsW2e8TU48k6e/ZQ59kHPDR8Kr9APBSLr/+Q/AA0p0Aae8McMMJFfBUPaL7h/Dap6pgOfCCR5AAbvCSOMUJt/DD/cU7+e8acLsD1PCN4rQapvCHUMA5/vDi3cc78vDW/5b7ZvBobMADKvH40sNBPPFGxsQDCvFdOMH3YPH9+a9ETvFOSaUOBfG7aLEXkvH00L8Dk/HDG8M36/FWrsdXh/HGULRepPGJN6z01/Fm1MROR/Exa8JeiPFtWrMD5PGL2Zr62fJDjJkM7vGxFMAr3fH4PqFP1PGUTMY3CPJnD4f7PfLcvMciP/JTvWZgCfI1ObX4FvKuKakAH/KlFMVCD/IXO8YkZfIaxas9afI55adSTvL6KnszgPIgOMZYxvLqs6tGgPJ5O7E5yPLOvbtPnvMNjrf39vJPEZoe3vJaP8IV7/KDIZRAHfMc5LU4JfMD7L/9S/MFt4kEOvM2NcU9evOs7JZejfP8Iok3vPNQyLlVgvOAT7lGnfOqO8YEyvP/1cc2fvMmXoo/APQ/0aH+zPO+V74u+vP8DbMcBPQ59Y9i6fOZPa1dGvNCdqhLF/TzF79DK/R778P8NPSkP8MPYPSA6YMDZfTc6L1ESPRsOcNDefTp+ME0e/SJDKwAcvS6NMUZm/S60Zs6wvTIu8ANkvSyM8H9sPQrO734svS6Rq1q6fTg1U8F4fSJHbsoz/Q8Rbn7vPNqecVPL/WuEMETQvUa1rsPO/VeAbk6WPU33L9LfPX6tJk6VvT0d6dVh/WLt8BVdPVIBMNQWPX8UK9VkPX41rxRmfVN+cY8q/UxPIz70PVS4sc4yvXPPLEF8/WVzrERMvYhnrwVCvYDxcJABPZuBaP5KPZBs7hXAPbwJ25k9fWVX7VLEvYuR6Y/LfafFXD+P/YP9bkSjfYcwp0ZhPY83qE2jvaxyL4Anvbrt8Mck/ZhDaNemPY4JKlQgfaBVKv/qPYOHscP0PYD1740sPb4QbdUtfYbRsAa3/YGA7k2Avfk4Y1JD/cO2MROGfcMw8McBfdXDLJYF/cQ4KcnIvdGxsNhu/Y2a6AwK/env5M9HPf3Dbj8D/dhVMATO/cFGcBQMPftPcYaavdmDLMHj/dDRqMRsPdNUb08uPe8D8M84Pdm95td/feLxcJGGfgI+7wDJ/gU85tCWPjTp78e7feRacQkSvi7wMY/bfgurZUYU/gD9bBgG/jQZL0OYfiqBI43TPitS7wfg/jx8p/3j/jxxbwae/i1RatkUfqWg7tMrfi80aBDs/hV8q7/uvjc7LEwx/i3+LwXx/hM5sZbpPjdYKgyy/gnRbo93PjXO8JY8vinB7BI//jDIaUKCPlBK71aG/mf2b8xC/lNNsIbOfk+Lbf6W/md6rQMaflq45VCbvmDEbFOVvmFVb1kovk0tsFf1Pknr71Av/kOLr36vvmTWK5k1/lIIaAk9fml4p9YD/oGtbwYLPrXrL46HvrJAa0BJvoHPcEAP/rKI8f9TfoSCZ1ALfoQZL4LfPo/psD2g/olEqM4q/pEU6z55PrNN7Q9QfvykcMoMPs4yp/7IfoqfL0NPvtC4qcBR/v/H7dgXfuMLK5SZvs6/sQShftS6sdRfPs5Ob0GfPujL749kPtlw6cEjPvjZcRszPv9AsAaKPyuksg2Bvxu7b89DvxOv6gEAfwSQpE8APwvP8P9E/wrGrwAG/yIPZ36SfzHR7b9Z/zH668ObvwACJkebfzDDccMS/wUa8YHU/w+acc1U/xoboI9jfxj0rY6g/wMP5n8pfxk78U8uPxd5rdewfyq5qoxyfxPCsUGzfyIAqIM4PwI6rZS7PxR66L+Cv2xDrBkRf3yj8FCL/1opMFUJv3BKa05MP0C5rX8gv1w5bYQg/0EQq1Ck/31BLB/nf35Xsb+u/2SuLP1sv1pU6tCu/0Q78FAsP20Ubtj2v0T/Ls42P1vYLAAB/7/16QAAv56WLkoH/6HAcIJKf7NM8UvKP4EKccLQ/7R8cZDUf6F68Fadf4+DcJjdf4c5bP4l/5bi7E3kf4qBLxbqf4xG7Fgqf6868RMr/6RD7YKuf4188FGvf6E+8ZA//7GUaNJEf8nAL5fNf+mUcgMNP9ZQ8hFef+qPMcpfP85T7wdhf93pscGj/8ki8E/kf+PpK8DmP/BI6Zftv8VSaptwv/y+qs3zv/9tLJD0f9LT6z83//CCZYZ5v8S1r5g+/+9oqL8MACWusA2PABquLxgSABnkqlMSQARV7wYUgCy+7H5YgCDJsEoWQBz96BhagC81a/3cQARDL4RdgABXsRBqgBZ56P9wACVWMUSxAB/6MJCzAAO8a1h1QCFX79A1QBomr356AAzV8P7';
@@ -6779,7 +6867,7 @@ body.cine>*:not(#cinBox):not(canvas):not(#toast){visibility:hidden!important}
 #cinBox .ct{font-size:13px;letter-spacing:4px;color:#d9c08a;opacity:0;animation:cinIn 1s ease forwards}#cinBox h2{margin:6px 0 4px;font-size:24px;color:#ffe3a3;opacity:0;animation:cinIn 1.2s ease forwards;font-family:serif}
 #cinBox .tn{font-size:13px;color:#c9d2dc;opacity:0;animation:cinIn 1s ease forwards}
 @keyframes cinIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}`; document.head.appendChild(ccss);
-let cinOn=false;
+let cinOn=false,playing=false;
 function showIntro(){ const step=2.6; cinOn=true;
   cin.innerHTML='<button class="sk" data-c="end">略過 ›</button>'+OPEN.map((t,i)=>`<p class="${i===4?'gold':''}" style="animation-delay:${(1+i*step).toFixed(1)}s">${t}</p>`).join('')+
     `<button class="go" data-c="end" style="animation-delay:${(1+OPEN.length*step).toFixed(1)}s">開始</button>`;
@@ -6794,11 +6882,13 @@ function showCard(ch){ cinOn=true; const i=SPOT_IDS.indexOf(ch.spot), here=c.cur
 cin.addEventListener('click',e=>{ const b=e.target.closest('[data-c]'); if(!b) return; const a=b.dataset.c;
   if(a==='end') endIntro(); else { cin.classList.add('hidden'); document.body.classList.remove('cine'); cinOn=false; if(c.pan) c.pan(false); cardAt=performance.now()+1500; if(a==='go') c.goSpot(+b.dataset.v); } });
 let cardAt=performance.now()+3000;   // 用真實時間計時，不受每幀時間差上限影響
-function tryCard(){ if(cinOn||!st.intro) return; const now=performance.now(); if(now<cardAt) return; cardAt=now+2000;
+function tryCard(){ if(!playing||cinOn||c.practice?.())return;
+  if(!st.intro){if(!c.idle||c.idle())showIntro();return;}
+  const now=performance.now(); if(now<cardAt) return; cardAt=now+2000;
   if(!box.classList.contains('hidden')||!document.getElementById('endBox').classList.contains('hidden')) return;
   if(c.idle&&!c.idle()) return; const ch=active().find(x=>st.seen.indexOf(x.id)<0); if(ch) showCard(ch); }
 let moonClock=0; function tick(dt){ tryCard(); moonClock-=dt; if(moonClock>0) return; moonClock=2; if(S.moon&&S.moon.done) bump(t=>t.t==='moon'?1:0);bump(t=>t.t==='scene'&&t.id!=='lantern'&&(S.scenes?.[t.id]||0)>0?1:0); }
-const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>{ if(!st.intro) setTimeout(showIntro,700); });
+const sb=document.getElementById('startBtn'); if(sb)sb.addEventListener('click',()=>{playing=true;cardAt=performance.now()+1800;},{once:true});
 /* 手記面板 */
 const btn=document.createElement('button'); btn.className='chip sm'; btn.id='storyBtn'; btn.setAttribute('aria-label','老漁人的手記'); btn.textContent='📜';
 const t2=document.getElementById('top2'); if(t2) t2.appendChild(btn);
@@ -6892,7 +6982,7 @@ return {progOf:id=>{ const ch=byId(id); return ch?prog(ch).slice():null; },isAct
   show();
  };
  // 預覽網址：?mermaid=1 直接播終幕回禮（只播放、不發獎勵、不改存檔）
- if(typeof location!=='undefined'&&/[?&]mermaid=1(&|$)/.test(location.search)){ const wait=()=>{ if(window.__REALDONE&&window.__playMermaidInvite) setTimeout(()=>window.__mermaidReward({title:'海之友',xp:20000,coins:12000},null,false),800); else setTimeout(wait,500); }; setTimeout(wait,1500); }
+ if(typeof location!=='undefined'&&/[?&]mermaid=1(&|$)/.test(location.search)){ const wait=()=>{ if(window.__GAME_READY&&window.__playMermaidInvite) setTimeout(()=>window.__mermaidReward({title:'海之友',xp:20000,coins:12000},null,false),800); else setTimeout(wait,500); }; setTimeout(wait,1500); }
 })();
 /* ===== 月鱗畫像：送霜汐回家後，她留下一片月鱗，鱗面映出她的樣子（使用者用 AI 產生的美人魚圖） =====
    每次隨機一張，優先給還沒收集到的；收集過的可以在霜汐的對話視窗裡「🖼 月鱗畫像」重看
@@ -8163,12 +8253,20 @@ function render(dt){t+=dt;if(W.prepareScene)W.prepareScene(scene);if(window.__ef
   { const rk=c.rain?Math.min(1,c.rain()*1.6):0; rainGlass.tick(dt,window.__effectBudget?.rainOverlay===false?0:rk); viewM.color.setScalar((.35+.65*daylight())*(1-.35*rk)); }   // 下雨：窗上有水珠、水痕往下滑，外面變暗變霧
   sparkles.forEach(q=>{ const k=Math.max(0,Math.sin(t*1.7+q.ph)); q.sp.material.opacity=Math.pow(k,8); q.sp.scale.setScalar(.03+.05*Math.pow(k,4)); if(k<.02&&Math.random()<.02) q.sp.position.set((Math.random()-.5)*1.5,(Math.random()-.5)*1.2,.0); });   // 水晶閃光
   updTanks(dt);for(const k of ['fresh','sea'])if(tanks[k]&&tanks[k].optics)tanks[k].optics.update();
-  const shadowSize=window.__gfxStatus&&window.__gfxStatus.shadow==='ultra'?4096:window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
+  const useShadows=window.__gfxStatus?.shadow!=='off';
+  const shadowSize=window.__gfxStatus?.shadow==='ultra'?(window.__resourcePolicy?.mobile?2048:4096):window.__GFX==='low'?256:window.__GFX==='mid'?512:2048;
+  if(!useShadows||sun.shadow.mapSize.x!==shadowSize){
+    if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}
+    sun.shadow.mapSize.set(shadowSize,shadowSize);
+  }
   const exposure=R.toneMappingExposure,shadows=R.shadowMap.enabled,shadowType=R.shadowMap.type,shadowAuto=R.shadowMap.autoUpdate,shadowRequest=R.shadowMap.needsUpdate;
   try{
-    R.shadowMap.autoUpdate=false;{ const sig=Math.round(sun.position.x*20)+'|'+Math.round(sun.position.y*20)+'|'+Math.round(sun.position.z*20)+'|'+Math.round(sun.intensity*50)+'|'+mountSig;
+    R.shadowMap.autoUpdate=false;R.shadowMap.enabled=useShadows;R.shadowMap.needsUpdate=false;
+    if(useShadows){const sig=Math.round(sun.position.x*20)+'|'+Math.round(sun.position.y*20)+'|'+Math.round(sun.position.z*20)+'|'+Math.round(sun.intensity*50)+'|'+mountSig;
       /* 小屋大部分東西不動：陰影只在太陽位置／亮度改變、標本換了、或每 2 秒（缸裡的魚會游）才重算；以前每秒 20～30 次 */
-      R.shadowMap.needsUpdate=!sun.shadow.map||sig!==lastShadowSig||t-lastHomeShadow>=Math.max(2,1/(window.__effectBudget?.shadowHz||20)); if(R.shadowMap.needsUpdate){ lastHomeShadow=t; lastShadowSig=sig; } }R.toneMappingExposure=.88;R.shadowMap.enabled=true;R.shadowMap.type=T.PCFSoftShadowMap;
+      R.shadowMap.needsUpdate=!sun.shadow.map||sig!==lastShadowSig||t-lastHomeShadow>=2;if(R.shadowMap.needsUpdate){lastHomeShadow=t;lastShadowSig=sig;}
+    }
+    R.toneMappingExposure=.88;R.shadowMap.type=T.PCFSoftShadowMap;
     R.setRenderTarget(null);W.radiance.render(scene,cam);
     // 白天陽光從左牆窗戶斜射進來：畫面裡看得到窗戶時，從窗口拉出光柱（跟著時段變亮變暗；關燈時更明顯）
     if(W.godRays&&W.raysOn&&W.raysOn()){ const dl=daylight(); if(dl>.05){ try{ W.godRays.render({camera:cam,point:winPt,color:winRayCol,strength:dl*(lightsOff()?.9:.6),thresh:.45}); }catch(e){ window.__noRays=true; } } }
@@ -8641,25 +8739,43 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113040438'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113085751'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
-  const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
+  const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
-  let pendingVersion='';
-  async function doUpdate(){if(!pendingVersion)return;upB.textContent='更新中…';upB.disabled=true;
-    try{if(window.__DIAG)window.__DIAG.action('navigation','intentional-update',pendingVersion);if(window.__saveNow)window.__saveNow();}catch(e){}
-    try{const r=await navigator.serviceWorker.getRegistration();if(r)await r.update();}catch(e){}
-    try{localStorage.setItem('swampAngler.updatedTo',pendingVersion);}catch(e){}const u=new URL(location.href);u.searchParams.set('v',pendingVersion);location.replace(u.toString());
+  let pendingVersion='',checking=false;
+  async function doUpdate(){
+    if(!pendingVersion||upB.disabled)return;
+    const version=pendingVersion;
+    upB.textContent='更新中…';upB.disabled=true;
+    try{window.__saveNow?.();window.__DIAG?.action('navigation','intentional-update',version);}catch(e){}
+    try{localStorage.setItem('swampAngler.updatedTo',version);}catch(e){}
+    const u=new URL(location.href);u.searchParams.set('v',version);location.replace(u.toString());
   }
-  upB.addEventListener('click',doUpdate);noB.addEventListener('click',()=>{bar.style.display='none';dismissed=bar.dataset.v||'';});
-  // 版本檢查只提示，不因回家、閒置、拍照切回頁面而中斷遊戲。
-  async function check(){try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();if(j.v&&j.v!==APP_VER&&j.v>APP_VER){pendingVersion=j.v;bar.dataset.v=j.v;if(dismissed!==j.v)bar.style.display='flex';if(window.__DIAG)window.__DIAG.event('update-available',j.v);}}catch(e){}}
+  upB.addEventListener('click',doUpdate);noB.addEventListener('click',()=>{bar.style.display='none';dismissed=pendingVersion;});
+  // Only a player action reloads the page. Overlapping checks share one notice.
+  async function check(){
+    if(checking||upB.disabled)return;
+    checking=true;
+    try{
+      const response=await fetch('version.json?t='+Date.now(),{cache:'no-store'});
+      if(!response.ok)return;
+      const {v}=await response.json();
+      if(typeof v!=='string'||!/^\d{14}$/.test(v)||v<=APP_VER||v<=pendingVersion)return;
+      pendingVersion=v;
+      if(dismissed!==v)bar.style.display='flex';
+      window.__DIAG?.event('update-available',v);
+    }catch(e){}finally{checking=false;}
+  }
   setTimeout(check,1500);setInterval(check,3*60*1000);
   try{ const up=localStorage.getItem('swampAngler.updatedTo'); if(up&&up===APP_VER){ localStorage.removeItem('swampAngler.updatedTo'); setTimeout(()=>{ const t=document.createElement('div'); t.textContent='✅ 已更新到最新版本'; t.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;padding:8px 14px;border-radius:999px;background:rgba(10,30,20,.85);color:#bff5c8;font-size:14px'; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); },2500); } }catch(e){} document.addEventListener('visibilitychange',()=>{ if(!document.hidden) check(); });
 })();
-  if('serviceWorker' in navigator) window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  if('serviceWorker' in navigator){
+    const register=()=>navigator.serviceWorker.register('sw.js').catch(()=>{});
+    if(document.readyState==='complete')register();else window.addEventListener('load',register,{once:true});
+  }
   async function install(){ if(installed) return 'installed'; if(deferred){ deferred.prompt(); const r=await deferred.userChoice; deferred=null; return r.outcome; }
     return /iPhone|iPad/.test(navigator.userAgent)?'ios':'manual'; }
   return {install,canPrompt:()=>!!deferred,installed:()=>installed};
@@ -9237,11 +9353,36 @@ function biteFX(kind){ try{
   const cv=document.getElementById('c'); if(cv){ let k=0; const sh=setInterval(()=>{ k++; cv.style.transform=k>10?'':`translate(${(Math.random()-.5)*16*(1-k/11)}px,${(Math.random()-.5)*16*(1-k/11)}px)`; if(k>10) clearInterval(sh); },35); }
   setTimeout(()=>el.remove(),2900); }catch(e){ console.warn('biteFX',e); } }
 
-/* ===== 新手指引：第一次開始遊戲時，一步一步圈出每個按鈕並說明用途；可略過，也能從設定重看 ===== */
+function createDockPractice(root,save,persist){
+  let active=false;
+  const hint=root.querySelector('[role=status]');
+  const prompts={
+    idle:'按住釣竿按鈕蓄力，再放開拋竿。',
+    charge:'放開按鈕，將浮標拋向水面。',
+    cast:'看著落在水面的浮標。',
+    wait:'等浮標下沉，看到「起鉤」就點一下。',
+    bite:'現在點「起鉤」！藍區是完美，黃區也能上鉤。',
+    fight:'按住收線，張力過高時放手，等降下來再收。',
+    lost:'收好釣竿後再拋一次。'
+  };
+  function finish(){
+    if(!active)return;
+    active=false;root.classList.add('hidden');save.tutDone=1;persist();
+  }
+  root.querySelector('button').addEventListener('click',finish);
+  return {
+    start(){active=!save.tutDone&&!(save.total>0);root.classList.toggle('hidden',!active);if(active)hint.textContent=prompts.idle;return active;},
+    active:()=>active,
+    update(state,snag){if(!active)return;const message=snag?'掛底了。放手並向側邊拖曳，換個角度收線。':prompts[state];if(message&&hint.textContent!==message)hint.textContent=message;},
+    finish
+  };
+}
+
+/* 從設定重看各按鈕用途。 */
 const TUT_STEPS=[
  [null,'歡迎來到濕地','這裡是老漁人留下的碼頭。跟著指引，一分鐘學會怎麼玩。'],
  ['#actBtn','拋竿','按住這個按鈕蓄力，力道條最滿時放開，就能拋得最遠。'],
- [null,'提竿與收線','浮標被拉進水裡時，立刻點一下提竿。拉扯時按住收線；魚衝刺時先放手，往魚游走的反方向滑動拉竿，別讓張力爆表。'],
+ [null,'提竿與收線','浮標下沉後，魚在藍區或黃區時點一下起鉤。拉扯時按住收線；魚衝刺時先放手，往魚游走的反方向滑動拉竿。'],
  [null,'轉向瞄準','在畫面空白處左右拖曳，就能轉身換方向拋竿。'],
  ['#baitChip','魚餌','點這裡換魚餌。不同的餌吸引不同的魚，稀有的餌要到釣具店買。'],
  ['#bMap','釣點','到不同的釣點，會遇到不同的魚。有些地方要獨木舟或修好的漁船才去得了。'],
@@ -9362,6 +9503,17 @@ return {update:(dt,t)=>{ update(dt,t); burstTick(dt); },force,scare,comeBack,bur
    ・挖掘：刮開濕沙→黏泥→碎貝殼層，每層聲音與震動不同；碰到硬殼要放慢清周圍，刮太快會刮破；竹蟶會往下縮、沙蟹會想逃
    ・泥面上還有招潮蟹、彈塗魚、寄居蟹在活動，點牠們可以抓
    ・挖到的放進桶子，離開時可以全部賣掉，或放進保冷箱帶回家烤（文蛤、赤嘴蛤、海瓜子、竹蟶、沙蟹）；沙蠶變成魚餌 ===== */
+const LOW_TIDE_WINDOWS=[[3,8],[15,20]];
+function tideWindow(hour,assist=false){
+  if(assist)return [hour,hour+24];
+  const h=((hour%24)+24)%24,day=hour-h;
+  const window=LOW_TIDE_WINDOWS.find(([start,end])=>h>=start&&h<end);
+  return window?[day+window[0],day+window[1]]:null;
+}
+function nextLowTide(hour){
+  const h=((hour%24)+24)%24;
+  return hour-h+(LOW_TIDE_WINDOWS.find(([start])=>h<start)?.[0]??27);
+}
 function createTide(W,c){
 'use strict';
 const T=THREE, rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -9530,9 +9682,8 @@ function spawnRoamers(){ roamers.forEach(r=>S.remove(r.g)); roamers=[];
     roamers.push({id,g:f.group,uni:f.uni,h:rand(0,6.28),t:rand(0,3),hop:0,L,flee:0}); } }
 /* ---------- 狀態 ---------- */
 let on=false, yaw=0, pitch=-.32, pos=new T.Vector3(0,1.6,18), bag=[], warned=0, evac=false, endH=0;
-const LOW=[[3,8],[15,20]];   /* 退潮 5 小時；在泥灘上時間走得比較慢（見 d.js），實際可以玩約 20 分鐘 */
-function lowWin(h){ if(easy()) return [h,h+24]; for(const w of LOW) if(h>=w[0]&&h<w[1]) return w; return null; }
-function nextLow(h){ for(const w of LOW) if(h<w[0]) return w[0]; return LOW[0][0]+24; }
+const lowWin=h=>tideWindow(h,easy());
+const nextLow=nextLowTide;
 /* ---------- HUD ---------- */
 const hud=document.createElement('div'); hud.id='tideHud'; hud.innerHTML=`<button id="tdCageB">🧺 拖籠</button><button id="tdStomp">👣 跺腳</button><div id="tdClock"></div><div id="tdBag"></div><div id="tdShore"><span id="tdArr">⬆</span> 岸邊 <b id="tdDist"></b></div><div id="tdHint">看泥面的痕跡判斷底下是什麼，點痕跡開挖・拖曳轉頭・兩指或上下拖曳前進</div><button id="tdExit">⬅ 回岸上</button>`;
 document.body.appendChild(hud);
@@ -10343,6 +10494,10 @@ const G={state:'intro',t:0,hour:7.1,yaw:0,yawT:0,power:0,chargeT:0,rodSide:0,rod
   sp:null,fd:null,f:null,fish:null,stT:0,landFrom:new T.Vector3(),landQ:new T.Quaternion(),snapped:false,endV:new T.Vector3(),base:new T.Vector3(),head:0,spot:0,chaseV:new T.Vector3()};
 const tv=new T.Vector3(), tv2=new T.Vector3(), tq=new T.Quaternion(), te=new T.Euler(0,0,0,'YZX');
 const bob=P.bobber, rod=P.rod;
+const practice=createDockPractice($('dockPractice'),save,()=>persist());
+if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht))save.spot=0;
+if(typeof save.hour==='number'&&Number.isFinite(save.hour))G.hour=save.hour;
+try{window.__REAL=createReal(W,P,SPOTS[save.spot].loc||'lake');}catch(error){console.warn('場景細節載入失敗',error);}
 function period(h){ h=((h%24)+24)%24; return h>=4.8&&h<8.5?'dawn':h<16.5&&h>=8.5?'day':h>=16.5&&h<19.8?'dusk':'night'; }
 const PER_WAIT={dawn:.75,day:1.1,dusk:.75,night:1.0};
 const tv2b=new T.Vector3(), tv3b=new T.Vector3(), tv4b=new T.Vector3();
@@ -10405,9 +10560,12 @@ function snagTick(dt){
 }
 function startCharge(){ if(SPOTS[G.spot].yacht&&G.boatStation==='helm'){switchBoatStation();return;} if(G.scareT>0){ toast('驚魂未定，等一下再拋竿…','warn',1400); return; } G.state='charge'; G.chargeT=0; G.aimYawCast=G.yawT; }
 function cast(){
-  G.snag=false; G.snagHit=null; G.snagOnce=false; G.bottom=false; G.baitUsed=META.useBait(); G.noBait=false; LURE.bobberVis(!(G.baitUsed&&G.baitUsed.lure));
-  const p=G.power, dist=6+p*META.gear().rod.cast, A=G.head+(G.fishingYaw||0)+G.yaw, fw=tv.set(-Math.sin(A),0,-Math.cos(A)), bx=(G.angler||G.base).x, bz=(G.angler||G.base).z;
-  let x=bx+fw.x*dist+rand(-.6,.6), z=bz+fw.z*dist+rand(-.6,.6);
+  G.practiceCast=practice.active();
+  G.snag=false; G.snagHit=null; G.snagOnce=false; G.bottom=false; G.baitUsed=G.practiceCast?BAITS[0]:META.useBait(); G.noBait=false; LURE.bobberVis(!(G.baitUsed&&G.baitUsed.lure));
+  const p=G.power, dist=G.practiceCast?7+p*3:6+p*META.gear().rod.cast;
+  const A=G.practiceCast?0:G.head+(G.fishingYaw||0)+G.yaw, fw=tv.set(-Math.sin(A),0,-Math.cos(A)), bx=(G.angler||G.base).x, bz=(G.angler||G.base).z;
+  let x=bx+fw.x*dist, z=bz+fw.z*dist;
+  if(!G.practiceCast){x+=rand(-.6,.6);z+=rand(-.6,.6);}
   for(let k=0;k<14;k++){ const r=Math.hypot(x,z), maxR=W.shoreR(Math.atan2(x,-z))-6; if(r<=maxR) break; x=bx+(x-bx)*.9; z=bz+(z-bz)*.9; }
   if(G.spot===0&&z>-4.5) z=-4.5;
   G.to.set(x,0,z); G.castDist=Math.max(3,Math.hypot(x-bx,z-bz)); G.castDur=.55+G.castDist*.028; G.apex=1.2+G.castDist*.12;
@@ -10420,10 +10578,11 @@ function landBobber(){
   if(G.baitUsed&&G.baitUsed.lure){ G.state='lure'; P.splash(G.to.x,0,G.to.z,10,.4); W.addRipple(G.to.x,G.to.z,.4); Snd.plop(); G.sp=null; G.fd=null; FUN.castTag(G.castDist); LURE.start(G.to,G.baitUsed,(G.angler||G.base)); return; }
   G.state='wait'; G.prawnDrag=0; G.prawnDone=false; P.splash(G.to.x,0,G.to.z,16,.7); W.addRipple(G.to.x,G.to.z,.55); Snd.plop();
   // 沉底釣：釣棚調到「深棚」又不是路亞時，鉛墜帶著餌沉到底，不看浮標、改看竿尖；結構區會有掛底風險
-  G.bottom=save.depth===2&&!(G.baitUsed&&G.baitUsed.lure)&&G.loc!=='ice'; setTimeout(()=>{ if(G.state==='wait'&&!G.snag) ambStart(); },400); G.snag=false; G.snagMv=0; G.snagFlip=0; G.snagOnce=false;
+  G.bottom=!G.practiceCast&&save.depth===2&&!(G.baitUsed&&G.baitUsed.lure)&&G.loc!=='ice'; setTimeout(()=>{ if(G.state==='wait'&&!G.snag) ambStart(); },400); G.snag=false; G.snagMv=0; G.snagFlip=0; G.snagOnce=false;
   if(G.bottom&&!save.bottomTip){ save.bottomTip=1; persist(); setTimeout(()=>toast('🎣 沉底釣：沒有浮標，看竿尖——輕抖是試咬，竿尖被拉彎才揚竿','',3600),600); }
   G.timer=rand(6,15)*PER_WAIT[period(G.hour)]*(1-G.luck*.6)*(G.baitUsed?G.baitUsed.wait:1)*WL.waitK()*(window.__ECO&&window.__ECO.fxOn('glow')?.6:1)*(1+.2*depNow(depKey())); G.nib=Math.floor(rand(0,3.99)); G.approach=0; G.sp=null; G.fd=null;
   FUN.castTag(G.castDist);
+  if(G.practiceCast){G.timer=2.2;G.nib=0;G.hot=false;return;}
   // 魚的警戒：同一個地方連續打水、或直接砸進魚群，附近的魚會警戒一陣子（咬口變慢），之後慢慢恢復
   const now=performance.now()/1000, near=G.lastLand&&Math.hypot(G.to.x-G.lastLand.x,G.to.z-G.lastLand.z)<3&&now-G.lastLand.t<25;
   G.spook=Math.min(1.5,(G.spook||0)+(near?.35:0)); G.lastLand={x:G.to.x,z:G.to.z,t:now};
@@ -10494,7 +10653,9 @@ const GRADES=[[.2,'幼魚'],[.7,'成魚'],[.93,'大物'],[9,'巨物']];
 const gradeOf=u=>GRADES.find(g=>u<g[0])[1];
 const MERTEST=/[?&]mertest=1/.test(location.search);
 const FORCE_FISH=(location.search.match(/[?&]fish=([a-z0-9_]+)/)||[])[1];   /* 測試：?fish=魚的代號（例如 sail）每次咬餌都是那種魚，搏魚照正常規則（用來實測線長、拉力） */
-function prepFish(){ if(MERTEST){ const sp=SPECIES.find(q=>q.special==='mermaid'); if(sp){ G.sp=sp; G.fd={sp,L:1.7,w:55,u:.5,grade:'A',lvl:1,value:500,xpMul:1}; return; } }   /* 美人魚測試網址：每一次咬餌都是美人魚 */ const wantPin=window.__STORY&&window.__STORY.wants('hairpin')&&WL.zoneId()==='lily'&&period(G.hour)==='night';
+function prepFish(){
+  if(G.practiceCast){const sp=SPECIES.find(q=>q.id==='bluegill');G.sp=sp;G.fd={sp,L:.18,w:.19,u:.35,grade:'B',lvl:1,value:7,xpMul:1,practice:true};return;}
+  if(MERTEST){ const sp=SPECIES.find(q=>q.special==='mermaid'); if(sp){ G.sp=sp; G.fd={sp,L:1.7,w:55,u:.5,grade:'A',lvl:1,value:500,xpMul:1}; return; } }   /* 美人魚測試網址：每一次咬餌都是美人魚 */ const wantPin=window.__STORY&&window.__STORY.wants('hairpin')&&WL.zoneId()==='lily'&&period(G.hour)==='night';
   if(wantPin&&Math.random()<.45){ const it=ITEMS_BY('hairpin'); if(it){ G.sp=FUN.ITEM_SP; G.fd={sp:FUN.ITEM_SP,item:it,L:it.size,w:it.w,lvl:1,value:0,xpMul:1}; return; } }
   if(!FORCE_FISH&&Math.random()<.085*(window.__STORY&&window.__STORY.needs('item')?2:1)){ const it=FUN.rollItem(); G.sp=FUN.ITEM_SP; G.fd={sp:FUN.ITEM_SP,item:it,L:it.size,w:it.w*rand(.85,1.15),lvl:1,value:Math.round(it.val*rand(.8,1.25)),u:.5,xpMul:0}; return; }
   G.depK=depKey(); const sp=(FORCE_FISH&&SPECIES.find(q=>q.id===FORCE_FISH))||pickSpecies(), pw=clamp((G.castDist-6)/30,0,1), seaK=(G.loc||'lake')==='sea'?.62:1, u=Math.pow(Math.random(),(1.6-.5*pw)/WL.sizeB()*(1+(1-reachK())*1.2+.15*depNow(G.depK))*seaK);   // 海裡的魚個頭普遍偏大
@@ -10502,7 +10663,10 @@ function prepFish(){ if(MERTEST){ const sp=SPECIES.find(q=>q.special==='mermaid'
   G.sp=sp; G.fd={sp,L,w,u,grade:gradeOf(u),lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*.4*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; if(window.__TAL) window.__TAL.applyBoss(G,SPECIES,RAR); }
 function bite(){ if(!G.fd) prepFish(); UW.bite(); G.state='bite'; G.biteT=0; FUN.hookStart(G.fd); W.addRipple(G.to.x,G.to.z,.75); P.splash(G.to.x,0,G.to.z,8,.5); Snd.bite(); vib([60,40,60]); }
 // 沒揚到竿：魚大多會把餌吃掉，沒餌就不會再有魚咬，要收線重新上餌（路亞不會被吃掉）
-function missBite(){ if(easy()&&G.fd){ FUN.hookEnd(); hook(true); return; } const lastFd=G.fd; FUN.hookEnd(); if(AMB.app){ AMB.app.flee=3; AMB.app.h+=Math.PI; AMB.app=null; } toast('太晚了：魚已經把餌吐掉，浮標一沉就要揚竿','warn',1800); G.combo=0; FUN.combo(0); G.state='wait'; G.timer=rand(4,9); G.nib=Math.floor(rand(0,2.99)); G.sp=null; G.fd=null; exitUW(); vib(40);
+function missBite(){ if(easy()&&G.fd&&!G.fd.practice){ FUN.hookEnd(); hook(true); return; } const lastFd=G.fd; FUN.hookEnd(); if(AMB.app){ AMB.app.flee=3; AMB.app.h+=Math.PI; AMB.app=null; }
+  G.combo=0; FUN.combo(0); G.state='wait'; G.sp=null; G.fd=null; exitUW(); vib(40);
+  if(G.practiceCast){G.timer=1.8;G.nib=0;toast('這次錯過了。等下一次浮標下沉，再點「起鉤」。','warn',1700);return;}
+  G.timer=rand(4,9);G.nib=Math.floor(rand(0,2.99));toast('太晚了：等浮標下沉、量表亮起就起鉤','warn',1800);
   const lost=fd0=>{ const id=G.baitUsed&&G.baitUsed.id, base={corn:.35,worm:.45,shrimp:.5,live:.3}[id]??.45, sty=fd0?SP_STY[fd0.sp.id]:'';
     return Math.max(.15,Math.min(.75,base+(sty==='nibbler'?.15:sty==='brawler'||sty==='runner'?-.1:0))); };
   if(!(G.baitUsed&&G.baitUsed.lure)){ if(Math.random()<lost(lastFd)){ G.noBait=true; G.stealT=1.6; setTimeout(()=>toast('餌被吃掉了，收線重新上餌','warn',2400),300); } else setTimeout(()=>toast('魚跑了，餌還在','',1600),300); } }
@@ -10510,6 +10674,7 @@ function hook(q){
   const sp=G.sp, L=G.fd.L; exitUW(); ambClear();
   const perfect=!!q; if(perfect){ save.perf=(save.perf||0)+1; if(window.__STORY) window.__STORY.onPerfect(); }
   G.f={perfect,hq:perfect?1:.7,drag:save.drag==null?1:save.drag,cover:0,abr:0,coverSide:Math.random()<.5?-1:1,d:G.loc==='ice'?rand(10,18):G.castDist,az0:Math.atan2(-(G.to.x-(G.angler||G.base).x),-(G.to.z-(G.angler||G.base).z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
+  if(G.fd.practice){G.f.stam=perfect?46:54;G.f.phaseT=.65;}
   G.f.pos=G.to.clone(); G.f.pos.y=-.35; setPoint(G.f.pos,PH.resolve(G.f.pos,Math.max(.12,L*.22)));
   G.state='fight'; P.splash(G.to.x,0,G.to.z,22,1); W.addRipple(G.to.x,G.to.z,.7); Snd.splash(.7); vib(40);
   toast(perfect?'完美揚竿！':'上鉤了！',perfect?'good':'',1200);
@@ -10636,6 +10801,7 @@ function showCard(){
   const isNew=!rec, isRec=!!rec&&fd.w>rec.bw;
   // 首次釣獲日期只在第一次釣到時記錄；更新前的舊紀錄沒有日期就不顯示，不亂填
   save.dex[sp.id]={n:(rec?rec.n:0)+1,bw:Math.max(rec?rec.bw:0,fd.w),bl:Math.max(rec?rec.bl:0,fd.L),md:Math.max(rec&&rec.md||0,FUN.medalLv(fd)),f:rec?rec.f:Date.now()}; save.total++;
+  practice.finish();
   // 魚獲紀錄：魚種、尺寸、釣點、時段、天氣、餌、釣法、釣棚，放生或賣出都保留紀錄與圖鑑進度
   if(!fd.item){ const wx=WL.wx?WL.wx():{}, wn=wx.r>.5?'雨':wx.r>.15?'毛毛雨':wx.f>.5?'霧':wx.c>.55?'陰':'晴', bt=G.baitUsed||{};
     save.catchLog=save.catchLog||[]; save.catchLog.unshift({id:sp.id,L:+fd.L.toFixed(3),w:+fd.w.toFixed(3),t:Date.now(),h:+G.hour.toFixed(2),z:(WL.zoneId&&WL.zoneId())||'',loc:G.loc||'lake',wx:wn,b:bt.id||'',m:G.loc==='ice'?'冰釣':bt.lure?'路亞':G.bottom?'沉底':'浮標',dp:save.depth==null?1:save.depth,new:isNew,rec:isRec});
@@ -10727,6 +10893,7 @@ function actDown(){
     case 'lure': LURE.press(); break;
     case 'fight': if(G.f&&G.f.netOn){ G.f.netGo=true;G.held=false;ui.act.classList.remove('held'); } break;
     case 'wait': if(G.snag){ break; }
+      if(G.practiceCast){toast('先等浮標下沉，看到「起鉤」再點。','',1600);break;}
       startRetrieve(G.prawnDrag>0?'太早了：蝦還抱著餌在走，等浮標停下來、輕輕往下沉再揚竿':G.dip>0?'太早了：剛剛只是魚在試咬，要等浮標整個沉下去再揚竿':'收線','warn'); break;
     case 'bite': { const r=FUN.hookPress(); if(r==='miss') missBite(); else hook(r==='perfect'); } break;
   }
@@ -10759,8 +10926,8 @@ window.addEventListener('keyup',e=>{ keys[e.code]=false; if(e.code==='Space'){ e
 $('startBtn').addEventListener('click',()=>{ if(/[?&]ending=1/.test(location.search)) setTimeout(function endT(){ if(G.state==='idle'&&window.__STORY&&window.__STORY.showEnding) window.__STORY.showEnding(); else setTimeout(endT,800); },2500);   /* 測試：?ending=1 按開始後直接播結局動畫 */ Snd.init(); $('intro').classList.add('hidden'); G.state='idle';if(window.__DIAG)window.__DIAG.start(); toast('按住按鈕蓄力，放開拋竿','',2200);
   // 預覽結局：網址帶 ending 參數時，開始後直接播放結局（測試與重看用）
   if(/[?&]ending=[1-9]/.test(location.search)) setTimeout(()=>window.__playEnding(),1200);
-  else if(!save.tutDone&&!(save.total>0)) setTimeout(()=>startTutorial(),2400);   // 新玩家：第一次開始遊戲時跑新手指引
-  else if(!save.tutDone){ save.tutDone=1; persist(); } });
+  else if(G.spot===0&&!MERTEST&&!FORCE_FISH)practice.start();
+});
 // 魚獲照片：截目前畫面縮成小圖（約 6KB），另存一個獨立的位置（不塞進存檔與雲端同步），最多保留 60 張
 const PHOTO_KEY='swampAngler.photos';
 function photoGet(){ try{ return JSON.parse(localStorage.getItem(PHOTO_KEY)||'{}'); }catch(e){ return {}; } }
@@ -10851,14 +11018,29 @@ function onGrilled(rec,a,b,season,who){ const sp=SPECIES.find(s=>s.id===rec.id);
   persist(); if(window.__ECO&&window.__ECO.render) window.__ECO.render();
   toastHome((legend?'👑 傳說料理！':'🍽 ')+sp.name+'：'+name+'！<br>'+fx.i+' '+fx.n+' '+min+' 分鐘'+(season==='herb'?'・♨️ 咬餌更快 '+Math.round(min*(q>=3?.6:.35))+' 分鐘':'')+(legend?'・雙重效果':'')+'<br><small>'+({salt:'🧂 鹽：效果時間 +20%',lemon:'🍋 檸檬：效果時間 +30%、完美更好烤',herb:'🌿 香草：附加咬餌更快'}[season]||'')+'（出門釣魚時生效）</small>','good',4200); fxBurst(fx.i); Snd.coin&&Snd.coin(); }
 /* ===== 潮間帶 ===== */
-const TIDE=createTide(W,{species:id=>SPECIES.find(q=>q.id===id),hour:()=>G.hour,toast:(...a)=>toastHome(...a),onExit:(bag,forced)=>tideDone(bag,forced),
+let tideScene;
+const TIDE=window.__TIDE={
+  low:h=>!!tideWindow(h,easy()||/[?&]tidetest=1/.test(location.search)),nextLow:nextLowTide,
+  active:()=>!!tideScene?.active(),render:dt=>tideScene?.render(dt),
+  makeModel:id=>getTideScene().makeModel(id)
+};
+function getTideScene(){return tideScene??=createTide(W,{species:id=>SPECIES.find(q=>q.id===id),hour:()=>G.hour,toast:(...a)=>toastHome(...a),onExit:(bag,forced)=>tideDone(bag,forced),
   sellNow:v=>{ save.coins+=v; setCoins(); persist(); Snd.coin&&Snd.coin(); },
   toCooler:(id,L)=>{ save.cooler=save.cooler||[]; if(save.cooler.length>=5) return false; save.cooler.push({id,L,w:+(L*L*L*600).toFixed(3),d:Date.now()}); persist(); return true; },
   keepTank:(id,L)=>{ const sp=SPECIES.find(q=>q.id===id); if(!sp||!window.__HOME) return '小屋還沒開放'; const fd={sp,L,w:+(L*L*L*600).toFixed(3)}; const r=window.__HOME.check(fd); if(!r.ok) return r.why||'放不進去'; window.__HOME.keep(fd,'潮間帶'); return true; },
-  dex:(id,L)=>{ try{ const sp=SPECIES.find(s=>s.id===id); if(sp&&window.__STORY) window.__STORY.onCatch({sp},{zone:'tide',loc:'tide',per:period(G.hour)}); }catch(_){}  const r=save.dex[id]; save.dex[id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,L),bl:Math.max(r?r.bl||0:0,L),md:r?r.md||0:0,f:r?r.f:Date.now()}; persist(); }}); window.__TIDE=TIDE;
+  dex:(id,L)=>{ try{ const sp=SPECIES.find(s=>s.id===id); if(sp&&window.__STORY) window.__STORY.onCatch({sp},{zone:'tide',loc:'tide',per:period(G.hour)}); }catch(_){}  const r=save.dex[id]; save.dex[id]={n:(r?r.n:0)+1,bw:Math.max(r?r.bw||0:0,L),bl:Math.max(r?r.bl||0:0,L),md:r?r.md||0:0,f:r?r.f:Date.now()}; persist(); }});}
 window.__P_splash=(x,y,z)=>{ try{ P.splash(x,.02,z,8,.25); }catch(e){} };
-function goTide(){ if(G.state!=='idle'){ toast('先收線再下灘','warn'); return; } MDL.preload('tide'); G.state='travel'; fadeEl.classList.add('on');
-  setTimeout(()=>{ if(TIDE.enter()) G.state='tide'; else G.state='idle'; fadeOutWhenReady(); },650); }
+function goTide(){
+  if(G.state!=='idle'){toast('先收線再下灘','warn');return;}
+  if(!TIDE.low(G.hour)){toast('退潮後才能下灘','warn');return;}
+  practice.finish();MDL.preload('tide');G.state='travel';fadeEl.classList.add('on');
+  setTimeout(()=>{
+    try{G.state=getTideScene().enter()?'tide':'idle';}
+    catch(error){G.state='idle';window.__DIAG?.add('tide',error.message);toast('潮間帶載入失敗，請再試一次。','warn');}
+    finally{fadeOutWhenReady();}
+  },650);
+  return true;
+}
 window.__W=W; window.__testMer=()=>{ const sp=SPECIES.find(q=>q.special==='mermaid'); G.sp=sp; G.fd={sp,L:1.7,w:55,lvl:1,value:500,xpMul:1,grade:'A',u:.5}; const fish=P.getFish(sp); G.fish=fish; if(!fish.group.parent) W.scene.add(fish.group); G.state='catch'; try{ showCard(); }catch(e){ return 'card '+e.message; } if(G.merShow) G.merShow.t=2; return !!fish.group.userData.merCtl; }; window.__HS=()=>HOME3D; window.__goTide=goTide;
 function tideDone(bag0,forced){ const handled=bag0.filter(b=>b.done).length; let bag=bag0.filter(b=>!b.done); if(!bag.length&&handled){ persist(); toast(forced?'被救回岸邊':'回到岸上了，這次處理了 '+handled+' 個收穫','good',2000); G.state='idle'; return; } G.state='idle';
   // 圖鑑：挖到的都算發現
@@ -10888,9 +11070,9 @@ window.__HOME=createHome({save,persist:()=>persist(),toast:(...a)=>toastHome(...
 const META=createMeta({W,save,persist,toast,Snd,SPECIES,RAR,P,setCoins,vib,PRESETS,goSpot,curSpot:()=>G.spot,setHour:h=>{ G.hour=h; W.setTime(h,true); }});
 const UW=createUnderwater(W,P);
 const tvSea=new THREE.Vector3();
-window.__MDL=createModels(W); const MDL=window.__MDL; MDL.preload('lake'); const RESIDENTS=createSurfaceResidents(W,P,MDL);
+window.__MDL=createModels(W); const MDL=window.__MDL,RESIDENTS=createSurfaceResidents(W,P,MDL);
 // 打開設定、商店等面板或新手指引時，鱷魚與女鬼都不會發動（玩家沒在看湖面）
-const uiBusy=()=>{ const sh=document.getElementById('sheet'); return (sh&&!sh.classList.contains('hidden'))||!$('shopUI').classList.contains('hidden')||!!document.getElementById('tutOv'); };
+const uiBusy=()=>{ const sh=document.getElementById('sheet'); return practice.active()||G.fd?.practice&&G.state==='fight'||(sh&&!sh.classList.contains('hidden'))||!$('shopUI').classList.contains('hidden')||!!document.getElementById('tutOv'); };
 const WL=createWild(W,P,Snd,save,toast,vib,{period:()=>period(G.hour),base:()=>G.base,head:()=>G.head,
   state:()=>uiBusy()?'menu':G.state, loc:()=>G.loc||'lake', kayak:()=>({on:!!SPOTS[G.spot].kayak,v:Math.abs(KY.v),yaw:G.head}),
   onBite:(pos)=>{ if(easy()) return; faceThreat(pos,{dur:2.6,pitch:-.25}); if(G.state==='wait'||G.state==='bite'){ G.state='lost'; G.stT=0; G.snapped=true; }   // 鱷魚咬船：斷線、連擊歸零、驚魂未定
@@ -10903,7 +11085,7 @@ const FUN=createFun(W,P,AT,{G,save,persist,toast,Snd,vib,RAR,setCoins,D,SPN:SPEC
 const SEA=createSea(W,P,AT,{G,save,persist,toast,Snd,vib,setCoins,period:()=>period(G.hour),wx:()=>WL.wx(),underwater:()=>UW.active()});
 const KK=createThrill(W,P,AT,{G,toast,Snd,vib,underwater:()=>UW.active(),hullDims:()=>SEA.hullDims(),hullClear:(p,m)=>SEA.hullClear(p,m),hullOut:(p,o)=>SEA.hullOut(p,o)}); window.__KK=KK;
 G.saveRef=save;
-window.__STORY=createStory({save,persist,toast,Snd,vib,goSpot:i=>goSpot(i),curSpot:()=>G.spot,idle:()=>G.state==='idle',pan:on=>{ G.cinePan=on; if(!on) G.yawT=0; },addXP:x=>META.addXP(x),setCoins:()=>setCoins(),syncHUD:()=>META.syncHUD()});
+window.__STORY=createStory({save,persist,toast,Snd,vib,goSpot:i=>goSpot(i),curSpot:()=>G.spot,practice:practice.active,idle:()=>G.state==='idle'&&!uiBusy(),pan:on=>{ G.cinePan=on; if(!on) G.yawT=0; },addXP:x=>META.addXP(x),setCoins:()=>setCoins(),syncHUD:()=>META.syncHUD()});
 const SKY=createNightSky(W,G); window.__SKY=SKY;
 /* Adaptive profiles change resolution, reflection, shadow and effect budgets together. */
 window.__gfxCap=()=>{const w=Math.max(1,window.innerWidth),h=Math.max(1,window.innerHeight),limit=W.renderer.capabilities.maxTextureSize||4096;const px=window.__resourcePolicy?.mobile?2200000:12000000;
@@ -10926,12 +11108,11 @@ const ARMS=createArms(W,P); window.__ARMS=ARMS;
 const LURE=createLure(W,P,{G,toast,Snd,mood:()=>{ const p=period(G.hour), wx=WL.wx(); return (p==='dawn'||p==='dusk'?1.25:p==='day'?.85:.8)*(wx.c>.5?1.12:1)*(G.loc==='ice'?.8:1); },uwOn:()=>save.uw!==false,reelSpd:()=>META.gear().reel.spd,onChase:()=>{ if(!G.fd) prepFish(); if(!G.fd||G.fd.item) return null; const f=P.getFish(G.fd.sp); if(f) seeThrough(f.group); return f?{group:f.group,uni:f.uni,L:G.fd.L}:null; }}); window.__G=G;
 window.__MOON=createMoonBay(W,{G,save,persist,toast,Snd,vib,hour:()=>((G.hour%24)+24)%24,zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour),giveRod:()=>{ const i=GEAR.rod.findIndex(r=>r.req==='moon'); if(i>=0&&save.gear.rod.indexOf(i)<0){ save.gear.rod.push(i); persist(); } }});
 window.__TAL=createTalents({save,persist,toast,Snd,vib,setCoins,addXP:x=>META.addXP(x),loc:()=>G.loc||'lake',zoneId:()=>WL.zoneId?WL.zoneId():'',period:()=>period(G.hour)}); window.__SEA=SEA;
-if(!SPOTS[save.spot]||(SPOTS[save.spot].kayak&&!save.kayak)||(SPOTS[save.spot].yacht&&!save.yacht)) save.spot=0;
 { const s=SPOTS[save.spot]; G.spot=save.spot; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head; WL.setSpot(save.spot); SEA.setLoc(s.loc||'lake'); }
 function goSpot(i){ if(G.state==='home'){ leaveHome(()=>goSpot(i)); return; }   // 在小屋裡選了釣點：先出門再過去
   if(G.state!=='idle'){ toast('先收線再移動','warn'); return; } { const lk=window.__STORY&&window.__STORY.lock(i); if(lk){ toast('🔒 '+lk,'warn',2400); return; } }
   // 上一行：所有入口共用的開放檢查
-  const s=SPOTS[i]; G.state='travel'; fadeEl.classList.add('on'); Snd.paddle(); setTimeout(()=>Snd.paddle(),380);
+  const s=SPOTS[i]; if(i!==0)practice.finish();G.state='travel'; fadeEl.classList.add('on'); Snd.paddle(); setTimeout(()=>Snd.paddle(),380);
   setTimeout(()=>{ G.spot=i; G.base.set(s.pos[0],0,s.pos[1]); G.head=s.head;G.boatStation='fishing';G.angler=null;G.fishingYaw=0; G.yaw=G.yawT=0; save.spot=i; persist(); WL.setSpot(i); if((s.loc||'lake')!==SEA.loc()) SEA.setLoc(s.loc||'lake'); fadeOutWhenReady(); G.state='idle'; toast('抵達'+s.name); if(s.id==='moon'&&!save.lagoonPg){ save.lagoonPg=1; persist(); setTimeout(()=>{ if(window.__STORY&&window.__STORY.page) window.__STORY.page('手記・附頁：月光灣的秘密','月光灣不是普通的湖灣。<br><br>灣底有一條很深的石縫，一路通到外海。平常潮水進不來，可是每逢月圓、大潮漲到最高的那幾夜，海水就會從石縫湧進灣裡。<br><br>那幾夜，我在這裡釣過小丑魚、藍色的刺尾鯛、拖著長絲的鰺……都是海裡才有的魚。月亮越圓，牠們越多。<br><br>霜汐說，她就是順著那條水道游進來的。<br><br>還有一件事，我只敢寫在這裡：有一年滿月的深夜，我看見一隻長著鹿角的海馬，比我的船還長，在月光下慢慢游過灣口。'); },1600); }; },750); }
 const KY={v:0,w:0,thr:0,turn:0,wake:0,ptr:null,x0:0,y0:0,zone:-1};
 const joy=$('joy'), joyK=$('joyK');
@@ -11009,7 +11190,7 @@ function guardUW(){ if(UW.active()&&!uwExiting&&G.state!=='wait'&&G.state!=='bit
 function updateFight(dt){
   // 天賦等級（沒有天賦系統時一律當 0）
   const talR=k=>window.__TAL&&window.__TAL.rank?window.__TAL.rank(k):0, ttlF=k=>window.__TAL&&window.__TAL.titleFx?window.__TAL.titleFx(k):0;
-  if(easy()){
+  if(easy()&&!G.fd.practice){
     const f=G.f,boat=!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht);f.assistT=(f.assistT||0)+dt;f.T=.35;f.brk=0;f.slk=0;f.abr=0;f.lostWhy=null;
     if(boat&&!G.fd.item&&!G.fd.sp.special){
       f.stam=0;f.run=false;
@@ -11026,7 +11207,7 @@ function updateFight(dt){
   const f=G.f, sp=G.fd.sp, fs=sp.f, fd=G.fd;
   if(f.pos&&G.loc!=='ice'){ f.d=Math.hypot(f.pos.x-(G.angler||G.base).x,f.pos.z-(G.angler||G.base).z); }
   f.ft=(f.ft||0)+dt; f.maxT=Math.max(f.maxT||0,f.T); if(f.run&&!f.wasRun) f.runs=(f.runs||0)+1; f.wasRun=f.run;   // 搏魚統計：時間、最高張力、衝刺次數
-  const ST=styOf(fd.sp.id), DF=D();
+  const ST=styOf(fd.sp.id), DF=fd.practice?DIFF.easy:D();
   f.phaseT-=dt;
   if(f.phaseT<=0){
     if(f.run){ f.run=false; f.ev=null; f.phaseT=rand(ST.rest[0],ST.rest[1])*(1.3-fs.agi*.3); f.latDir=0; }
@@ -11164,10 +11345,10 @@ function updateFight(dt){
     if(!f.surgeTip){ f.surgeTip=1; toast('魚還有力氣，又衝出去了','warn',1500); } }
 }
 
-function update(dt){
+function update(dt,elapsed=dt){
   if(G.state!=='home')PH.refresh();
   if(document.body.dataset.fishingState!==G.state) document.body.dataset.fishingState=G.state;
-  if(easy()){
+  if(easy()&&!G.practiceCast){
     if(G.state==='wait'){ G.snag=false; G.noBait=false; G.nib=0; G.timer=Math.min(G.timer,.6); }
     if(G.state==='lure'){ G.easyLureT=(G.easyLureT||0)+dt; if(G.easyLureT>.6){ G.to.copy(bob.position); G.to.y=0; LURE.end(); if(!G.fd) prepFish(); bite(); } } else G.easyLureT=0;
     if(G.state==='bite'&&G.fd){ FUN.hookEnd(); hook(true); }
@@ -11176,8 +11357,8 @@ function update(dt){
   // 離開拉魚：釣竿傾斜一律歸零，不受手指狀態影響
   if(G.prevSt==='fight'&&G.state!=='fight'){ G.yawT=G.aimYaw||0; G.rodSideT=0; }
   if(G.state==='fight'&&G.prevSt!=='fight') G.aimYaw=G.aimYawCast!=null?G.aimYawCast:G.yawT; G.prevSt=G.state;
-  G.t+=dt; G.hour+=dt/(G.state==='tide'?240:40);   // 在泥灘上時間放慢 6 倍，退潮有足夠的時間慢慢找、慢慢挖
-  G.hSave=(G.hSave||0)+dt; if(G.hSave>10){ G.hSave=0; save.hour=((G.hour%24)+24)%24; persist(); }
+  G.t+=elapsed; G.hour+=elapsed/(G.state==='tide'?240:40);   // 在泥灘上時間放慢 6 倍
+  G.hSave=(G.hSave||0)+elapsed; if(G.hSave>10){ G.hSave=0; save.hour=((G.hour%24)+24)%24; persist(); }
   const info=W.setTime(G.hour);if(G.state==='home'){W.updateEnvironment(dt,G.t);updateKayak(dt);return;}W.update(dt,G.t); updateKayak(dt);
   if(keys.ArrowLeft||keys.ArrowRight){ const k=(keys.ArrowRight?1:0)-(keys.ArrowLeft?1:0); if(G.state==='fight') G.rodSideT=k; else if(G.state==='idle'||G.state==='charge'||G.state==='wait'||G.state==='bite'||G.state==='lure') G.yawT=clamp(G.yawT-k*dt*1.2,-.95,.95); }
   G.rodSide+=(G.rodSideT-G.rodSide)*Math.min(1,dt*8); rod.side=G.rodSide;
@@ -11186,7 +11367,7 @@ function update(dt){
   const st=G.state;
   if(st==='intro'||st==='idle'||st==='charge'){
     rod.pitchT=st==='charge'?.15+.5*G.power:Math.sin(G.t*.8)*.01;
-    if(st==='charge'){ G.chargeT+=dt; G.power=(1-Math.cos(G.chargeT*2.4))/2; setPower(G.power); setAct('放開<br>拋竿','力道條滿格時放開最遠',false); }
+    if(st==='charge'){ G.chargeT+=elapsed; G.power=(1-Math.cos(G.chargeT*2.4))/2; setPower(G.power); setAct('放開<br>拋竿','力道條滿格時放開最遠',false); }
     else if(st==='idle'){ if(G.loc==='ice'){ if(!ICE.drilled()){ if(G.held) ICE.drill(easy()?dt*12:dt); setAct(G.held?'鑿冰中 '+Math.round(ICE.progress()*100)+'%':'按住<br>鑿冰洞','冰釣：先在前方鑿開冰洞',false); } else setAct('點擊<br>放線','把浮標從冰洞放下去',false); } else if(SPOTS[G.spot].yacht&&G.boatStation==='helm')setAct('返回<br>釣位','駕駛座：搖桿控制航行；停船後返回釣位',false);else setAct('按住<br>蓄力','左右拖曳畫面可以轉向瞄準',false); }
   }
   P.updateRod(dt);
@@ -11195,13 +11376,16 @@ function update(dt){
     G.idleF=Math.min(1,(G.idleF||0)+dt*1.5); hangPos(tv2b); bob.position.copy(tv2b).lerp(tv3b.copy(rod.guidesW[2]).add(tv4b.set(0,-.05,0)),sstep(0,1,G.idleF)); lineEnd=bob.position; slack=.02; }
   else if(st==='intro'||st==='idle'||st==='charge'){ G.idleF=0; hangPos(bob.position); lineEnd=bob.position; slack=.05; }
   else if(st==='cast'){
-    if(G.delay>0){ G.delay-=dt; hangPos(bob.position); if(G.delay<=0) G.from.copy(bob.position); }
-    else { G.castT+=dt; const s=Math.min(1,G.castT/G.castDur);
+    stepFishingPhysics(elapsed,step=>{
+    if(G.delay>0){ G.delay-=step; hangPos(bob.position); if(G.delay<=0) G.from.copy(bob.position); }
+    else { G.castT+=step; const s=Math.min(1,G.castT/G.castDur);
       const old=bob.position.clone(), want=new T.Vector3(lerp(G.from.x,G.to.x,s),lerp(G.from.y,0,s)+4*G.apex*s*(1-s),lerp(G.from.z,G.to.z,s));
       const q=PH.move(old,want,.06,false); setPoint(bob.position,q.pos);
       if(q.contact){ G.castHit=q.contact; G.to.set(q.pos.x,0,q.pos.z); landBobber(); }
 
       if(G.castT>.25) rod.pitchT=.05; if(s>=1&&G.state==='cast') landBobber(); }
+    return G.state==='cast';
+    });
     lineEnd=bob.position; slack=.1; setAct('・・・','',false);
   }
   else if(st==='lure'){
@@ -11220,12 +11404,12 @@ function update(dt){
     rod.pitchT=.05;
     const y=W.swell(G.to.x,G.to.z,G.t)-.005;
     if(st==='wait'){
-      G.timer-=dt; if(G.dip>0) G.dip-=dt;
+      G.timer-=elapsed; if(G.dip>0) G.dip-=elapsed;
       if(G.noBait) G.timer=99;
       // 泰國蝦咬餌：先用螯抱住餌拖著走（浮標橫向慢慢移動），停下來開始吃才真正咬住；拖著走的時候揚竿只會拉到空鉤
-      if(G.prawnDrag>0){ G.prawnDrag-=dt; const k=.16*dt; G.to.x+=G.dragDir.x*k; G.to.z+=G.dragDir.z*k; G.dragRip=(G.dragRip||0)-dt; if(G.dragRip<=0){ G.dragRip=.45; W.addRipple(G.to.x,G.to.z,.08); } if(G.prawnDrag<=0){ G.prawnDrag=0; bite(); } }
-      else if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer=rand(.7,2.2); } else { if(!G.fd) prepFish(); if(G.fd&&G.fd.sp.id==='prawn'&&!G.prawnDone){ G.prawnDone=true; G.prawnDrag=rand(2.5,5); G.timer=99; const a=Math.random()*6.283; G.dragDir={x:Math.cos(a),z:Math.sin(a)}; W.addRipple(G.to.x,G.to.z,.15); Snd.nibble(); vib(10); } else bite(); } }
-      if(G.state==='wait'&&G.nib===0&&G.timer<3&&!G.fd){ prepFish(); if(!G.fd.item&&(save.uw!==false||G.fd.sp.special==='mermaid')) enterUW(); }
+      if(G.prawnDrag>0){ G.prawnDrag-=elapsed; const k=.16*elapsed; G.to.x+=G.dragDir.x*k; G.to.z+=G.dragDir.z*k; G.dragRip=(G.dragRip||0)-elapsed; if(G.dragRip<=0){ G.dragRip=.45; W.addRipple(G.to.x,G.to.z,.08); } if(G.prawnDrag<=0){ G.prawnDrag=0; bite(); } }
+      else if(G.timer<=0){ if(G.nib>0){ G.nib--; nibble(); G.timer+=rand(.7,2.2); } else { if(!G.fd) prepFish(); if(G.fd&&G.fd.sp.id==='prawn'&&!G.prawnDone){ G.prawnDone=true; G.prawnDrag=rand(2.5,5); G.timer=99; const a=Math.random()*6.283; G.dragDir={x:Math.cos(a),z:Math.sin(a)}; W.addRipple(G.to.x,G.to.z,.15); Snd.nibble(); vib(10); } else bite(); } }
+      if(G.state==='wait'&&G.nib===0&&G.timer<3&&!G.fd){ prepFish(); if(!G.fd.practice&&!G.fd.item&&(save.uw!==false||G.fd.sp.special==='mermaid')) enterUW(); }
       if(UW.active()&&G.state==='wait') UW.setProgress(1-G.timer/3);
       if(G.fd&&G.state==='wait'){ G.bubT=(G.bubT||0)-dt; if(G.bubT<=0){ G.bubT=rand(.25,.7); W.addRipple(G.to.x+rand(-.3,.3),G.to.z+rand(-.3,.3),.05); P.splash(G.to.x+rand(-.25,.25),0,G.to.z+rand(-.25,.25),1,.15); } }
       { const wv=WL.wind(), old=new T.Vector3(G.to.x,y,G.to.z), want=old.clone();
@@ -11240,18 +11424,18 @@ function update(dt){
       if(G.stealT>0){ G.stealT-=dt; const tap=Math.max(0,Math.sin(G.stealT*22))*.03; bob.position.y-=tap; if(Math.random()<dt*5) W.addRipple(G.to.x,G.to.z,.12); }   // 小魚一口一口啄餌：浮標快速點水
       if(G.noBait&&!(G.stealT>0)&&!G.bottom) bob.position.y+=.025*bob.scale.x;   // 餌沒了：浮標少了重量，浮得比較高
       if(G.inspDip>0){ G.inspDip-=dt; bob.position.y-=Math.sin(G.inspDip*18)*.02; bob.rotation.z=Math.sin(G.inspDip*14)*.25; }
-      setAct('收線',G.snag?'掛底了！左右來回拖曳畫面試著解開（硬收會斷線）':UW.active()?'魚正在靠近餌……':G.bottom?'看竿尖：被拉彎時立刻點擊！':'浮標被拉進水裡時，立刻點擊！',false);
+      setAct(G.practiceCast?'等魚<br>咬餌':'收線',G.snag?'掛底了！左右拖曳改變拉線角度':UW.active()?'魚正在靠近餌……':G.bottom?'竿尖拉彎時，看量表起鉤':'浮標下沉時，看量表起鉤',false);
       if(G.bottom){ const dropFrom=bob.position.clone(); bob.position.y=-1.2; rod.bendT=.1+(G.dip>0?.22*Math.sin((G.dip/(G.dipMax||.28))*Math.PI):0)+Math.sin(G.t*1.3)*.012;   // 竿尖：試咬時輕抖、平常隨水流微微晃
         const hookAt=new T.Vector3(G.to.x,-1.2,G.to.z), q=PH.move(dropFrom,hookAt,.065,false);
         setPoint(bob.position,q.pos); if(q.contact) tackleSnag(q.contact,dropFrom);
       }
 
     } else {
-      G.biteT+=dt; bob.position.set(G.to.x+Math.sin(G.biteT*3)*.15,G.bottom?-1.2:y-.13-.04*Math.sin(G.biteT*12),G.to.z+G.biteT*.2); if(G.bottom){ rod.bendT=.55+.08*Math.sin(G.biteT*14); rod.pitchT=-.02; }
+      G.biteT+=elapsed; bob.position.set(G.to.x+Math.sin(G.biteT*3)*.15,G.bottom?-1.2:y-.13-.04*Math.sin(G.biteT*12),G.to.z+G.biteT*.2); if(G.bottom){ rod.bendT=.55+.08*Math.sin(G.biteT*14); rod.pitchT=-.02; }
       { const q=PH.move(new T.Vector3(G.to.x,y,G.to.z),bob.position,.065); setPoint(bob.position,q.pos); }
       P.shadow.material.opacity=0;
       setAct('起鉤','藍色區按下＝完美，黃色區＝上鉤',true);
-      if(FUN.hookExpired()){ FUN.pop('錯過','miss'); missBite(); }
+      if(FUN.advanceHook(elapsed)){FUN.pop('錯過','miss');missBite();}
     }
     lineEnd=bob.position; slack=.35;
     if(G.bottom){ const pull=st==='bite'?Math.min(1,G.biteT*1.5):0, tw=G.dip>0?.15:0;
@@ -11259,7 +11443,7 @@ function update(dt){
       lineEnd=G.entry; slack=G.snag?.0:.22-.18*pull-tw;   // 魚咬時線被拉直；掛底時線完全繃直
       G.entT=(G.entT||0)-dt; if(G.entT<=0){ G.entT=pull>0?.25:rand(1.2,2.4); W.addRipple(G.entry.x,G.entry.z,pull>0?.22:.08); } }
   }
-  else if(st==='fight'){ updateFight(dt); if(G.state==='fight'){ const f=G.f; lineEnd=rod.end; slack=clamp(.1*(1-f.T*1.4),0,.1);   // 魚掛在線上：線幾乎繃直
+  else if(st==='fight'){ stepFishingPhysics(elapsed,step=>{updateFight(step);return G.state==='fight';}); if(G.state==='fight'){ const f=G.f; lineEnd=rod.end; slack=clamp(.1*(1-f.T*1.4),0,.1);   // 魚掛在線上：線幾乎繃直
       trem=(.012+.05*f.T)*(f.run?1.6:1); } }
   else if(st==='retrieve'){
     const path=G.retrievePath||[bob.position.clone(),rod.tipW.clone()];
@@ -11278,14 +11462,14 @@ function update(dt){
     if(G.state==='retrieve'&&G.retrieveNode>=path.length) G.state='idle';
   }
 
-  else if(st==='lost'){ G.stT+=dt; lineOn=false; setAct('・・・','',false); if(G.stT>1.3){ G.snapped=false; G.state='idle'; } }
+  else if(st==='lost'){ G.stT+=elapsed; lineOn=false; setAct('・・・','',false); if(G.stT>1.3){ G.snapped=false; G.state='idle'; } }
   else if(st==='land'||st==='catch'||st==='post'){
     const g=G.fish.group, D=dispDist(); rod.pitchT=.45; bob.visible=false; lineOn=st!=='post';
     if(st!=='land'&&g.parent===W.head) liftAbove(g);   /* 展示中的魚整條保持在水面以上（只在低於水面時往上抬，不會一直累加） */
     W.head.updateMatrixWorld(true);
     if(st==='land'&&G.netting){
       // 抄網起魚：①網子伸到魚旁、探進水裡 ②魚被兜進網袋 ③整網提出水面（網袋被拉垂、滴水）④拉到眼前，魚在網裡掙扎
-      G.stT+=dt; const t=G.stT, L=G.fd.L, n=NET.g, hoopR=Math.max(.55,L*.6);
+      G.stT+=elapsed; const t=G.stT, L=G.fd.L, n=NET.g, hoopR=Math.max(.55,L*.6);
       // 抄網時低頭看水面（魚就在船邊），提起來後再抬頭
       n.visible=true; n.scale.setScalar(hoopR/.5); W.head.getWorldQuaternion(tq); const yaw=new THREE.Euler().setFromQuaternion(tq,'YXZ').y;
       const fishAt=G.landFrom, start=W.head.localToWorld(tv2.set(.7,-.35,-1.6)), lift=W.head.localToWorld(new THREE.Vector3(.15,-.05,-Math.max(1.6,L*2.2)));
@@ -11308,7 +11492,7 @@ function update(dt){
     }
     else if(st==='land'){
       // 起魚三段：①竿子高舉，魚被線吊出水面、頭朝上掛在竿尖下甩動掙扎、身上滴水 ②把吊著的魚拉到眼前晃著 ③轉成展示角度
-      G.stT+=dt; const T1=1.1, T2=2.3, T3=2.75, t=G.stT, L=G.fd.L;
+      G.stT+=elapsed; const T1=1.1, T2=2.3, T3=2.75, t=G.stT, L=G.fd.L;
       rod.pitchT=t<T1?.38:t<T2?.3:.45; rod.bendT=t<T2?.55+.12*Math.sin(t*9):.3;
       const tip=rod.tipW, hangLen=.55+L*.2;
       if(!G.swing) G.swing={a:0,v:1.6};
@@ -11347,7 +11531,8 @@ function update(dt){
   P.setLine(lineEnd||rod.tipW, slack, !atHelm&&lineOn&&!!lineEnd, info.light, trem);
   if(st!=='fight'&&st!=='wait'&&st!=='lure') { if(st!=='bite') P.shadow.material.opacity=Math.max(0,P.shadow.material.opacity-dt); }
   const showing=st==='land'||st==='catch';
-  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); SCH.update(dt,G.t);
+  practice.update(G.state,G.snag);
+  P.updateFx(dt,info.light); UW.update(dt); WL.update(dt,G.t); AT.update(dt,G.t); FUN.update(dt,elapsed); SEA.update(dt,G.t); KK.update(dt,G.t); MDL.update(dt); SCH.update(dt,G.t);
   { const z=WL.zoneId?WL.zoneId():'dock'; if(z!==G.wzone&&G.loc!=='sea'){ G.wzone=z; const T2={dock:[[.010,.019,.011],[.018,.045,.026]],lily:[[.010,.026,.010],[.028,.07,.028]],wood:[[.020,.019,.009],[.05,.044,.02]],deep:[[.006,.015,.017],[.012,.034,.04]],moon:[[.007,.017,.02],[.016,.04,.05]]}[z]; if(T2&&W.setWaterTint) W.setWaterTint(T2[0],T2[1]); } if(W.tintTick) W.tintTick(dt); } try{ fightFx(dt); }catch(e){} try{ updDistMark(); }catch(e){} try{ ambUpdate(dt); }catch(e){ console.warn('amb',e); } try{ updMag(); }catch(e){} if(G.spook>0){ const was=G.spook; G.spook=Math.max(0,G.spook-dt*.03);
     // 警戒退下來時，嚇跑的魚群從外側游回剛才的落水點附近
     if(was>=.15&&G.spook<.15&&G.spookAt&&(G.loc==='lake'||G.loc==='sea')){ if(SCH.comeBack(G.spookAt.x,G.spookAt.z)) toast('🐟 剛才嚇跑的魚慢慢游回來了，可以再試試','good',2200); G.spookAt=null; } } if(!save.lookTip&&W.info.day<.15&&G.state==='idle'&&G.t>20){ save.lookTip=1; persist(); toast('🌌 上下拖曳畫面可以抬頭看星空','good',3500); }
@@ -11381,34 +11566,69 @@ function showLightSet(on){ if(showL) showL.intensity+=((on?1.4:0)-showL.intensit
 /* ---------- 主迴圈與自動畫質 ---------- */
 function onResize(){ W.resize(window.innerWidth,window.innerHeight); UW.resize(window.innerWidth,window.innerHeight); }
 window.addEventListener('resize',onResize); onResize();
-if(typeof save.hour==='number'&&isFinite(save.hour)) G.hour=save.hour;
 W.setTime(G.hour,true);
 dockCameraButton($('bCam'),$('cameraSlot'),$('top'));
 const screenCapture=createScreenCapture({canvas:W.renderer.domElement,button:$('bCam'),report:(m,k)=>toast(m,k,2200),captureState:scene=>SEA.photoTarget(scene),onCaptured:(scene,target)=>SEA.recordPhoto(scene,target),scene:()=>TIDE.active()?'tide':HOME3D.active()?'home':UW.active()?'underwater':END.on()?'ending':G.loc||'lake',save:persist});
 const fpsDisplay=createFPSDisplay(document,save.fps!==false);window.__setFPSVisible=on=>fpsDisplay.setEnabled(on);document.addEventListener('visibilitychange',()=>fpsDisplay.reset());
 const frameLimiter=createFrameLimiter(GAME_FPS_LIMIT,performance.now());window.__frameLimit=GAME_FPS_LIMIT;
+document.addEventListener('visibilitychange',()=>frameLimiter.reset(performance.now()));
 const gpuStatus=document.createElement('div');gpuStatus.style.cssText='display:none;position:fixed;inset:0;z-index:200;background:rgba(6,16,20,.92);color:white;align-items:center;justify-content:center;text-align:center;padding:28px;font:18px sans-serif';document.body.appendChild(gpuStatus);
 const graphicsRecovery=createGraphicsRecovery(W.renderer.domElement,{save:persist,report:(kind,msg)=>{if(window.__DIAG)window.__DIAG.add(kind,msg);},lost:()=>{screenCapture.cancel();releaseAll();if(window.__DIAG)window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','context-lost');gpuStatus.textContent='畫面正在恢復，遊戲進度已保存。';gpuStatus.style.display='flex';setTimeout(()=>{if(graphicsRecovery.paused()){gpuStatus.innerHTML='<div>畫面尚未恢復，遊戲進度已保存。<br><button style="margin-top:20px;padding:12px 24px">重新載入</button></div>';gpuStatus.querySelector('button').onclick=()=>{persist();if(window.__DIAG)window.__DIAG.action('navigation','manual-gpu-recovery');location.reload();};}},8000);},restored:()=>{W.resetGraphics();HOME3D.resetGraphics();frameLimiter.reset(performance.now());gfxAuto.pause();gpuStatus.style.display='none';}});
 let homeWarmAt=0;
 /* 標本館：一公尺以上的標本照真實大小吊掛展示（從小屋進去） */
 const TROPHY_HALL=createTrophyHall(W);
 { const hb=document.getElementById('bHall'); if(hb) hb.addEventListener('click',()=>{ Snd.init&&Snd.init(); TROPHY_HALL.enter(); }); }
-const introEl=document.getElementById('intro');
+let lastIntroRender=-Infinity;
 function frame(now){
-  const frameSeconds=frameLimiter.step(now);if(frameSeconds===null){requestAnimationFrame(frame);return;}
-  if(graphicsRecovery.paused()||document.hidden||screenCapture.paused()){frameLimiter.reset(now);requestAnimationFrame(frame);return;}const dt=Math.min(.05,frameSeconds);window.__frameSeconds=frameSeconds;
-  // Resolution changes clear the drawing buffer: apply them BEFORE drawing this frame.
-  gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:!!window.__REALDONE&&document.getElementById('intro').classList.contains('hidden')&&!document.hidden,scene:TIDE.active()?'tide':HOME3D.active()?HOME3D.qualityScope():UW.active()?'underwater':G.loc||'lake'});
-  if(window.__DIAG)window.__DIAG.beginFrame();try{ window.__UWON=UW.active(); update(dt);if(window.__DIAG)window.__DIAG.stage('simulation');if(!HOME3D.active()){merPresent(dt); if(MERTEST&&G.state==='fight'){ if(G.f){ G.f.brk=0; G.f.slk=0; G.f.abr=0; G.f.d=Math.min(G.f.d,20); G.f.lostWhy=null; } G.mtT=(G.mtT||0)+dt;   /* 測試：線不會斷、不會鬆脫、不會被拉光 */ if(G.mtT>3){ G.mtT=0; try{ land(); }catch(e){} } } else G.mtT=0;   /* 測試：拉 3 秒自動上岸 */ if(END.on()){ END.tick(dt); bob.visible=false; P.rodGroup.visible=false; P.setLine(rod.tipW,0,false,0,0); } END.frame(dt); AFTER.update(dt); guardUW(); MDL.glowTick(); RESIDENTS.update(dt,G); if(!HOME3D.active()&&!END.on()) GHOST.update(dt);}if(window.__DIAG)window.__DIAG.stage('actors'); if(typeof TROPHY_HALL!=='undefined'&&TROPHY_HALL.active()) TROPHY_HALL.render(dt); else if(TIDE.active()) TIDE.render(dt); else if(HOME3D.active()) HOME3D.render(dt); else if(UW.active()) UW.render(); else { if(window.__GEOLOD) window.__GEOLOD.update(W.scene,W.camera,dt,window.__effectTier);
-      /* 開始畫面、場景還在載入時：背景（蓋在說明文字後面的湖景）每三幀才畫一次，把時間讓給下載、解碼、上傳貼圖——載入更快，開始畫面也不會卡成 20 幾幀。載完或按下開始就恢復每幀都畫 */
-      const loadingIntro=!window.__REALDONE&&typeof introEl!=='undefined'&&introEl&&!introEl.classList.contains('hidden'); window.__introTick=((window.__introTick||0)+1)%3;
-      if(!loadingIntro||window.__introTick===0){ W.render(); LURE.renderPiP(W.renderer,dt); } } }catch(e){if(G.state==='home'||HOME3D.active())recoverHome(e);else console.error(e);}
-  if(HOME3D.active()){if(!homeWarmAt)homeWarmAt=now;if(homeWarmAt>0&&now-homeWarmAt>5000){homeWarmAt=-1;if(window.__DIAG)window.__DIAG.action('home','done','5 seconds rendered');}}else homeWarmAt=0;if(window.__DIAG)window.__DIAG.stage('render');screenCapture.afterFrame();fpsDisplay.frame(frameSeconds);if(window.__DIAG){window.__DIAG.frame(frameSeconds);window.__DIAG.scene(G.state==='home'?'home':G.loc||'lake','ready');}
-
-  // 預先編譯著色器：換地點後 1.5 秒，在背景一次把場景裡所有材質（包含還沒出現的魚、特效）編譯好，
-  // 免得玩到一半第一次看到某樣東西才編譯、卡 0.5 秒（診斷裡「著色器編譯」那幾次長卡頓）
-  try{ const wm=window.__warm||(window.__warm={key:'',at:0}), home=typeof HOME3D!=='undefined'&&HOME3D.active(), key=(home?'home':G.loc||'lake')+'|'+G.spot, n=W.scene.children.length; if(key!==wm.key){ wm.key=key; wm.at=now+1500; wm.n=n; } else if(n!==wm.n){ wm.n=n; wm.at=now+3000; }   /* 之後又載入新模型：等 3 秒沒有新東西再補編譯一次 */
-    if(wm.at&&now>wm.at&&!home&&!(typeof TROPHY_HALL!=='undefined'&&TROPHY_HALL.active())&&W.renderer.compile){ wm.at=0; W.renderer.compile(W.scene,W.camera); } }catch(e){}
+  const frameSeconds=frameLimiter.step(now);
+  if(frameSeconds===null){requestAnimationFrame(frame);return;}
+  if(graphicsRecovery.paused()||document.hidden||screenCapture.paused()){
+    frameLimiter.reset(now);requestAnimationFrame(frame);return;
+  }
+  const elapsed=gameplayElapsed(frameSeconds),dt=Math.min(.05,elapsed);
+  window.__frameSeconds=frameSeconds;
+  // Resolution changes clear the drawing buffer: apply them before drawing this frame.
+  const home=HOME3D.active(), tide=TIDE.active(), underwater=UW.active();
+  const scope=tide?'tide':home?HOME3D.qualityScope():underwater?'underwater':G.loc||'lake';
+  gfxAuto.sample(frameSeconds,{enabled:!screenCapture.isBusy(),ready:G.state!=='intro',scene:scope});
+  const diag=window.__DIAG;
+  try{
+    diag?.beginFrame();
+    window.__UWON=underwater;
+    update(dt,elapsed);
+    diag?.stage('simulation');
+    if(!HOME3D.active()){
+      merPresent(dt);
+      if(MERTEST&&G.state==='fight'){
+        if(G.f){G.f.brk=0;G.f.slk=0;G.f.abr=0;G.f.d=Math.min(G.f.d,20);G.f.lostWhy=null;}
+        G.mtT=(G.mtT||0)+elapsed;
+        if(G.mtT>3){G.mtT=0;land();}
+      }else G.mtT=0;
+      if(END.on()){END.tick(dt);bob.visible=false;P.rodGroup.visible=false;P.setLine(rod.tipW,0,false,0,0);}
+      END.frame(dt);AFTER.update(dt);guardUW();MDL.glowTick();RESIDENTS.update(dt,G);
+      if(!END.on())GHOST.update(dt);
+    }
+    diag?.stage('actors');
+    if(TROPHY_HALL.active())TROPHY_HALL.render(dt);
+    else if(TIDE.active())TIDE.render(dt);
+    else if(HOME3D.active())HOME3D.render(dt);
+    else if(UW.active())UW.render();
+    else if(G.state!=='intro'||now-lastIntroRender>=50){
+      lastIntroRender=now;
+      window.__GEOLOD?.update(W.scene,W.camera,dt,window.__effectTier);
+      W.render();LURE.renderPiP(W.renderer,dt);
+    }
+    if(HOME3D.active()){
+      if(!homeWarmAt)homeWarmAt=now;
+      if(homeWarmAt>0&&now-homeWarmAt>5000){homeWarmAt=-1;diag?.action('home','done','5 seconds rendered');}
+    }else homeWarmAt=0;
+    diag?.stage('render');screenCapture.afterFrame();
+    if(G.state!=='intro')fpsDisplay.frame(frameSeconds);
+    diag?.frame(frameSeconds);diag?.scene(G.state==='home'?'home':G.loc||'lake','ready');
+  }catch(error){
+    if(G.state==='home'||HOME3D.active())recoverHome(error);
+    else console.error(error);
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -11416,7 +11636,9 @@ requestAnimationFrame(frame);
 
 (function boot(){
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',boot,{once:true});return;}
-  if(!window.THREE){ boot.n=(boot.n||0)+1; { const t=document.getElementById('loadTip'); if(t&&boot.n%20===0) t.textContent='正在下載 3D 引擎…（'+Math.round(boot.n/20)+' 秒）'; } if(boot.n>2400){ showErr('3D 引擎載入失敗。請確認網路連線後重新整理頁面。'); return; } setTimeout(boot,50); return; }
+  if(!window.THREE||!THREE.GLTFLoader||!THREE.DRACOLoader){
+    showErr('3D 引擎載入失敗。請確認網路連線後重新整理頁面。');return;
+  }
   // 模型、貼圖、音效從 jsDelivr 下載（實測比 GitHub 快約 8 倍）；某個檔案從 CDN 下載失敗，就只對那個檔案改從本站重抓，不影響其他檔案
   try{ const C=window.__CDN, wrap=(proto)=>{ const orig=proto.load; proto.load=function(url,onLoad,onProg,onErr){ const cu=C.url(url); if(cu===url) return orig.call(this,url,onLoad,onProg,onErr);
       const self=this; return orig.call(this,cu,onLoad,onProg,e=>{ console.warn('CDN 失敗，改從本站下載',url); orig.call(self,url,onLoad,onProg,onErr); }); }; };
@@ -11424,36 +11646,20 @@ requestAnimationFrame(frame);
     // 所有模型都經過 Draco 幾何壓縮（體積約剩 1/4）：每個 GLTF 載入器自動接上同一個 Draco 解壓器
     let resourceSave={};try{resourceSave=JSON.parse(localStorage.getItem('swampAngler.v1')||'{}');}catch(_){}const previous=readDiagnosticJournal();const recovery=!!(previous&&!previous.clean&&Date.now()-previous.at<600000&&((previous.started&&previous.visible!==false)||previous.recovery));window.__resourcePolicy=deviceResourcePolicy(navigator.userAgent,resourceSave.gfx||'auto',recovery);window.__imageBudget=createImageBudget(window.__resourcePolicy);installImageBudget(THREE,window.__imageBudget);
     if(THREE.DRACOLoader&&THREE.GLTFLoader){ const dl=new THREE.DRACOLoader();dl.setWorkerLimit(1); dl.setDecoderPath('vendor/draco/'); dl.preload();
-      for(const k of ['load','parse']){ const o=THREE.GLTFLoader.prototype[k]; THREE.GLTFLoader.prototype[k]=function(...a){ if(!this.dracoLoader) this.setDRACOLoader(dl);
-        const ci=k==='load'?1:2, cb=a[ci]; if(typeof cb==='function') a[ci]=g=>{ try{ if(window.__WARM&&g&&g.scene) window.__WARM(g.scene); }catch(_){} return cb(g); };   /* 模型一載完就先送上顯示卡 */
-        return o.apply(this,a); }; } }
-    if(THREE.TextureLoader){ const o=THREE.TextureLoader.prototype.load; THREE.TextureLoader.prototype.load=function(url,onLoad,...rest){ return o.call(this,url,t=>{ if(onLoad) onLoad(t); setTimeout(()=>{ try{ const W=window.__W; if(W&&W.renderer&&W.renderer.initTexture&&t&&t.image) W.renderer.initTexture(t); }catch(_){} },0); },...rest); };   /* 等呼叫端設好 encoding、wrap 之後再上傳，避免用錯的格式上傳一次 */ }   /* 一般貼圖（湖景照片、家具材質）載完就先上傳 */ if(THREE.ImageBitmapLoader) wrap(THREE.ImageBitmapLoader.prototype); window.__GEOLOD=createGeometryLOD(); window.__GEOLOD.install(THREE); }catch(e){ console.warn('cdn',e); }
+      const parse=THREE.GLTFLoader.prototype.parse;
+      THREE.GLTFLoader.prototype.parse=function(...args){if(!this.dracoLoader)this.setDRACOLoader(dl);return parse.apply(this,args);};
+    }
+    if(THREE.ImageBitmapLoader)wrap(THREE.ImageBitmapLoader.prototype);
+    window.__GEOLOD=createGeometryLOD();window.__GEOLOD.install(THREE);
+  }catch(e){console.warn('3D 資源初始化',e);}
   try{
     const W=createWorld({canvas:document.getElementById('c')});W.renderer.info.autoReset=false; window.__DIAG=createDiag(W,{get G(){ return window.__G||{}; },get save(){ return (window.__G&&window.__G.saveRef)||{}; },persist:()=>{if(window.__SAVE_LOCK)return;if(window.__G?.saveRef)localStorage.setItem(window.__SAVE_KEY||'swampAngler.v1',JSON.stringify(window.__G.saveRef));}}); const P=createProps(W);
-    // 主畫面的載入提示：進度條、第一次進入的說明、網路慢時的提醒（避免玩家以為當機）
-    const ln=document.getElementById('loadNote'), lbox=document.getElementById('loadBox'), lbar=document.querySelector('#loadBar i'), ltip=document.getElementById('loadTip'), sb=document.getElementById('startBtn');
-    if(window.__resourcePolicy?.recovery){sb.textContent='繼續釣魚（保護模式）';const note=document.createElement('p');note.textContent='前次頁面未正常結束，本次已降低記憶體負載，遊戲進度保留。';note.style.cssText='color:#efc04c;font-size:14px';sb.parentNode.insertBefore(note,sb);}
-    const first=!localStorage.getItem('swampAngler.loaded'); let lastP=-1, lastT=performance.now();
-    if(ltip) ltip.textContent=first?'第一次進入需要下載真實的湖景、模型與貼圖（約 60MB），視網路速度約 1～3 分鐘。下載完會存在裝置裡，下次幾秒就好。':'正在從裝置讀取場景，請稍候…';
-    if(sb&&first){ sb.dataset.t=sb.textContent; sb.textContent='場景下載中，請稍候…'; sb.style.opacity=.7; }
-    const slow=setInterval(()=>{ if(lbox&&lbox.classList.contains('done')){ clearInterval(slow); return; } if(performance.now()-lastT>15000&&ltip) ltip.textContent='網路比較慢，仍在下載中，請不要關閉畫面…（也可以先按「開始釣魚」，畫面會在下載完後自動變成真實場景）\n目前：'+(window.__LASTURL||'')+'（'+(window.__LOADN||'')+'）'; },3000);
-    try{ window.__REAL=createReal(W,P,(p,done,err)=>{ if(!ln) return; if(p!==lastP){ lastP=p; lastT=performance.now(); }
-      if(lbar) lbar.style.width=Math.max(3,Math.round((done?1:p)*100))+'%';
-      if(done||Math.round(p*100)>=100){ if(!window.__REALDONE){ const wasHidden=[]; try{ W.scene.traverse(o=>{ if(!o.visible&&!o.isLight){ wasHidden.push(o); o.visible=true; } }); }catch(_){}
-        // 把平常藏起來的物件（魚、鱷魚、船、特效…）也一起編譯：以前它們第一次出現才編譯，每次卡 100～200 毫秒
-        try{ W.renderer.compile(W.scene,W.camera); }catch(_){} for(const o of wasHidden) o.visible=false;
-        try{ if(W.renderer.initTexture){ const seen=new Set(); W.scene.traverse(o=>{ const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[]; for(const m of ms) for(const k in m){ const t=m[k]; if(t&&t.isTexture&&!seen.has(t)){ seen.add(t); try{ W.renderer.initTexture(t); }catch(_){} } } }); } }catch(_){} }
-      // 上一行：場景載完時趁還在載入畫面，一次把全場材質的著色器編譯好、貼圖全部先上傳到顯示卡，避免開始玩後轉頭第一次看到某個東西才編譯、上傳而卡一下
-      window.__REALDONE=true; ln.textContent='✅ 真實場景已載入'; if(lbox) lbox.classList.add('done'); try{ localStorage.setItem('swampAngler.loaded','1'); }catch(e){} if(sb&&sb.dataset.t){ sb.textContent=sb.dataset.t; sb.style.opacity=''; } }
-      else if(err&&p===0) ln.textContent='部分場景檔案載入失敗，暫用簡化畫面（'+err+'）';
-      else ln.textContent='正在載入真實場景… '+Math.round(p*100)+'%'; }); }catch(e){ console.warn(e); }
-    startGame(W,P); }
+    startGame(W,P);
+    window.__GAME_READY=true;
+    const start=document.getElementById('startBtn'),note=document.getElementById('loadNote');
+    start.textContent=window.__resourcePolicy.recovery?'開始釣魚（保護模式）':'開始釣魚';
+    start.disabled=false;
+    note.textContent='可以開始釣魚。場景細節會陸續載入。';
+  }
   catch(e){ console.error(e); showErr('這個瀏覽器無法啟動 WebGL 3D 畫面。<br><small>'+String(e&&e.message||e)+'</small>'); }
-})();
-// 自動更新：每分鐘（以及切回遊戲時）查一次線上版本，有新版就在畫面上方掛一條提示，點一下用新網址重新載入，繞過瀏覽器把舊 index.html 留在快取裡的問題
-(function(){ let shown=false, bar=null;
-  function offer(v){ if(shown) return; shown=true; bar=document.createElement('div'); bar.textContent='🔄 有新版本，點一下更新'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);transform:translateX(-50%);z-index:260;background:#f2c14e;color:#1a1a1a;font:600 15px/1 sans-serif;padding:12px 18px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:pointer';
-    bar.onclick=()=>{ try{ persist(); }catch(_){} if(window.__DIAG) window.__DIAG.action('navigation','update-reload '+v); location.replace(location.pathname+'?v='+encodeURIComponent(v)); }; document.body.appendChild(bar); }
-  async function check(){ if(shown||!window.__APP_VER) return; try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); const j=await r.json(); if(j&&j.v&&j.v!==window.__APP_VER&&j.v>window.__APP_VER) offer(j.v); }catch(_){} }
-  setTimeout(check,20000); setInterval(check,60000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) check(); });
 })();

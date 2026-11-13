@@ -28,9 +28,12 @@ function createModels(W){
 'use strict';
 const T=THREE, loader=new T.GLTFLoader(), files={}, waiters={}, mixers=[];
 const ang=a=>({'+x':0,'-z':Math.PI/2,'-x':Math.PI,'+z':-Math.PI/2})[a];
-function load(f){ if(files[f]) return; const e=files[f]={g:null};
-  const ok=g=>{ e.g=g; (waiters[f]||[]).forEach(fn=>{ try{ fn(g); }catch(err){ console.warn('real',f,err); } }); waiters[f]=[]; };
-  loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{ e.err=1; }); }
+function load(f){
+  if(files[f]?.g||files[f]?.loading||Date.now()<(files[f]?.retryAt||0))return;
+  const e=files[f]={g:null,loading:true};
+  const ok=g=>{e.g=g;e.loading=false;(waiters[f]||[]).forEach(fn=>{try{fn(g);}catch(err){console.warn('real',f,err);}});delete waiters[f];};
+  loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{e.loading=false;e.retryAt=Date.now()+5000;});
+}
 const ready=f=>files[f]&&files[f].g;
 function onReady(f,fn){ if(ready(f)) fn(files[f].g); else (waiters[f]=waiters[f]||[]).push(fn); }
 function preload(set){ (RSETS[set]||[]).forEach(load); }
@@ -91,6 +94,7 @@ function poseFish(r,dt){ if(!r.grp.parent){ r.idle+=dt; if(r.idle>12) FRIGS.dele
 function cloneSafe(grp){ grp.clone=function(){ const g=new T.Group(), inv=new T.Matrix4(); this.updateMatrixWorld(true); inv.copy(this.matrixWorld).invert(); this.traverse(ch=>{ if(!ch.isMesh) return; const mats=(Array.isArray(ch.material)?ch.material:[ch.material]).map(m=>{ const k=m.clone(); k.skinning=false; k.onBeforeCompile=()=>{}; k.needsUpdate=true; return k; });
     const m=new T.Mesh(ch.geometry,Array.isArray(ch.material)?mats:mats[0]); m.frustumCulled=false; if(!ch.isSkinnedMesh){ m.matrixAutoUpdate=true; new T.Matrix4().multiplyMatrices(inv,ch.matrixWorld).decompose(m.position,m.quaternion,m.scale); } g.add(m); }); g.position.copy(this.position); g.quaternion.copy(this.quaternion); g.scale.copy(this.scale); g.visible=this.visible; return g; }; }
 const fishReady=id=>!!(RFISH[id]&&ready(RFISH[id][0]));
+const fishUnavailable=id=>!RFISH[id]||!!files[RFISH[id][0]]?.retryAt;
 function fish(sp){ const c=RFISH[sp.id]; if(!c) return null; const g=ready(c[0]); if(!g) return null; const opt=c[2]||{};
   const sc=g.scene; sc.updateMatrixWorld(true); let ms=[]; sc.traverse(o=>{ if(o.isMesh) ms.push(o); });
   if(!ms.length) return null;
@@ -202,5 +206,5 @@ const want=id=>{ if(RFISH[id]) load(RFISH[id][0]); };   // 圖鑑詳細頁要看
 function glowTick(){ const lt=W.info?W.info.light:1, k=Math.max(0,.6-lt); GLOW.forEach(n=>n.emissiveIntensity=.12+k*1.0); }
 // 水族箱在小屋裡沒有跑戶外的 update，自己逐隻驅動甲殼類的骨架
 const poseRig=(g,dt)=>{ let r=null; g.traverse(o=>{ if(!r&&o.userData&&o.userData.rig) r=o.userData.rig; }); if(r) poseFish(r,dt); };
-return {glowTick,preload,want,fish,fishReady,attach,attachYacht,update,credits,poseRig};
+return {glowTick,preload,want,fish,fishReady,fishUnavailable,attach,attachYacht,update,credits,poseRig};
 }

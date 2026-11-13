@@ -236,22 +236,40 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
 (()=>{ const APP_VER='__APP_BUILD__'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
-  const bar=document.createElement('div'); bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
+  const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
   bar.innerHTML='<span>🔄 有新版本</span><button style="border:0;border-radius:999px;padding:6px 14px;background:#ffcf66;color:#3a2600;font-weight:700">立即更新</button><button style="border:0;background:none;color:#aab;font-size:16px">✕</button>';
   document.body.appendChild(bar); const [upB,noB]=bar.querySelectorAll('button'); let dismissed='';
-  let pendingVersion='';
-  async function doUpdate(){if(!pendingVersion)return;upB.textContent='更新中…';upB.disabled=true;
-    try{if(window.__DIAG)window.__DIAG.action('navigation','intentional-update',pendingVersion);if(window.__saveNow)window.__saveNow();}catch(e){}
-    try{const r=await navigator.serviceWorker.getRegistration();if(r)await r.update();}catch(e){}
-    try{localStorage.setItem('swampAngler.updatedTo',pendingVersion);}catch(e){}const u=new URL(location.href);u.searchParams.set('v',pendingVersion);location.replace(u.toString());
+  let pendingVersion='',checking=false;
+  async function doUpdate(){
+    if(!pendingVersion||upB.disabled)return;
+    const version=pendingVersion;
+    upB.textContent='更新中…';upB.disabled=true;
+    try{window.__saveNow?.();window.__DIAG?.action('navigation','intentional-update',version);}catch(e){}
+    try{localStorage.setItem('swampAngler.updatedTo',version);}catch(e){}
+    const u=new URL(location.href);u.searchParams.set('v',version);location.replace(u.toString());
   }
-  upB.addEventListener('click',doUpdate);noB.addEventListener('click',()=>{bar.style.display='none';dismissed=bar.dataset.v||'';});
-  // 版本檢查只提示，不因回家、閒置、拍照切回頁面而中斷遊戲。
-  async function check(){try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();if(j.v&&j.v!==APP_VER&&j.v>APP_VER){pendingVersion=j.v;bar.dataset.v=j.v;if(dismissed!==j.v)bar.style.display='flex';if(window.__DIAG)window.__DIAG.event('update-available',j.v);}}catch(e){}}
+  upB.addEventListener('click',doUpdate);noB.addEventListener('click',()=>{bar.style.display='none';dismissed=pendingVersion;});
+  // Only a player action reloads the page. Overlapping checks share one notice.
+  async function check(){
+    if(checking||upB.disabled)return;
+    checking=true;
+    try{
+      const response=await fetch('version.json?t='+Date.now(),{cache:'no-store'});
+      if(!response.ok)return;
+      const {v}=await response.json();
+      if(typeof v!=='string'||!/^\d{14}$/.test(v)||v<=APP_VER||v<=pendingVersion)return;
+      pendingVersion=v;
+      if(dismissed!==v)bar.style.display='flex';
+      window.__DIAG?.event('update-available',v);
+    }catch(e){}finally{checking=false;}
+  }
   setTimeout(check,1500);setInterval(check,3*60*1000);
   try{ const up=localStorage.getItem('swampAngler.updatedTo'); if(up&&up===APP_VER){ localStorage.removeItem('swampAngler.updatedTo'); setTimeout(()=>{ const t=document.createElement('div'); t.textContent='✅ 已更新到最新版本'; t.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;padding:8px 14px;border-radius:999px;background:rgba(10,30,20,.85);color:#bff5c8;font-size:14px'; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); },2500); } }catch(e){} document.addEventListener('visibilitychange',()=>{ if(!document.hidden) check(); });
 })();
-  if('serviceWorker' in navigator) window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  if('serviceWorker' in navigator){
+    const register=()=>navigator.serviceWorker.register('sw.js').catch(()=>{});
+    if(document.readyState==='complete')register();else window.addEventListener('load',register,{once:true});
+  }
   async function install(){ if(installed) return 'installed'; if(deferred){ deferred.prompt(); const r=await deferred.userChoice; deferred=null; return r.outcome; }
     return /iPhone|iPad/.test(navigator.userAgent)?'ios':'manual'; }
   return {install,canPrompt:()=>!!deferred,installed:()=>installed};

@@ -1,5 +1,5 @@
 /* ===== 真實場景：360° 實拍環境、HDR 光照、掃描 3D 模型（素材：Poly Haven，CC0） ===== */
-function createReal(W,P,cb){
+function createReal(W,P,initialSet){
 'use strict';
 const T=THREE, U=W.U;
 const clamp=(x,a,b)=>x<a?a:x>b?b:x, sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
@@ -8,13 +8,9 @@ const SETS={
  lake:{pre:'env_',mask:'env_mask.png',meta:{dawn:{u:.3633,el:6.33,exp:.252,lc:[1.0,.72,.52],li:1.2,light:.7},day:{u:.3496,el:5.62,exp:1.0,lc:[1.0,.86,.7],li:2.4,light:1},night:{u:.6865,el:44.3,exp:.14,lc:[.55,.62,.85],li:.5,light:.3}}},
  ice:{pre:'ice_',mask:'ice_mask.png',meta:{dawn:{u:.6191,el:17.05,exp:.9,lc:[.9,.93,.97],li:1.4,light:.85},day:{u:.5996,el:28.3,exp:1.0,lc:[1.0,.96,.9],li:2.5,light:1},night:{u:.6191,el:17.05,exp:.9,lc:[.55,.62,.85],li:.5,light:.3}}},
  sea:{pre:'sea_',mask:'sea_mask.png',meta:{dawn:{u:.3623,el:4.92,exp:.305,lc:[1.0,.72,.5],li:1.3,light:.7},day:{u:.3447,el:48.16,exp:.568,lc:[1.0,.95,.88],li:2.6,light:1},night:{u:.3486,el:17.23,exp:1.343,lc:[.6,.68,.9],li:.45,light:.35}}}};
-let SET='lake', META=SETS.lake.meta, started=false, shownSet='lake', photoOn=1;
+let SET='', META=SETS.lake.meta, started=false, shownSet='', photoOn=1;
 const YAW=.25; U.uYaw.value=YAW;
-let total=0, errors=0;
 const mgr=new T.LoadingManager();
-mgr.onProgress=(u,l,t)=>{ window.__LASTURL=(u||'').split('/').pop(); window.__LOADN=l+'/'+t; total=t; if(cb) cb(l/t,false,errors); };
-mgr.onError=(u)=>{ if(window.__CDN&&u&&u.indexOf(window.__CDN.base)===0) return;   /* CDN 失敗的檔案會自動改從本站重抓，不算失敗（原本只要有一個就整個退回簡化畫面） */
-  errors++; if(cb) cb(0,false,errors); };
 const tl=new T.TextureLoader(mgr);
 const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter=T.LinearFilter; t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; return t; };
 const tex={}, env={}, masks={};
@@ -25,14 +21,34 @@ function hazeStrip(img){ const N=256, H=img.height, y0=Math.round(H*(1-.300)), y
   for(let x=0;x<N;x++) for(let y=0;y<cv.height;y++) for(let c=0;c<3;c++) col[x*3+c]+=d[(y*N+x)*4+c]/cv.height;
   const out=new Uint8Array(N*4), R=12; for(let x=0;x<N;x++){ for(let c=0;c<3;c++){ let s=0; for(let k=-R;k<=R;k++) s+=col[((x+k+N)%N)*3+c]; out[x*4+c]=Math.round(s/(2*R+1)); } out[x*4+3]=255; }
   const t=new T.DataTexture(out,N,1,T.RGBAFormat); t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; t.minFilter=t.magFilter=T.LinearFilter; t.needsUpdate=true; return t; }
-function loadKey(k){ const id=SET+'_'+k; if(tex[id]) return; const o={ready:false,n:0}; tex[id]=o; const fin=()=>{ if(++o.n===2) o.ready=true; }, p=SETS[SET].pre;
-  o.band=prep(tl.load(`${p}${k}_band.jpg`,t=>{ try{ o.hz=hazeStrip(t.image); }catch(e){ console.warn('haze strip',e); } fin(); })); o.full=prep(tl.load(`${p}${k}_full.jpg`,fin)); }
-function loadEnv(k){ const id=SET+'_'+k; if(env[id]!==undefined) return; env[id]=null; if(!T.RGBELoader) return;
-  new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(`${SETS[SET].pre}${k}.hdr`,t=>{ env[id]=t;W.invalidateEnvironment(); }); }
-function useSet(name){ SET=name; META=SETS[name].meta; if(!masks[name]) masks[name]=prep(tl.load(SETS[name].mask)); U.uMask.value=masks[name];
-  for(const id in tex){ if(!id.startsWith(name+'_')){ tex[id].band.dispose(); tex[id].full.dispose(); if(tex[id].hz) tex[id].hz.dispose(); delete tex[id]; } }
-  ['day','dawn','night'].forEach(k=>{ loadKey(k); loadEnv(k); });W.invalidateEnvironment(); }
-useSet('lake');
+function disposePhoto(photo){photo.band?.dispose();photo.full?.dispose();photo.hz?.dispose();}
+function loadKey(k){
+  const id=SET+'_'+k,previous=tex[id];
+  if(previous&&(!previous.retryAt||Date.now()<previous.retryAt))return;
+  if(previous)disposePhoto(previous);
+  const photo=tex[id]={ready:false,n:0},prefix=SETS[SET].pre;
+  const failed=()=>{if(tex[id]===photo)photo.retryAt=Date.now()+5000;};
+  const done=()=>{if(++photo.n===2)photo.ready=true;};
+  photo.band=prep(tl.load(prefix+k+'_band.jpg',t=>{
+    if(tex[id]!==photo)return;
+    try{photo.hz=hazeStrip(t.image);}catch(error){console.warn('haze strip',error);}
+    done();
+  },undefined,failed));
+  photo.full=prep(tl.load(prefix+k+'_full.jpg',done,undefined,failed));
+}
+const envRetry={};
+function loadEnv(k){
+  const id=SET+'_'+k;
+  if(env[id]!==undefined||!T.RGBELoader||Date.now()<(envRetry[id]||0))return;
+  env[id]=null;
+  new T.RGBELoader(mgr).setDataType(T.UnsignedByteType).load(SETS[SET].pre+k+'.hdr',t=>{
+    env[id]=t;W.invalidateEnvironment();
+  },undefined,()=>{delete env[id];envRetry[id]=Date.now()+5000;});
+}
+function useSet(name){ if(name===SET)return;SET=name; META=SETS[name].meta; if(!masks[name]) masks[name]=prep(tl.load(SETS[name].mask)); U.uMask.value=masks[name];
+  for(const id in tex){if(!id.startsWith(name+'_')){disposePhoto(tex[id]);delete tex[id];}}
+  W.invalidateEnvironment(); }
+useSet(initialSet||'lake');
 
 function sched(h){
   const H=((h%24)+24)%24;
@@ -50,12 +66,15 @@ const sunDir=(m,o)=>{ const th=(m.u-YAW)*Math.PI*2, e=m.el*Math.PI/180; return o
 W.photoReady=h=>{ try{ const [a,b]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b]; return !!(A&&A.ready&&B&&B.ready); }catch(e){ return true; } };
 W.setPhotoHook((h,wx)=>{
   { const k=Math.min(1,Math.max(0,(wx.cloud-.35)/.4)+wx.rain*.6); U.uOvcK.value+=(k-U.uOvcK.value)*.08; }
-  const [a,b,m]=sched(h), A=tex[SET+'_'+a], B=tex[SET+'_'+b];
+  const [a,b,m]=sched(h);
+  loadKey(a);loadKey(b);
+  if(window.__effectBudget?.environment!==false){loadEnv(a);loadEnv(b);}
+  const A=tex[SET+'_'+a], B=tex[SET+'_'+b];
   /* 新地點的實拍照片還沒下載好：以前直接沿用上一個地點的照片，所以剛到海上會看到湖邊的樹林（還被拉得糊糊的）。
      現在還沒好就先用程式算的天空頂著，照片一到再換上；換地點的黑幕也會等照片好了才拉開（見 d.js fadeOutWhenReady） */
   if(!A||!A.ready||!B||!B.ready){ if(shownSet&&shownSet!==SET&&started){ U.uPhoto.value=0; shownSet=''; } return null; }
   if(shownSet!==SET){ shownSet=SET; if(started) U.uPhoto.value=photoOn; }
-  if(!started){ started=true; W.setPhotoActive(); photoOn=U.uPhoto.value||1; if(cb) cb(1,true,errors); }
+  if(!started){ started=true; W.setPhotoActive(); photoOn=U.uPhoto.value||1; }
   U.uBandA.value=A.band; U.uFullA.value=A.full; U.uBandB.value=B.band; U.uFullB.value=B.full; U.uPMix.value=m; U.uHzA.value=A.hz||A.band; U.uHzB.value=B.hz||B.band;
   U.uRadianceA.value=env[SET+'_'+a]||null;U.uRadianceB.value=env[SET+'_'+b]||null;U.uRadianceReady.value=U.uRadianceA.value&&U.uRadianceB.value?1:0;
   const MA=META[a], MB=META[b], L=(x,y)=>x+(y-x)*m;

@@ -329,7 +329,7 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/rod_real2.glb',g=>{ try{
     const mats=(Array.isArray(o.material)?o.material:[o.material]).map(m0=>{ const m=m0.clone(); if(m.map) m.map.anisotropy=8; if('envMapIntensity' in m) m.envMapIntensity=.45;
       m.onBeforeCompile=sh=>{ sh.uniforms.uRodPts=rodPtsU;
         sh.vertexShader='uniform vec3 uRodPts['+(NS+1)+'];\n'+sh.vertexShader
-          .replace('#include <beginnormal_vertex>','float rS=clamp(position.x,0.0,1.0), rF=rS*'+NS+'.0; int rI=int(min('+(NS-1)+'.0,floor(rF)));\n vec3 rA=uRodPts[rI], rB=uRodPts[rI+1], rT=normalize(rB-rA);\n vec3 rC=mix(rA,rB,rF-float(rI))+rT*(position.x-rS)*'+R_LEN.toFixed(3)+';\n vec3 rDn=normalize(vec3(0.0,-1.0,0.0)+rT*rT.y), rSd=normalize(cross(rT,rDn));\n vec3 objectNormal=normalize(rT*normal.x+rDn*normal.y+rSd*normal.z);')
+          .replace('#include <beginnormal_vertex>','float rS=clamp(position.x,0.0,1.0), rF=rS*'+NS+'.0; int rI=int(min('+(NS-1)+'.0,floor(rF)));\n vec3 rA=uRodPts[rI], rB=uRodPts[rI+1], rT=normalize(rB-rA);\n vec3 rC=mix(rA,rB,rF-float(rI))+rT*(position.x-rS)*'+R_LEN.toFixed(3)+';\n vec3 rDn=normalize(vec3(0.0,-1.0,0.0)+rT*rT.y), rSd=normalize(cross(rT,rDn));\n vec3 objectNormal=normalize(rT*normal.x+rDn*normal.y+rSd*normal.z);\n#ifdef USE_TANGENT\n vec3 objectTangent=normalize(rT*tangent.x+rDn*tangent.y+rSd*tangent.z);\n#endif')
           .replace('#include <begin_vertex>','vec3 transformed=rC+rDn*position.y+rSd*position.z;'); };
       m.customProgramCacheKey=()=>'realRodCurve'; m.needsUpdate=true; return m; });
     const mesh=new T.Mesh(geo,Array.isArray(o.material)?mats:mats[0]); mesh.frustumCulled=false; mesh.castShadow=false; mesh.receiveShadow=false; cont.add(mesh); }
@@ -914,7 +914,7 @@ function buildMermaid(sp){
 }
 const fishCache={};
 /* ---------- 真實掃描魚模型（Barramundi Fish, Microsoft 2017, CC0） ---------- */
-const SCAN={ready:false};
+const SCAN={ready:false,loading:false,retryAt:0};
 const SCANMAP={
  barra:{tk:0},
  lmbass:{back:'#5d7a3a',belly:'#e6e2c6',tk:.75},
@@ -927,19 +927,40 @@ const SCANMAP={
  ghost:{back:'#6fb0e0',belly:'#e8f8ff',tk:.9,ghost:true},
  amber:{back:'#6a6a4a',belly:'#f0eee6',tk:.55,sy:.85},
  grouper:{back:'#5a4a30',belly:'#d8c8a8',tk:.8,sy:1.1,barN:5,barK:.35}};
-(function initScan(){
-  if(typeof SCAN_DATA==='undefined') return;
+function loadScanData(){
+  if(typeof SCAN_DATA==='undefined')throw new Error('掃描魚資料未載入');
   const dec=(s,Ty)=>{ const b=atob(s), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return new Ty(u.buffer); };
   const geo=new T.BufferGeometry();
   geo.setAttribute('position',new T.BufferAttribute(dec(SCAN_DATA.pos,Float32Array),3));
   geo.setAttribute('normal',new T.BufferAttribute(dec(SCAN_DATA.nrm,Float32Array),3));
   const uv=new T.BufferAttribute(dec(SCAN_DATA.uv,Float32Array),2); geo.setAttribute('uv',uv); geo.setAttribute('uv2',uv);
   geo.setIndex(new T.BufferAttribute(dec(SCAN_DATA.idx,SCAN_DATA.i32?Uint32Array:Uint16Array),1));
-  const tl=new T.TextureLoader(); let left=3;
-  const done=()=>{ if(--left===0){ SCAN.ready=true; for(const id in fishCache) if(SCANMAP[id]) delete fishCache[id]; } };
-  const ld=(u,srgb)=>{ const t=tl.load(u,done,undefined,()=>{}); t.flipY=false; if(srgb) t.encoding=T.sRGBEncoding; t.anisotropy=4; return t; };
-  SCAN.geo=geo; SCAN.tex={col:ld(SCAN_DATA.col,true),mr:ld(SCAN_DATA.mr,false),nm:ld(SCAN_DATA.nm,false)};
-})();
+  const tl=new T.TextureLoader(),textures={};let left=3,broken=false;
+  const done=()=>{if(--left===0&&!broken){
+    Object.assign(SCAN,{geo,tex:textures,ready:true,loading:false});
+    for(const id in fishCache)if(SCANMAP[id]&&!fishCache[id].real)delete fishCache[id];
+  }};
+  const failed=()=>{if(broken)return;broken=true;geo.dispose();Object.values(textures).forEach(t=>t.dispose());scanFailed();};
+  for(const [key,srgb] of [['col',true],['mr',false],['nm',false]]){
+    const t=tl.load(SCAN_DATA[key],done,undefined,failed);
+    t.flipY=false;if(srgb)t.encoding=T.sRGBEncoding;t.anisotropy=4;textures[key]=t;
+  }
+}
+function scanFailed(){SCAN.loading=false;SCAN.retryAt=Date.now()+15000;}
+function initScan(){
+  if(SCAN.ready||SCAN.loading||Date.now()<SCAN.retryAt)return;
+  SCAN.loading=true;
+  const useData=()=>{try{loadScanData();}catch(e){scanFailed();}};
+  if(typeof SCAN_DATA!=='undefined'){useData();return;}
+  const script=document.createElement('script');
+  const stop=()=>{clearTimeout(timeout);script.onload=script.onerror=null;script.remove();};
+  const timeout=setTimeout(()=>{stop();scanFailed();},12000);
+  script.src='app_scan.js?v=__SCAN_BUILD__';
+  script.dataset.optionalAsset='';
+  script.onload=()=>{stop();useData();};
+  script.onerror=()=>{stop();scanFailed();};
+  document.head.appendChild(script);
+}
 function buildScan(sp,cfg){
   const uni={uSwim:{value:0},uAmp:{value:0}}, g=new T.Group(), tx=SCAN.tex;
   const m=new T.MeshPhysicalMaterial({map:tx.col,roughnessMap:tx.mr,metalnessMap:tx.mr,aoMap:tx.mr,normalMap:tx.nm,roughness:1,metalness:cfg.metal||1,clearcoat:.55,clearcoatRoughness:.25,envMapIntensity:1.25});
@@ -954,6 +975,11 @@ function buildScan(sp,cfg){
   return {group:g,uni,sp,scan:true};
 }
 function getFish(sp){
+  const models=window.__MDL;
+  if(SCANMAP[sp.id]&&!models?.fishReady(sp.id)){
+    if(!models||models.fishUnavailable(sp.id))initScan();
+    models?.want(sp.id);
+  }
   const fc=fishCache[sp.id];
   if(fc&&(fc.real||!(window.__MDL&&window.__MDL.fishReady(sp.id)))) return fc;
   if(window.__MDL){ const r=window.__MDL.fish(sp); if(r) return (fishCache[sp.id]=r); }

@@ -16,11 +16,36 @@ function biteFX(kind){ try{
   const cv=document.getElementById('c'); if(cv){ let k=0; const sh=setInterval(()=>{ k++; cv.style.transform=k>10?'':`translate(${(Math.random()-.5)*16*(1-k/11)}px,${(Math.random()-.5)*16*(1-k/11)}px)`; if(k>10) clearInterval(sh); },35); }
   setTimeout(()=>el.remove(),2900); }catch(e){ console.warn('biteFX',e); } }
 
-/* ===== 新手指引：第一次開始遊戲時，一步一步圈出每個按鈕並說明用途；可略過，也能從設定重看 ===== */
+function createDockPractice(root,save,persist){
+  let active=false;
+  const hint=root.querySelector('[role=status]');
+  const prompts={
+    idle:'按住釣竿按鈕蓄力，再放開拋竿。',
+    charge:'放開按鈕，將浮標拋向水面。',
+    cast:'看著落在水面的浮標。',
+    wait:'等浮標下沉，看到「起鉤」就點一下。',
+    bite:'現在點「起鉤」！藍區是完美，黃區也能上鉤。',
+    fight:'按住收線，張力過高時放手，等降下來再收。',
+    lost:'收好釣竿後再拋一次。'
+  };
+  function finish(){
+    if(!active)return;
+    active=false;root.classList.add('hidden');save.tutDone=1;persist();
+  }
+  root.querySelector('button').addEventListener('click',finish);
+  return {
+    start(){active=!save.tutDone&&!(save.total>0);root.classList.toggle('hidden',!active);if(active)hint.textContent=prompts.idle;return active;},
+    active:()=>active,
+    update(state,snag){if(!active)return;const message=snag?'掛底了。放手並向側邊拖曳，換個角度收線。':prompts[state];if(message&&hint.textContent!==message)hint.textContent=message;},
+    finish
+  };
+}
+
+/* 從設定重看各按鈕用途。 */
 const TUT_STEPS=[
  [null,'歡迎來到濕地','這裡是老漁人留下的碼頭。跟著指引，一分鐘學會怎麼玩。'],
  ['#actBtn','拋竿','按住這個按鈕蓄力，力道條最滿時放開，就能拋得最遠。'],
- [null,'提竿與收線','浮標被拉進水裡時，立刻點一下提竿。拉扯時按住收線；魚衝刺時先放手，往魚游走的反方向滑動拉竿，別讓張力爆表。'],
+ [null,'提竿與收線','浮標下沉後，魚在藍區或黃區時點一下起鉤。拉扯時按住收線；魚衝刺時先放手，往魚游走的反方向滑動拉竿。'],
  [null,'轉向瞄準','在畫面空白處左右拖曳，就能轉身換方向拋竿。'],
  ['#baitChip','魚餌','點這裡換魚餌。不同的餌吸引不同的魚，稀有的餌要到釣具店買。'],
  ['#bMap','釣點','到不同的釣點，會遇到不同的魚。有些地方要獨木舟或修好的漁船才去得了。'],

@@ -44,7 +44,8 @@ function auditSceneLighting(scene){
 function createInteriorReflection(T,R){
  const pmrem=new T.PMREMGenerator(R),cube=new T.WebGLCubeRenderTarget(128,{generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter,type:R.capabilities.isWebGL2&&R.extensions.has('EXT_color_buffer_float')?T.HalfFloatType:T.UnsignedByteType}),camera=new T.CubeCamera(.08,40,cube),records=new WeakMap();let failed=false,work=null;
  function update(scene,position,outdoor,time){
-  const level=typeof window!=='undefined'&&window.__gfxStatus?window.__gfxStatus.level:4;let rec=records.get(scene);
+  const graphics=typeof window!=='undefined'?window.__gfxStatus:null;
+  const level=graphics?.effectLevel??graphics?.level??4;let rec=records.get(scene);
   if(failed||level<3){scene.environment=outdoor;return;}
   scene.environment=rec?rec.rt.texture:outdoor;
   if(rec&&time-rec.time<30)return;
