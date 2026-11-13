@@ -354,6 +354,7 @@ function onRelease(){ for(const q of save.quests) if(q.k==='release'&&q.prog<q.n
 function claim(i){ const q=save.quests[i]; if(!q||q.prog<q.n) return; save.coins+=q.reward; addXP(q.xp); save.quests.splice(i,1); fillQuests(); setCoins(); Snd.coin(); toast(`領取 🪙 ${q.reward} 與 ${q.xp} 經驗`,'good'); }
 
 const row=(name,sub,right,col)=>`<div class="row"${col?` style="--rc:${col}"`:''}>${col?'<span class="dot"></span>':''}<div class="nm"><b>${name}</b><small>${sub}</small></div><div class="rt">${right}</div></div>`;
+const atHomeNow=()=>document.body.classList.contains('athome');   /* 人在老漁人的小屋裡（不是在任何釣點） */
 function render(){
   let h='';
   if(cur==='shop'){
@@ -450,15 +451,15 @@ function render(){
   else if(cur==='spot'){
     shT.textContent='釣點';
     if(window.__HOME&&window.__HOME.unlocked()){ const HM=window.__HOME, hd=HM.data(), t=HM.tank();
-      h+=row('🏠 老漁人的小屋',`${t.n} ${hd.fresh.length}/${t.cap}${hd.seaTank?'・海水缸 '+hd.sea.length+'/'+HM.seaT().cap:''}・標本 ${hd.mounts.length}/${HM.MOUNT_MAX}`,'<div class="bb"><button class="sbtn" data-a="homeP">管理</button><button class="sbtn pri" data-a="homeGo">回家</button></div>'); }
+      h+=row('🏠 老漁人的小屋',`${t.n} ${hd.fresh.length}/${t.cap}${hd.seaTank?'・海水缸 '+hd.sea.length+'/'+HM.seaT().cap:''}・標本 ${hd.mounts.length}/${HM.MOUNT_MAX}`,'<div class="bb"><button class="sbtn" data-a="homeP">管理</button>'+(atHomeNow()?'<span class="eqd">目前位置</span>':'<button class="sbtn pri" data-a="homeGo">回家</button>')+'</div>'); }   /* 人在小屋時，小屋才是目前位置 */
     if(!save.kayak) h+=row('🛶 獨木舟','買了才能划到湖裡的其他釣點','<button class="sbtn pri" data-a="kayak">🪙 800</button>');
     if(!save.yacht){ const ok=window.__STORY&&window.__STORY.done('c5'), m=save.mat||{}, need=BOAT_COST, have=k=>(m[k]||0)>=need[k];
       h+=ok?row('🛥️ 修復老漁人的漁船',`停在河口船塢的舊漁船，修好就能出海。需要 🪙 ${need.coins.toLocaleString()}、魚鱗 ${need.scale}（有 ${m.scale||0}）、魚骨 ${need.bone}（有 ${m.bone||0}）、珍珠 ${need.pearl}（有 ${m.pearl||0}）`,`<button class="sbtn pri" data-a="yacht"${save.coins>=need.coins&&have('scale')&&have('bone')&&have('pearl')?'':' disabled'}>修復</button>`)
           :row('🔒 ？？？的漁船','完成主線第六章「月潮」後，霜汐會告訴你它在哪裡','<span class="lk">第六章後</span>'); }
     { const tl=window.__TIDE, hh=(window.__G&&window.__G.hour)||0, low=tl&&tl.low(hh), nx=tl?tl.nextLow(hh):0;   // 潮間帶：退潮時才能去
       h+=row('🦀 蚵仔寮潮間帶',low?'退潮中！看泥面痕跡，挖文蛤、赤嘴蛤、竹蟶、海瓜子、沙蟹':'滿潮中，下次退潮 '+String(Math.floor(nx%24)).padStart(2,'0')+':'+(nx%1?'30':'00'),low?'<button class="sbtn pri" data-a="tide">下灘</button>':'<span class="lk">等退潮</span>'); }
-    h+=SPOTS.map((s,i)=>{ const why=window.__STORY?window.__STORY.lock(i):null, lock=window.__STORY?!!why:(save.lv<s.lv||(s.req==='mer1'&&!(save.mer&&save.mer.n>=1))), need=(s.kayak&&!save.kayak)||(s.yacht&&!save.yacht), here=c.curSpot()===i;
-      const btn=here?'<span class="eqd">目前位置</span>':lock?`<span class="lk">${why||(s.req?'需要美人魚的認可':'Lv '+s.lv+' 解鎖')}</span>`:need?`<span class="lk">${s.yacht?'需要遊艇':'需要獨木舟'}</span>`:`<button class="sbtn pri" data-a="go" data-v="${i}">${s.yacht?'出海':s.kayak?'划過去':'回碼頭'}</button>`;
+    h+=SPOTS.map((s,i)=>{ const why=window.__STORY?window.__STORY.lock(i):null, lock=window.__STORY?!!why:(save.lv<s.lv||(s.req==='mer1'&&!(save.mer&&save.mer.n>=1))), need=(s.kayak&&!save.kayak)||(s.yacht&&!save.yacht), here=!atHomeNow()&&c.curSpot()===i;
+      const btn=here?'<span class="eqd">目前位置</span>':lock?`<span class="lk">${why||(s.req?'需要美人魚的認可':'Lv '+s.lv+' 解鎖')}</span>`:need?`<span class="lk">${s.yacht?'需要遊艇':'需要獨木舟'}</span>`:`<button class="sbtn pri" data-a="go" data-v="${i}">${s.yacht?'出海':atHomeNow()?'出門':s.kayak?'划過去':'回碼頭'}</button>`;
       return row(lock?'🔒 '+(s.req?'？？？':s.name):(s.yacht?'🛥️ ':s.kayak?'🛶 ':s.loc==='ice'?'❄️ ':'🪵 ')+s.name,lock?(s.req?'只在月光下才看得見的地方':'跟著老漁人的手記前進，就會找到這裡'):s.sub,btn); }).join('');
   }
   shB.innerHTML=h;
