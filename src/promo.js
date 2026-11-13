@@ -30,8 +30,8 @@ function render(){ if(!st) return; const on=st.open; document.body.classList.tog
   bar.textContent=on?`🎁 釣魚抽蝦皮 5 折券！越難釣的魚越容易中・剩 ${st.remaining} 份`:'🎁 蝦皮 5 折券已全部送出，謝謝參加'; bar.style.display=on?'':'none';
   chip.textContent=mine?'🎁 我的折扣碼':`🎁 剩 ${st.remaining} 份`; }
 function show(){ const w=(st&&st.winners)||[]; const end=st?new Date(st.ends).toLocaleDateString('zh-TW'):'12/31';
-  box.querySelector('.pc').innerHTML=(mine?`<h3>🎉 你的蝦皮 5 折券</h3><div class="code">${mine}</div><p>到「靜月之光」蝦皮賣場結帳時輸入這組代碼。</p>`:`<h3>🎁 釣魚抽蝦皮 5 折券</h3><p>登入 Google 後，每釣到一條魚都有機會抽中「靜月之光」蝦皮賣場的 <b>5 折優惠券</b>。魚越難釣，機率越高：常見魚約十萬分之一，魚王 1%。</p>`)+
-   `<ul><li>全部只有 ${st?st.total:3} 份，每人最多中一次，送完為止</li><li>使用期限：${end} 23:59 前</li><li>滿 NT$99 可用，最高折抵 NT$3,000，每組代碼限用一次</li><li>抽獎由伺服器決定，修改遊戲無法提高機率</li></ul>`+
+  box.querySelector('.pc').innerHTML=(mine?`<h3>🎉 你的蝦皮 5 折券</h3><div class="code">${mine}</div><p>到「靜月之光」蝦皮賣場結帳時輸入這組代碼。</p>`:`<h3>🎁 釣魚抽蝦皮 5 折券</h3><p>登入 Google 後，每釣到一條魚都有機會抽中「靜月之光」蝦皮賣場的 <b>5 折優惠券</b>。越難釣的魚，越有機會中獎，挑戰魚王試試手氣！</p>`)+
+   `<ul><li>全部只有 ${st?st.total:3} 份，每人最多中一次，送完為止</li><li>使用期限：${end} 23:59 前</li><li>滿 NT$99 可用，最高折抵 NT$3,000，每組代碼限用一次</li><li>抽獎由伺服器決定，修改遊戲無法作弊</li></ul>`+
    (w.length?`<p><b>已經釣到的人：</b>${w.map(x=>`${x.name}（${x.fish||'魚'}）`).join('、')}</p>`:'')+
    `<div class="row">${mine?'<button class="pri" data-a="copy">複製代碼</button>':''}<button class="sec" data-a="x">關閉</button></div>`;
   box.querySelectorAll('button').forEach(b=>b.onclick=()=>{ if(b.dataset.a==='copy'){ try{ navigator.clipboard.writeText(mine); toast('已複製代碼','good',1600); }catch(e){} } else box.classList.remove('on'); });
