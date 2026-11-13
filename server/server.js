@@ -5,7 +5,14 @@
    環境變數：FIREBASE_SA（服務帳戶 JSON 全文）、PROMO_CODES（逗號分隔）、PROMO_END（ISO 時間，預設 2026-12-31T23:59:59+08:00）、ALLOW_ORIGIN */
 const http=require('http'), admin=require('firebase-admin');
 const {rollChance}=require('./chance');
-const SA=JSON.parse(process.env.FIREBASE_SA||'{}');
+/* 金鑰 JSON：在手機上複製貼上時，private_key 裡的「\n」常會變成真的換行，JSON.parse 就失敗（Bad control character）。
+   字串裡面的真換行改回 \n 再解析；解析失敗也不把內容印到記錄裡 */
+function parseSA(raw){ raw=String(raw||'').trim(); if(!raw) return {};
+  try{ return JSON.parse(raw); }catch(e){}
+  let out='', inStr=false, esc=false; for(const ch of raw){ if(inStr){ if(esc){ esc=false; out+=ch; continue; } if(ch==='\\'){ esc=true; out+=ch; continue; } if(ch==='"'){ inStr=false; out+=ch; continue; } if(ch==='\n'){ out+='\\n'; continue; } if(ch==='\r') continue; out+=ch; } else { if(ch==='"') inStr=true; out+=ch; } }
+  try{ return JSON.parse(out); }catch(e){ console.error('FIREBASE_SA 格式不對：請重新複製整個金鑰檔內容（從 { 到 }）'); return {}; } }
+const SA=parseSA(process.env.FIREBASE_SA);
+if(SA.private_key) SA.private_key=SA.private_key.replace(/\\n/g,'\n');
 admin.initializeApp(SA.project_id?{credential:admin.credential.cert(SA)}:{});
 const db=admin.firestore();
 const CODES=(process.env.PROMO_CODES||'').split(',').map(s=>s.trim()).filter(Boolean);
