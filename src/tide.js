@@ -38,7 +38,7 @@ window.__tideH=hAt;
 function gAt(x,z){ const cs=200/GN, fx=(x+100)/cs, fz=(z+100)/cs, i=Math.floor(fx), j=Math.floor(fz), u=fx-i, v=fz-j, X=k=>-100+k*cs;
   const h00=hAt(X(i),X(j)), h10=hAt(X(i+1),X(j)), h01=hAt(X(i),X(j+1)), h11=hAt(X(i+1),X(j+1)); return (h00*(1-u)+h10*u)*(1-v)+(h01*(1-u)+h11*u)*v; }
 const edgeK=(lx,lz)=>{ const e=Math.max(Math.abs(lx),Math.abs(lz))/(.8/2); return 1-Math.min(1,Math.max(0,(e-.7)/.3)); };   // 挖掘面中間用精細高度、邊緣過渡到粗地面高度
-const GN=300, gg=new T.PlaneGeometry(200,200,GN,GN).rotateX(-Math.PI/2), gp=gg.attributes.position;
+const GN=220, gg=new T.PlaneGeometry(200,200,GN,GN).rotateX(-Math.PI/2), gp=gg.attributes.position;
 for(let k=0;k<gp.count;k++) gp.setY(k,hAt(gp.getX(k),gp.getZ(k)));
 gg.computeVertexNormals();
 const gmat=new T.MeshStandardMaterial({color:0xb8aea0,map:mudT,normalMap:mudN,normalScale:new T.Vector2(.75,.75),roughness:.42,metalness:0});
@@ -187,7 +187,7 @@ let on=false, yaw=0, pitch=-.32, pos=new T.Vector3(0,1.6,18), bag=[], warned=0, 
 const lowWin=h=>tideWindow(h,easy());
 const nextLow=nextLowTide;
 /* ---------- HUD ---------- */
-const hud=document.createElement('div'); hud.id='tideHud'; hud.innerHTML=`<button id="tdCageB">🧺 拖籠</button><button id="tdStomp">👣 跺腳</button><div id="tdClock"></div><div id="tdBag"></div><div id="tdShore"><span id="tdArr">⬆</span> 岸邊 <b id="tdDist"></b></div><div id="tdHint">看泥面的痕跡判斷底下是什麼，點痕跡開挖・拖曳轉頭・兩指或上下拖曳前進</div><button id="tdExit">⬅ 回岸上</button>`;
+const hud=document.createElement('div'); hud.id='tideHud'; hud.innerHTML=`<button id="tdCageB">🧺 拖籠</button><button id="tdStomp">👣 跺腳</button><div id="tdClock"></div><div id="tdBag"></div><div id="tdShore"><span id="tdArr">⬆</span> 岸邊 <b id="tdDist"></b></div><div id="tdHint">看泥面的痕跡判斷底下是什麼，點痕跡開挖・拖曳轉頭・上下拖曳抬頭低頭・左下按住前進</div><button id="tdExit">⬅ 回岸上</button>`;
 document.body.appendChild(hud);
 const st=document.createElement('style'); st.textContent=`body.attide #top,body.attide #top2,body.attide #act,body.attide #joy,body.attide #hint,body.attide #magWin,body.attide #hotChip,body.attide #steer,body.attide #dragBtn,body.attide #combo,body.attide #goal,body.attide #castTag,body.attide #depthChip,body.attide #uwTag,body.attide #tag,body.attide #scare,body.attide #fxBar,body.attide #bTour,body.attide #bViewBack,body.attide #bShot,body.attide #scene{display:none!important}
 #tideHud{position:fixed;inset:0;pointer-events:none;z-index:6;display:none;font-family:inherit}
@@ -778,10 +778,17 @@ function walkTick(dt,left){ const soft=hAt(pos.x,pos.z)<-.06, sandy=sandK(pos.x,
   if(amb){ amb.wind.g.gain.value=.04+.02*Math.sin(performance.now()*.0003); amb.wave.g.gain.value=.02+.08*Math.max(0,1-left/40); amb.bird-=dt; if(amb.bird<=0){ amb.bird=4+Math.random()*9; birdCall(); if(Math.random()<.5) setTimeout(birdCall,180); } } }
  let drag=null;
 const ray=new T.Raycaster(), v2=new T.Vector2();
-function down(e){ if(!on||dig) return; drag={x:e.clientX,y:e.clientY,yaw,moved:0,t:performance.now()}; }
+/* 前進／後退：按住就走（軟泥裡會自動變慢），放開就停 */
+let walkHold=0; { const wb=document.createElement('div'); wb.id='tdWalk'; wb.innerHTML='<button data-w="1">▲<br>前進</button><button data-w="-1">▼<br>後退</button>';
+  wb.style.cssText='position:fixed;left:calc(env(safe-area-inset-left,0px) + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 18px);display:none;flex-direction:column;gap:10px;z-index:7';
+  const st=document.createElement('style'); st.textContent='#tdWalk button{width:74px;height:66px;border-radius:18px;border:1px solid rgba(255,255,255,.25);background:rgba(10,20,24,.62);color:#fff;font-size:15px;font-weight:800;line-height:1.25;touch-action:none;-webkit-user-select:none;user-select:none}#tdWalk button:active{background:rgba(60,110,120,.8)} body.attide #tdWalk{display:flex!important}';
+  document.head.appendChild(st); document.body.appendChild(wb);
+  wb.querySelectorAll('button').forEach(b=>{ const go=e=>{ e.preventDefault(); e.stopPropagation(); walkHold=+b.dataset.w; walkReq=walkHold; }, stop=e=>{ e.preventDefault(); walkHold=0; walkReq=0; };
+    b.addEventListener('pointerdown',go); b.addEventListener('pointerup',stop); b.addEventListener('pointercancel',stop); b.addEventListener('pointerleave',stop); }); }
+function down(e){ if(!on||dig) return; drag={x:e.clientX,y:e.clientY,yaw,pitch,moved:0,t:performance.now()}; }
 function move(e){ if(!on||!drag||dig||(cage.on&&cage.wash>0)) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.moved=Math.max(drag.moved,Math.hypot(dx,dy)); yaw=drag.yaw-dx*.005;
-  walkReq=clamp(-dy*.012,-1,1); }   // 上下拖曳的距離＝走路的意圖（快慢），實際移動在每格畫面裡算（軟泥會變慢）
-function up(e){ walkReq=0; if(!on||!drag||dig||cage.on||hold){ drag=null; return; } const was=drag; drag=null; if(was.moved>10) return;
+  if(!cage.on) pitch=clamp(drag.pitch-dy*.0045,-1.15,.45); }   /* 上下拖曳＝抬頭、低頭（以前是走路，所以沒辦法上下看）；走路改用左下角的前進／後退鈕 */
+function up(e){ if(!walkHold) walkReq=0; if(!on||!drag||dig||cage.on||hold){ drag=null; return; } const was=drag; drag=null; if(was.moved>10) return;
   v2.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1); ray.setFromCamera(v2,cam);
   let rTap=null,rBest=120; roamers.forEach(q=>{ const v=q.g.position.clone().project(cam); if(v.z>1) return; const sx=(v.x+1)/2*innerWidth, sy=(1-v.y)/2*innerHeight, dd=Math.hypot(sx-e.clientX,sy-e.clientY); if(dd<rBest&&q.g.position.distanceTo(pos)<8){ rBest=dd; rTap=q; } });   // 點在牠附近 80 像素內就算點到
   const rh=rTap?[{object:rTap.g}]:[]; if(rh.length){ let o=rh[0].object; const r=roamers.find(q=>{ let x=o; while(x){ if(x===q.g) return true; x=x.parent; } return false; });
@@ -800,7 +807,7 @@ window.addEventListener('pointerdown',e=>{ if(!on||dig) return; const t=e.target
 let t=0;
 let rspawn=0;
 function render(dt){ if(!on) return;
-  const daylight=Math.max(0,Math.min(1,W.U.uDay.value));sun.color.setRGB(W.U.uLightCol.value.x,W.U.uLightCol.value.y,W.U.uLightCol.value.z);sun.intensity=.7;sun.target.position.set(pos.x,0,pos.z);sun.position.copy(sun.target.position).addScaledVector(W.U.uSunDir.value,60);sun.target.updateMatrixWorld();tideHemi.intensity=.2+.7*daylight;tideHemi.color.setRGB(.25+.5*daylight,.32+.5*daylight,.45+.45*daylight);S.environment=W.scene.environment;if(tideDome)tideDome.material.color.setScalar(.06+.94*daylight);S.fog.color.copy(sky).multiplyScalar(.08+.92*daylight);
+  const daylight=Math.max(0,Math.min(1,W.U.uDay.value));sun.color.setRGB(W.U.uLightCol.value.x,W.U.uLightCol.value.y,W.U.uLightCol.value.z);sun.intensity=.7;sun.target.position.set(pos.x,0,pos.z);sun.position.copy(sun.target.position).addScaledVector(W.U.uSunDir.value,60);sun.target.updateMatrixWorld();tideHemi.intensity=.2+.7*daylight;tideHemi.color.setRGB(.25+.5*daylight,.32+.5*daylight,.45+.45*daylight);S.environment=W.scene.environment;if(tideDome)tideDome.material.color.setScalar(.22+.78*daylight);S.fog.color.copy(sky).multiplyScalar(.2+.8*daylight);
   if((tideLightTick-=dt)<=0){tideLightTick=1;const shadowSize=window.__gfxStatus&&window.__gfxStatus.shadow==='ultra'?4096:window.__GFX==='high'?2048:512;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}S.traverse(o=>{if(o.isMesh){o.receiveShadow=true;if(o.geometry.type!=='PlaneGeometry'&&o.material&&o.material.isMeshStandardMaterial)o.castShadow=true;}});}
  if(!dig) dropTick(dt); jetTick(dt); t+=dt; if(!roamers.length&&(rspawn-=dt)<=0){ rspawn=2; spawnRoamers(); } /* 模型下載好就放出泥面上的生物 */ const h=c.hour(), left=(endH-h)*60;   // 剩下幾分鐘（遊戲時間）
   $('tdClock').innerHTML=left>40?`🌊 退潮中・離漲潮還有 ${Math.floor(left)} 分`:`<span style="color:#ffb39a">⚠️ 漲潮倒數 ${Math.max(0,Math.floor(left))} 分</span>`;
