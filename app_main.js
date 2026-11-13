@@ -1,4 +1,4 @@
-/*APPV:20261113125031*/
+/*APPV:20261113131530*/
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
 function budgetImageSize(width,height,policy){const edge=width/Math.max(1,height)>4?policy.panoramaEdge:policy.textureEdge,k=Math.min(1,edge/Math.max(width,height));return{width:Math.max(1,Math.round(width*k)),height:Math.max(1,Math.round(height*k))};}
@@ -3867,6 +3867,7 @@ function render(){
     h+=tg('imm','沉浸模式','隱藏上方大部分介面，只留設定和動作按鈕',!!save.imm);
     h+='<div class="note">真實魚模型：Barramundi Fish © Microsoft 2017，CC0 授權（Khronos glTF Sample Assets）</div>';
     h+='<div class="note">真實動物與魚類 3D 模型（Sketchfab，CC-BY 4.0）：<br>'+(window.__MDL?window.__MDL.credits():'')+'</div>';
+    h+='<div class="note">木船「Wooden Boat」by donnichols（Sketchfab，CC BY 4.0）</div>';
     h+='<div class="note">泥灘消波塊「Tetrapod」by Akihiko Tarutani、擱淺小船「FishingBoat」by Godot2000、「Old Boat」by donnichols（Sketchfab，CC BY 4.0）</div>';
     h+='<div class="note">釣竿與捲線器模型：「Canna Da Pesca」by topfrank2013（Sketchfab，CC BY 4.0）</div>';
     h+='<div class="note">實拍湖景、HDR 光照、碼頭與泥灘材質、枯木樹樁岩石蕨類模型、家具與道具、標本館木料：Poly Haven（CC0）</div>';
@@ -4104,18 +4105,18 @@ let padG=null; const paddleTilt={x:0,z:0};
 /* 槳掛在鏡頭上（永遠在胸前、轉頭也跟著）：鏡頭座標下方 .27、前方 .82；padOn＝握槳程度（0 握竿、1 握槳），划船時升起、停下後收回畫面下方 */
 const PAD_Y=-.27, PAD_Z=-.82; let padOn=0;
 const boat=new T.Group(); boat.visible=false; S.add(boat);
-const canoeCollider=W.fishingPhysics.addBox({x:-.4,y:-.3,z:-2.45},{x:.4,y:.3,z:1.75},()=>boat.visible,'船體');
+const canoeCollider=W.fishingPhysics.addBox({x:-.75,y:-.3,z:-2.35},{x:.75,y:.35,z:1.65},()=>boat.visible,'船體');
 canoeCollider.update=()=>{const b=ctx.base();canoeCollider.boxes[0].frame={x:b.x,z:b.z,head:ctx.head()};
 };
-/* 原木獨木舟（依玩家設定圖生成）：載入後取代程式做的塑膠艇；船頭朝 −Z，長 4.2 米 */
+/* 木船：「Wooden Boat」by donnichols（Sketchfab，CC BY 4.0），實拍質感的老木划艇（原檔附的兩支槳拿掉了，用遊戲自己的槳）。載入後取代程式做的塑膠艇；船頭朝 −Z */
 if(T.GLTFLoader) new T.GLTFLoader().load('models/canoe.glb',g=>{ const o=g.scene; o.traverse(x=>{ if(x.isMesh){ const source=x.material,mp=source.map; if(mp){ tuneTextureSampling(T,mp,W.renderer.capabilities.getMaxAnisotropy()); } x.material=new T.MeshStandardMaterial({map:mp||null,normalMap:source.normalMap||null,roughnessMap:source.roughnessMap||null,vertexColors:!mp&&!!x.geometry.attributes.color,roughness:.85,metalness:0}); x.castShadow=x.receiveShadow=true; } });
-  const w=new T.Group(); w.add(o); w.rotation.y=Math.PI; w.updateMatrixWorld(true); let b=new T.Box3().setFromObject(w); const sz=b.getSize(new T.Vector3()); w.scale.set(.78/Math.max(sz.x,1e-6),.42/Math.max(sz.y,1e-6),4.2/Math.max(sz.z,1e-6));   // 長寬高分開縮放成真實獨木舟比例
+  const w=new T.Group(); w.add(o); w.rotation.y=Math.PI; w.updateMatrixWorld(true); let b=new T.Box3().setFromObject(w); const sz=b.getSize(new T.Vector3()); w.scale.setScalar(4.0/Math.max(sz.z,1e-6));   // 依真實比例等比縮放：長 4 公尺（寬約 1.55、深約 0.6 公尺），不再壓扁
   w.updateMatrixWorld(true); b=new T.Box3().setFromObject(w); const c=b.getCenter(new T.Vector3()); w.position.set(-c.x,-.2-b.min.y,-.35-c.z);
   o.traverse(x=>{ if(x.isMesh) x.renderOrder=-2; });
   // 船艙水線遮罩：一片只寫深度、不畫顏色的橢圓蓋在船艙水線上，排在船體之後、其他東西之前畫。
   // 船艙比水面低，水面、浮萍、睡蓮、雨圈這些貼在水面的東西才不會畫進船裡（船看起來像沉了）；船板先畫好不受影響
   const capGeo=new T.CircleGeometry(1,40); capGeo.rotateX(-Math.PI/2); const cap=new T.Mesh(capGeo,new T.MeshBasicMaterial({colorWrite:false,depthWrite:true,side:T.DoubleSide}));
-  cap.scale.set(.34,1,2.0); cap.position.set(0,.045,-.35); cap.renderOrder=-1; cap.frustumCulled=false; cap.userData.hullCap=true; boat.add(cap);
+  cap.scale.set(.62,1,1.72); cap.position.set(0,.045,-.35); cap.renderOrder=-1; cap.frustumCulled=false; cap.userData.hullCap=true; boat.add(cap);
   boat.children.forEach(ch=>{ if(ch!==padG&&ch!==w&&ch!==cap) ch.visible=false; }); boat.add(w); });   // 只藏舊塑膠艇的船身，槳要留著
 { const yel=new T.MeshStandardMaterial({color:0xf2b705,roughness:.32}), blk=new T.MeshStandardMaterial({color:0x151515,roughness:.6}), gry=new T.MeshStandardMaterial({color:0x33363b,metalness:.5,roughness:.4});
   const hull=new T.Mesh(new T.SphereGeometry(1,48,20),yel); hull.scale.set(.36,.22,1.95); hull.position.set(0,.02,-.15); boat.add(hull);
@@ -8769,7 +8770,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261113125031'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261113131530'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
