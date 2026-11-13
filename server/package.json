@@ -1,4 +1,16 @@
-{ "name":"swamp-angler-promo","version":"1.0.0","private":true,"main":"server.js",
-  "scripts":{"start":"node server.js","test":"node --test"},
-  "engines":{"node":">=18"},
-  "dependencies":{"firebase-admin":"^12.7.0"} }
+{
+ "name": "swamp-angler-promo",
+ "version": "1.0.0",
+ "private": true,
+ "main": "server.js",
+ "scripts": {
+  "start": "node server.js",
+  "test": "node --test"
+ },
+ "engines": {
+  "node": "20.x"
+ },
+ "dependencies": {
+  "firebase-admin": "^12.7.0"
+ }
+}
