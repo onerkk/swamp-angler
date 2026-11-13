@@ -12,7 +12,10 @@ function parseSA(raw){ raw=String(raw||'').trim(); if(!raw) return {};
   let out='', inStr=false, esc=false; for(const ch of raw){ if(inStr){ if(esc){ esc=false; out+=ch; continue; } if(ch==='\\'){ esc=true; out+=ch; continue; } if(ch==='"'){ inStr=false; out+=ch; continue; } if(ch==='\n'){ out+='\\n'; continue; } if(ch==='\r') continue; out+=ch; } else { if(ch==='"') inStr=true; out+=ch; } }
   try{ return JSON.parse(out); }catch(e){ console.error('FIREBASE_SA 格式不對：請重新複製整個金鑰檔內容（從 { 到 }）'); return {}; } }
 const SA=parseSA(process.env.FIREBASE_SA);
-if(SA.private_key) SA.private_key=SA.private_key.replace(/\\n/g,'\n');
+/* 私密金鑰：手機複製時換行可能變成真換行、空白、被吃掉，或多出縮排。把頭尾標記之間的內容只留下 base64 字元，再照標準格式每 64 字一行重組 */
+function fixPem(k){ k=String(k||''); const m=k.match(/-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/); if(!m) return k;
+  const body=m[2].replace(/\\n/g,'').replace(/[^A-Za-z0-9+/=]/g,''); return `-----BEGIN ${m[1]}-----\n${body.match(/.{1,64}/g).join('\n')}\n-----END ${m[1]}-----\n`; }
+if(SA.private_key) SA.private_key=fixPem(SA.private_key);
 admin.initializeApp(SA.project_id?{credential:admin.credential.cert(SA)}:{});
 const db=admin.firestore();
 const CODES=(process.env.PROMO_CODES||'').split(',').map(s=>s.trim()).filter(Boolean);
