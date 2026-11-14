@@ -139,8 +139,14 @@ const ui={coin:$('coin'),clock:$('clock'),toast:$('toast'),fight:$('fight'),fNam
   fTens:$('fTens'),fStam:$('fStam'),steer:$('steer'),actWrap:$('act'),act:$('actBtn'),actLbl:$('actLbl'),pw:$('pw'),sub:$('actSub'),catch:$('catch'),log:$('log')};
 ui.netBtn=$('netBtn'); ui.dragBtn=$('dragBtn');
 // 洩力按鈕：鬆／中／緊循環切換，記在存檔；搏魚中切換立即生效
-const DRAGN=['鬆','中','緊'], dragLbl=()=>{ if(ui.dragBtn) ui.dragBtn.textContent=DRAGN[save.drag==null?1:save.drag]; };
-if(ui.dragBtn){ dragLbl(); ui.dragBtn.addEventListener('pointerdown',e=>{ e.stopPropagation(); save.drag=((save.drag==null?1:save.drag)+1)%3; dragLbl(); if(G.f) G.f.drag=save.drag; vib(10); persist(); }); }
+/* 洩力改成左右滑動的連續調整（0＝最鬆、1＝最緊）：以前按一下換一段，要從「中」調鬆得先經過「緊」，大魚衝刺時一按就斷線 */
+const dragV=()=>save.dragV!=null?save.dragV:(save.drag==null?.5:save.drag/2);
+const dragLbl=()=>{ const v=dragV(), el=ui.dragBtn; if(!el) return; el.style.setProperty('--dv',(v*100).toFixed(1)+'%'); el.setAttribute('aria-valuenow',Math.round(v*100)); const t=$('dragVal'); if(t) t.textContent=v<.34?'鬆':v<.67?'中':'緊'; };
+if(ui.dragBtn){ dragLbl(); let dPtr=null, lastBuzz=-1;
+  const setFrom=e=>{ const r=ui.dragBtn.querySelector('.dtrk').getBoundingClientRect(); const v=clamp((e.clientX-r.left)/Math.max(1,r.width),0,1); save.dragV=Math.round(v*100)/100; save.drag=Math.round(save.dragV*2); if(G.f) G.f.drag=save.dragV; dragLbl(); const z=Math.round(v*10); if(z!==lastBuzz){ lastBuzz=z; vib(4); } };
+  ui.dragBtn.addEventListener('pointerdown',e=>{ e.stopPropagation(); e.preventDefault(); dPtr=e.pointerId; try{ ui.dragBtn.setPointerCapture(e.pointerId); }catch(_){} setFrom(e); });
+  ui.dragBtn.addEventListener('pointermove',e=>{ if(e.pointerId!==dPtr) return; e.stopPropagation(); setFrom(e); });
+  const end=e=>{ if(e.pointerId!==dPtr) return; dPtr=null; persist(); }; ui.dragBtn.addEventListener('pointerup',end); ui.dragBtn.addEventListener('pointercancel',end); }
 if(ui.netBtn) ui.netBtn.addEventListener('pointerdown',e=>{ e.stopPropagation(); if(G.f&&G.f.netOn) G.f.netGo=true; });
 // 釣棚按鈕：點一下切換淺／中／深；浮標吃水深度跟著改，提示目前這個水層容易遇到哪類魚
 const depthTxt=$('depthTxt'), DEPTH_TIP=['水面附近：藍鰓、鱷雀鱔、鬼頭刀、鮪魚等中上層魚','中層：大部分鱸魚、鱒魚、鯛類','觸底：鯰魚、鯉魚、石斑、比目魚、魟等底棲魚'];
@@ -344,7 +350,7 @@ function missBite(){ if(easy()&&G.fd&&!G.fd.practice){ FUN.hookEnd(); hook(true)
 function hook(q){
   const sp=G.sp, L=G.fd.L; exitUW(); ambClear();
   const perfect=!!q; if(perfect){ save.perf=(save.perf||0)+1; if(window.__STORY) window.__STORY.onPerfect(); }
-  G.f={perfect,hq:perfect?1:.7,drag:save.drag==null?1:save.drag,cover:0,abr:0,coverSide:Math.random()<.5?-1:1,d:G.loc==='ice'?rand(10,18):G.castDist,az0:Math.atan2(-(G.to.x-(G.angler||G.base).x),-(G.to.z-(G.angler||G.base).z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
+  G.f={perfect,hq:perfect?1:.7,drag:dragV(),cover:0,abr:0,coverSide:Math.random()<.5?-1:1,d:G.loc==='ice'?rand(10,18):G.castDist,az0:Math.atan2(-(G.to.x-(G.angler||G.base).x),-(G.to.z-(G.angler||G.base).z)),theta:0,latDir:0,run:true,phaseT:rand(.8,1.6),stam:perfect?85:100,T:.3,brk:0,slk:0,jumpT:0,jumpDur:1,ripT:0,vibT:0,clickA:0};
   if(G.fd.practice){G.f.stam=perfect?46:54;G.f.phaseT=.65;}
   G.f.pos=G.to.clone(); G.f.pos.y=-.35; setPoint(G.f.pos,PH.resolve(G.f.pos,Math.max(.12,L*.22)));
   G.state='fight'; P.splash(G.to.x,0,G.to.z,22,1); W.addRipple(G.to.x,G.to.z,.7); Snd.splash(.7); vib(40);
@@ -934,7 +940,7 @@ function updateFight(dt){
   if(shake) Tt+=G.held?.38:.12;
   Tt+=(Math.sin(G.t*13.1)+Math.sin(G.t*7.3))*.015*(f.run?2:1)*DF.jit;
   // 洩力：鬆／中／緊。拉力超過洩力門檻的部分改成出線（魚把線拉走），而不是全部變成張力
-  const dcap=[.66,.8,.94][f.drag], over=Math.max(0,Tt-dcap); if(over>0){ Tt=dcap+over*.3; f.d+=over*2.2*dt; if(Math.random()<dt*8) Snd.click(4800); }
+  const dcap=.66+.28*f.drag, over=Math.max(0,Tt-dcap); if(over>0){ Tt=dcap+over*.3; f.d+=over*2.2*dt; if(Math.random()<dt*8) Snd.click(4800); }
   f.T+=(Tt-f.T)*Math.min(1,dt*5);
   if(f.T>.9) f.brk+=dt*(f.T-.9)*14*META.gear().reel.drag*(1-.05*TR('power')); else f.brk=Math.max(0,f.brk-dt*.8);
   // 線太鬆：只有「沒在收線」而且張力過低時才累積——按住收線時線一定是繃的；小魚、漂流物本來就拉不出張力，不能因此判脫鉤
@@ -943,7 +949,7 @@ function updateFight(dt){
   const zone=f.T>.4&&f.T<.8;
   const drain=(3+18*f.T)*(1+.8*clamp(good,0,1))*(zone?1.2:1)/(fs.stam*DF.stam*(.7+.25*Math.sqrt(fd.w))*(fd.boss&&fd.boss.stam||1)/((1+.05*talR('fight'))*(1+ttlF('stam'))));   /* Boss 的耐力倍率：越後面的 Boss 遛越久；搏魚天賦讓魚體力掉得快 */
   f.stam=clamp(f.stam-drain*(window.__ECO&&window.__ECO.fxOn('meal_str')?1.3:1)*dt+(f.T<.2?2.5*dt:0),0,100);
-  const reel=G.held?[.75,1,1.2][f.drag]*META.gear().reel.spd*clamp(1.25-f.T,.15,1)*(f.stam<8?1.4:1)*(zone?1.15:1)*(dive?.3:1):0;
+  const reel=G.held?(.75+.45*f.drag)*META.gear().reel.spd*clamp(1.25-f.T,.15,1)*(f.stam<8?1.4:1)*(zone?1.15:1)*(dive?.3:1):0;
   const run=f.run?fs.spd*ST.spd*stamF*1.5*(G.held?.35:1)*(dive?.4:1)*(fd.boss?(fd.boss.spd||1)*(1-.03*talR('calm'))*(1-ttlF('boss')):1):(G.held?0:.05);   /* Boss 的衝刺速度倍率：衝得越快越容易把線放光，捲線器的速度與線量就變得重要 */
   f.d=Math.max(0,f.d+(run-reel)*dt);
   f.theta=clamp(f.theta+f.latDir*fs.agi*ST.lat*.16*stamF*dt*(G.held?.7:1),-.85,.85);

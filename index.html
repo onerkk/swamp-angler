@@ -242,6 +242,12 @@ body.sheetOn #bCam{display:none!important}
 .dexsec{margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px;line-height:1.6}.dexsec.dim{opacity:.6}
 .dexgrid{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px}.dexgrid span{opacity:.65}
 .dexbar{display:flex;align-items:center;gap:10px;margin:3px 0}.dexbar span{width:3em;opacity:.7}.dexbar i{flex:1;height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}.dexbar em{display:block;height:100%;background:var(--rc,#e9b949);border-radius:4px}
+#dragBtn{flex:1;display:flex;align-items:center;gap:8px;touch-action:none;user-select:none;-webkit-user-select:none;padding:4px 2px;cursor:pointer}
+#dragBtn .dl{font-size:12px;opacity:.8;flex:0 0 auto}
+#dragBtn .dtrk{position:relative;flex:1;height:8px;border-radius:99px;background:linear-gradient(90deg,#6fd08c,#f2c94c 55%,#e8684a)}
+#dragBtn .dfil{position:absolute;inset:0;border-radius:99px;background:rgba(0,0,0,.45);left:var(--dv,50%)}
+#dragBtn .dknb{position:absolute;top:50%;left:var(--dv,50%);width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+#dragBtn .dknb em{font-style:normal;font-size:12px;font-weight:800;color:#2a2a2a}
 #homeUI{display:none;position:fixed;left:0;right:0;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:20;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
 #homeUI .hb{display:flex;gap:10px;pointer-events:auto}#homeUI .hh{color:#fff;opacity:.7;font-size:13px;text-shadow:0 1px 3px #000}
 /* 小屋下方按鈕重新設計：原本是兩三排大按鈕疊在畫面中間，擋住水族箱。改成畫面最下緣一條半透明的工具列，圖示在上、字在下 */
@@ -446,7 +452,7 @@ window.__CDN={base:'https://cdn.jsdelivr.net/gh/onerkk/swamp-angler@main/',on:fa
   <div class="lbl"><span>魚的體力</span><span id="fStam">100%</span></div>
   <div class="bar"><i id="sFill"></i></div>
   <div id="fCtl" style="display:flex;gap:8px;margin-top:8px;align-items:center"><span style="font-size:12px;opacity:.8">洩力</span>
-    <button id="dragBtn" style="flex:1;border:0;border-radius:999px;padding:6px 0;background:rgba(255,255,255,.14);color:#fff;font-size:13px">中</button>
+    <div id="dragBtn" role="slider" aria-label="洩力" aria-valuemin="0" aria-valuemax="100"><span class="dl">鬆</span><div class="dtrk"><i class="dfil"></i><b class="dknb"><em id="dragVal">中</em></b></div><span class="dl">緊</span></div>
     <button id="netBtn" class="hidden" style="flex:1.4;border:0;border-radius:999px;padding:6px 0;background:#ffcf66;color:#3a2600;font-weight:700;font-size:13px">🥅 抄網</button></div>
 </div>
 <div id="steer" class="hidden"></div>
@@ -509,7 +515,7 @@ function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classLi
 </script>
 <script>
 (async function(){
-  const version='20261113225908', note=document.getElementById('loadNote');
+  const version='20261114011417', note=document.getElementById('loadNote');
   for(let attempt=0;attempt<4;attempt++){
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),18000);
