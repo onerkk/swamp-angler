@@ -1,4 +1,4 @@
-/*APPV:20261114011417*/
+/*APPV:20261114012325*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -2748,6 +2748,7 @@ const reel=new T.Group(); rodGroup.add(reel);
   const bail=new T.Mesh(new T.TorusGeometry(.034,.0016,6,20,Math.PI),chromeMat); bail.rotation.y=Math.PI/2; bail.position.set(.044,-.085,0); reel.add(bail); }
 reel.name='tackleReel';
 const crank=new T.Group(); crank.position.set(-.008,-.085,.034); reel.add(crank);
+const knobObj=new T.Object3D(); knobObj.position.set(-.008,-.135,.048); reel.add(knobObj);   /* 搖柄把手的位置（手要握的點）：真實釣竿載入後改成模型上量到的把手 */
 { const arm=new T.Mesh(new T.BoxGeometry(.006,.055,.005),darkMetal); arm.position.y=-.024; crank.add(arm);
   const knob=new T.Mesh(new T.CylinderGeometry(.008,.008,.022,12),gripMat); knob.rotation.x=Math.PI/2; knob.position.set(0,-.05,.014); crank.add(knob); }
 // Machined reel details: rotor, line-roller, drag dial and fastener heads.
@@ -2786,6 +2787,10 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/rod_real2.glb',g=>{ try{
   // 4. 捲線器：握把這一半裡離中心線最遠的那一點；它的方向就是「下方」，它在軸上的位置對到手握處
   let far=0,tReel=tmin+Lm*.12; const Dn=new T.Vector3(0,-1,0); V.forEach((p,n)=>{ if(tv[n]>tmin+Lm*.4) return; const d=rad(p,tv[n],c0,A), l=d.length(); if(l>far){ far=l; tReel=tv[n]; Dn.copy(d); } });
   Dn.addScaledVector(A,-Dn.dot(A)).normalize(); const Sd=new T.Vector3().crossVectors(A,Dn).normalize(), k=R_LEN*(1-REEL_S)/Math.max(1e-6,tmax-tReel);
+  // 4b. 捲線器上手要碰到的兩個點（捲線器座標：x 沿竿向前、y 向上、z 往旁）：搖柄把手＝捲線器附近往旁邊伸最遠的點；線杯前緣＝捲線器下方最靠竿尖的點（釣線從這裡出去）
+  { let kz=0,ky=0,kt=tReel,sT=-1e9,sY=far*.7; V.forEach((p,n)=>{ const t=tv[n]; if(Math.abs(t-tReel)>Lm*.08) return; const d=rad(p,t,c0,A), y=d.dot(Dn), z=d.dot(Sd);
+      if(Math.abs(z)>Math.abs(kz)&&y>far*.15){ kz=z; ky=y; kt=t; } if(y>far*.45&&y<far*1.05&&t>sT){ sT=t; sY=y; } });
+    realRod.knob=new T.Vector3((kt-tReel)*k,-ky*k,kz*k); realRod.spool=sT>-1e9?new T.Vector3((sT-tReel)*k,-sY*k,0):null; }
   // 5. 把每個頂點改存成（s, 往下, 往旁）；法線也換到同一組方向
   const cont=new T.Group(), nm=new T.Matrix3(), nv=new T.Vector3();
   for(const o of meshes){ const src=o.geometry, pa=src.attributes.position, na=src.attributes.normal, geo=new T.BufferGeometry(), P=new Float32Array(pa.count*3), N=new Float32Array(pa.count*3); nm.getNormalMatrix(o.matrixWorld);
@@ -2799,7 +2804,7 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/rod_real2.glb',g=>{ try{
           .replace('#include <begin_vertex>','vec3 transformed=rC+rDn*position.y+rSd*position.z;'); };
       m.customProgramCacheKey=()=>'realRodCurve'; m.needsUpdate=true; return m; });
     const mesh=new T.Mesh(geo,Array.isArray(o.material)?mats:mats[0]); mesh.frustumCulled=false; mesh.castShadow=false; mesh.receiveShadow=false; cont.add(mesh); }
-  realRod.cont=cont; rodGroup.add(cont); realRod.ready=true;
+  realRod.cont=cont; rodGroup.add(cont); realRod.ready=true; knobObj.position.copy(realRod.knob);
   for(const m of segs) m.visible=false; for(const m of guides) m.visible=false; tipTop.visible=false; reel.visible=false;
 }catch(e){ console.warn('real rod',e); } },undefined,()=>console.warn('real rod: load failed'));
 function poseRealRod(){ if(!realRod.ready) return; for(let i=0;i<=NS;i++) rodPtsU.value[i].copy(pts[i]); }
@@ -2820,10 +2825,10 @@ function updateRod(dt){
   GS.forEach((s,k)=>{ rodAt(s,tmp); frameAt(s); const g=guides[k]; g.position.copy(tmp).addScaledVector(dn,.008+.026*(1-s)); g.quaternion.setFromUnitVectors(AZ,tan);
     rod.guidesW[k].copy(g.position); rodGroup.localToWorld(rod.guidesW[k]); });
   tipTop.position.copy(pts[NS]); frameAt(.999); tipTop.quaternion.setFromUnitVectors(AZ,tan);
-  rodAt(.125,tmp); frameAt(.125); basis.makeBasis(tan, tmp2.copy(dn).negate(), sd); reel.position.copy(tmp); reel.quaternion.setFromRotationMatrix(basis);
+  const rS0=realRod.ready?REEL_S:.125; rodAt(rS0,tmp); frameAt(rS0);   /* 捲線器錨點跟真實模型的捲線器座同一處（以前停在舊竿子的 .125，手跟著握到空氣） */ basis.makeBasis(tan, tmp2.copy(dn).negate(), sd); reel.position.copy(tmp); reel.quaternion.setFromRotationMatrix(basis);
   crank.rotation.z=rod.spin;
   rod.tipW.copy(pts[NS]); rodGroup.localToWorld(rod.tipW);
-  reel.updateMatrixWorld(true); rod.spoolW.set(.058,-.085,0); reel.localToWorld(rod.spoolW);
+  reel.updateMatrixWorld(true); if(realRod.ready&&realRod.spool) rod.spoolW.copy(realRod.spool); else rod.spoolW.set(.058,-.085,0); reel.localToWorld(rod.spoolW);
   rodGroup.updateMatrixWorld(true);
   try{ poseRealRod(); }catch(e){ /* 真實模型擺姿勢出錯：退回原本的竿子，不讓遊戲壞掉 */ console.warn('real rod pose',e); realRod.ready=false; if(realRod.cont) realRod.cont.visible=false; for(const m of segs) m.visible=true; for(const m of guides) m.visible=true; tipTop.visible=true; reel.visible=true; }
 }
@@ -3502,7 +3507,7 @@ const previewFinish=createTacklePreview(W,(kind,id)=>{
  const body=root.children[0],texture=paintFloat(body.material,colors[0],colors[1],id);let i=0;root.traverse(o=>{if(o.userData.floatAntenna){o.material.color.setHex(i++%2?colors[1]:colors[0]).convertSRGBToLinear();o.material.metalness=id==='gold'?.8:0;}});root.rotation.z=-.2;return{root,focus:new T.Vector3(0,.035,0),dispose:()=>texture.dispose()};
 });
 
-return { foam, foamBurst, dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook,setFloatLook,previewFinish,rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
+return { foam, foamBurst, dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, knobObj, setRodLook,setFloatLook,previewFinish,rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
 }
 /* ===== 第 2 段 · 水下鏡頭、釣具店、等級與任務 ===== */
 const SH2 = {};
@@ -6383,6 +6388,10 @@ return {update,onCatch,koiK,active,scaleFx};
 function createArms(W,P){
 'use strict';
 const T=THREE, S=W.scene, reel=P.reelObj, crank=P.crankObj, rod=P.rod;
+/* 握法照真實的紡車式捲線器：搖柄在哪一側，那一側的手轉搖柄；另一隻手握竿，捲線器腳夾在中指與無名指之間。
+   以前固定「左手握前面、右手轉搖柄」，但搖柄其實在左側，右手要橫過去，看起來手沒握在竿上 */
+const knobO=P.knobObj, ARM=window.__ARM=window.__ARM||{grip:{R:.6,L:-.6},crank:{R:-.35,L:.35},back:.012};
+const crankSide=()=>{ if(!knobO) return 'R'; return knobO.position.z>=0?'L':'R'; };
 const arms=[]; let ready=false;
 // 左手：往前握前握把末端；右手：轉右側搖柄把手（捲線器座標：x 沿竿向前、y 向上、z 搖柄側）
 const GRIP=new T.Vector3(-.2,-.012,-.006), KNOB=new T.Vector3(0,-.05,.03);
@@ -6432,8 +6441,9 @@ function update(show,st,power,dt,pad){
   pullK+=(((ff&&GG.held)?T:0)-pullK)*Math.min(1,dt*5); lungeK+=(((ff&&ff.run)?.5+.5*T:0)-lungeK)*Math.min(1,dt*4);
   const shake=T>.78?(T-.78)*.05:0;
   for(const a of arms){ a.grp.visible=show; if(!show) continue;
-    if(a.side==='L'){ reel.getWorldPosition(tg); tmp.subVectors(rod.tipW,tg).normalize(); tg.addScaledVector(tmp,.2); }   // 沿竿身往竿尖 20cm，一定在竿上
-    else crank.localToWorld(tg.copy(KNOB));
+    const cs=crankSide(), cranking=a.side===cs;
+    if(!cranking){ reel.getWorldPosition(tg); tmp.subVectors(rod.tipW,tg).normalize(); tg.addScaledVector(tmp,-ARM.back); }   // 握竿：手掌包住捲線器座，捲線器腳在指間
+    else if(knobO) knobO.getWorldPosition(tg); else crank.localToWorld(tg.copy(KNOB));
     const pk=pad&&pad.k>.001?pad.k:0; if(pk){ pad.grip(a.side,pg); tg.lerp(pg,pk); }   // 划船：握點移到槳桿
     off.copy(a.side==='R'?SH_R:SH_L); off.y+=.24*back-.08*swing+.06*pullK-.03*lungeK+(Math.random()-.5)*shake; off.z+=.32*back-.3*swing+.13*pullK-.12*lungeK+(Math.random()-.5)*shake; off.x+=(a.side==='R'?.06:-.04)*back;
     W.camera.localToWorld(sh.copy(off));
@@ -6441,10 +6451,10 @@ function update(show,st,power,dt,pad){
     q.setFromUnitVectors(a.ld,wd);
     upM.set(0,1,0).applyQuaternion(q); upW.set(0,1,0).applyQuaternion(cq);
     upM.addScaledVector(wd,-upM.dot(wd)).normalize(); upW.addScaledVector(wd,-upW.dot(wd)).normalize();
-    let roll=Math.atan2(tmp.crossVectors(upM,upW).dot(wd),upM.dot(upW))+(a.side==='R'?-.35:-.6);
-    if(a.side==='R') roll+=.45*Math.sin(rod.spin||0)*reelK;                    // 收線：前臂隨搖柄轉動
+    let roll=Math.atan2(tmp.crossVectors(upM,upW).dot(wd),upM.dot(upW))+(cranking?ARM.crank[a.side]:ARM.grip[a.side]);
+    if(cranking) roll+=.45*Math.sin(rod.spin||0)*reelK;                    // 收線：前臂隨搖柄轉動
     q2.setFromAxisAngle(wd,roll); q.premultiply(q2);
-    if(a.side==='R'&&reelK>.01){ sd.crossVectors(wd,upW).normalize(); q2.setFromAxisAngle(sd,.22*Math.cos(rod.spin||0)*reelK); q.premultiply(q2); }  // 手腕上下擺
+    if(cranking&&reelK>.01){ sd.crossVectors(wd,upW).normalize(); q2.setFromAxisAngle(sd,.22*Math.cos(rod.spin||0)*reelK); q.premultiply(q2); }  // 手腕上下擺
     const s=.5/a.L0; a.grp.scale.setScalar(s); a.grp.quaternion.copy(q);
     // 用掌心對準握點，竿子穿過掌心與手指之間
     upM.set(0,1,0).applyQuaternion(q);
@@ -8892,7 +8902,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261114011417'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261114012325'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -10661,6 +10671,13 @@ if(ui.dragBtn){ dragLbl(); let dPtr=null, lastBuzz=-1;
   ui.dragBtn.addEventListener('pointerdown',e=>{ e.stopPropagation(); e.preventDefault(); dPtr=e.pointerId; try{ ui.dragBtn.setPointerCapture(e.pointerId); }catch(_){} setFrom(e); });
   ui.dragBtn.addEventListener('pointermove',e=>{ if(e.pointerId!==dPtr) return; e.stopPropagation(); setFrom(e); });
   const end=e=>{ if(e.pointerId!==dPtr) return; dPtr=null; persist(); }; ui.dragBtn.addEventListener('pointerup',end); ui.dragBtn.addEventListener('pointercancel',end); }
+/* 上鉤前就能調洩力：拋竿、等魚、咬餌時滑桿放在畫面角落的小面板；上鉤後搬回搏魚面板裡。大魚一上鉤就衝，等到上鉤才調來不及 */
+{ const dock=$('dragDock'), fctl=$('fCtl'), PRE=new Set(['idle','charge','cast','wait','lure','bite','retrieve','snatch']);
+  setInterval(()=>{ if(!dock||!ui.dragBtn||!fctl) return; const b=document.body.classList, fightOn=!ui.fight.classList.contains('hidden');
+    const pre=!fightOn&&PRE.has(G.state)&&!b.contains('athome')&&!b.contains('attide')&&!b.contains('sheetOn')&&!b.contains('furnOn')&&!b.contains('intro');
+    if(fightOn&&ui.dragBtn.parentNode!==fctl) fctl.insertBefore(ui.dragBtn,ui.netBtn||null);
+    else if(pre&&ui.dragBtn.parentNode!==dock) dock.appendChild(ui.dragBtn);
+    dock.classList.toggle('on',pre&&ui.dragBtn.parentNode===dock); },200); }
 if(ui.netBtn) ui.netBtn.addEventListener('pointerdown',e=>{ e.stopPropagation(); if(G.f&&G.f.netOn) G.f.netGo=true; });
 // 釣棚按鈕：點一下切換淺／中／深；浮標吃水深度跟著改，提示目前這個水層容易遇到哪類魚
 const depthTxt=$('depthTxt'), DEPTH_TIP=['水面附近：藍鰓、鱷雀鱔、鬼頭刀、鮪魚等中上層魚','中層：大部分鱸魚、鱒魚、鯛類','觸底：鯰魚、鯉魚、石斑、比目魚、魟等底棲魚'];

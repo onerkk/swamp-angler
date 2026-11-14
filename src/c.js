@@ -282,6 +282,7 @@ const reel=new T.Group(); rodGroup.add(reel);
   const bail=new T.Mesh(new T.TorusGeometry(.034,.0016,6,20,Math.PI),chromeMat); bail.rotation.y=Math.PI/2; bail.position.set(.044,-.085,0); reel.add(bail); }
 reel.name='tackleReel';
 const crank=new T.Group(); crank.position.set(-.008,-.085,.034); reel.add(crank);
+const knobObj=new T.Object3D(); knobObj.position.set(-.008,-.135,.048); reel.add(knobObj);   /* 搖柄把手的位置（手要握的點）：真實釣竿載入後改成模型上量到的把手 */
 { const arm=new T.Mesh(new T.BoxGeometry(.006,.055,.005),darkMetal); arm.position.y=-.024; crank.add(arm);
   const knob=new T.Mesh(new T.CylinderGeometry(.008,.008,.022,12),gripMat); knob.rotation.x=Math.PI/2; knob.position.set(0,-.05,.014); crank.add(knob); }
 // Machined reel details: rotor, line-roller, drag dial and fastener heads.
@@ -320,6 +321,10 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/rod_real2.glb',g=>{ try{
   // 4. 捲線器：握把這一半裡離中心線最遠的那一點；它的方向就是「下方」，它在軸上的位置對到手握處
   let far=0,tReel=tmin+Lm*.12; const Dn=new T.Vector3(0,-1,0); V.forEach((p,n)=>{ if(tv[n]>tmin+Lm*.4) return; const d=rad(p,tv[n],c0,A), l=d.length(); if(l>far){ far=l; tReel=tv[n]; Dn.copy(d); } });
   Dn.addScaledVector(A,-Dn.dot(A)).normalize(); const Sd=new T.Vector3().crossVectors(A,Dn).normalize(), k=R_LEN*(1-REEL_S)/Math.max(1e-6,tmax-tReel);
+  // 4b. 捲線器上手要碰到的兩個點（捲線器座標：x 沿竿向前、y 向上、z 往旁）：搖柄把手＝捲線器附近往旁邊伸最遠的點；線杯前緣＝捲線器下方最靠竿尖的點（釣線從這裡出去）
+  { let kz=0,ky=0,kt=tReel,sT=-1e9,sY=far*.7; V.forEach((p,n)=>{ const t=tv[n]; if(Math.abs(t-tReel)>Lm*.08) return; const d=rad(p,t,c0,A), y=d.dot(Dn), z=d.dot(Sd);
+      if(Math.abs(z)>Math.abs(kz)&&y>far*.15){ kz=z; ky=y; kt=t; } if(y>far*.45&&y<far*1.05&&t>sT){ sT=t; sY=y; } });
+    realRod.knob=new T.Vector3((kt-tReel)*k,-ky*k,kz*k); realRod.spool=sT>-1e9?new T.Vector3((sT-tReel)*k,-sY*k,0):null; }
   // 5. 把每個頂點改存成（s, 往下, 往旁）；法線也換到同一組方向
   const cont=new T.Group(), nm=new T.Matrix3(), nv=new T.Vector3();
   for(const o of meshes){ const src=o.geometry, pa=src.attributes.position, na=src.attributes.normal, geo=new T.BufferGeometry(), P=new Float32Array(pa.count*3), N=new Float32Array(pa.count*3); nm.getNormalMatrix(o.matrixWorld);
@@ -333,7 +338,7 @@ if(T.GLTFLoader) new T.GLTFLoader().load('models/rod_real2.glb',g=>{ try{
           .replace('#include <begin_vertex>','vec3 transformed=rC+rDn*position.y+rSd*position.z;'); };
       m.customProgramCacheKey=()=>'realRodCurve'; m.needsUpdate=true; return m; });
     const mesh=new T.Mesh(geo,Array.isArray(o.material)?mats:mats[0]); mesh.frustumCulled=false; mesh.castShadow=false; mesh.receiveShadow=false; cont.add(mesh); }
-  realRod.cont=cont; rodGroup.add(cont); realRod.ready=true;
+  realRod.cont=cont; rodGroup.add(cont); realRod.ready=true; knobObj.position.copy(realRod.knob);
   for(const m of segs) m.visible=false; for(const m of guides) m.visible=false; tipTop.visible=false; reel.visible=false;
 }catch(e){ console.warn('real rod',e); } },undefined,()=>console.warn('real rod: load failed'));
 function poseRealRod(){ if(!realRod.ready) return; for(let i=0;i<=NS;i++) rodPtsU.value[i].copy(pts[i]); }
@@ -354,10 +359,10 @@ function updateRod(dt){
   GS.forEach((s,k)=>{ rodAt(s,tmp); frameAt(s); const g=guides[k]; g.position.copy(tmp).addScaledVector(dn,.008+.026*(1-s)); g.quaternion.setFromUnitVectors(AZ,tan);
     rod.guidesW[k].copy(g.position); rodGroup.localToWorld(rod.guidesW[k]); });
   tipTop.position.copy(pts[NS]); frameAt(.999); tipTop.quaternion.setFromUnitVectors(AZ,tan);
-  rodAt(.125,tmp); frameAt(.125); basis.makeBasis(tan, tmp2.copy(dn).negate(), sd); reel.position.copy(tmp); reel.quaternion.setFromRotationMatrix(basis);
+  const rS0=realRod.ready?REEL_S:.125; rodAt(rS0,tmp); frameAt(rS0);   /* 捲線器錨點跟真實模型的捲線器座同一處（以前停在舊竿子的 .125，手跟著握到空氣） */ basis.makeBasis(tan, tmp2.copy(dn).negate(), sd); reel.position.copy(tmp); reel.quaternion.setFromRotationMatrix(basis);
   crank.rotation.z=rod.spin;
   rod.tipW.copy(pts[NS]); rodGroup.localToWorld(rod.tipW);
-  reel.updateMatrixWorld(true); rod.spoolW.set(.058,-.085,0); reel.localToWorld(rod.spoolW);
+  reel.updateMatrixWorld(true); if(realRod.ready&&realRod.spool) rod.spoolW.copy(realRod.spool); else rod.spoolW.set(.058,-.085,0); reel.localToWorld(rod.spoolW);
   rodGroup.updateMatrixWorld(true);
   try{ poseRealRod(); }catch(e){ /* 真實模型擺姿勢出錯：退回原本的竿子，不讓遊戲壞掉 */ console.warn('real rod pose',e); realRod.ready=false; if(realRod.cont) realRod.cont.visible=false; for(const m of segs) m.visible=true; for(const m of guides) m.visible=true; tipTop.visible=true; reel.visible=true; }
 }
@@ -1036,5 +1041,5 @@ const previewFinish=createTacklePreview(W,(kind,id)=>{
  const body=root.children[0],texture=paintFloat(body.material,colors[0],colors[1],id);let i=0;root.traverse(o=>{if(o.userData.floatAntenna){o.material.color.setHex(i++%2?colors[1]:colors[0]).convertSRGBToLinear();o.material.metalness=id==='gold'?.8:0;}});root.rotation.z=-.2;return{root,focus:new T.Vector3(0,.035,0),dispose:()=>texture.dispose()};
 });
 
-return { foam, foamBurst, dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, setRodLook,setFloatLook,previewFinish,rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
+return { foam, foamBurst, dockMats:{plankMat,postMat,beamMat}, rodGroup, reelObj:reel, crankObj:crank, knobObj, setRodLook,setFloatLook,previewFinish,rod, updateRod, setLine, bobber, splash, updateFx, shadow, SPECIES, RAR, getFish };
 }

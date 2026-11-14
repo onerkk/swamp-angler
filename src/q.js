@@ -2,6 +2,10 @@
 function createArms(W,P){
 'use strict';
 const T=THREE, S=W.scene, reel=P.reelObj, crank=P.crankObj, rod=P.rod;
+/* 握法照真實的紡車式捲線器：搖柄在哪一側，那一側的手轉搖柄；另一隻手握竿，捲線器腳夾在中指與無名指之間。
+   以前固定「左手握前面、右手轉搖柄」，但搖柄其實在左側，右手要橫過去，看起來手沒握在竿上 */
+const knobO=P.knobObj, ARM=window.__ARM=window.__ARM||{grip:{R:.6,L:-.6},crank:{R:-.35,L:.35},back:.012};
+const crankSide=()=>{ if(!knobO) return 'R'; return knobO.position.z>=0?'L':'R'; };
 const arms=[]; let ready=false;
 // 左手：往前握前握把末端；右手：轉右側搖柄把手（捲線器座標：x 沿竿向前、y 向上、z 搖柄側）
 const GRIP=new T.Vector3(-.2,-.012,-.006), KNOB=new T.Vector3(0,-.05,.03);
@@ -51,8 +55,9 @@ function update(show,st,power,dt,pad){
   pullK+=(((ff&&GG.held)?T:0)-pullK)*Math.min(1,dt*5); lungeK+=(((ff&&ff.run)?.5+.5*T:0)-lungeK)*Math.min(1,dt*4);
   const shake=T>.78?(T-.78)*.05:0;
   for(const a of arms){ a.grp.visible=show; if(!show) continue;
-    if(a.side==='L'){ reel.getWorldPosition(tg); tmp.subVectors(rod.tipW,tg).normalize(); tg.addScaledVector(tmp,.2); }   // 沿竿身往竿尖 20cm，一定在竿上
-    else crank.localToWorld(tg.copy(KNOB));
+    const cs=crankSide(), cranking=a.side===cs;
+    if(!cranking){ reel.getWorldPosition(tg); tmp.subVectors(rod.tipW,tg).normalize(); tg.addScaledVector(tmp,-ARM.back); }   // 握竿：手掌包住捲線器座，捲線器腳在指間
+    else if(knobO) knobO.getWorldPosition(tg); else crank.localToWorld(tg.copy(KNOB));
     const pk=pad&&pad.k>.001?pad.k:0; if(pk){ pad.grip(a.side,pg); tg.lerp(pg,pk); }   // 划船：握點移到槳桿
     off.copy(a.side==='R'?SH_R:SH_L); off.y+=.24*back-.08*swing+.06*pullK-.03*lungeK+(Math.random()-.5)*shake; off.z+=.32*back-.3*swing+.13*pullK-.12*lungeK+(Math.random()-.5)*shake; off.x+=(a.side==='R'?.06:-.04)*back;
     W.camera.localToWorld(sh.copy(off));
@@ -60,10 +65,10 @@ function update(show,st,power,dt,pad){
     q.setFromUnitVectors(a.ld,wd);
     upM.set(0,1,0).applyQuaternion(q); upW.set(0,1,0).applyQuaternion(cq);
     upM.addScaledVector(wd,-upM.dot(wd)).normalize(); upW.addScaledVector(wd,-upW.dot(wd)).normalize();
-    let roll=Math.atan2(tmp.crossVectors(upM,upW).dot(wd),upM.dot(upW))+(a.side==='R'?-.35:-.6);
-    if(a.side==='R') roll+=.45*Math.sin(rod.spin||0)*reelK;                    // 收線：前臂隨搖柄轉動
+    let roll=Math.atan2(tmp.crossVectors(upM,upW).dot(wd),upM.dot(upW))+(cranking?ARM.crank[a.side]:ARM.grip[a.side]);
+    if(cranking) roll+=.45*Math.sin(rod.spin||0)*reelK;                    // 收線：前臂隨搖柄轉動
     q2.setFromAxisAngle(wd,roll); q.premultiply(q2);
-    if(a.side==='R'&&reelK>.01){ sd.crossVectors(wd,upW).normalize(); q2.setFromAxisAngle(sd,.22*Math.cos(rod.spin||0)*reelK); q.premultiply(q2); }  // 手腕上下擺
+    if(cranking&&reelK>.01){ sd.crossVectors(wd,upW).normalize(); q2.setFromAxisAngle(sd,.22*Math.cos(rod.spin||0)*reelK); q.premultiply(q2); }  // 手腕上下擺
     const s=.5/a.L0; a.grp.scale.setScalar(s); a.grp.quaternion.copy(q);
     // 用掌心對準握點，竿子穿過掌心與手指之間
     upM.set(0,1,0).applyQuaternion(q);

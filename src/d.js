@@ -147,6 +147,13 @@ if(ui.dragBtn){ dragLbl(); let dPtr=null, lastBuzz=-1;
   ui.dragBtn.addEventListener('pointerdown',e=>{ e.stopPropagation(); e.preventDefault(); dPtr=e.pointerId; try{ ui.dragBtn.setPointerCapture(e.pointerId); }catch(_){} setFrom(e); });
   ui.dragBtn.addEventListener('pointermove',e=>{ if(e.pointerId!==dPtr) return; e.stopPropagation(); setFrom(e); });
   const end=e=>{ if(e.pointerId!==dPtr) return; dPtr=null; persist(); }; ui.dragBtn.addEventListener('pointerup',end); ui.dragBtn.addEventListener('pointercancel',end); }
+/* 上鉤前就能調洩力：拋竿、等魚、咬餌時滑桿放在畫面角落的小面板；上鉤後搬回搏魚面板裡。大魚一上鉤就衝，等到上鉤才調來不及 */
+{ const dock=$('dragDock'), fctl=$('fCtl'), PRE=new Set(['idle','charge','cast','wait','lure','bite','retrieve','snatch']);
+  setInterval(()=>{ if(!dock||!ui.dragBtn||!fctl) return; const b=document.body.classList, fightOn=!ui.fight.classList.contains('hidden');
+    const pre=!fightOn&&PRE.has(G.state)&&!b.contains('athome')&&!b.contains('attide')&&!b.contains('sheetOn')&&!b.contains('furnOn')&&!b.contains('intro');
+    if(fightOn&&ui.dragBtn.parentNode!==fctl) fctl.insertBefore(ui.dragBtn,ui.netBtn||null);
+    else if(pre&&ui.dragBtn.parentNode!==dock) dock.appendChild(ui.dragBtn);
+    dock.classList.toggle('on',pre&&ui.dragBtn.parentNode===dock); },200); }
 if(ui.netBtn) ui.netBtn.addEventListener('pointerdown',e=>{ e.stopPropagation(); if(G.f&&G.f.netOn) G.f.netGo=true; });
 // 釣棚按鈕：點一下切換淺／中／深；浮標吃水深度跟著改，提示目前這個水層容易遇到哪類魚
 const depthTxt=$('depthTxt'), DEPTH_TIP=['水面附近：藍鰓、鱷雀鱔、鬼頭刀、鮪魚等中上層魚','中層：大部分鱸魚、鱒魚、鯛類','觸底：鯰魚、鯉魚、石斑、比目魚、魟等底棲魚'];
