@@ -1,4 +1,4 @@
-/*APPV:20261114015152*/
+/*APPV:20261114060544*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -7428,7 +7428,7 @@ function focus(i){ if(!items.length){ nameEl.textContent='還沒有一公尺以�
 ui.addEventListener('click',e=>{ const k=e.target.closest('[data-k]'); if(!k) return; const a=k.dataset.k; if(a==='exit') exit(); else focus(idx+(a==='next'?1:-1)); });
 // 拖曳轉頭：在標本館裡攔下畫布的觸控，不讓小屋收到
 const tipEl=ui.querySelector('.ht'); let tipT=null; function tip(t,ms){ tipEl.textContent=t; tipEl.classList.add('on'); clearTimeout(tipT); tipT=setTimeout(()=>tipEl.classList.remove('on'),ms||2800); }
-let camY=1.65, camYT=1.65, seated=false, dim=false, velX=0, velZ=0; const WF=window.WalkFeel?window.WalkFeel({stride:.72,vol:.55}):{update:()=>({dx:0,dy:0,roll:0,pitch:0})}; const lightsAll=[];
+let camY=1.65, camYT=1.65, seated=false, dim=false, velX=0, velZ=0, nearT=0; const WF=window.WalkFeel?window.WalkFeel({stride:.72,vol:.55}):{update:()=>({dx:0,dy:0,roll:0,pitch:0})}; const lightsAll=[];
 function use(id,o){ const H=window.__HOME, r=(k)=>{ try{ return H&&H.furnUse?H.furnUse(k):null; }catch(e){ return null; } };
   if(id==='sofa'||id==='seat'){ const b=new T.Box3().setFromObject(o), c=b.getCenter(new T.Vector3()); camXT=c.x; camZT=c.z-(id==='sofa'?.1:0); camYT=b.min.y+(id==='sofa'?1.12:1.05); yawT=0; pitchT=.12; seated=true;
     tip(id==='sofa'?'窩進沙發，抬頭看著滿屋子的戰利品……':'坐下來歇一會兒',2600); if(id==='sofa'){ const res=r('sofa'); if(res&&res.msg) setTimeout(()=>tip(res.msg,3400),2700); } return; }
@@ -7456,7 +7456,11 @@ function render(dt){ if(!on) return; const tt=performance.now()/1000; tagList.fo
   else { const dx=camXT-camX, dz=camZT-camZ, d=Math.hypot(dx,dz); if(d>.01){ const sp=Math.min(1.7,d*1.5+.15); tvx=dx/d*sp; tvz=dz/d*sp; } else { camX=camXT; camZ=camZT; } }
   const ka=Math.min(1,dt*4.5); velX+=(tvx-velX)*ka; velZ+=(tvz-velZ)*ka; if(!(joy.x||joy.y)&&Math.hypot(camXT-camX,camZT-camZ)<=.01){ velX=velZ=0; }
   camX=Math.max(-HW+.8,Math.min(HW-.8,camX+velX*dt)); camZ=Math.max(-len-1.5,Math.min(5.2,camZ+velZ*dt)); if(joy.x||joy.y){ camXT=camX; camZT=camZ; }
-  const wf=WF.update(dt,seated?0:Math.hypot(camX-px,camZ-pz),Math.abs(camX)<1.1?'carpet':'wood');   /* 中央走道是地毯，兩側是木地板 */
+  const wf=WF.update(dt,seated?0:Math.hypot(camX-px,camZ-pz),Math.abs(camX)<1.1?'carpet':'wood');
+  /* 自己走動時，下方名牌改成「眼前那一隻」：以前一直停在最後按到的那隻（看著龍膽石斑卻寫扁頭鯰） */
+  if((joy.x||joy.y||Math.abs(yawT-yaw)>.01)&&items.length&&(nearT-=dt)<0){ nearT=.25; let best=-1, bs=1e9; const fx=-Math.sin(yaw), fz=-Math.cos(yaw);
+    items.forEach((it,i)=>{ const dx=it.x-camX, dz=it.z-camZ, d=Math.hypot(dx,dz); if(d<.1) return; const c=(dx*fx+dz*fz)/d; if(c<.5) return; const sc=d*(2-c); if(sc<bs){ bs=sc; best=i; } });
+    if(best>=0&&best!==idx){ idx=best; const it=items[idx]; nameEl.textContent=`${idx+1}／${items.length}　${it.sp.name}　${Math.round(it.rec.L*100)} cm`; } }   /* 中央走道是地毯，兩側是木地板 */
   yaw+=(yawT-yaw)*Math.min(1,dt*6); pitch+=(pitchT-pitch)*Math.min(1,dt*6);
   const s=R.getSize(new T.Vector2()); cam.aspect=s.x/s.y; cam.fov=s.x<s.y?72:58; cam.updateProjectionMatrix();
   camY+=(camYT-camY)*Math.min(1,dt*3); cam.position.set(camX+Math.cos(yaw)*wf.dx,camY+wf.dy,camZ-Math.sin(yaw)*wf.dx); cam.rotation.order='YXZ'; cam.rotation.set(pitch+wf.pitch,yaw,wf.roll);
@@ -8905,7 +8909,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261114015152'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261114060544'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

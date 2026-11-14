@@ -264,7 +264,11 @@ body.sheetOn #bCam{display:none!important}
 @media (orientation:landscape) and (max-height:540px){ #homeUI .hb .btn{min-height:46px;min-width:56px} #homeUI .hh{top:calc(env(safe-area-inset-top,0px) + 12px)} }
 body.athome #homeUI{display:flex}
 body.sheetOn #homeUI,body.sheetOn #homeView,body.sheetOn #fishCard{display:none!important}
-#homeView{position:fixed;left:12px;top:calc(64px + env(safe-area-inset-top,0px));z-index:21;display:flex;gap:8px}#homeView.hidden,#fishCard.hidden{display:none}
+#homeView{position:fixed;left:12px;top:calc(64px + env(safe-area-inset-top,0px));z-index:21;display:flex;gap:8px}#homeView .btn{white-space:nowrap;width:auto!important;padding-left:14px!important;padding-right:14px!important}   /* 「潛入缸內」不再斷成兩行 */
+/* 烤魚／家具選單開著時，相機鈕會被面板壓在下面：先藏起來；選單列改精簡，一次看得到更多條魚 */
+body:has(#grillPick:not(.hidden)) #bCam,body:has(#furnPick:not(.hidden)) #bCam,body:has(#grillUI:not(.hidden)) #bCam{display:none!important}
+#grillPick .it{padding:5px 4px}#grillPick .it .btn{min-height:34px!important;padding:4px 14px!important}
+#homeView.hidden,#fishCard.hidden{display:none}
 #fishCard{position:fixed;left:16px;right:16px;bottom:calc(90px + env(safe-area-inset-bottom,0px));z-index:22;padding:14px 16px;border-radius:14px;background:rgba(14,22,26,.88);color:#fff;border:1px solid rgba(255,255,255,.12);box-shadow:0 6px 24px rgba(0,0,0,.4)}
 #fishCard b{font-size:19px;color:var(--rc,#e9c46a)}#fishCard small{opacity:.7;margin-left:6px}#fishCard .fg{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;margin-top:8px;font-size:14px}#fishCard .fg span{opacity:.6}
 body.athome #drops,body.athome #flare,body.athome #act,body.athome #fight,body.athome #top2,body.athome #hotChip,body.athome #combo,body.athome #castTag,body.athome #fxBar,body.athome #bTour,body.athome #pop,body.athome #bGoal{display:none!important}
@@ -519,7 +523,7 @@ function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classLi
 </script>
 <script>
 (async function(){
-  const version='20261114015152', note=document.getElementById('loadNote');
+  const version='20261114060544', note=document.getElementById('loadNote');
   for(let attempt=0;attempt<4;attempt++){
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),18000);
