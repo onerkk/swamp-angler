@@ -248,9 +248,9 @@ body.sheetOn #bCam{display:none!important}
 #dragBtn .dfil{position:absolute;inset:0;border-radius:99px;background:rgba(0,0,0,.45);left:var(--dv,50%)}
 #dragBtn .dknb{position:absolute;top:50%;left:var(--dv,50%);width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
 #dragBtn .dknb em{font-style:normal;font-size:12px;font-weight:800;color:#2a2a2a}
-#dragDock{position:fixed;z-index:24;display:none;align-items:center;gap:8px;left:calc(env(safe-area-inset-left,0px) + 140px);bottom:calc(env(safe-area-inset-bottom,0px) + 12px);width:min(40vw,300px);padding:6px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--stroke);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:#fff}
+#dragDock{position:fixed;z-index:24;display:none;align-items:center;gap:8px;right:calc(env(safe-area-inset-right,0px) + 12px);bottom:calc(env(safe-area-inset-bottom,0px) + 172px);width:min(62vw,250px);padding:6px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--stroke);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:#fff}
 #dragDock.on{display:flex} #dragDock>.dk{font-size:12px;opacity:.85;flex:0 0 auto}
-@media (orientation:portrait){ #dragDock{left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 168px);width:min(58vw,300px)} }
+/* 洩力面板放在右手邊、起鉤按鈕與蝦皮券上方：不擋雙手和釣竿，也不壓底部的提示字；拇指從按鈕往上滑就碰得到 */
 #homeUI{display:none;position:fixed;left:0;right:0;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:20;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
 #homeUI .hb{display:flex;gap:10px;pointer-events:auto}#homeUI .hh{color:#fff;opacity:.7;font-size:13px;text-shadow:0 1px 3px #000}
 /* 小屋下方按鈕重新設計：原本是兩三排大按鈕疊在畫面中間，擋住水族箱。改成畫面最下緣一條半透明的工具列，圖示在上、字在下 */
@@ -519,7 +519,7 @@ function showErr(h){var e=document.getElementById('err');e.innerHTML=h;e.classLi
 </script>
 <script>
 (async function(){
-  const version='20261114012325', note=document.getElementById('loadNote');
+  const version='20261114015152', note=document.getElementById('loadNote');
   for(let attempt=0;attempt<4;attempt++){
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),18000);
