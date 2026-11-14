@@ -1,4 +1,4 @@
-/*APPV:20261114060544*/
+/*APPV:20261114081719*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -7408,7 +7408,7 @@ function enrich(g){ g.traverse(o=>{ if(!o.isMesh||!o.material) return; const mat
 /* 介面 */
 const ui=document.createElement('div'); ui.id='hallUI'; ui.innerHTML='<div class="hj"><i></i></div><div class="ht"></div><div class="hn"></div><div class="hb"><button data-k="prev">◀</button><button data-k="exit">🏠 回小屋</button><button data-k="next">▶</button></div>'; document.body.appendChild(ui);
 const st=document.createElement('style'); st.textContent=`#hallUI{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:30;display:none;flex-direction:column;align-items:center;gap:10px;pointer-events:none}
-#hallUI .hj{position:fixed;left:22px;bottom:calc(env(safe-area-inset-bottom,0px) + 150px);width:120px;height:120px;border-radius:50%;background:rgba(20,14,8,.45);border:1px solid rgba(255,213,106,.4);pointer-events:auto;touch-action:none}#hallUI .hj i{position:absolute;left:38px;top:38px;width:44px;height:44px;border-radius:50%;background:rgba(255,233,168,.75)}
+#hallUI .hj{position:fixed;left:22px;bottom:calc(env(safe-area-inset-bottom,0px) + 112px);width:110px;height:110px;border-radius:50%;background:rgba(20,14,8,.22);border:1px solid rgba(255,213,106,.28);pointer-events:auto;touch-action:none}#hallUI .hj i{position:absolute;left:33px;top:33px;width:44px;height:44px;border-radius:50%;background:rgba(255,233,168,.55)}@media (orientation:landscape){#hallUI .hj{left:calc(env(safe-area-inset-left,0px) + 18px);bottom:calc(env(safe-area-inset-bottom,0px) + 54px)}}   /* 搖桿縮小、變淡、橫向時貼在左下角，不再擋住吊著的標本 */
 #hallUI .ht{position:fixed;left:50%;top:30%;transform:translateX(-50%);max-width:84vw;padding:10px 16px;border-radius:14px;background:rgba(20,14,8,.85);color:#ffe9a8;font-size:15px;line-height:1.6;text-align:center;opacity:0;transition:opacity .4s;pointer-events:none}#hallUI .ht.on{opacity:1}
 #hallUI .hn{padding:6px 14px;border-radius:999px;background:rgba(20,14,8,.72);color:#ffe9a8;font-size:14px;font-weight:800}#hallUI .hb{display:flex;gap:10px;pointer-events:auto}
 #hallUI button{min-width:64px;padding:12px 16px;border-radius:999px;border:1px solid rgba(255,213,106,.6);background:rgba(42,31,14,.9);color:#ffe9a8;font-size:16px;font-weight:800;font-family:inherit}
@@ -8909,7 +8909,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261114060544'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261114081719'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
