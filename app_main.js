@@ -1,4 +1,4 @@
-/*APPV:20261115052033*/
+/*APPV:20261115053613*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -5758,10 +5758,18 @@ function createModels(W){
 'use strict';
 const T=THREE, loader=new T.GLTFLoader(), files={}, waiters={}, mixers=[];
 const ang=a=>({'+x':0,'-z':Math.PI/2,'-x':Math.PI,'+z':-Math.PI/2})[a];
+/* 貼圖預先上傳：模型下載好之後，貼圖要到「第一次被畫出來」那一幀才送進顯示卡，一張 1024～2048 的貼圖會讓那一幀卡幾十毫秒——
+   而魚第一次被畫出來，正好是上鉤搏魚的那一刻。改成下載好就排隊，在沒有搏魚的空檔每 0.3 秒送一張，之後出場就不卡。
+   依設定圖烘焙的舊模型（BAKED）之後還會改取樣方式，不預傳，避免傳兩次 */
+const warmQ=[]; let warmTimer=0;
+function warmTextures(g,f){ try{ if(BAKED.has(f)||!W.renderer||!W.renderer.initTexture) return; if(W.qualityTextures) W.qualityTextures(g.scene);
+    const seen=new Set(); g.scene.traverse(m=>{ if(!m.isMesh) return; (Array.isArray(m.material)?m.material:[m.material]).forEach(mt=>{ if(!mt) return; for(const k of ['map','normalMap','roughnessMap','metalnessMap','emissiveMap']){ const t=mt[k]; if(t&&t.image&&!seen.has(t)){ seen.add(t); warmQ.push(t); } } }); });
+    if(!warmTimer) warmTimer=setInterval(()=>{ const G=window.__G, st=G&&G.state; if(st==='fight'||st==='bite'||st==='land'||st==='charge'||st==='cast'||document.hidden) return;
+      const t=warmQ.shift(); if(!t){ clearInterval(warmTimer); warmTimer=0; return; } try{ W.renderer.initTexture(t); }catch(e){} },300); }catch(e){} }
 function load(f){
   if(files[f]?.g||files[f]?.loading||Date.now()<(files[f]?.retryAt||0))return;
   const e=files[f]={g:null,loading:true};
-  const ok=g=>{e.g=g;e.loading=false;(waiters[f]||[]).forEach(fn=>{try{fn(g);}catch(err){console.warn('real',f,err);}});delete waiters[f];};
+  const ok=g=>{e.g=g;e.loading=false;warmTextures(g,f);(waiters[f]||[]).forEach(fn=>{try{fn(g);}catch(err){console.warn('real',f,err);}});delete waiters[f];};
   loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{e.loading=false;e.retryAt=Date.now()+5000;});
 }
 const ready=f=>files[f]&&files[f].g;
@@ -8965,7 +8973,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261115052033'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261115053613'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

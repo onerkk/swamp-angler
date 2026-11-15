@@ -28,10 +28,18 @@ function createModels(W){
 'use strict';
 const T=THREE, loader=new T.GLTFLoader(), files={}, waiters={}, mixers=[];
 const ang=a=>({'+x':0,'-z':Math.PI/2,'-x':Math.PI,'+z':-Math.PI/2})[a];
+/* 貼圖預先上傳：模型下載好之後，貼圖要到「第一次被畫出來」那一幀才送進顯示卡，一張 1024～2048 的貼圖會讓那一幀卡幾十毫秒——
+   而魚第一次被畫出來，正好是上鉤搏魚的那一刻。改成下載好就排隊，在沒有搏魚的空檔每 0.3 秒送一張，之後出場就不卡。
+   依設定圖烘焙的舊模型（BAKED）之後還會改取樣方式，不預傳，避免傳兩次 */
+const warmQ=[]; let warmTimer=0;
+function warmTextures(g,f){ try{ if(BAKED.has(f)||!W.renderer||!W.renderer.initTexture) return; if(W.qualityTextures) W.qualityTextures(g.scene);
+    const seen=new Set(); g.scene.traverse(m=>{ if(!m.isMesh) return; (Array.isArray(m.material)?m.material:[m.material]).forEach(mt=>{ if(!mt) return; for(const k of ['map','normalMap','roughnessMap','metalnessMap','emissiveMap']){ const t=mt[k]; if(t&&t.image&&!seen.has(t)){ seen.add(t); warmQ.push(t); } } }); });
+    if(!warmTimer) warmTimer=setInterval(()=>{ const G=window.__G, st=G&&G.state; if(st==='fight'||st==='bite'||st==='land'||st==='charge'||st==='cast'||document.hidden) return;
+      const t=warmQ.shift(); if(!t){ clearInterval(warmTimer); warmTimer=0; return; } try{ W.renderer.initTexture(t); }catch(e){} },300); }catch(e){} }
 function load(f){
   if(files[f]?.g||files[f]?.loading||Date.now()<(files[f]?.retryAt||0))return;
   const e=files[f]={g:null,loading:true};
-  const ok=g=>{e.g=g;e.loading=false;(waiters[f]||[]).forEach(fn=>{try{fn(g);}catch(err){console.warn('real',f,err);}});delete waiters[f];};
+  const ok=g=>{e.g=g;e.loading=false;warmTextures(g,f);(waiters[f]||[]).forEach(fn=>{try{fn(g);}catch(err){console.warn('real',f,err);}});delete waiters[f];};
   loader.load(REAL_DIR+f+'.glb',ok,undefined,()=>{e.loading=false;e.retryAt=Date.now()+5000;});
 }
 const ready=f=>files[f]&&files[f].g;
