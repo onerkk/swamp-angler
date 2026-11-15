@@ -27,6 +27,8 @@ const Snd=(()=>{
   // 捲線器循環：rate 決定轉速（收線慢轉、魚拉走線時高速尖叫），vol 0 就淡出
   function reelLoop(vol,rate){ if(!ctx||!SMP.reel) return false; if(!reelSrc&&vol>.01){ reelSrc=ctx.createBufferSource(); reelSrc.buffer=SMP.reel; reelSrc.loop=true; reelG=ctx.createGain(); reelG.gain.value=0; reelSrc.connect(reelG); reelG.connect(outdoor); reelSrc.start(); }
     if(reelSrc){ reelG.gain.setTargetAtTime(vol,ctx.currentTime,.06); reelSrc.playbackRate.setTargetAtTime(rate,ctx.currentTime,.08); if(vol<=.01){ const s=reelSrc; reelSrc=null; setTimeout(()=>{ try{ s.stop(); }catch(e){} },400); } } return true; }
+  const SVAR={coin:2,creak:3};   /* 有實錄音的音效：名稱→有幾個版本 */
+  function smp(name,vol,rate){ const n=SVAR[name]||0, ok=[]; for(let i=0;i<n;i++) if(SMP[name+'_'+i]) ok.push(name+'_'+i); if(!ok.length) return false; return sample(ok[Math.floor(Math.random()*ok.length)],vol,(rate||1)*(.95+Math.random()*.1)); }
   function sample(k,vol,rate){ if(!ctx||!SMP[k]) return false; const s=ctx.createBufferSource(); s.buffer=SMP[k]; s.playbackRate.value=rate||1; const g=ctx.createGain(); g.gain.value=vol; s.connect(g); g.connect(soundBus||out); s.start(); return true; }
   function init(){
     if(ctx){ if(ctx.state==='suspended') ctx.resume(); return; }
@@ -35,6 +37,8 @@ const Snd=(()=>{
     out=ctx.createGain(); out.gain.value=on?.8:0; out.connect(ctx.destination);outdoor=ctx.createGain();outdoor.gain.value=indoor?0:1;outdoor.connect(out); if(indoor) setTimeout(()=>{ if(indoor) musicStart(); },0);
     // 真實錄音音效（OpenGameArt「Fisheefects」，CC0）：捲線器、水花；載入失敗就沿用合成音
     ['reel','splash'].forEach(k=>fetch('sfx_'+k+'.mp3').then(r=>r.arrayBuffer()).then(b=>ctx.decodeAudioData(b)).then(buf=>{ SMP[k]=buf; }).catch(()=>{}));
+    /* 實錄音效（sfx/名稱_編號.mp3）：同一種聲音有幾個不同的錄音，每次隨機挑一個並微調音高，不會每次都一模一樣。還沒載到或沒有錄音的，退回合成聲 */
+    for(const k in SVAR) for(let i=0;i<SVAR[k];i++) fetch('sfx/'+k+'_'+i+'.mp3').then(r=>r.arrayBuffer()).then(b=>ctx.decodeAudioData(b)).then(buf=>{ SMP[k+'_'+i]=buf; }).catch(()=>{});
     nb=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate); const d=nb.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
     const amb=(rate,type,f,q,g0,lf,lg)=>{ const s=ctx.createBufferSource(); s.buffer=nb; s.loop=true; s.playbackRate.value=rate;
       const fl=ctx.createBiquadFilter(); fl.type=type; fl.frequency.value=f; fl.Q.value=q; const g=ctx.createGain(); g.gain.value=g0;
@@ -102,12 +106,12 @@ const Snd=(()=>{
     plop:outdoors(function(){ tn(320,.09,'sine',.14,0,120); nz(.06,'bandpass',1800,2,.05); }),
     reelLoop,
     nibble:outdoors(function(){ tn(260,.06,'sine',.07,0,140); }),
-    creak:outdoors(function(k){ k=k||1; tn(70+Math.random()*50,.16,'sawtooth',.035*k,0,40); nz(.08,'bandpass',900+Math.random()*500,3,.02*k); }),   // 竿身承受重量的吱嘎聲
+    creak:outdoors(function(k){ k=k||1; if(smp('creak',.28*k)) return; tn(70+Math.random()*50,.16,'sawtooth',.035*k,0,40); nz(.08,'bandpass',900+Math.random()*500,3,.02*k); }),   // 竿身承受重量的吱嘎聲
     bite:outdoors(function(){ tn(180,.22,'sine',.28,0,55); nz(.25,'lowpass',900,.6,.12); }),
     click(p){ nz(.014,'highpass',p||3200,.8,.09); },
     snap:outdoors(function(){ nz(.05,'highpass',3000,.6,.5); tn(110,.3,'triangle',.25,0,40); }),
     fanfare(r){ const b=[523.25,659.25,783.99,1046.5,1318.5]; for(let i=0;i<3+r;i++) tn(b[i%5]*(i>=5?2:1),.35,'triangle',.11,i*.09); if(r>=3) tn(261.6,.9,'sine',.12,0); },
-    coin(){ tn(1318,.08,'square',.04); tn(1760,.14,'square',.04,.07); },
+    coin(){ if(smp('coin',.5)) return; tn(1318,.08,'square',.04); tn(1760,.14,'square',.04,.07); },
     rain(k){ if(rainG) rainG.gain.setTargetAtTime(k*.16,ctx.currentTime,.5); },
     thunder:outdoors(function(){ nz(2.6,'lowpass',160,.7,.5,60); nz(.5,'lowpass',900,.5,.22); }),
     eagle:outdoors(function(){ for(let i=0;i<3;i++) tn(2900-i*120,.12,'sine',.05,i*.13,2300); tn(2400,.5,'sine',.04,.45,1700); }),
