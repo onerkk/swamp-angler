@@ -723,7 +723,7 @@ function renderRefl(){
   try{
     // Reflection target stores linear radiance, so the water shader applies exposure once.
     renderer.toneMapping=T.NoToneMapping; renderer.outputEncoding=T.LinearEncoding;
-    renderer.setRenderTarget(reflRT);renderer.setClearColor(0x000000,0);renderer.clear();renderer.render(scene,reflCam);
+    renderer.setRenderTarget(reflRT);renderer.setClearColor(0x000000,0);renderer.clear();{const restore=window.__GEOLOD&&window.__GEOLOD.swapFar?window.__GEOLOD.swapFar():null;try{renderer.render(scene,reflCam);}finally{if(restore)restore();}}
     WU.uReflOn.value=1;
   }finally{
     renderer.setRenderTarget(ort);renderer.setClearColor(oc,oa);scene.background=bg;renderer.shadowMap.autoUpdate=sh;

@@ -2,7 +2,9 @@
    遠處改用預先簡化的幾何（約 12% 面數，models/lod/），材質、貼圖完全不變，切換時不會重新編譯著色器；近處仍是原檔。
    切換距離依材質等級：高 18 公尺、中 11 公尺、低 7 公尺，並留 15% 緩衝避免在邊界來回閃。
    中、低畫質的近處改用中間版本（約 35% 面數，_lod0），高畫質近處一律原檔。 */
-const LOD_MODELS=['dead_tree_trunk_02.glb','tree_stump_01.glb','tree_stump_02.glb','rock_moss_set_01.glb','fern_02.glb','grass_medium_01.glb','nettle_plant.glb'];
+const LOD_MODELS=['dead_tree_trunk_02.glb','tree_stump_01.glb','tree_stump_02.glb','rock_moss_set_01.glb','fern_02.glb','grass_medium_01.glb','nettle_plant.glb',
+ /* 2026-11-15 量測後加入：灌木、枯枝、碼頭與船上的實物掃描小道具（每個 0.5～2.7 萬面，以前不論多遠都畫原檔）。小杉樹簡化後針葉會變稀，不列入 */
+ 'shrub_02.glb','dry_branches_medium_01.glb','plastic_crate_01.glb','lifebuoy.glb','fishermans_hat.glb','wine_barrel_01.glb','wooden_bucket_01.glb','metal_toolbox.glb'];
 function lodFileFor(url,level=1){const name=String(url).split('?')[0].split('/').pop();return LOD_MODELS.includes(name)?'models/lod/'+name.replace(/\.glb$/,'_lod'+level+'.glb'):null;}
 function lodDistance(tier){return tier==='high'?18:tier==='mid'?11:7;}
 function pairLODMeshes(full,lod,lodOf,fullOf,slot='far'){
@@ -46,7 +48,11 @@ function createGeometryLOD(){
   stats.near=n;stats.far=f;
  }
  // 取某個幾何的簡化版本（mid＝35%、far＝12%），沒有就回傳原檔；水族箱水草這類實例化物件自己決定什麼時候用哪一版
+ /* 倒影專用：水面倒影只有一兩百像素寬，卻把整個場景用近景的精細模型重畫一遍（湖區實測光倒影就 46 萬面）。
+    畫倒影前把有簡化版的物件全部暫時換成最簡版，畫完換回來；倒影裡看不出差別 */
+ function swapFar(){const back=[];for(const m of list){const full=fullOf.get(m.geometry)||m.geometry,e=lodOf.get(full),lod=e&&e.far;if(lod&&m.geometry!==lod){back.push(m,m.geometry);m.geometry=lod;}}
+  return()=>{for(let i=0;i<back.length;i+=2)back[i].geometry=back[i+1];};}
  function variant(geo,which){const full=fullOf.get(geo)||geo,e=lodOf.get(full);return which==='full'?full:(e&&e[which])||full;}
- return{install,update,variant,stats};
+ return{install,update,variant,swapFar,stats};
 }
 if(typeof module!=='undefined'&&module.exports)module.exports={LOD_MODELS,lodFileFor,lodDistance,pairLODMeshes,createGeometryLOD};
