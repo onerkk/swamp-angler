@@ -1,4 +1,4 @@
-/*APPV:20261115050211*/
+/*APPV:20261115051831*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -139,7 +139,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports={deviceResourcePol
    中、低畫質的近處改用中間版本（約 35% 面數，_lod0），高畫質近處一律原檔。 */
 const LOD_MODELS=['dead_tree_trunk_02.glb','tree_stump_01.glb','tree_stump_02.glb','rock_moss_set_01.glb','fern_02.glb','grass_medium_01.glb','nettle_plant.glb',
  /* 2026-11-15 量測後加入：灌木、枯枝、碼頭與船上的實物掃描小道具（每個 0.5～2.7 萬面，以前不論多遠都畫原檔）。小杉樹簡化後針葉會變稀，不列入 */
- 'shrub_02.glb','dry_branches_medium_01.glb','plastic_crate_01.glb','lifebuoy.glb','fishermans_hat.glb','wine_barrel_01.glb','wooden_bucket_01.glb','metal_toolbox.glb'];
+ 'shrub_02.glb','dry_branches_medium_01.glb','plastic_crate_01.glb','lifebuoy.glb','fishermans_hat.glb','wine_barrel_01.glb','wooden_bucket_01.glb','metal_toolbox.glb','yacht.glb'];   /* 遊艇 12 萬面：倒影用 2.5 萬面版，中低畫質近處用 4.3 萬面版 */
 function lodFileFor(url,level=1){const name=String(url).split('?')[0].split('/').pop();return LOD_MODELS.includes(name)?'models/lod/'+name.replace(/\.glb$/,'_lod'+level+'.glb'):null;}
 function lodDistance(tier){return tier==='high'?18:tier==='mid'?11:7;}
 function pairLODMeshes(full,lod,lodOf,fullOf,slot='far'){
@@ -8965,7 +8965,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261115050211'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261115051831'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

@@ -4,7 +4,7 @@
    中、低畫質的近處改用中間版本（約 35% 面數，_lod0），高畫質近處一律原檔。 */
 const LOD_MODELS=['dead_tree_trunk_02.glb','tree_stump_01.glb','tree_stump_02.glb','rock_moss_set_01.glb','fern_02.glb','grass_medium_01.glb','nettle_plant.glb',
  /* 2026-11-15 量測後加入：灌木、枯枝、碼頭與船上的實物掃描小道具（每個 0.5～2.7 萬面，以前不論多遠都畫原檔）。小杉樹簡化後針葉會變稀，不列入 */
- 'shrub_02.glb','dry_branches_medium_01.glb','plastic_crate_01.glb','lifebuoy.glb','fishermans_hat.glb','wine_barrel_01.glb','wooden_bucket_01.glb','metal_toolbox.glb'];
+ 'shrub_02.glb','dry_branches_medium_01.glb','plastic_crate_01.glb','lifebuoy.glb','fishermans_hat.glb','wine_barrel_01.glb','wooden_bucket_01.glb','metal_toolbox.glb','yacht.glb'];   /* 遊艇 12 萬面：倒影用 2.5 萬面版，中低畫質近處用 4.3 萬面版 */
 function lodFileFor(url,level=1){const name=String(url).split('?')[0].split('/').pop();return LOD_MODELS.includes(name)?'models/lod/'+name.replace(/\.glb$/,'_lod'+level+'.glb'):null;}
 function lodDistance(tier){return tier==='high'?18:tier==='mid'?11:7;}
 function pairLODMeshes(full,lod,lodOf,fullOf,slot='far'){
