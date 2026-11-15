@@ -756,6 +756,17 @@ function goTide(){
   },650);
   return true;
 }
+/* 預熱：魚第一次被畫出來的那一幀，要編譯牠的著色器（主畫面、陰影、倒影各一份）、上傳貼圖和模型，手機上一次就是 0.2～0.5 秒的停頓，
+   而那一幀正好是上鉤的瞬間（實機診斷：長任務的主因是著色器編譯與貼圖上傳）。
+   改成拋竿後等魚的空檔，把這個水域會出現的魚一種一種先放到鏡頭背後、縮到 1 公分畫一幀，該編譯的、該上傳的都在等待時做完；
+   之後真的上鉤就直接出場。每 1.2 秒最多一種，只在「等魚」狀態做，不會佔到咬餌和搏魚的時間 */
+{ const warmed=window.__warmedFish=new Set(), bk=new THREE.Vector3(); let busy=false;
+  setInterval(()=>{ try{ if(busy||G.state!=='wait'||G.fd||document.hidden||!window.__MDL) return; const loc=G.loc||'lake';
+      const sp=SPECIES.find(q=>!warmed.has(q.id)&&!q.special&&((q.loc||'lake')===loc||q.loc==='both')&&window.__MDL.fishReady(q.id)); if(!sp) return;
+      warmed.add(sp.id); const f=P.getFish(sp); if(!f||!f.group||(G.fish&&G.fish.group===f.group)) return; const g=f.group, was=g.visible, ps=g.position.clone(), sc=g.scale.clone();
+      if(!g.parent) W.scene.add(g); W.camera.getWorldDirection(bk); g.position.copy(W.camera.getWorldPosition(new THREE.Vector3())).addScaledVector(bk,-4); g.position.y-=1; g.scale.setScalar(.01); g.visible=true; busy=true;
+      let n=0; const done=()=>{ if(++n<3){ requestAnimationFrame(done); return; } busy=false; if(G.fish&&G.fish.group===g) return; g.visible=false; g.position.copy(ps); g.scale.copy(sc); }; requestAnimationFrame(done);
+    }catch(e){ busy=false; } },1200); }
 window.__W=W; window.__testMer=()=>{ const sp=SPECIES.find(q=>q.special==='mermaid'); G.sp=sp; G.fd={sp,L:1.7,w:55,lvl:1,value:500,xpMul:1,grade:'A',u:.5}; const fish=P.getFish(sp); G.fish=fish; if(!fish.group.parent) W.scene.add(fish.group); G.state='catch'; try{ showCard(); }catch(e){ return 'card '+e.message; } if(G.merShow) G.merShow.t=2; return !!fish.group.userData.merCtl; }; window.__HS=()=>HOME3D; window.__goTide=goTide;
 function tideDone(bag0,forced){ const handled=bag0.filter(b=>b.done).length; let bag=bag0.filter(b=>!b.done); if(!bag.length&&handled){ persist(); toast(forced?'被救回岸邊':'回到岸上了，這次處理了 '+handled+' 個收穫','good',2000); G.state='idle'; return; } G.state='idle';
   // 圖鑑：挖到的都算發現

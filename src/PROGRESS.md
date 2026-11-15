@@ -10,6 +10,11 @@
 - 2026-11-14 第 2 批上線：紅甘、鯽魚、線鱧（烏鱧代替）、鯉魚、神仙魚（藍帶荷包魚）、龍蝦、泰國蝦（日本沼蝦代替）、北極紅點鮭（白斑紅點鮭代替），頭朝 −x；龍蝦／泰國蝦走 buildCrust，未在遊戲內確認腳的動作
 - 2026-11-14 全換真實模型（第 1 批上線）：真鯛、黑鯛、鸚哥魚（アオブダイ）、青嘴龍占（ハマフエフキ）、正鰹、土魠、黃鰭鮪、鱸鰻（オオウナギ）、鬚鳚（センカエルウオ）→ ffishAsia CC0 實物掃描，頭朝 −x。流程：/tmp/ff/conv.py（下載→simplify→貼圖 JPEG 1024→draco）→ shrink.py（再減到約 3 萬面）→ /tmp/gt/clean.mjs（刪掉掃描附帶的 12 面標記方塊）→ /tmp/simsite/fvt.html 俯視圖確認頭向。
   剩下 AI 生成待找：印度鯪、鱖魚、紅甘、鬼頭刀、雨傘旗魚、弓鰭魚、鯽魚、吳郭魚、線鱧、孔雀鱸、塘蝨、斑點雀鱔、鯉魚、鰱魚、草魚、北極紅點鮭、江鱈、海鱺、曲紋唇魚、湄公河巨鯰、黃金鱸、白鮭、湖紅點鮭、哲羅鮭、劍旗魚、小丑魚、擬刺尾鯛、神仙魚、長吻蝴蝶魚、絲鰺、海馬、變身苦、海雞母、河豚、星點臭肚、棘鰆、龍蝦、泰國蝦
+- 2026-11-15 實機診斷（Adreno 830、畫質 high、PR 2.62、貼圖 2048）：平均 50–78 FPS，問題是長任務（102 次，最長 1.1 秒）：著色器編譯、貼圖／幾何上傳、未歸因 JS。programs 高達 226。
+  無頭 CPU profile（scratchpad/h/prof2.js，啟動後 100 秒）：WebGLProgram 編譯（three 的 Jr）5.7 秒、texImage2D 0.8 秒、GLTF 解析 0.2 秒，其餘都很小 → 卡頓主因＝第一次畫到新材質時同步編譯著色器。
+  已做：d.js 魚種預熱（state==='wait' 且尚未選魚時，每 1.2 秒把一種本水域、模型已載好的魚放到鏡頭背後 4m、縮到 1cm 畫 3 幀再藏起來；window.__warmedFish）。測試：13 種魚 programs 81→105、textures 119→172，無錯誤（scratchpad/h/warm.js，用 setInterval 強制 G.state='wait'）。
+  試過又撤回：TextureLoader 改 createImageBitmap（背景解碼）——ImageBitmap 的解碼資料會常駐記憶體（不像 <img> 可被回收），而且要預先翻轉、h.js hazeStrip 等讀像素的地方要跟著改；有當機史，不值得。
+  待查：每種魚約用掉 2 個獨立的著色器程式（13 種 +24），若能讓所有魚共用同一組，編譯次數可大減；進小屋一次編 30 個程式＋212 個幾何（1.5 秒，發生在轉場）；hall.js normalFrom 用 CPU 算法線圖。
 - 2026-11-15 效能優化第二批（已上線）：①貼圖預先上傳（m.js warmTextures：模型載好後在非搏魚空檔每 0.3 秒 initTexture 一張；BAKED 不預傳）②釣竿 rod_real2 3.8 萬→1.5 萬面 ③實例化岸邊植物依「最近一株」距離換 LOD（lod.js ilist，userData.lodPts；14m 內原檔、14–30m mid、更遠 far），LOD_MODELS 加 fir_sapling、shrub_03、grass_medium_02。
   量測：月光灣 62.7 萬→35.9 萬 tris/幀；遠洋深藍 88 萬（未再量）；近海 168 萬→66 萬；湖 292 萬→249 萬（無頭 1fps 下陰影每幀重畫，實機較低）。湖剩下的大戶：碼頭 14m 內的實例化植物 17 萬面、高畫質近處樹樁原檔、draw calls 約 500（233 個網格×主畫面＋陰影）。
   下一步需要實機資料：請玩家在卡的地方到設定複製診斷資訊（u.js report，含各階段 ms、calls、tris、effectTier）。

@@ -1,4 +1,4 @@
-/*APPV:20261115054025*/
+/*APPV:20261115060419*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -8981,7 +8981,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261115054025'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261115060419'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -11359,6 +11359,17 @@ function goTide(){
   },650);
   return true;
 }
+/* 預熱：魚第一次被畫出來的那一幀，要編譯牠的著色器（主畫面、陰影、倒影各一份）、上傳貼圖和模型，手機上一次就是 0.2～0.5 秒的停頓，
+   而那一幀正好是上鉤的瞬間（實機診斷：長任務的主因是著色器編譯與貼圖上傳）。
+   改成拋竿後等魚的空檔，把這個水域會出現的魚一種一種先放到鏡頭背後、縮到 1 公分畫一幀，該編譯的、該上傳的都在等待時做完；
+   之後真的上鉤就直接出場。每 1.2 秒最多一種，只在「等魚」狀態做，不會佔到咬餌和搏魚的時間 */
+{ const warmed=window.__warmedFish=new Set(), bk=new THREE.Vector3(); let busy=false;
+  setInterval(()=>{ try{ if(busy||G.state!=='wait'||G.fd||document.hidden||!window.__MDL) return; const loc=G.loc||'lake';
+      const sp=SPECIES.find(q=>!warmed.has(q.id)&&!q.special&&((q.loc||'lake')===loc||q.loc==='both')&&window.__MDL.fishReady(q.id)); if(!sp) return;
+      warmed.add(sp.id); const f=P.getFish(sp); if(!f||!f.group||(G.fish&&G.fish.group===f.group)) return; const g=f.group, was=g.visible, ps=g.position.clone(), sc=g.scale.clone();
+      if(!g.parent) W.scene.add(g); W.camera.getWorldDirection(bk); g.position.copy(W.camera.getWorldPosition(new THREE.Vector3())).addScaledVector(bk,-4); g.position.y-=1; g.scale.setScalar(.01); g.visible=true; busy=true;
+      let n=0; const done=()=>{ if(++n<3){ requestAnimationFrame(done); return; } busy=false; if(G.fish&&G.fish.group===g) return; g.visible=false; g.position.copy(ps); g.scale.copy(sc); }; requestAnimationFrame(done);
+    }catch(e){ busy=false; } },1200); }
 window.__W=W; window.__testMer=()=>{ const sp=SPECIES.find(q=>q.special==='mermaid'); G.sp=sp; G.fd={sp,L:1.7,w:55,lvl:1,value:500,xpMul:1,grade:'A',u:.5}; const fish=P.getFish(sp); G.fish=fish; if(!fish.group.parent) W.scene.add(fish.group); G.state='catch'; try{ showCard(); }catch(e){ return 'card '+e.message; } if(G.merShow) G.merShow.t=2; return !!fish.group.userData.merCtl; }; window.__HS=()=>HOME3D; window.__goTide=goTide;
 function tideDone(bag0,forced){ const handled=bag0.filter(b=>b.done).length; let bag=bag0.filter(b=>!b.done); if(!bag.length&&handled){ persist(); toast(forced?'被救回岸邊':'回到岸上了，這次處理了 '+handled+' 個收穫','good',2000); G.state='idle'; return; } G.state='idle';
   // 圖鑑：挖到的都算發現
