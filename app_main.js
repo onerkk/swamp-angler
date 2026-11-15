@@ -1,4 +1,4 @@
-/*APPV:20261115103013*/
+/*APPV:20261115105124*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -4826,7 +4826,21 @@ function bank(cx,cz,w,d,side){ const g=new T.PlaneGeometry(w,d,60,60); g.rotateX
   for(let i=0;i<p.count;i++){ const x=p.getX(i), z=p.getZ(i), edge=side*x+Math.sin(z*.55)*1.1+Math.sin(z*1.7+1)*.35;
     p.setY(i,-.45+.95*sstep(-w*.32,w*.22,-edge)+.06*Math.sin(x*2.1+z*1.3)+.04*Math.sin(x*5.3-z*3.1)); }
   g.computeVertexNormals(); const m=new T.Mesh(g,mudMat); m.position.set(cx,0,cz); m.userData.lake=true; m.visible=!(W.isSea&&W.isSea()); W.scene.add(m); BANKS.push(m); }
-bank(-10.5,-7,11,13,1); bank(12.5,-9,10,12,-1);
+/* 碼頭周圍的岸（一整片馬蹄形）：以前左右各一塊長方形泥灘（邊緣直直切斷），碼頭尾端後面是一片水，回頭看是「漂在水上的碼頭＋遠處的照片」。
+   現在碼頭從一段真的泥岸伸出來：岸線在碼頭下方出水，到碼頭尾端剛好跟木板同高，往後升成土坡擋住後方；
+   兩側往前彎成小灣，位置跟原本左右兩塊泥灘的水線一致（上面的石頭、倒木、蕨類不用搬），外緣緩緩沒入水裡，沒有切斷的邊 */
+{ const CX=1.05, x0=-44, x1=46, z0=-17, z1=70, w=x1-x0, d=z1-z0, cx=(x0+x1)/2, cz=(z0+z1)/2, g=new T.PlaneGeometry(w,d,150,145); g.rotateX(-Math.PI/2); const p=g.attributes.position, uv=g.attributes.uv;
+  const keep=new Uint8Array(p.count);
+  const shoreZ=x=>Math.max(-13.5,2.9-17*Math.pow(Math.abs(x-CX)/11.2,6))+Math.sin(x*.55)*.45+Math.sin(x*1.7+1)*.16;
+  for(let i=0;i<p.count;i++){ const x=p.getX(i)+cx, z=p.getZ(i)+cz, zs=shoreZ(x), sl=(shoreZ(x+.25)-shoreZ(x-.25))/.5, dist=(z-zs)/Math.sqrt(1+sl*sl);
+    const A=.95+.32*sstep(12,5,Math.abs(x-CX)), outer=sstep(0,1,Math.min((x-x0)/8,(x1-x)/8,(z1-z)/8));
+    let y=-.45+A*sstep(-2.6,3.3,dist)+2.6*sstep(8,45,dist)*sstep(2,8,z)+(.05*Math.sin(x*2.1+z*1.3)+.035*Math.sin(x*5.3-z*3.1))*sstep(0,3,dist);
+    y-=3.4*sstep(-1.2,-4.2,dist);   /* 淺灘往外很快變深，切口落在 3 公尺以下的深水裡，水色會把它蓋掉，看不到鋸齒邊 */
+    y=-3.85+(y+3.85)*outer; p.setY(i,y); keep[i]=(dist>-4.8&&outer>.02)?1:0; uv.setXY(i,uv.getX(i)*w/11,uv.getY(i)*d/13); }
+  /* 水很清，水下的地形會整片透出來像陸地：只保留岸上和離水線 2.8 公尺內的淺灘，其餘（小灣中央、外緣）的三角形直接拿掉 */
+  { const ix=g.index.array, out=[]; for(let t=0;t<ix.length;t+=3){ if(keep[ix[t]]||keep[ix[t+1]]||keep[ix[t+2]]) out.push(ix[t],ix[t+1],ix[t+2]); } g.setIndex(out); }
+  g.computeVertexNormals(); const m=new T.Mesh(g,mudMat); m.position.set(cx,0,cz); m.receiveShadow=true; m.userData.lake=true; m.visible=!(W.isSea&&W.isSea()); W.scene.add(m); BANKS.push(m);
+  if(W.fishingPhysics&&W.fishingPhysics.addBox){ const PHY=W.fishingPhysics, on=()=>m.visible; PHY.addBox({x:x0,y:-1,z:4.6},{x:x1,y:4,z:z1},on,"岸"); PHY.addBox({x:x0,y:-1,z:-12.5},{x:-10.6,y:4,z:4.6},on,"岸"); PHY.addBox({x:12.8,y:-1,z:-12.5},{x:x1,y:4,z:4.6},on,"岸"); } }
 
 /* ---------- 掃描 3D 模型 ---------- */
 if(T.GLTFLoader){
@@ -4873,6 +4887,13 @@ if(T.GLTFLoader){
   scatter('shrub_03.glb',10,.6,1.1,ZONES,.2);
   scatter('fir_sapling_medium.glb',7,3.5,5.5,BACK,.25);
   place('shrub_02.glb',[[-12.8,.46,-5.6,.5,0,0,1.2],[-13.4,.46,-11,2,0,0,1.0],[15,.46,-8,1,0,0,1.1]]);
+  /* 碼頭後方那段岸上的植物：草靠水邊、灌木在中段、小樹在坡上；碼頭正後方留一條 3 公尺寬的空地當小路 */
+  { const REAR=[[-19,-2.2,6.5,13],[2.2,19,6.5,13]], REARB=[[-20,-3,12,23],[3,20,12,23]];
+    scatter('grass_medium_01.glb',22,.3,.6,REAR,.3); scatter('grass_medium_02.glb',10,.35,.7,REAR,.3);
+    scatter('shrub_03.glb',6,.6,1.1,REARB,.6); scatter('fir_sapling_medium.glb',5,3.5,5.5,REARB,.8);
+    const gy=(x,z,d)=>{ const y=groundY(x,z); return y===null?d:y; };
+    place('shrub_02.glb',[[-6.5,gy(-6.5,10,.9),10,.8,0,0,1.1],[8,gy(8,11.5,.9),11.5,2.2,0,0,1.0]]);
+    place('fern_02.glb',[[-3.6,gy(-3.6,7.4,.8),7.4,0,0,0,1.5],[4.2,gy(4.2,8,.8),8,1.2,0,0,1.6],[-9,gy(-9,8.6,.8),8.6,2,0,0,1.4]]); }
 }
 return {sched,useSet};
 }
@@ -8987,7 +9008,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261115103013'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261115105124'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
