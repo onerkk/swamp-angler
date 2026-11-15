@@ -1,4 +1,4 @@
-/*APPV:20261115105124*/
+/*APPV:20261115111351*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -4735,11 +4735,26 @@ const prep=t=>{ t.generateMipmaps=false; t.minFilter=T.LinearFilter; t.magFilter
 const tex={}, env={}, masks={};
 // 遠處水面的霧色帶：取全景照片地平線上方 0.5°～6° 那一段，每個方位取平均，再左右各模糊約 17°，做成 256×1 的色帶。
 // 照片裡遠山、樹叢剪影的邊緣不會再讓水面霧色一刀變色
-function hazeStrip(img){ const N=256, H=img.height, y0=Math.round(H*(1-.300)), y1=Math.round(H*(1-.208)), cv=document.createElement('canvas'); cv.width=N; cv.height=Math.max(1,y1-y0);
+function hazeStrip(img,flipped){ const N=256, H=img.height, ya=Math.round(H*(1-.300)), yb=Math.round(H*(1-.208)), y0=flipped?H-yb:ya, y1=flipped?H-ya:yb,   /* 預先上下翻過的圖：同一段地平線在鏡像的位置 */ cv=document.createElement('canvas'); cv.width=N; cv.height=Math.max(1,y1-y0);
   const g=cv.getContext('2d'); g.drawImage(img,0,y0,img.width,y1-y0,0,0,N,cv.height); const d=g.getImageData(0,0,N,cv.height).data, col=new Float32Array(N*3);
   for(let x=0;x<N;x++) for(let y=0;y<cv.height;y++) for(let c=0;c<3;c++) col[x*3+c]+=d[(y*N+x)*4+c]/cv.height;
   const out=new Uint8Array(N*4), R=12; for(let x=0;x<N;x++){ for(let c=0;c<3;c++){ let s=0; for(let k=-R;k<=R;k++) s+=col[((x+k+N)%N)*3+c]; out[x*4+c]=Math.round(s/(2*R+1)); } out[x*4+3]=255; }
   const t=new T.DataTexture(out,N,1,T.RGBAFormat); t.wrapS=T.RepeatWrapping; t.wrapT=T.ClampToEdgeWrapping; t.minFilter=t.magFilter=T.LinearFilter; t.needsUpdate=true; return t; }
+/* 全景照片在背景執行緒解碼：天空的全景帶是 8192×1366 的 JPEG，原本用 <img> 載入，要到第一次送進顯示卡時才在主執行緒解碼，
+   一張就卡一秒左右（實機診斷：開場與換時段時的「貼圖上傳 1108ms」）。改成 fetch → createImageBitmap（背景解碼）→ 立刻預先上傳。
+   ImageBitmap 上傳不吃 flipY，所以解碼時先上下翻好、flipY 設成 false。不支援就退回原本的載入方式 */
+function panoLoad(url,onLoad,onErr){
+  if(typeof createImageBitmap!=='function'||typeof fetch!=='function') return tl.load(url,onLoad,undefined,onErr);
+  const t=new T.Texture(); t.format=T.RGBFormat; try{ mgr.itemStart(url); }catch(_){}
+  const end=()=>{ try{ mgr.itemEnd(url); }catch(_){} };
+  fetch(url).then(r=>{ if(!r.ok) throw new Error('http '+r.status); return r.blob(); })
+    .then(b=>createImageBitmap(b,{imageOrientation:'flipY',premultiplyAlpha:'none',colorSpaceConversion:'none'}))
+    .then(bm=>{ let im=bm; try{ if(window.__imageBudget&&window.__imageBudget.resize){ im=window.__imageBudget.resize(bm); if(im!==bm&&bm.close) bm.close(); } }catch(_){ im=bm; }
+      try{ im.__assetURL=String(url).split('/').pop(); }catch(_){}
+      t.image=im; t.flipY=false; t.preFlipped=true; t.needsUpdate=true; try{ if(W.renderer&&W.renderer.initTexture) W.renderer.initTexture(t); }catch(_){}
+      end(); if(onLoad) onLoad(t); })
+    .catch(()=>{ end(); tl.load(url,x=>{ t.image=x.image; t.flipY=true; t.preFlipped=false; t.needsUpdate=true; if(onLoad) onLoad(t); },undefined,onErr); });
+  return t; }
 function disposePhoto(photo){photo.band?.dispose();photo.full?.dispose();photo.hz?.dispose();}
 function loadKey(k){
   const id=SET+'_'+k,previous=tex[id];
@@ -4748,12 +4763,12 @@ function loadKey(k){
   const photo=tex[id]={ready:false,n:0},prefix=SETS[SET].pre;
   const failed=()=>{if(tex[id]===photo)photo.retryAt=Date.now()+5000;};
   const done=()=>{if(++photo.n===2)photo.ready=true;};
-  photo.band=prep(tl.load(prefix+k+'_band.jpg',t=>{
+  photo.band=prep(panoLoad(prefix+k+'_band.jpg',t=>{
     if(tex[id]!==photo)return;
-    try{photo.hz=hazeStrip(t.image);}catch(error){console.warn('haze strip',error);}
+    try{photo.hz=hazeStrip(t.image,!!t.preFlipped);}catch(error){console.warn('haze strip',error);}
     done();
-  },undefined,failed));
-  photo.full=prep(tl.load(prefix+k+'_full.jpg',done,undefined,failed));
+  },failed));
+  photo.full=prep(panoLoad(prefix+k+'_full.jpg',done,failed));
 }
 const envRetry={};
 function loadEnv(k){
@@ -4831,6 +4846,7 @@ function bank(cx,cz,w,d,side){ const g=new T.PlaneGeometry(w,d,60,60); g.rotateX
    兩側往前彎成小灣，位置跟原本左右兩塊泥灘的水線一致（上面的石頭、倒木、蕨類不用搬），外緣緩緩沒入水裡，沒有切斷的邊 */
 { const CX=1.05, x0=-44, x1=46, z0=-17, z1=70, w=x1-x0, d=z1-z0, cx=(x0+x1)/2, cz=(z0+z1)/2, g=new T.PlaneGeometry(w,d,150,145); g.rotateX(-Math.PI/2); const p=g.attributes.position, uv=g.attributes.uv;
   const keep=new Uint8Array(p.count);
+  W.coveShoreZ=x=>shoreZ(x);   /* 小灣的水線（給搏魚時把魚擋在水裡用） */
   const shoreZ=x=>Math.max(-13.5,2.9-17*Math.pow(Math.abs(x-CX)/11.2,6))+Math.sin(x*.55)*.45+Math.sin(x*1.7+1)*.16;
   for(let i=0;i<p.count;i++){ const x=p.getX(i)+cx, z=p.getZ(i)+cz, zs=shoreZ(x), sl=(shoreZ(x+.25)-shoreZ(x-.25))/.5, dist=(z-zs)/Math.sqrt(1+sl*sl);
     const A=.95+.32*sstep(12,5,Math.abs(x-CX)), outer=sstep(0,1,Math.min((x-x0)/8,(x1-x)/8,(z1-z)/8));
@@ -9008,7 +9024,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261115105124'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261115111351'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -11622,6 +11638,7 @@ function updateFight(dt){
     // Lateral rod pressure changes the fish's path, not merely the tension number.
     want.x+=Math.cos(az)*G.rodSide*dt*1.6; want.z-=Math.sin(az)*G.rodSide*dt*1.6;
     if(G.loc!=='sea'){ const Rm=W.shoreR(Math.atan2(want.x,-want.z))-3,r=Math.hypot(want.x,want.z); if(r>Rm){want.x*=Rm/r;want.z*=Rm/r;} }
+    if((G.loc||'lake')==='lake'&&W.coveShoreZ){ const zs=W.coveShoreZ(want.x)-1.6; if(want.z>zs) want.z=zs; }   /* 碼頭周圍是真的岸：魚不能游進岸底下，擋在水線外 1.6 公尺 */
     const moved=PH.move(old,want,Math.max(.12,fd.L*.22)); setPoint(f.pos,moved.pos);
     const landing=fishingLanding(PH,(G.angler||G.base),f.pos,fd.L,!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht),G.spot===0);
     const lineHit=PH.hit(rod.tipW,f.pos,.025,box=>!(landing.near&&box.label==='船體')); f.cover=lineHit?1:0;

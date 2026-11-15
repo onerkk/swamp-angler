@@ -992,6 +992,7 @@ function updateFight(dt){
     // Lateral rod pressure changes the fish's path, not merely the tension number.
     want.x+=Math.cos(az)*G.rodSide*dt*1.6; want.z-=Math.sin(az)*G.rodSide*dt*1.6;
     if(G.loc!=='sea'){ const Rm=W.shoreR(Math.atan2(want.x,-want.z))-3,r=Math.hypot(want.x,want.z); if(r>Rm){want.x*=Rm/r;want.z*=Rm/r;} }
+    if((G.loc||'lake')==='lake'&&W.coveShoreZ){ const zs=W.coveShoreZ(want.x)-1.6; if(want.z>zs) want.z=zs; }   /* 碼頭周圍是真的岸：魚不能游進岸底下，擋在水線外 1.6 公尺 */
     const moved=PH.move(old,want,Math.max(.12,fd.L*.22)); setPoint(f.pos,moved.pos);
     const landing=fishingLanding(PH,(G.angler||G.base),f.pos,fd.L,!!(SPOTS[G.spot].kayak||SPOTS[G.spot].yacht),G.spot===0);
     const lineHit=PH.hit(rod.tipW,f.pos,.025,box=>!(landing.near&&box.label==='船體')); f.cover=lineHit?1:0;
