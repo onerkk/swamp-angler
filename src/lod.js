@@ -4,7 +4,9 @@
    中、低畫質的近處改用中間版本（約 35% 面數，_lod0），高畫質近處一律原檔。 */
 const LOD_MODELS=['dead_tree_trunk_02.glb','tree_stump_01.glb','tree_stump_02.glb','rock_moss_set_01.glb','fern_02.glb','grass_medium_01.glb','nettle_plant.glb',
  /* 2026-11-15 量測後加入：灌木、枯枝、碼頭與船上的實物掃描小道具（每個 0.5～2.7 萬面，以前不論多遠都畫原檔）。小杉樹簡化後針葉會變稀，不列入 */
- 'shrub_02.glb','dry_branches_medium_01.glb','plastic_crate_01.glb','lifebuoy.glb','fishermans_hat.glb','wine_barrel_01.glb','wooden_bucket_01.glb','metal_toolbox.glb','yacht.glb'];   /* 遊艇 12 萬面：倒影用 2.5 萬面版，中低畫質近處用 4.3 萬面版 */
+ 'shrub_02.glb','dry_branches_medium_01.glb','plastic_crate_01.glb','lifebuoy.glb','fishermans_hat.glb','wine_barrel_01.glb','wooden_bucket_01.glb','metal_toolbox.glb','yacht.glb',
+ /* 岸邊實例化的植物（小杉樹、灌木、草）：只在離最近一株 14 公尺以上才換簡化版，近看仍是原檔 */
+ 'fir_sapling_medium.glb','shrub_03.glb','grass_medium_02.glb'];   /* 遊艇 12 萬面：倒影用 2.5 萬面版，中低畫質近處用 4.3 萬面版 */
 function lodFileFor(url,level=1){const name=String(url).split('?')[0].split('/').pop();return LOD_MODELS.includes(name)?'models/lod/'+name.replace(/\.glb$/,'_lod'+level+'.glb'):null;}
 function lodDistance(tier){return tier==='high'?18:tier==='mid'?11:7;}
 function pairLODMeshes(full,lod,lodOf,fullOf,slot='far'){
@@ -18,7 +20,7 @@ function pairLODMeshes(full,lod,lodOf,fullOf,slot='far'){
  return paired;
 }
 function createGeometryLOD(){
- const lodOf=new WeakMap(),fullOf=new WeakMap(),stats={paired:0,near:0,far:0};let list=[],scanT=0,cam=null,pos=null;
+ const lodOf=new WeakMap(),fullOf=new WeakMap(),stats={paired:0,near:0,far:0};let list=[],ilist=[],scanT=0,cam=null,pos=null;
  function install(T){
   if(!T||!T.GLTFLoader||T.GLTFLoader.prototype.__geometryLOD)return;const load=T.GLTFLoader.prototype.load;T.GLTFLoader.prototype.__geometryLOD=true;
   T.GLTFLoader.prototype.load=function(url,onLoad,onProgress,onError){
@@ -33,7 +35,7 @@ function createGeometryLOD(){
  }
  function update(scene,camera,dt,tier){
   if(!scene||!camera)return;if(!cam){cam=new camera.position.constructor();pos=new camera.position.constructor();}
-  const now=typeof performance!=='undefined'?performance.now()/1000:scanT+dt;if(now>=scanT){scanT=now+2;list=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&!o.isInstancedMesh&&lodOf.has(fullOf.get(o.geometry)||o.geometry))list.push(o);});}
+  const now=typeof performance!=='undefined'?performance.now()/1000:scanT+dt;if(now>=scanT){scanT=now+2;list=[];ilist=[];scene.traverse(o=>{if(!o.isMesh||o.isSkinnedMesh||!lodOf.has(fullOf.get(o.geometry)||o.geometry))return;if(o.isInstancedMesh){if(o.userData.lodPts)ilist.push(o);}else list.push(o);});}
   camera.getWorldPosition(cam);const d=lodDistance(tier),near2=d*d,far2=(d*1.15)*(d*1.15);let n=0,f=0;
   // 高畫質：7 公尺內原檔、7～18 公尺中間版、更遠簡化版（一根 8 萬面的枯木在 10 公尺外用 35% 面數已看不出差別）；中低畫質近處就用中間版
   const fullD=tier==='high'?7:0;
@@ -45,12 +47,17 @@ function createGeometryLOD(){
       現在緩衝帶裡最多只用中間版，沒有中間版就用簡化版 */
    else want=m.geometry===lod?lod:(e.mid||lod);
    m.geometry=want;if(m.geometry===lod)f++;else n++;}
+  /* 實例化的岸邊植物：一種植物一次畫完所有株，所以用「離鏡頭最近的那一株」決定整批的精細度。
+     14 公尺內原檔、14～30 公尺中間版、更遠最簡版（各留 15% 緩衝）。以前不論多遠都是原檔：在月光灣量到 41 公尺外的植物還畫 17.6 萬面 */
+  for(const m of ilist){if(!m.visible)continue;const full=fullOf.get(m.geometry)||m.geometry,e=lodOf.get(full);if(!e)continue;let best=Infinity;const P=m.userData.lodPts;
+   for(let i=0;i<P.length;i+=3){const dx=P[i]-cam.x,dy=P[i+1]-cam.y,dz=P[i+2]-cam.z,q=dx*dx+dy*dy+dz*dz;if(q<best)best=q;}const dd=Math.sqrt(best),cur=m.geometry===full?0:m.geometry===e.far?2:1;
+   let lv=dd<14?0:dd<30?1:2;if(lv>cur&&dd<(cur===0?14:30)*1.15)lv=cur;const want=lv===0?full:lv===1?(e.mid||e.far||full):(e.far||e.mid||full);if(m.geometry!==want)m.geometry=want;if(lv===2)f++;else n++;}
   stats.near=n;stats.far=f;
  }
  // 取某個幾何的簡化版本（mid＝35%、far＝12%），沒有就回傳原檔；水族箱水草這類實例化物件自己決定什麼時候用哪一版
  /* 倒影專用：水面倒影只有一兩百像素寬，卻把整個場景用近景的精細模型重畫一遍（湖區實測光倒影就 46 萬面）。
     畫倒影前把有簡化版的物件全部暫時換成最簡版，畫完換回來；倒影裡看不出差別 */
- function swapFar(){const back=[];for(const m of list){const full=fullOf.get(m.geometry)||m.geometry,e=lodOf.get(full),lod=e&&e.far;if(lod&&m.geometry!==lod){back.push(m,m.geometry);m.geometry=lod;}}
+ function swapFar(){const back=[];for(const m of list.concat(ilist)){const full=fullOf.get(m.geometry)||m.geometry,e=lodOf.get(full),lod=e&&e.far;if(lod&&m.geometry!==lod){back.push(m,m.geometry);m.geometry=lod;}}
   return()=>{for(let i=0;i<back.length;i+=2)back[i].geometry=back[i+1];};}
  function variant(geo,which){const full=fullOf.get(geo)||geo,e=lodOf.get(full);return which==='full'?full:(e&&e[which])||full;}
  return{install,update,variant,swapFar,stats};
