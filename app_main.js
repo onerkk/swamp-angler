@@ -1,4 +1,4 @@
-/*APPV:20261115114024*/
+/*APPV:20261115114744*/
 /* 卡頓歸因探針（最先載入）：把 setInterval／setTimeout／requestAnimationFrame 的回呼包一層計時，
    超過 30 毫秒的記到 window.__slowCalls（名稱＝函式名或原始碼開頭），診斷報告的「長任務」就能寫出是哪個計時器或哪一幀造成的。
    只在超時時記一筆，平常只多兩次 performance.now()，不影響效能 */
@@ -8273,10 +8273,10 @@ function enterView(w){ mode='view'; document.body.classList.add('tankview'); vie
 function exitView(){ mode='room'; document.body.classList.remove('tankview'); ui.view.classList.add('hidden'); ui.card.classList.add('hidden'); ui.btns.classList.remove('hidden'); ui.hint.textContent=HINT; }
 document.getElementById('bViewBack').addEventListener('click',()=>{ if(mode==='dive') exitDive(); exitView(); });
 // 潛入缸內：鏡頭進到水裡，像人在缸中，可以四處轉頭近看魚；水裡有藍綠色的霧
-const diveB=document.getElementById('bDive'), fogDive=new T.FogExp2(0x15565c,.11);
-function enterDive(){ if(mode!=='view') return; mode='dive'; document.body.classList.add('tankdive'); dYaw=dYawT=0; dPitch=dPitchT=0; scene.fog=fogDive; diveB.textContent='↑ 浮出水面'; ui.hint.textContent='搖桿在缸裡游動・拖曳轉頭・點魚看資料'; }
+const diveB=document.getElementById('bDive'), fogDive=new T.FogExp2(0x15565c,0); scene.fog=fogDive;   /* 霧一直掛著、平常濃度 0：以前潛入缸內才掛上霧，場景裡每種材質的著色器都要重新編譯一次（實機診斷：一次編 14 個，卡 1.6 秒）。現在只改濃度，不用重編 */
+function enterDive(){ if(mode!=='view') return; mode='dive'; document.body.classList.add('tankdive'); dYaw=dYawT=0; dPitch=dPitchT=0; fogDive.density=.11; diveB.textContent='↑ 浮出水面'; ui.hint.textContent='搖桿在缸裡游動・拖曳轉頭・點魚看資料'; }
 const DV={on:false,p:new T.Vector3()};
-function exitDive(){ if(mode!=='dive') return; DV.on=false; document.body.classList.remove('tankdive'); mode='view'; scene.fog=null; diveB.textContent='🤿 潛入缸內'; ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
+function exitDive(){ if(mode!=='dive') return; DV.on=false; document.body.classList.remove('tankdive'); mode='view'; fogDive.density=0; diveB.textContent='🤿 潛入缸內'; ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
 diveB.addEventListener('click',()=>{ if(mode==='dive') exitDive(); else enterDive(); });
 el.addEventListener('pointerdown',e=>{ if(!on) return; down={x:e.clientX,y:e.clientY,t:performance.now()}; drag={x:e.clientX,y:e.clientY,yaw:yawT,pitch:pitchT,pan:panT,dy:dYawT,dp:dPitchT}; });
 el.addEventListener('pointermove',e=>{ if(!on||!drag||mode==='act') return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
@@ -9036,7 +9036,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261115114024'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261115114744'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -11218,8 +11218,13 @@ function homeEnter(){ const hd=HOME.data();
 function recoverHome(err){Snd.setIndoor?.(false);if(window.__DIAG)window.__DIAG.action('home','error',err.message);console.error('home recovery',err);try{HOME3D.exit();}catch(_){}G.state='idle';document.body.classList.remove('athome','tankview','tankdive','grilling');fadeEl.classList.remove('on');toast('小屋載入暫時失敗，已返回釣點，遊戲進度保留','warn',4200);}
 // 切換場景時黑幕多撐 3 個畫面：新場景第一次繪製要把幾何與貼圖上傳到顯示卡，這一下會卡幾百毫秒，讓它發生在黑幕後面而不是玩家眼前
 /* 換地點的黑幕：至少等 3 幀；如果新地點的實拍天空還在下載，最多再等 10 秒（下載好就立刻拉開），不讓玩家看到上一個地點的景色 */
-function fadeOutWhenReady(){ let n=3; const t0=performance.now(); const step=()=>{ const wait=!HOME3D.active()&&W.photoReady&&!W.photoReady(G.hour)&&performance.now()-t0<10000;
-  if(--n>0||wait) requestAnimationFrame(step); else fadeEl.classList.remove('on'); }; requestAnimationFrame(step); }
+/* 轉場的黑幕要等場景「準備好」才拉開：以前畫 3 幀就拉開，新場景的著色器編譯、貼圖和模型上傳還在進行，
+   玩家看到的就是一進場先卡好幾下（實機診斷：進小屋後 4 秒內有 1.9、0.8、0.8、1.1 秒的停頓）。
+   現在等到顯示卡上的著色器、貼圖、模型數量連續 14 幀沒有再增加（代表該準備的都準備完了）才拉開，最多等 7 秒 */
+function fadeOutWhenReady(){ let n=3, stable=0, last=''; const t0=performance.now(); const step=()=>{ const now=performance.now(), info=W.renderer.info, key=(info.programs?info.programs.length:0)+'/'+info.memory.textures+'/'+info.memory.geometries;
+    if(key===last) stable++; else { stable=0; last=key; }
+    const wait=!HOME3D.active()&&W.photoReady&&!W.photoReady(G.hour)&&now-t0<10000, settling=stable<14&&now-t0<7000;
+  if(--n>0||wait||settling) requestAnimationFrame(step); else fadeEl.classList.remove('on'); }; requestAnimationFrame(step); }
 function goHome(){if(G.state==='home')return;if(G.state!=='idle'){toast('先收線再回家','warn');return;}if(!HOME.unlocked()){toast('完成主線第一章後才能整理小屋','warn');return;}persist();if(window.__DIAG)window.__DIAG.action('home','begin');G.state='travel';fadeEl.classList.add('on');Snd.paddle();
  setTimeout(()=>{try{if(window.__DIAG)window.__DIAG.scene('home','loading');Snd.setIndoor?.(true);window.__GHOST?.stopAudio?.();if(W.suspendEffects)W.suspendEffects();if(typeof KY!=='undefined')KY.v=KY.w=KY.thr=KY.turn=0;const homeAt=performance.now();HOME3D.enter();window.__DIAG?.event('home-setup',Math.round(performance.now()-homeAt)+'ms');G.state='home';document.body.classList.add('athome');fadeOutWhenReady();toast('回到老漁人的小屋','good',1400);if(window.__DIAG)window.__DIAG.action('home','first-frame');}catch(err){recoverHome(err);}},650);}
 function leaveHome(then){ if(G.state!=='home') return; G.state='travel'; fadeEl.classList.add('on');

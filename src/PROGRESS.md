@@ -10,6 +10,7 @@
 - 2026-11-14 第 2 批上線：紅甘、鯽魚、線鱧（烏鱧代替）、鯉魚、神仙魚（藍帶荷包魚）、龍蝦、泰國蝦（日本沼蝦代替）、北極紅點鮭（白斑紅點鮭代替），頭朝 −x；龍蝦／泰國蝦走 buildCrust，未在遊戲內確認腳的動作
 - 2026-11-14 全換真實模型（第 1 批上線）：真鯛、黑鯛、鸚哥魚（アオブダイ）、青嘴龍占（ハマフエフキ）、正鰹、土魠、黃鰭鮪、鱸鰻（オオウナギ）、鬚鳚（センカエルウオ）→ ffishAsia CC0 實物掃描，頭朝 −x。流程：/tmp/ff/conv.py（下載→simplify→貼圖 JPEG 1024→draco）→ shrink.py（再減到約 3 萬面）→ /tmp/gt/clean.mjs（刪掉掃描附帶的 12 面標記方塊）→ /tmp/simsite/fvt.html 俯視圖確認頭向。
   剩下 AI 生成待找：印度鯪、鱖魚、紅甘、鬼頭刀、雨傘旗魚、弓鰭魚、鯽魚、吳郭魚、線鱧、孔雀鱸、塘蝨、斑點雀鱔、鯉魚、鰱魚、草魚、北極紅點鮭、江鱈、海鱺、曲紋唇魚、湄公河巨鯰、黃金鱸、白鮭、湖紅點鮭、哲羅鮭、劍旗魚、小丑魚、擬刺尾鯛、神仙魚、長吻蝴蝶魚、絲鰺、海馬、變身苦、海雞母、河豚、星點臭肚、棘鰆、龍蝦、泰國蝦
+- 2026-11-15 轉場與小屋卡頓：①d.js fadeOutWhenReady 改成等 renderer.info 的 programs／textures／geometries 連續 14 幀不變才拉開黑幕（上限 7 秒）——所有轉場共用（進小屋、換釣點、開場）。②w.js 小屋的 FogExp2 一直掛著、平常 density 0，潛入缸內只改 density（以前 scene.fog 在 null↔Fog 之間切換，全部材質重編：診斷「著色器編譯+14 1645ms」）。測試 scratchpad/h/boot2.js（__goSpot(5) 後黑幕約 9–11 秒拉開，無頭環境本來就慢）。
 - 2026-11-15 第三份實機診斷（v111351）：開場長任務從 971／356ms 降到 55／94ms（全景背景解碼有效）。仍在：進小屋 1869ms（編譯 31＋貼圖 11＋幾何 216）＋839＋775＋1128ms；小屋內 35 秒後一次「著色器編譯+14」1645ms；前一段湖區閒置每 1.63 秒一次 161ms「未歸因 JS」（13 次，極規律）。
   1.63 秒那個在無頭環境重現不出來，已排除：大型 TypedArray／getImageData／AudioBuffer 配置（alloc.js：60 秒 0MB）、PMREM 重算（pm.js：遊戲 1 小時＝40 秒，dh>0.35 才重算＝每 14 秒）、建立魚實例的 JS（fishcost.js：1–20ms）、魚的著色器不共用（keys.js：13 種魚只多 7 個程式）。沒有 1.6 秒的 setInterval；最接近的是 b.js lowReflObjects（1500ms 重掃）但應該很輕。
   新增 src/timing-probe.js（bundle 第一個檔）：包住 setInterval／setTimeout／rAF 回呼，>30ms 記到 window.__slowCalls；u.js 的長任務歸因會併入，stage() >30ms 也記（render 附各 pass 的 ms）。下一份診斷的「未歸因」應該會變成具體名稱。

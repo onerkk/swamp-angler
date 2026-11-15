@@ -673,10 +673,10 @@ function enterView(w){ mode='view'; document.body.classList.add('tankview'); vie
 function exitView(){ mode='room'; document.body.classList.remove('tankview'); ui.view.classList.add('hidden'); ui.card.classList.add('hidden'); ui.btns.classList.remove('hidden'); ui.hint.textContent=HINT; }
 document.getElementById('bViewBack').addEventListener('click',()=>{ if(mode==='dive') exitDive(); exitView(); });
 // 潛入缸內：鏡頭進到水裡，像人在缸中，可以四處轉頭近看魚；水裡有藍綠色的霧
-const diveB=document.getElementById('bDive'), fogDive=new T.FogExp2(0x15565c,.11);
-function enterDive(){ if(mode!=='view') return; mode='dive'; document.body.classList.add('tankdive'); dYaw=dYawT=0; dPitch=dPitchT=0; scene.fog=fogDive; diveB.textContent='↑ 浮出水面'; ui.hint.textContent='搖桿在缸裡游動・拖曳轉頭・點魚看資料'; }
+const diveB=document.getElementById('bDive'), fogDive=new T.FogExp2(0x15565c,0); scene.fog=fogDive;   /* 霧一直掛著、平常濃度 0：以前潛入缸內才掛上霧，場景裡每種材質的著色器都要重新編譯一次（實機診斷：一次編 14 個，卡 1.6 秒）。現在只改濃度，不用重編 */
+function enterDive(){ if(mode!=='view') return; mode='dive'; document.body.classList.add('tankdive'); dYaw=dYawT=0; dPitch=dPitchT=0; fogDive.density=.11; diveB.textContent='↑ 浮出水面'; ui.hint.textContent='搖桿在缸裡游動・拖曳轉頭・點魚看資料'; }
 const DV={on:false,p:new T.Vector3()};
-function exitDive(){ if(mode!=='dive') return; DV.on=false; document.body.classList.remove('tankdive'); mode='view'; scene.fog=null; diveB.textContent='🤿 潛入缸內'; ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
+function exitDive(){ if(mode!=='dive') return; DV.on=false; document.body.classList.remove('tankdive'); mode='view'; fogDive.density=0; diveB.textContent='🤿 潛入缸內'; ui.hint.textContent='點一條魚看牠的資料・左右拖曳移動'; }
 diveB.addEventListener('click',()=>{ if(mode==='dive') exitDive(); else enterDive(); });
 el.addEventListener('pointerdown',e=>{ if(!on) return; down={x:e.clientX,y:e.clientY,t:performance.now()}; drag={x:e.clientX,y:e.clientY,yaw:yawT,pitch:pitchT,pan:panT,dy:dYawT,dp:dPitchT}; });
 el.addEventListener('pointermove',e=>{ if(!on||!drag||mode==='act') return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
