@@ -10,6 +10,9 @@
 - 2026-11-14 第 2 批上線：紅甘、鯽魚、線鱧（烏鱧代替）、鯉魚、神仙魚（藍帶荷包魚）、龍蝦、泰國蝦（日本沼蝦代替）、北極紅點鮭（白斑紅點鮭代替），頭朝 −x；龍蝦／泰國蝦走 buildCrust，未在遊戲內確認腳的動作
 - 2026-11-14 全換真實模型（第 1 批上線）：真鯛、黑鯛、鸚哥魚（アオブダイ）、青嘴龍占（ハマフエフキ）、正鰹、土魠、黃鰭鮪、鱸鰻（オオウナギ）、鬚鳚（センカエルウオ）→ ffishAsia CC0 實物掃描，頭朝 −x。流程：/tmp/ff/conv.py（下載→simplify→貼圖 JPEG 1024→draco）→ shrink.py（再減到約 3 萬面）→ /tmp/gt/clean.mjs（刪掉掃描附帶的 12 面標記方塊）→ /tmp/simsite/fvt.html 俯視圖確認頭向。
   剩下 AI 生成待找：印度鯪、鱖魚、紅甘、鬼頭刀、雨傘旗魚、弓鰭魚、鯽魚、吳郭魚、線鱧、孔雀鱸、塘蝨、斑點雀鱔、鯉魚、鰱魚、草魚、北極紅點鮭、江鱈、海鱺、曲紋唇魚、湄公河巨鯰、黃金鱸、白鮭、湖紅點鮭、哲羅鮭、劍旗魚、小丑魚、擬刺尾鯛、神仙魚、長吻蝴蝶魚、絲鰺、海馬、變身苦、海雞母、河豚、星點臭肚、棘鰆、龍蝦、泰國蝦
+- 2026-11-15 第三份實機診斷（v111351）：開場長任務從 971／356ms 降到 55／94ms（全景背景解碼有效）。仍在：進小屋 1869ms（編譯 31＋貼圖 11＋幾何 216）＋839＋775＋1128ms；小屋內 35 秒後一次「著色器編譯+14」1645ms；前一段湖區閒置每 1.63 秒一次 161ms「未歸因 JS」（13 次，極規律）。
+  1.63 秒那個在無頭環境重現不出來，已排除：大型 TypedArray／getImageData／AudioBuffer 配置（alloc.js：60 秒 0MB）、PMREM 重算（pm.js：遊戲 1 小時＝40 秒，dh>0.35 才重算＝每 14 秒）、建立魚實例的 JS（fishcost.js：1–20ms）、魚的著色器不共用（keys.js：13 種魚只多 7 個程式）。沒有 1.6 秒的 setInterval；最接近的是 b.js lowReflObjects（1500ms 重掃）但應該很輕。
+  新增 src/timing-probe.js（bundle 第一個檔）：包住 setInterval／setTimeout／rAF 回呼，>30ms 記到 window.__slowCalls；u.js 的長任務歸因會併入，stage() >30ms 也記（render 附各 pass 的 ms）。下一份診斷的「未歸因」應該會變成具體名稱。
 - 2026-11-15 全景照片背景解碼（h.js panoLoad）：band（8192×1366）與 full 改 fetch→createImageBitmap（imageOrientation:'flipY'，flipY=false，t.preFlipped）→立刻 renderer.initTexture；hazeStrip 加 flipped 參數；失敗退回 tl.load。three r128 的 Texture 沒有 userData（第一次寫 userData.preFlipped 整個掉進 fallback）。白天／夜晚／清晨截圖方向正確。只改全景這幾張（一般貼圖不改，避免 ImageBitmap 常駐記憶體）。
   魚不進岸底：h.js 匯出 W.coveShoreZ，d.js 搏魚目標位置在 lake 夾在水線外 1.6m。
 - 2026-11-15 碼頭周圍的 3D 岸（方案 B，已上線）：h.js 把原本兩塊長方形 bank() 換成一整片馬蹄形地形（x −44..46、z −17..70，150×145 格）：shoreZ(x)=max(−13.5, 2.9−17·(|x−1.05|/11.2)^6)＋小起伏，高度用「到水線的距離」算（−.45＋A·sstep(−2.6,3.3,dist)，A 在碼頭後 1.27、兩側 .95，後方再升 2.6m），水下部分 3.4·sstep(−1.2,−4.2) 快速變深並把 dist<−4.8 的三角形拿掉（水很清，淺的湖底會整片透出來像陸地；切口要藏在 3m 以下）。船的碰撞盒 3 個（W.fishingPhysics.addBox，label「岸」）。後岸植物用 REAR／REARB 區 scatter＋place。截圖工具 scratchpad/h/lake.js（六個方向）。

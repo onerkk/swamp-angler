@@ -1,4 +1,16 @@
-/*APPV:20261115111351*/
+/*APPV:20261115114024*/
+/* 卡頓歸因探針（最先載入）：把 setInterval／setTimeout／requestAnimationFrame 的回呼包一層計時，
+   超過 30 毫秒的記到 window.__slowCalls（名稱＝函式名或原始碼開頭），診斷報告的「長任務」就能寫出是哪個計時器或哪一幀造成的。
+   只在超時時記一筆，平常只多兩次 performance.now()，不影響效能 */
+(function(){
+  if(typeof window==='undefined'||window.__slowCalls) return; const slow=window.__slowCalls=[];
+  const label=fn=>{ try{ return (fn.name&&fn.name.length>1?fn.name:String(fn).replace(/\s+/g,' ').slice(0,70)); }catch(_){ return '?'; } };
+  const wrap=(kind,fn)=>{ if(typeof fn!=='function') return fn; let name=null; return function(){ const n=performance.now(); try{ return fn.apply(this,arguments); } finally{ const ms=performance.now()-n; if(ms>30){ if(name===null) name=kind+' '+label(fn); slow.push({name,ms,at:n}); if(slow.length>80) slow.shift(); } } }; };
+  const si=window.setInterval, st=window.setTimeout, raf=window.requestAnimationFrame;
+  window.setInterval=function(fn,ms,...a){ return si.call(window,wrap('定時 '+(ms|0)+'ms',fn),ms,...a); };
+  window.setTimeout=function(fn,ms,...a){ return st.call(window,wrap('延遲',fn),ms,...a); };
+  if(raf) window.requestAnimationFrame=function(fn){ return raf.call(window,wrap('畫面更新',fn)); };
+})();
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -6956,14 +6968,14 @@ function createDiag(W,c){
  if(typeof document!=='undefined')listen(document,'visibilitychange',()=>{visible=!document.hidden;event('visibility',visible?'visible':'hidden');snapshot=state();checkpoint(true);if(!visible&&c.persist)c.persist();});
  try{if(typeof PerformanceObserver!=='undefined'){observer=new PerformanceObserver(list=>{for(const e of list.getEntries()){stalls++;const info=W.renderer.info,d=prevCounts?{p:(info.programs?.length||0)-prevCounts.p,t:(info.memory?.textures||0)-prevCounts.t,g:(info.memory?.geometries||0)-prevCounts.g}:null;
    // 長任務發生時，看這段期間新增了幾個著色器程式、貼圖、幾何：新增的就是卡頓來源（編譯／上傳）
-   const t0=e.startTime,t1=e.startTime+e.duration,calls=heavyCalls.filter(h=>h.at+h.ms>=t0-5&&h.at<=t1+5).map(h=>h.name+' '+Math.round(h.ms)+'ms');
+   const t0=e.startTime,t1=e.startTime+e.duration,calls=heavyCalls.concat(typeof window!=='undefined'&&window.__slowCalls||[]).filter(h=>h.at+h.ms>=t0-5&&h.at<=t1+5).sort((x,y)=>y.ms-x.ms).slice(0,4).map(h=>h.name+' '+Math.round(h.ms)+'ms');
    const why=(calls.length?calls.join('、')+' ':'')+(d?(d.p>0?'著色器編譯+'+d.p+' ':'')+(d.t>0?'貼圖上傳+'+d.t+' ':'')+(d.g>0?'幾何上傳+'+d.g+' ':''):'');const rec={at:Date.now(),ms:Math.round(e.duration),why:why.trim()||'未歸因的 JS（多半是垃圾回收）',op:operation?.name||'',scene:snapshot.scene||''};longs.push(rec);if(longs.length>40)longs.shift();event('longtask',rec.ms+'ms '+rec.why);}});observer.observe({type:'longtask',buffered:true});}}catch(_){observer=null;}
  try{const cv=W.renderer.domElement;listen(cv,'webglcontextlost',e=>{gpuLost++;add('gpu','WebGL 顯示環境中斷（context lost）：通常是顯示記憶體不足或系統回收，畫面會黑掉或閃退');checkpoint(true);});listen(cv,'webglcontextrestored',()=>add('gpu','WebGL 顯示環境已恢復'));}catch(_){}
  const fr=[];
  function frame(seconds){const n=performance.now(),dt=seconds*1000;if(dt>0&&dt<2000&&Number.isFinite(dt))fr.push([n,dt]);while(fr.length&&(n-fr[0][0]>10000||fr.length>1500))fr.shift();if(n-lastBeat>=5000){lastBeat=n;snapshot=state();checkpoint();}}
  function fps(){if(!fr.length)return{avg:0,min:0,worst:0};let total=0,worst=0;for(const f of fr){total+=f[1];worst=Math.max(worst,f[1]);}return{avg:Math.round(1000*fr.length/total),min:Math.round(1000/worst),worst:Math.round(worst)};}
  function beginFrame(){frameAt=stageAt=performance.now();const info=W.renderer.info;prevCounts={p:info.programs?.length||0,t:info.memory?.textures||0,g:info.memory?.geometries||0};if(info?.reset)info.reset();}
- function stage(name){const now=performance.now();stages[name]=+(now-stageAt).toFixed(1);stageAt=now;}
+ function stage(name){const now=performance.now(),ms=now-stageAt;stages[name]=+ms.toFixed(1);if(ms>30){let extra='';try{const ps=window.__passStats;if(name==='render'&&ps)extra='（水下 '+ps.sub.ms+'／倒影 '+ps.refl.ms+'／主畫面 '+ps.main.ms+'ms'+(ps.main.shadow?'＋陰影':'')+'）';}catch(_){}heavyCalls.push({name:'階段:'+name+extra,ms,at:stageAt});if(heavyCalls.length>60)heavyCalls.shift();}stageAt=now;}
  function gpu(){try{const gl=W.renderer.getContext(),ext=gl.getExtension('WEBGL_debug_renderer_info');return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);}catch(_){return'?';}}
  function frameDist(){const a=fr.map(f=>f[1]).sort((x,y)=>x-y);if(!a.length)return{p50:0,p95:0,over33:0,over100:0};const q=k=>Math.round(a[Math.min(a.length-1,Math.floor(a.length*k))]);return{p50:q(.5),p95:q(.95),over33:a.filter(x=>x>33).length,over100:a.filter(x=>x>100).length};}
  function heavy(n=5){const out=[];try{const sc=snapshot.scene==='home'&&window.__HOME_SCENE?window.__HOME_SCENE:W.scene;sc.traverse(o=>{if(!o.isMesh)return;let v=true,q=o;while(q){if(!q.visible){v=false;break;}q=q.parent;}if(!v)return;const g=o.geometry,tri=(g.index?g.index.count/3:(g.attributes.position?.count||0)/3)*(o.isInstancedMesh?o.count:1);out.push([Math.round(tri),o.name||(o.isInstancedMesh?'實例化'+o.count:'未命名'),o.castShadow?'影':'']);});}catch(_){}return out.sort((a,b)=>b[0]-a[0]).slice(0,n).map(x=>x[1]+' '+Math.round(x[0]/1000)+'k'+x[2]).join('、');}
@@ -9024,7 +9036,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261115111351'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261115114024'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
