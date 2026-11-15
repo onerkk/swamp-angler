@@ -10,6 +10,9 @@
 - 2026-11-14 第 2 批上線：紅甘、鯽魚、線鱧（烏鱧代替）、鯉魚、神仙魚（藍帶荷包魚）、龍蝦、泰國蝦（日本沼蝦代替）、北極紅點鮭（白斑紅點鮭代替），頭朝 −x；龍蝦／泰國蝦走 buildCrust，未在遊戲內確認腳的動作
 - 2026-11-14 全換真實模型（第 1 批上線）：真鯛、黑鯛、鸚哥魚（アオブダイ）、青嘴龍占（ハマフエフキ）、正鰹、土魠、黃鰭鮪、鱸鰻（オオウナギ）、鬚鳚（センカエルウオ）→ ffishAsia CC0 實物掃描，頭朝 −x。流程：/tmp/ff/conv.py（下載→simplify→貼圖 JPEG 1024→draco）→ shrink.py（再減到約 3 萬面）→ /tmp/gt/clean.mjs（刪掉掃描附帶的 12 面標記方塊）→ /tmp/simsite/fvt.html 俯視圖確認頭向。
   剩下 AI 生成待找：印度鯪、鱖魚、紅甘、鬼頭刀、雨傘旗魚、弓鰭魚、鯽魚、吳郭魚、線鱧、孔雀鱸、塘蝨、斑點雀鱔、鯉魚、鰱魚、草魚、北極紅點鮭、江鱈、海鱺、曲紋唇魚、湄公河巨鯰、黃金鱸、白鮭、湖紅點鮭、哲羅鮭、劍旗魚、小丑魚、擬刺尾鯛、神仙魚、長吻蝴蝶魚、絲鰺、海馬、變身苦、海雞母、河豚、星點臭肚、棘鰆、龍蝦、泰國蝦
+- 2026-11-15 冰湖可走動：d.js updateKayak 加 onIce 分支（搖桿前後走、左右轉身，1.5 m/s 有慣性，範圍營地 90m，僅 idle；鍵盤 WASD 也可），f.js 冰湖 player 位置跟 G.base（＋G.walkBob），t.js 冰洞鑿好後固定在原地、離開 2.6m 才消失、營地道具鑿好才出現；雪地腳步聲 sfx/step_snow_0–4（Kenney CC0）。測試 scratchpad/h/ice.js（鍵盤 W 25 秒走 16.8m）。
+  玩家新需求（未做）：①湖要擴大、地圖邊界太小、在碼頭回頭看四周都是岸（b.js shoreR/shoreR0：以碼頭為圓心半徑約 54m，GLSL 與 JS 各一份，d.js 划船邊界 shoreR-5）②所有聲音改真實錄音：Snd 約 28 種音效只有 reel、splash 是取樣（另有腳步聲、尖叫），其餘 coin/fanfare/plop/gator/click/paddle/snap/sizzle/rumble/plip/nibble/grind/engine/eagle/creak/bite/bird/whoosh/thunder/rain/frog/drip/crackle/環境聲都是合成。來源限 GitHub 可下載的 CC0（Kenney 等）。
+  第二份實機診斷（開機 7 秒）：前 10 秒平均 12 FPS，長任務 12 次共 4.3 秒＝著色器編譯＋貼圖上傳（971ms、356ms…）與未歸因 JS（558、905ms）。開場載入要分散。
 - 2026-11-15 實機診斷（Adreno 830、畫質 high、PR 2.62、貼圖 2048）：平均 50–78 FPS，問題是長任務（102 次，最長 1.1 秒）：著色器編譯、貼圖／幾何上傳、未歸因 JS。programs 高達 226。
   無頭 CPU profile（scratchpad/h/prof2.js，啟動後 100 秒）：WebGLProgram 編譯（three 的 Jr）5.7 秒、texImage2D 0.8 秒、GLTF 解析 0.2 秒，其餘都很小 → 卡頓主因＝第一次畫到新材質時同步編譯著色器。
   已做：d.js 魚種預熱（state==='wait' 且尚未選魚時，每 1.2 秒把一種本水域、模型已載好的魚放到鏡頭背後 4m、縮到 1cm 畫 3 幀再藏起來；window.__warmedFish）。測試：13 種魚 programs 81→105、textures 119→172，無錯誤（scratchpad/h/warm.js，用 setInterval 強制 G.state='wait'）。

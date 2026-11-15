@@ -1,4 +1,4 @@
-/*APPV:20261115060419*/
+/*APPV:20261115100342*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -50,14 +50,14 @@ if(PROMO_URL){ refresh(); setInterval(refresh,120000); }
 /* 走路手感（標本館、小屋共用）
    - 步伐相位依「實際走了多遠」推進：走快步子就快、撞牆沒前進就不晃、停下來慢慢收在兩腳著地
    - 每步：頭部輕微下沉、換腳時極小的左右重心與側傾（幅度照真人步行時眼睛高度約 2～3 公分的起伏）
-   - 腳步聲用實錄音檔：木地板、地毯各 5 種（Kenney Impact Sounds，CC0），隨機挑、音高音量微變；
+   - 腳步聲用實錄音檔：木地板、地毯、雪地各 5 種（Kenney Impact Sounds，CC0），隨機挑、音高音量微變；
      依腳下是木板還是地毯換聲音。音檔還沒載完時先用合成聲頂著 */
 (function(){
-  let AC=null; const BUF={wood:[],carpet:[]}; let loading=false;
+  let AC=null; const BUF={wood:[],carpet:[],snow:[]}; let loading=false;
   const ac=()=>{ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==='suspended') AC.resume().catch(()=>{}); return AC; };
   const soundOn=()=>((window.__SAVE||{}).sound!==false);
   function load(){ if(loading) return; const a=ac(); if(!a) return; loading=true;
-    for(const k of ['wood','carpet']) for(let i=0;i<5;i++) fetch('sfx/step_'+k+'_'+i+'.mp3').then(r=>r.arrayBuffer()).then(b=>new Promise((ok,no)=>a.decodeAudioData(b,ok,no))).then(buf=>{ BUF[k].push(buf); }).catch(()=>{}); }
+    for(const k of ['wood','carpet','snow']) for(let i=0;i<5;i++) fetch('sfx/step_'+k+'_'+i+'.mp3').then(r=>r.arrayBuffer()).then(b=>new Promise((ok,no)=>a.decodeAudioData(b,ok,no))).then(buf=>{ BUF[k].push(buf); }).catch(()=>{}); }
   let lastIdx=-1;
   function play(surface,vol){ const a=ac(); if(!a||!soundOn()) return; load(); const t=a.currentTime, list=BUF[surface]||BUF.wood;
     const g=a.createGain(); g.gain.value=vol*(.85+Math.random()*.25); g.connect(a.destination);
@@ -4214,7 +4214,7 @@ function dataTex(w,h,fn){ const d=new Uint8Array(w*h*4), o=[0,0,0,255];
 const fwd=(a,out)=>out.set(-Math.sin(a),0,-Math.cos(a));
 const inShore=(v,bx,bz,m)=>{ for(let k=0;k<20;k++){ const r=Math.hypot(v.x,v.z), R=W.shoreR(Math.atan2(v.x,-v.z))-m; if(r<=R) break; v.x=bx+(v.x-bx)*.9; v.z=bz+(v.z-bz)*.9; } return v; };
 let spotI=0, zoneI=0; const spd={};
-const sp=()=>{ const s=SPOTS[spotI], b=ctx.base?ctx.base():null, z=SPOTS[zoneI]; spd.pos=b?[b.x,b.z]:s.pos; spd.head=ctx.head?ctx.head():s.head; spd.kayak=s.kayak; spd.yacht=!!s.yacht; spd.eye=s.eye; spd.aff=z.aff; spd.size=z.size; spd.rare=z.rare; return spd; };
+const sp=()=>{ const s=SPOTS[spotI], b=ctx.base?ctx.base():null, z=SPOTS[zoneI]; spd.pos=b?[b.x,b.z]:s.pos; spd.head=ctx.head?ctx.head():s.head; spd.kayak=s.kayak; spd.yacht=!!s.yacht; spd.ice=s.loc==='ice'; spd.eye=s.eye; spd.aff=z.aff; spd.size=z.size; spd.rare=z.rare; return spd; };
 const tv=new T.Vector3(), tv2=new T.Vector3(), cw=new T.Vector3();
 
 /* ---------- 倒木區的枯樹與浮木 ---------- */
@@ -4462,6 +4462,7 @@ function update(dt,t){
     if(window.__DW){ const D=window.__DW, last=D.last; if(!last||Math.hypot(bx-last.x,bz-last.z)>.45){ D.last={x:bx,z:bz}; D.trail[D.next].set(bx,bz,t,0); D.next=(D.next+1)%D.trail.length; } } boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
     W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
   else if(s.yacht){ boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; const sw=W.swell(bx,bz,t)*.9; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
+  else if(s.ice){ boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; W.player.position.set(bx,(s.eye||2.4)+((window.__G&&window.__G.walkBob)||0),bz); W.head.rotation.z=0; }   /* 冰湖可以走動：人跟著位置移動，帶走路的起伏 */
   else { boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; W.player.position.set(0,2.4,0); W.head.rotation.z=0; }
   updateWeather(dt); updateRain(dt); updateGator(dt); updateEagle(dt,t);
   gEye.emissiveIntensity=(1-W.info.day)*2.2;
@@ -6870,8 +6871,12 @@ function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visib
   else if(!drilled&&on&&prog>0&&!(c.held&&c.held())) auger.visible=prog>0;
   if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
       W.addRipple(holePos.x,holePos.z,.15+.2*T2); if(T2>.6){ c.chips&&0; if(c.splash) c.splash(holePos,T2); } } } if(!on){ drilled=false; prog=0; cutHole.value.z=0; return; }
-  const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; auger.visible=false; liftT=0; }
-  holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); hole.position.copy(holePos); camp.position.copy(holePos); camp.rotation.y=h; hole.visible=drilled;
+  const b=c.base(), h=c.head();
+  /* 冰洞留在鑿好的地方：以前只要位置或方向有一點變化就整個重來。現在可以在冰面上走動，
+     鑿好的洞固定在原地；走離洞口超過 2.6 公尺才算離開（洞消失，到新位置重新鑿）。還沒鑿的時候，預定位置跟著人前方 1.6 公尺 */
+  if(drilled){ if(Math.hypot(b.x-holePos.x,b.z-holePos.z)>2.6){ drilled=false; prog=0; auger.visible=false; liftT=0; } }
+  else { const key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; if(prog>0&&prog<1){ prog=0; auger.visible=false; liftT=0; } } holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); }
+  hole.position.copy(holePos); camp.position.copy(holePos); if(!drilled) camp.rotation.y=h; camp.visible=drilled; hole.visible=drilled;   /* 營地道具（火爐、保溫瓶…）鑿好洞才擺出來，不會跟著人在冰上滑 */
   sheet.position.x=b.x; sheet.position.z=b.z; cutHole.value.set(holePos.x,holePos.z,drilled?.17:0); }
 /* 鑿冰洞：按住約 2 秒，冰屑四濺，完成後冰洞出現 */
 function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); auger.visible=true; auger.position.set(holePos.x,.02-prog*.42,holePos.z); auger.rotation.y+=dt*9; if(c.grind&&Math.random()<dt*10) c.grind(); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; cutHole.value.set(holePos.x,holePos.z,.17); liftT=1.2; if(c.done) c.done(holePos); } return prog; }
@@ -8981,7 +8986,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261115060419'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261115100342'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -11457,9 +11462,11 @@ function stowRod(pk){ P.rodGroup.position.set(0,-.55*pk,.1*pk); P.rodGroup.rotat
 const boatStationButton=document.createElement('button');boatStationButton.id='boatStation';boatStationButton.hidden=true;boatStationButton.className='btn';boatStationButton.style.cssText='position:fixed;right:16px;bottom:calc(210px + env(safe-area-inset-bottom));z-index:25;padding:12px 16px;border-radius:22px;background:#163b37;color:#fff;border:1px solid #c6ab6c;font:600 14px sans-serif';document.body.appendChild(boatStationButton);
 function switchBoatStation(){if(!SPOTS[G.spot].yacht||G.state!=='idle')return;G.boatStation=G.boatStation==='helm'?'fishing':'helm';KY.v=KY.w=KY.thr=KY.turn=0;G.yaw=G.yawT=0;toast(G.boatStation==='helm'?'駕駛座：搖桿控制航行，停船後返回側舷釣位':'船艉側舷釣位：已停船，向船外拋竿');}
 boatStationButton.addEventListener('click',switchBoatStation);
+const iceWalk=window.WalkFeel?window.WalkFeel({stride:.7,vol:.5}):{update:()=>({dy:0})};
 function updateKayak(dt){
   if(HOME3D.active()){ boatStationButton.hidden=true;joy.classList.remove('hidden'); Snd.engine(false,0,0); return; }
-  const s=SPOTS[G.spot], can=(s.kayak||(s.yacht&&G.boatStation==='helm'))&&G.state==='idle'&&!document.body.classList.contains('catching');
+  const s=SPOTS[G.spot], onIce=s.loc==='ice', can=(s.kayak||onIce||(s.yacht&&G.boatStation==='helm'))&&G.state==='idle'&&!document.body.classList.contains('catching');
+  { const lb=joy.querySelector('span'); if(lb){ const t=onIce?'走動':'划船'; if(lb.textContent!==t) lb.textContent=t; } }
   joy.classList.toggle('hidden',!can);
   const z=s.kayak?zoneOf(G.base.x,G.base.z):G.spot; if(z!==KY.zone){ KY.zone=z; WL.setZone(z); }
   boatStationButton.hidden=!(s.yacht&&G.state==='idle'&&!HOME3D.active());boatStationButton.textContent=G.boatStation==='helm'?'🎣 返回釣位':'🚤 前往駕駛座';
@@ -11467,6 +11474,13 @@ function updateKayak(dt){
   if(keys.KeyW) thr=1; if(keys.KeyS) thr=-.6; if(keys.KeyA) turn=-1; if(keys.KeyD) turn=1;
   if(!can){ thr=0; turn=0; if(s.yacht){KY.v=0;KY.w=0;} }
   Snd.engine(!!s.yacht&&G.boatStation==='helm'&&G.state!=='travel',Math.abs(KY.v)/16.5,Math.abs(thr));   /* 遊艇引擎聲：站上駕駛座發動，船速越快越響 */
+  /* 冰湖：用搖桿在冰面上走動找釣點（前後走、左右轉身）。走到新位置要重新鑿冰洞；只能在沒放線時走。
+     步行速度約每秒 1.5 公尺，起步、停下有慣性；活動範圍是營地周圍 90 公尺 */
+  if(onIce){ G.boatV=0; G.boatW=0; WL.paddle(dt,0); stowRod(0);
+    KY.v+=(thr*1.5-KY.v)*Math.min(1,dt*4.5); KY.w+=(turn*1.5-KY.w)*Math.min(1,dt*6); if(Math.abs(KY.v)<.01&&!thr) KY.v=0; if(Math.abs(KY.w)<.01&&!turn) KY.w=0;
+    const px=G.base.x, pz=G.base.z; if(KY.v||KY.w){ G.head-=KY.w*dt; let nx=px-Math.sin(G.head)*KY.v*dt, nz=pz-Math.cos(G.head)*KY.v*dt; const ox=s.pos[0], oz=s.pos[1], r=Math.hypot(nx-ox,nz-oz); if(r>90){ nx=ox+(nx-ox)*90/r; nz=oz+(nz-oz)*90/r; }
+      G.base.x=nx; G.base.z=nz; }
+    const wf=iceWalk.update(dt,Math.hypot(G.base.x-px,G.base.z-pz),'snow'); G.walkBob=wf.dy; return; }
   if(!s.kayak&&!s.yacht){ KY.v=0; KY.w=0; G.boatV=0; G.boatW=0; WL.paddle(dt,0); stowRod(WL.padOn()); return; }
   KY.v+=(thr*(s.yacht?9.9:1.5)-KY.v*(s.yacht?.6:.65))*dt;   /* 17 呎中控台釣魚艇＋90 匹船外機：極速約每秒 16.5 公尺（約 32 節），約 4 秒衝到八成 */   /* 遊艇雙引擎全速約每秒 22 公尺（約 43 節，運動型釣魚遊艇的極速），約 4 秒內衝到八成；獨木舟約 2.3 公尺 */ KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
   WL.paddle(dt,s.yacht?0:clamp(Math.max(Math.abs(thr),Math.abs(turn)*.7),0,1),AT.ring);   // 遊艇靠引擎，不划槳

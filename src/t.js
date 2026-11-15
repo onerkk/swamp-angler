@@ -104,8 +104,12 @@ function update(dt){ dt=dt||.016; updSnow(dt); const on=c.loc()==='ice'; g.visib
   else if(!drilled&&on&&prog>0&&!(c.held&&c.held())) auger.visible=prog>0;
   if(on&&drilled&&c.state&&c.state()==='fight'){ const T2=c.tens?c.tens():.5; strT-=dt; if(strT<=0){ strT=.5-.35*Math.min(1,T2);   // 冰洞裡的掙扎：依張力冒出水紋與水花
       W.addRipple(holePos.x,holePos.z,.15+.2*T2); if(T2>.6){ c.chips&&0; if(c.splash) c.splash(holePos,T2); } } } if(!on){ drilled=false; prog=0; cutHole.value.z=0; return; }
-  const b=c.base(), h=c.head(), key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; drilled=false; prog=0; auger.visible=false; liftT=0; }
-  holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); hole.position.copy(holePos); camp.position.copy(holePos); camp.rotation.y=h; hole.visible=drilled;
+  const b=c.base(), h=c.head();
+  /* 冰洞留在鑿好的地方：以前只要位置或方向有一點變化就整個重來。現在可以在冰面上走動，
+     鑿好的洞固定在原地；走離洞口超過 2.6 公尺才算離開（洞消失，到新位置重新鑿）。還沒鑿的時候，預定位置跟著人前方 1.6 公尺 */
+  if(drilled){ if(Math.hypot(b.x-holePos.x,b.z-holePos.z)>2.6){ drilled=false; prog=0; auger.visible=false; liftT=0; } }
+  else { const key=b.x.toFixed(1)+','+b.z.toFixed(1)+','+h.toFixed(2); if(key!==lastKey){ lastKey=key; if(prog>0&&prog<1){ prog=0; auger.visible=false; liftT=0; } } holePos.set(b.x-Math.sin(h)*1.6,0,b.z-Math.cos(h)*1.6); }
+  hole.position.copy(holePos); camp.position.copy(holePos); if(!drilled) camp.rotation.y=h; camp.visible=drilled; hole.visible=drilled;   /* 營地道具（火爐、保溫瓶…）鑿好洞才擺出來，不會跟著人在冰上滑 */
   sheet.position.x=b.x; sheet.position.z=b.z; cutHole.value.set(holePos.x,holePos.z,drilled?.17:0); }
 /* 鑿冰洞：按住約 2 秒，冰屑四濺，完成後冰洞出現 */
 function drill(dt){ if(drilled) return 1; prog=Math.min(1,prog+dt/2); auger.visible=true; auger.position.set(holePos.x,.02-prog*.42,holePos.z); auger.rotation.y+=dt*9; if(c.grind&&Math.random()<dt*10) c.grind(); if(Math.random()<dt*14&&c.chips) c.chips(holePos); if(prog>=1){ drilled=true; hole.visible=true; cutHole.value.set(holePos.x,holePos.z,.17); liftT=1.2; if(c.done) c.done(holePos); } return prog; }

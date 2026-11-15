@@ -25,7 +25,7 @@ function dataTex(w,h,fn){ const d=new Uint8Array(w*h*4), o=[0,0,0,255];
 const fwd=(a,out)=>out.set(-Math.sin(a),0,-Math.cos(a));
 const inShore=(v,bx,bz,m)=>{ for(let k=0;k<20;k++){ const r=Math.hypot(v.x,v.z), R=W.shoreR(Math.atan2(v.x,-v.z))-m; if(r<=R) break; v.x=bx+(v.x-bx)*.9; v.z=bz+(v.z-bz)*.9; } return v; };
 let spotI=0, zoneI=0; const spd={};
-const sp=()=>{ const s=SPOTS[spotI], b=ctx.base?ctx.base():null, z=SPOTS[zoneI]; spd.pos=b?[b.x,b.z]:s.pos; spd.head=ctx.head?ctx.head():s.head; spd.kayak=s.kayak; spd.yacht=!!s.yacht; spd.eye=s.eye; spd.aff=z.aff; spd.size=z.size; spd.rare=z.rare; return spd; };
+const sp=()=>{ const s=SPOTS[spotI], b=ctx.base?ctx.base():null, z=SPOTS[zoneI]; spd.pos=b?[b.x,b.z]:s.pos; spd.head=ctx.head?ctx.head():s.head; spd.kayak=s.kayak; spd.yacht=!!s.yacht; spd.ice=s.loc==='ice'; spd.eye=s.eye; spd.aff=z.aff; spd.size=z.size; spd.rare=z.rare; return spd; };
 const tv=new T.Vector3(), tv2=new T.Vector3(), cw=new T.Vector3();
 
 /* ---------- 倒木區的枯樹與浮木 ---------- */
@@ -273,6 +273,7 @@ function update(dt,t){
     if(window.__DW){ const D=window.__DW, last=D.last; if(!last||Math.hypot(bx-last.x,bz-last.z)>.45){ D.last={x:bx,z:bz}; D.trail[D.next].set(bx,bz,t,0); D.next=(D.next+1)%D.trail.length; } } boat.rotation.set(Math.sin(t*1.3)*.012+paddleTilt.x,s.head,Math.sin(t*1.1)*.02+paddleTilt.z);
     W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
   else if(s.yacht){ boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; const sw=W.swell(bx,bz,t)*.9; W.player.position.set(bx,s.eye+sw,bz); W.head.rotation.z=0; }
+  else if(s.ice){ boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; W.player.position.set(bx,(s.eye||2.4)+((window.__G&&window.__G.walkBob)||0),bz); W.head.rotation.z=0; }   /* 冰湖可以走動：人跟著位置移動，帶走路的起伏 */
   else { boat.visible=false; if(W.U.uBoat) W.U.uBoat.value.w=0; W.player.position.set(0,2.4,0); W.head.rotation.z=0; }
   updateWeather(dt); updateRain(dt); updateGator(dt); updateEagle(dt,t);
   gEye.emissiveIntensity=(1-W.info.day)*2.2;

@@ -1,14 +1,14 @@
 /* 走路手感（標本館、小屋共用）
    - 步伐相位依「實際走了多遠」推進：走快步子就快、撞牆沒前進就不晃、停下來慢慢收在兩腳著地
    - 每步：頭部輕微下沉、換腳時極小的左右重心與側傾（幅度照真人步行時眼睛高度約 2～3 公分的起伏）
-   - 腳步聲用實錄音檔：木地板、地毯各 5 種（Kenney Impact Sounds，CC0），隨機挑、音高音量微變；
+   - 腳步聲用實錄音檔：木地板、地毯、雪地各 5 種（Kenney Impact Sounds，CC0），隨機挑、音高音量微變；
      依腳下是木板還是地毯換聲音。音檔還沒載完時先用合成聲頂著 */
 (function(){
-  let AC=null; const BUF={wood:[],carpet:[]}; let loading=false;
+  let AC=null; const BUF={wood:[],carpet:[],snow:[]}; let loading=false;
   const ac=()=>{ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==='suspended') AC.resume().catch(()=>{}); return AC; };
   const soundOn=()=>((window.__SAVE||{}).sound!==false);
   function load(){ if(loading) return; const a=ac(); if(!a) return; loading=true;
-    for(const k of ['wood','carpet']) for(let i=0;i<5;i++) fetch('sfx/step_'+k+'_'+i+'.mp3').then(r=>r.arrayBuffer()).then(b=>new Promise((ok,no)=>a.decodeAudioData(b,ok,no))).then(buf=>{ BUF[k].push(buf); }).catch(()=>{}); }
+    for(const k of ['wood','carpet','snow']) for(let i=0;i<5;i++) fetch('sfx/step_'+k+'_'+i+'.mp3').then(r=>r.arrayBuffer()).then(b=>new Promise((ok,no)=>a.decodeAudioData(b,ok,no))).then(buf=>{ BUF[k].push(buf); }).catch(()=>{}); }
   let lastIdx=-1;
   function play(surface,vol){ const a=ac(); if(!a||!soundOn()) return; load(); const t=a.currentTime, list=BUF[surface]||BUF.wood;
     const g=a.createGain(); g.gain.value=vol*(.85+Math.random()*.25); g.connect(a.destination);

@@ -854,9 +854,11 @@ function stowRod(pk){ P.rodGroup.position.set(0,-.55*pk,.1*pk); P.rodGroup.rotat
 const boatStationButton=document.createElement('button');boatStationButton.id='boatStation';boatStationButton.hidden=true;boatStationButton.className='btn';boatStationButton.style.cssText='position:fixed;right:16px;bottom:calc(210px + env(safe-area-inset-bottom));z-index:25;padding:12px 16px;border-radius:22px;background:#163b37;color:#fff;border:1px solid #c6ab6c;font:600 14px sans-serif';document.body.appendChild(boatStationButton);
 function switchBoatStation(){if(!SPOTS[G.spot].yacht||G.state!=='idle')return;G.boatStation=G.boatStation==='helm'?'fishing':'helm';KY.v=KY.w=KY.thr=KY.turn=0;G.yaw=G.yawT=0;toast(G.boatStation==='helm'?'駕駛座：搖桿控制航行，停船後返回側舷釣位':'船艉側舷釣位：已停船，向船外拋竿');}
 boatStationButton.addEventListener('click',switchBoatStation);
+const iceWalk=window.WalkFeel?window.WalkFeel({stride:.7,vol:.5}):{update:()=>({dy:0})};
 function updateKayak(dt){
   if(HOME3D.active()){ boatStationButton.hidden=true;joy.classList.remove('hidden'); Snd.engine(false,0,0); return; }
-  const s=SPOTS[G.spot], can=(s.kayak||(s.yacht&&G.boatStation==='helm'))&&G.state==='idle'&&!document.body.classList.contains('catching');
+  const s=SPOTS[G.spot], onIce=s.loc==='ice', can=(s.kayak||onIce||(s.yacht&&G.boatStation==='helm'))&&G.state==='idle'&&!document.body.classList.contains('catching');
+  { const lb=joy.querySelector('span'); if(lb){ const t=onIce?'走動':'划船'; if(lb.textContent!==t) lb.textContent=t; } }
   joy.classList.toggle('hidden',!can);
   const z=s.kayak?zoneOf(G.base.x,G.base.z):G.spot; if(z!==KY.zone){ KY.zone=z; WL.setZone(z); }
   boatStationButton.hidden=!(s.yacht&&G.state==='idle'&&!HOME3D.active());boatStationButton.textContent=G.boatStation==='helm'?'🎣 返回釣位':'🚤 前往駕駛座';
@@ -864,6 +866,13 @@ function updateKayak(dt){
   if(keys.KeyW) thr=1; if(keys.KeyS) thr=-.6; if(keys.KeyA) turn=-1; if(keys.KeyD) turn=1;
   if(!can){ thr=0; turn=0; if(s.yacht){KY.v=0;KY.w=0;} }
   Snd.engine(!!s.yacht&&G.boatStation==='helm'&&G.state!=='travel',Math.abs(KY.v)/16.5,Math.abs(thr));   /* 遊艇引擎聲：站上駕駛座發動，船速越快越響 */
+  /* 冰湖：用搖桿在冰面上走動找釣點（前後走、左右轉身）。走到新位置要重新鑿冰洞；只能在沒放線時走。
+     步行速度約每秒 1.5 公尺，起步、停下有慣性；活動範圍是營地周圍 90 公尺 */
+  if(onIce){ G.boatV=0; G.boatW=0; WL.paddle(dt,0); stowRod(0);
+    KY.v+=(thr*1.5-KY.v)*Math.min(1,dt*4.5); KY.w+=(turn*1.5-KY.w)*Math.min(1,dt*6); if(Math.abs(KY.v)<.01&&!thr) KY.v=0; if(Math.abs(KY.w)<.01&&!turn) KY.w=0;
+    const px=G.base.x, pz=G.base.z; if(KY.v||KY.w){ G.head-=KY.w*dt; let nx=px-Math.sin(G.head)*KY.v*dt, nz=pz-Math.cos(G.head)*KY.v*dt; const ox=s.pos[0], oz=s.pos[1], r=Math.hypot(nx-ox,nz-oz); if(r>90){ nx=ox+(nx-ox)*90/r; nz=oz+(nz-oz)*90/r; }
+      G.base.x=nx; G.base.z=nz; }
+    const wf=iceWalk.update(dt,Math.hypot(G.base.x-px,G.base.z-pz),'snow'); G.walkBob=wf.dy; return; }
   if(!s.kayak&&!s.yacht){ KY.v=0; KY.w=0; G.boatV=0; G.boatW=0; WL.paddle(dt,0); stowRod(WL.padOn()); return; }
   KY.v+=(thr*(s.yacht?9.9:1.5)-KY.v*(s.yacht?.6:.65))*dt;   /* 17 呎中控台釣魚艇＋90 匹船外機：極速約每秒 16.5 公尺（約 32 節），約 4 秒衝到八成 */   /* 遊艇雙引擎全速約每秒 22 公尺（約 43 節，運動型釣魚遊艇的極速），約 4 秒內衝到八成；獨木舟約 2.3 公尺 */ KY.w+=(turn*.55*(.4+Math.min(1,Math.abs(KY.v)))-KY.w)*Math.min(1,dt*3);
   WL.paddle(dt,s.yacht?0:clamp(Math.max(Math.abs(thr),Math.abs(turn)*.7),0,1),AT.ring);   // 遊艇靠引擎，不划槳
