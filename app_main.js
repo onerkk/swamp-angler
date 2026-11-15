@@ -1,4 +1,4 @@
-/*APPV:20261115100342*/
+/*APPV:20261115102623*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -1595,7 +1595,7 @@ float noise2(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); vec2 u = f*f*(3.0 - 
   return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x), mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y); }
 float fbm3(vec2 p){ float v = 0.0; float a = 0.5; for(int i = 0; i < 3; i++){ v += a*noise2(p); p = p*2.03 + vec2(11.7, 5.3); a *= 0.5; } return v/0.875; }
 float fbm5(vec2 p){ float v = 0.0; float a = 0.5; for(int i = 0; i < 5; i++){ v += a*noise2(p); p = p*2.03 + vec2(11.7, 5.3); a *= 0.5; } return v/0.96875; }
-float shoreR(float az){ float d = (az - 0.12)/0.30; return 54.0 + 9.0*sin(az*2.3 + 1.1) + 6.0*sin(az*5.1 + 0.3) + 3.0*sin(az*11.7 + 2.0) + 45.0*exp(-d*d); }
+float shoreR(float az){ float d = (az - 0.12)/0.30; return 2.8*(54.0 + 9.0*sin(az*2.3 + 1.1) + 6.0*sin(az*5.1 + 0.3) + 3.0*sin(az*11.7 + 2.0) + 45.0*exp(-d*d)); }   /* 湖放大 2.8 倍（2026-11-15）：JS 的 shoreR0 要同步 */
 float cloudSh(vec2 xz){ return uCShadow*smoothstep(0.45, 0.75, noise2(xz*0.011 + uCloudOff*1.6)); }
 float fogF(float d){ return 1.0 - exp(-d*uFogDen); }
 vec3 fogColor(vec3 rd){ float sd = max(dot(rd, uSunDir), 0.0); return uFogCol + uGlow*(pow(sd, 6.0)*0.5 + pow(sd, 48.0)*0.7)*uDay; }
@@ -2056,7 +2056,8 @@ const clamp=(x,a,b)=>x<a?a:x>b?b:x, lerp=(a,b,t)=>a+(b-a)*t;
 const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 let seaMode=false;
 function shoreR(az){ return seaMode?1400:shoreR0(az); }
-function shoreR0(az){ const d=(az-0.12)/0.30; return 54+9*Math.sin(az*2.3+1.1)+6*Math.sin(az*5.1+0.3)+3*Math.sin(az*11.7+2.0)+45*Math.exp(-d*d); }
+const LAKE_SCALE=2.8;   /* 湖的半徑倍率：原本以碼頭為圓心只有約 54 公尺，四周很快就碰到岸。著色器裡的 shoreR 要用同一個數字 */
+function shoreR0(az){ const d=(az-0.12)/0.30; return LAKE_SCALE*(54+9*Math.sin(az*2.3+1.1)+6*Math.sin(az*5.1+0.3)+3*Math.sin(az*11.7+2.0)+45*Math.exp(-d*d)); }
 
 const renderer = new T.WebGLRenderer({canvas:opts.canvas, antialias:!window.__resourcePolicy?.mobile, powerPreference:'high-performance'});
 renderer.outputEncoding = T.sRGBEncoding;
@@ -8986,7 +8987,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261115100342'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261115102623'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';

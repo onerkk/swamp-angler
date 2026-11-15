@@ -56,7 +56,7 @@ float noise2(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); vec2 u = f*f*(3.0 - 
   return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x), mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y); }
 float fbm3(vec2 p){ float v = 0.0; float a = 0.5; for(int i = 0; i < 3; i++){ v += a*noise2(p); p = p*2.03 + vec2(11.7, 5.3); a *= 0.5; } return v/0.875; }
 float fbm5(vec2 p){ float v = 0.0; float a = 0.5; for(int i = 0; i < 5; i++){ v += a*noise2(p); p = p*2.03 + vec2(11.7, 5.3); a *= 0.5; } return v/0.96875; }
-float shoreR(float az){ float d = (az - 0.12)/0.30; return 54.0 + 9.0*sin(az*2.3 + 1.1) + 6.0*sin(az*5.1 + 0.3) + 3.0*sin(az*11.7 + 2.0) + 45.0*exp(-d*d); }
+float shoreR(float az){ float d = (az - 0.12)/0.30; return 2.8*(54.0 + 9.0*sin(az*2.3 + 1.1) + 6.0*sin(az*5.1 + 0.3) + 3.0*sin(az*11.7 + 2.0) + 45.0*exp(-d*d)); }   /* 湖放大 2.8 倍（2026-11-15）：JS 的 shoreR0 要同步 */
 float cloudSh(vec2 xz){ return uCShadow*smoothstep(0.45, 0.75, noise2(xz*0.011 + uCloudOff*1.6)); }
 float fogF(float d){ return 1.0 - exp(-d*uFogDen); }
 vec3 fogColor(vec3 rd){ float sd = max(dot(rd, uSunDir), 0.0); return uFogCol + uGlow*(pow(sd, 6.0)*0.5 + pow(sd, 48.0)*0.7)*uDay; }
@@ -517,7 +517,8 @@ const clamp=(x,a,b)=>x<a?a:x>b?b:x, lerp=(a,b,t)=>a+(b-a)*t;
 const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 let seaMode=false;
 function shoreR(az){ return seaMode?1400:shoreR0(az); }
-function shoreR0(az){ const d=(az-0.12)/0.30; return 54+9*Math.sin(az*2.3+1.1)+6*Math.sin(az*5.1+0.3)+3*Math.sin(az*11.7+2.0)+45*Math.exp(-d*d); }
+const LAKE_SCALE=2.8;   /* 湖的半徑倍率：原本以碼頭為圓心只有約 54 公尺，四周很快就碰到岸。著色器裡的 shoreR 要用同一個數字 */
+function shoreR0(az){ const d=(az-0.12)/0.30; return LAKE_SCALE*(54+9*Math.sin(az*2.3+1.1)+6*Math.sin(az*5.1+0.3)+3*Math.sin(az*11.7+2.0)+45*Math.exp(-d*d)); }
 
 const renderer = new T.WebGLRenderer({canvas:opts.canvas, antialias:!window.__resourcePolicy?.mobile, powerPreference:'high-performance'});
 renderer.outputEncoding = T.sRGBEncoding;
