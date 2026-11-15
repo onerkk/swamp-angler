@@ -1,4 +1,4 @@
-/*APPV:20261114081719*/
+/*APPV:20261115044221*/
 /* ===== 釣魚抽蝦皮折扣碼（遊戲端）=====
    中不中獎、折扣碼都由伺服器決定（server/），這裡只負責：把「釣到哪一級的魚」告訴伺服器、顯示活動與結果。
    PROMO_URL 沒設定（伺服器還沒部署）時，整個活動不出現 */
@@ -78,6 +78,46 @@ if(PROMO_URL){ refresh(); setInterval(refresh,120000); }
       st.dy=(-Math.abs(s)*.026+.008)*amp; st.dx=Math.cos(ph)*.01*amp; st.roll=Math.cos(ph)*.004*amp; st.pitch=Math.sin(ph*2)*.003*amp; return st; };
     st.preload=load;
     return st; };
+})();
+/* ===== 變異個體收集 =====
+   每種魚除了一般個體，還有三種稀有的變異：白化、黑化、黃金。釣到會記在圖鑑裡（每種魚 3 格），
+   價值加倍，另有整套收集的成就。給喜歡「收集、開圖鑑」的玩家一個長期目標：魚種釣齊之後還有三倍的格子要填。
+   - 機率：白化、黑化各約 1/45，黃金約 1/220；連續沒出會慢慢提高（保底），不會永遠碰不到
+   - 外觀：只改這一條魚的材質顏色（共用模型，離開漁獲畫面就還原），不另外載模型
+   - 存檔：save.vars[魚種]={albino:次數,melan:次數,gold:次數}；save.varPity＝連續沒出的次數 */
+(function(){
+  const VARS=[
+    {id:'albino',name:'白化',icon:'🤍',p:1/45,mult:4,desc:'天生缺少色素，全身乳白帶粉。野外極難存活，釣到是運氣。'},
+    {id:'melan',name:'黑化',icon:'🖤',p:1/45,mult:4,desc:'黑色素過多，通體墨黑。在水裡幾乎看不見牠。'},
+    {id:'gold',name:'黃金',icon:'💛',p:1/220,mult:15,desc:'傳說中的黃金個體，鱗片像鍍了一層金。老漁人說一輩子只見過一次。'}];
+  const BY={}; VARS.forEach(v=>BY[v.id]=v);
+  const S=()=>window.__SAVE||{};
+  function roll(fd,rnd){ if(!fd||fd.item||fd.practice||!fd.sp||fd.sp.special||fd.sp.noSell||fd.sp.loc==='tide') return null;
+    const s=S(), pity=s.varPity||0, k=1+Math.min(3,pity/35), r=rnd==null?Math.random():rnd; let acc=0;
+    for(const v of VARS){ acc+=v.p*k; if(r<acc){ fd.vr=v.id; fd.value=Math.round(fd.value*v.mult); return v; } }
+    return null; }
+  function record(fd){ const s=S(); if(!fd||fd.item||fd.practice) return null; if(!fd.vr){ s.varPity=(s.varPity||0)+1; return null; }
+    s.varPity=0; s.vars=s.vars||{}; const o=s.vars[fd.sp.id]=s.vars[fd.sp.id]||{}; const first=!o[fd.vr]; o[fd.vr]=(o[fd.vr]||0)+1; return {v:BY[fd.vr],first}; }
+  const count=()=>{ const v=S().vars||{}; let n=0; for(const k in v) for(const j in v[k]) if(v[k][j]>0) n++; return n; };
+  const countOf=id=>{ const v=S().vars||{}; let n=0; for(const k in v) if(v[k][id]>0) n++; return n; };
+  const fullSets=()=>{ const v=S().vars||{}; let n=0; for(const k in v) if(VARS.every(q=>v[k][q.id]>0)) n++; return n; };
+  /* 外觀：改材質顏色，記住原值；untint 還原 */
+  let tinted=null;
+  function untint(){ if(!tinted) return; tinted.traverse(m=>{ if(!m.isMesh) return; (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ const o=mm&&mm.userData&&mm.userData.__vr; if(!o) return;
+      mm.color.copy(o.c); if(mm.emissive) mm.emissive.copy(o.e); mm.emissiveIntensity=o.ei; mm.metalness=o.m; mm.roughness=o.r; delete mm.userData.__vr; }); }); tinted=null; }
+  function tint(group,id){ untint(); if(!group||!BY[id]||!window.THREE) return; const T=window.THREE; tinted=group;
+    group.traverse(m=>{ if(!m.isMesh) return; (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{ if(!mm||!mm.color||mm.userData.__vr) return;
+      mm.userData.__vr={c:mm.color.clone(),e:mm.emissive?mm.emissive.clone():new T.Color(0),ei:mm.emissiveIntensity||0,m:mm.metalness||0,r:mm.roughness==null?.6:mm.roughness};
+      if(id==='albino'){ mm.color.setRGB(2.1,1.95,1.9); if(mm.emissive){ mm.emissive.setRGB(1,.82,.8); mm.emissiveIntensity=.16; } mm.roughness=Math.max(.5,mm.roughness||.6); }
+      else if(id==='melan'){ mm.color.setRGB(.16,.16,.2); if(mm.emissive){ mm.emissive.setRGB(0,0,0); mm.emissiveIntensity=0; } mm.roughness=.45; }
+      else { mm.color.setRGB(1.9,1.25,.3); if(mm.emissive){ mm.emissive.setRGB(1,.6,.05); mm.emissiveIntensity=.22; } mm.metalness=.65; mm.roughness=.28; } }); }); }
+  setInterval(()=>{ const G=window.__G; if(tinted&&G&&G.state!=='catch'&&G.state!=='fight'&&G.state!=='land') untint(); },400);
+  /* 圖鑑詳細頁的一列：三格，釣到的亮起來 */
+  function dexRow(spId){ const o=(S().vars||{})[spId]||{};
+    return '<div class="dexsec"><b>變異個體</b>　'+VARS.map(v=>`<span style="display:inline-block;margin:2px 8px 2px 0;padding:2px 9px;border-radius:99px;border:1px solid rgba(255,255,255,.18);${o[v.id]?'background:rgba(255,213,106,.16)':'opacity:.4'}">${o[v.id]?v.icon+' '+v.name+' ×'+o[v.id]:'？ '+v.name}</span>`).join('')+
+      '<br><small style="opacity:.7">白化、黑化約 45 尾出一次，黃金約 220 尾一次；越久沒出機率越高。</small></div>'; }
+  const dots=spId=>{ const o=(S().vars||{})[spId]; return o?VARS.filter(v=>o[v.id]>0).map(v=>v.icon).join(''):''; };
+  window.__VAR={VARS,BY,roll,record,count,countOf,fullSets,tint,untint,dexRow,dots};
 })();
 /* Bound decoded source images before they become GPU textures. Keep HDR/data textures intact. */
 function deviceResourcePolicy(agent='',mode='auto',recovery=false){const mobile=/iPhone|iPad|iPod|Android/i.test(agent);return{mobile,recovery,textureEdge:recovery?512:mobile&&mode!=='high'?1024:2048,panoramaEdge:recovery?2048:mobile&&mode!=='high'?4096:8192,anisotropy:mobile?4:16};}
@@ -3895,14 +3935,14 @@ function render(){
     const found=SPECIES.filter(s=>save.dex[s.id]).length;
     h+=`<div class="tabs" style="margin-bottom:6px"><button class="tab${logMode!=='list'?' on':''}" data-a="logmode" data-v="dex">📖 圖鑑</button><button class="tab${logMode==='list'?' on':''}" data-a="logmode" data-v="list">🧾 魚獲紀錄</button></div>`;
     if(logMode==='list'){ h+=logList(); } else {
-    h+=`<div class="note">已發現 ${found}/${SPECIES.length} 種，總漁獲 ${save.total} 尾</div>`;
+    h+=`<div class="note">已發現 ${found}/${SPECIES.length} 種，總漁獲 ${save.total} 尾${window.__VAR?'　｜　變異個體 '+window.__VAR.count()+' 格（🤍'+window.__VAR.countOf('albino')+' 🖤'+window.__VAR.countOf('melan')+' 💛'+window.__VAR.countOf('gold')+'）':''}</div>`;
     const dsp=dexSel&&SPECIES.find(s=>s.id===dexSel);
     if(dsp){ h=dexPage(dsp); }
     else { const RG=[['all','全部'],['lake','湖'],['ice','冰湖'],['sea','海'],['tide','潮間帶']], rg=window.__DEXRG||'all', inRg=sp=>rg==='all'||(sp.loc||'lake')===rg||(rg==='lake'&&sp.loc==='both')||(rg==='sea'&&sp.loc==='both');
     h+='<div class="tabs" style="flex-wrap:wrap;margin-bottom:6px">'+RG.map(([k,n])=>{ const L=SPECIES.filter(s=>k==='all'||(s.loc||'lake')===k||(s.loc==='both'&&(k==='lake'||k==='sea'))); return `<button class="tab${rg===k?' on':''}" data-a="dexrg" data-v="${k}">${n} ${L.filter(s=>save.dex[s.id]).length}/${L.length}</button>`; }).join('')+'</div>';
     h+='<div class="note" style="font-size:12px">點任一種查看詳細資料</div>';
     h+=SPECIES.filter(inRg).map(sp=>{ const d=save.dex[sp.id], r=RAR[sp.rar];
-      return `<div class="dexrow" data-a="dex" data-v="${sp.id}"><img class="dexth" data-th="${sp.id}" alt="" src="${DEXV.cached(sp.id,!!d)||DEXV.BLANK}">`+row(d?sp.name:'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${styOf(sp.id).n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col)+'</div>'; }).join(''); }
+      return `<div class="dexrow" data-a="dex" data-v="${sp.id}"><img class="dexth" data-th="${sp.id}" alt="" src="${DEXV.cached(sp.id,!!d)||DEXV.BLANK}">`+row(d?sp.name+(window.__VAR?' '+window.__VAR.dots(sp.id):''):'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${styOf(sp.id).n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col)+'</div>'; }).join(''); }
   }
   } else if(cur==='home'){
     const HM=window.__HOME, hd=HM.data(), t=HM.tank(), nm=id=>(SPECIES.find(s=>s.id===id)||{}).name||id, dt=d=>new Date(d).toLocaleDateString('zh-TW');
@@ -3995,6 +4035,7 @@ function dexPage(sp){ const d=save.dex[sp.id], r=RAR[sp.rar], wh=dexWhere(sp), t
   if(!d){ h+='<div class="dexsec dim">還沒釣到這種魚，釣到後會解鎖外觀、介紹與完整資料。</div>'; return `<div style="--rc:${r.col}">${h}</div>`; }
   const W=x=>sp.k*Math.pow(x/100,3), wl=W(sp.len[0])*.9, wu=W(sp.len[1])*1.12, val=w=>Math.round(sp.price*Math.pow(w+.3,.85)*r.mult*.4);
   h+=`<div class="dexsec">${sp.desc||''}</div>`;
+  if(window.__VAR&&!sp.special&&!sp.noSell) h+=window.__VAR.dexRow(sp.id);
   if(window.__layerOf&&!sp.special) h+=`<div class="dexsec" style="opacity:.85">🎚️ 常在水層：${window.__LAYER_N[window.__layerOf(sp)]}</div>`;
   h+=`<div class="dexgrid"><span>體長</span><b>${sp.len[0]}–${sp.len[1]} 公分</b><span>體重</span><b>${fmtW(wl)}–${fmtW(wu)}</b><span>等級</span><b>LVL ${sp.lvl[0]}–${sp.lvl[1]}</b><span>參考售價</span><b>${sp.noSell?'保育類・不可販售':'🪙 '+val(wl).toLocaleString()+'–'+val(wu).toLocaleString()}</b><span>拉扯型態</span><b>${styOf(sp.id).n}</b></div>`;
   if(sp.f){ h+='<div class="dexsec">'+STAT_N.map(([k,n])=>{ const mx=Math.max(...SPECIES.map(s=>s.f?s.f[k]||0:0),.01), v=Math.min(1,(sp.f[k]||0)/mx);
@@ -4820,6 +4861,7 @@ if(T.GLTFLoader){
 return {sched,useSet};
 }
 /* ===== 樂趣系統：起鉤計時、拋竿距離、連擊、尺寸獎牌、魚群熱點、寶物、釣魚大賽、拍照、美人魚相遇 ===== */
+const VR=()=>window.__VAR;
 const ITEMS=[
  {id:'boot',name:'破舊雨靴',file:'item_rubber_boots.glb',w:1.4,val:8,size:.45,rare:0,p:24,desc:'不知道誰掉的雨靴，裡面還躲著一隻小蝌蚪。'},
  {id:'tyre',name:'廢棄輪胎',file:'item_old_tyre.glb',w:6,val:15,size:.7,rare:0,p:16,desc:'有人把輪胎丟進濕地，順手清掉，算是做了件好事。'},
@@ -5009,6 +5051,14 @@ const ACH=[
  ['spAll','圖鑑全收集','發現所有魚種',()=>[dexV().length,c.SPN],10000],
  ['gold1','第一頂金冠','釣到金冠尺寸的魚',()=>[golds(),1],500],
  ['gold8','金冠收藏家','8 種魚拿到金冠',()=>[golds(),8],4000],
+ ['var1','不一樣的魚','釣到第一尾變異個體（白化、黑化或黃金）',()=>[VR()?VR().count():0,1],800],
+ ['var10','變異獵人','圖鑑裡收集 10 格變異個體',()=>[VR()?VR().count():0,10],5000],
+ ['var30','變異收藏家','圖鑑裡收集 30 格變異個體',()=>[VR()?VR().count():0,30],15000],
+ ['var80','變異博物館','圖鑑裡收集 80 格變異個體',()=>[VR()?VR().count():0,80],50000],
+ ['varGold1','一輩子一次','釣到黃金個體',()=>[VR()?VR().countOf('gold'):0,1],6000],
+ ['varGold10','點石成金','10 種魚釣到黃金個體',()=>[VR()?VR().countOf('gold'):0,10],40000],
+ ['varSet1','三色齊全','同一種魚的白化、黑化、黃金全部釣到',()=>[VR()?VR().fullSets():0,1],12000],
+ ['varSet10','三色圖鑑','10 種魚三色齊全',()=>[VR()?VR().fullSets():0,10],80000],
  ['big10','十公斤巨物','釣到 10 公斤以上的魚',()=>[maxW(),10],1500],
  ['big30','濕地巨獸','釣到 30 公斤以上的魚',()=>[maxW(),30],6000],
  ['combo5','五連擊','連續釣到 5 尾',()=>[S.maxCombo||0,5],800],
@@ -8909,7 +8959,7 @@ const PWA=(()=>{ let deferred=null, installed=matchMedia('(display-mode: standal
   window.addEventListener('appinstalled',()=>{ installed=true; deferred=null; });
 /* 自動偵測新版本：網頁內建這次部署的版本號，定時（開啟時、每 10 分鐘、切回畫面時）比對伺服器上的 version.json；
    有新版就在畫面上方跳出「有新版本」，玩家按下後清掉舊快取並重新載入（存檔在 localStorage，不受影響） */
-(()=>{ const APP_VER='20261114081719'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
+(()=>{ const APP_VER='20261115044221'; window.__APP_VER=APP_VER; if(APP_VER.indexOf('APP_BUILD')>=0) return;
   { const tag=document.createElement('div'); tag.id='verTag'; tag.textContent='版本 '+APP_VER.slice(4,8)+'-'+APP_VER.slice(8,12); tag.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);z-index:95;font:11px system-ui;color:rgba(255,255,255,.45);pointer-events:none';
     document.body.appendChild(tag); const sb=document.getElementById('startBtn'); if(sb) sb.addEventListener('click',()=>setTimeout(()=>tag.remove(),400)); }   /* 標題畫面右下角顯示版本號：一眼就能確認手機上跑的是不是最新版 */
   const bar=document.createElement('div');bar.id='updateNotice'; bar.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:90;display:none;align-items:center;gap:10px;padding:9px 14px;border-radius:999px;background:rgba(20,30,48,.92);border:1px solid rgba(255,214,120,.6);color:#ffe3a3;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-family:sans-serif';
@@ -10875,7 +10925,7 @@ function prepFish(){
   if(!FORCE_FISH&&Math.random()<.085*(window.__STORY&&window.__STORY.needs('item')?2:1)){ const it=FUN.rollItem(); G.sp=FUN.ITEM_SP; G.fd={sp:FUN.ITEM_SP,item:it,L:it.size,w:it.w*rand(.85,1.15),lvl:1,value:Math.round(it.val*rand(.8,1.25)),u:.5,xpMul:0}; return; }
   G.depK=depKey(); const sp=(FORCE_FISH&&SPECIES.find(q=>q.id===FORCE_FISH))||pickSpecies(), pw=clamp((G.castDist-6)/30,0,1), seaK=(G.loc||'lake')==='sea'?.62:1, u=Math.pow(Math.random(),(1.6-.5*pw)/WL.sizeB()*(1+(1-reachK())*1.2+.15*depNow(G.depK))*seaK);   // 海裡的魚個頭普遍偏大
   const big=u>.96?1+(u-.96)/.04*.15:1, L=lerp(sp.len[0],sp.len[1],u)/100*big, w=sp.k*L*L*L*rand(.9,1.12);
-  G.sp=sp; G.fd={sp,L,w,u,grade:gradeOf(u),lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*.4*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; if(window.__TAL) window.__TAL.applyBoss(G,SPECIES,RAR); }
+  G.sp=sp; G.fd={sp,L,w,u,grade:gradeOf(u),lvl:Math.round(lerp(sp.lvl[0],sp.lvl[1],u)),value:Math.round(sp.price*Math.pow(w+.3,.85)*RAR[sp.rar].mult*D().rew*.4*(window.__ECO?window.__ECO.priceMul(sp.id):1)),xpMul:D().rew}; if(window.__TAL) window.__TAL.applyBoss(G,SPECIES,RAR); if(window.__VAR&&!G.fd.boss&&!G.fd.practice) window.__VAR.roll(G.fd);   /* 變異個體（白化／黑化／黃金）：上鉤前就決定，搏魚時就看得到顏色 */ }
 function bite(){ if(!G.fd) prepFish(); UW.bite(); G.state='bite'; G.biteT=0; FUN.hookStart(G.fd); W.addRipple(G.to.x,G.to.z,.75); P.splash(G.to.x,0,G.to.z,8,.5); Snd.bite(); vib([60,40,60]); }
 // 沒揚到竿：魚大多會把餌吃掉，沒餌就不會再有魚咬，要收線重新上餌（路亞不會被吃掉）
 function missBite(){ if(easy()&&G.fd&&!G.fd.practice){ FUN.hookEnd(); hook(true); return; } const lastFd=G.fd; FUN.hookEnd(); if(AMB.app){ AMB.app.flee=3; AMB.app.h+=Math.PI; AMB.app=null; }
@@ -10895,7 +10945,7 @@ function hook(q){
   toast(perfect?'完美揚竿！':'上鉤了！',perfect?'good':'',1200);
   ui.fight.classList.remove('hidden'); WL.onHook(G.fd,()=>fishPos(G.chaseV,0));
   SEA.onHook(G.fd,()=>fishPos(G.chaseV,0));
-  const fish=G.fd.item?FUN.itemFish(G.fd.item):P.getFish(sp); G.fish=fish; fish.group.scale.setScalar(L); fish.group.visible=false; if(!fish.group.parent) W.scene.add(fish.group); seeThrough(fish.group);
+  const fish=G.fd.item?FUN.itemFish(G.fd.item):P.getFish(sp); G.fish=fish; if(window.__VAR){ if(G.fd.vr) window.__VAR.tint(fish.group,G.fd.vr); else window.__VAR.untint(); } fish.group.scale.setScalar(L); fish.group.visible=false; if(!fish.group.parent) W.scene.add(fish.group); seeThrough(fish.group);
   if(G.fd.boss&&window.__TAL) window.__TAL.bossIntro(G,b=>{ P.splash(G.to.x,0,G.to.z,70,2.4); W.addRipple(G.to.x,G.to.z,1.6); Snd.splash(2.2); if(G.loc!=='ice') setTimeout(()=>{ if(G.state==='fight'&&G.f) startJump(); },500); });
 }
 function fishPos(out,y){ const f=G.f; if(f.pos) out.copy(f.pos); else { const az=f.az0+f.theta; out.set((G.angler||G.base).x-Math.sin(az)*f.d,0,(G.angler||G.base).z-Math.cos(az)*f.d); } out.y=y; if(G.loc==='ice'&&window.__ICE){ const hp=window.__ICE.holePos(); out.x=hp.x; out.z=hp.z; } return out; }
@@ -11041,10 +11091,11 @@ function showCard(){
   const isNew=!rec, isRec=!!rec&&fd.w>rec.bw;
   // 首次釣獲日期只在第一次釣到時記錄；更新前的舊紀錄沒有日期就不顯示，不亂填
   save.dex[sp.id]={n:(rec?rec.n:0)+1,bw:Math.max(rec?rec.bw:0,fd.w),bl:Math.max(rec?rec.bl:0,fd.L),md:Math.max(rec&&rec.md||0,FUN.medalLv(fd)),f:rec?rec.f:Date.now()}; save.total++;
+  const vrGot=window.__VAR?window.__VAR.record(fd):null;
   practice.finish();
   // 魚獲紀錄：魚種、尺寸、釣點、時段、天氣、餌、釣法、釣棚，放生或賣出都保留紀錄與圖鑑進度
   if(!fd.item){ const wx=WL.wx?WL.wx():{}, wn=wx.r>.5?'雨':wx.r>.15?'毛毛雨':wx.f>.5?'霧':wx.c>.55?'陰':'晴', bt=G.baitUsed||{};
-    save.catchLog=save.catchLog||[]; save.catchLog.unshift({id:sp.id,L:+fd.L.toFixed(3),w:+fd.w.toFixed(3),t:Date.now(),h:+G.hour.toFixed(2),z:(WL.zoneId&&WL.zoneId())||'',loc:G.loc||'lake',wx:wn,b:bt.id||'',m:G.loc==='ice'?'冰釣':bt.lure?'路亞':G.bottom?'沉底':'浮標',dp:save.depth==null?1:save.depth,new:isNew,rec:isRec});
+    save.catchLog=save.catchLog||[]; save.catchLog.unshift({id:sp.id,L:+fd.L.toFixed(3),w:+fd.w.toFixed(3),t:Date.now(),h:+G.hour.toFixed(2),z:(WL.zoneId&&WL.zoneId())||'',loc:G.loc||'lake',wx:wn,b:bt.id||'',m:G.loc==='ice'?'冰釣':bt.lure?'路亞':G.bottom?'沉底':'浮標',dp:save.depth==null?1:save.depth,new:isNew,rec:isRec}); if(fd.vr) save.catchLog[0].vr=fd.vr;
     if(save.catchLog.length>300) save.catchLog.length=300; G.logRec=save.catchLog[0]; }
   persist();
   if(window.__STORY&&!G.fd.item) window.__STORY.onCatch(fd,{zone:(SPOTS[G.spot]||{}).id,loc:G.loc,per:period(G.hour),rain:W.U.uRain.value>.25});
@@ -11054,6 +11105,7 @@ function showCard(){
   $('cLv').textContent=fd.lvl; $('cName').textContent=sp.name; $('cRar').textContent=r.name+' '+r.en+(fd.grade?'｜'+fd.grade:''); $('cSci').textContent=sp.sci;
   $('cLen').textContent=(fd.L*100).toFixed(1)+' cm'; $('cW').textContent=fd.w<1?Math.round(fd.w*1000)+' g':fd.w.toFixed(2)+' kg';
   $('cVal').textContent='🪙 '+fd.value.toLocaleString(); $('cDesc').textContent=sp.desc+' 拉扯型態：'+styOf(sp.id).n+'，難度 '+stars(fd)+'。';
+  if(vrGot){ const v=vrGot.v; $('cRar').textContent+='｜'+v.icon+v.name+'個體'; $('cDesc').textContent=v.icon+' '+v.name+'個體！'+v.desc+'（價值 ×'+v.mult+(vrGot.first?'，圖鑑新增一格':'')+'）　'+$('cDesc').textContent; if(G.fish&&G.fish.group) window.__VAR.tint(G.fish.group,fd.vr); setTimeout(()=>toast(v.icon+' 釣到'+v.name+'個體的'+sp.name+'！','good',3200),600); vib([40,60,40,60,120]); }
   // 搏魚結算：花了多久、揚竿品質、最高張力、魚衝了幾次；刷新最快紀錄時標示
   if(G.f&&!fd.item){ const f=G.f, ft=f.ft||0, mm=Math.floor(ft/60), ss=Math.round(ft%60), bestK='bf_'+sp.id, best=(save.fightBest||{})[bestK];
     const fast=!best||ft<best; save.fightBest=save.fightBest||{}; if(fast) save.fightBest[bestK]=+ft.toFixed(1);

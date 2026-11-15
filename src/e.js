@@ -384,14 +384,14 @@ function render(){
     const found=SPECIES.filter(s=>save.dex[s.id]).length;
     h+=`<div class="tabs" style="margin-bottom:6px"><button class="tab${logMode!=='list'?' on':''}" data-a="logmode" data-v="dex">📖 圖鑑</button><button class="tab${logMode==='list'?' on':''}" data-a="logmode" data-v="list">🧾 魚獲紀錄</button></div>`;
     if(logMode==='list'){ h+=logList(); } else {
-    h+=`<div class="note">已發現 ${found}/${SPECIES.length} 種，總漁獲 ${save.total} 尾</div>`;
+    h+=`<div class="note">已發現 ${found}/${SPECIES.length} 種，總漁獲 ${save.total} 尾${window.__VAR?'　｜　變異個體 '+window.__VAR.count()+' 格（🤍'+window.__VAR.countOf('albino')+' 🖤'+window.__VAR.countOf('melan')+' 💛'+window.__VAR.countOf('gold')+'）':''}</div>`;
     const dsp=dexSel&&SPECIES.find(s=>s.id===dexSel);
     if(dsp){ h=dexPage(dsp); }
     else { const RG=[['all','全部'],['lake','湖'],['ice','冰湖'],['sea','海'],['tide','潮間帶']], rg=window.__DEXRG||'all', inRg=sp=>rg==='all'||(sp.loc||'lake')===rg||(rg==='lake'&&sp.loc==='both')||(rg==='sea'&&sp.loc==='both');
     h+='<div class="tabs" style="flex-wrap:wrap;margin-bottom:6px">'+RG.map(([k,n])=>{ const L=SPECIES.filter(s=>k==='all'||(s.loc||'lake')===k||(s.loc==='both'&&(k==='lake'||k==='sea'))); return `<button class="tab${rg===k?' on':''}" data-a="dexrg" data-v="${k}">${n} ${L.filter(s=>save.dex[s.id]).length}/${L.length}</button>`; }).join('')+'</div>';
     h+='<div class="note" style="font-size:12px">點任一種查看詳細資料</div>';
     h+=SPECIES.filter(inRg).map(sp=>{ const d=save.dex[sp.id], r=RAR[sp.rar];
-      return `<div class="dexrow" data-a="dex" data-v="${sp.id}"><img class="dexth" data-th="${sp.id}" alt="" src="${DEXV.cached(sp.id,!!d)||DEXV.BLANK}">`+row(d?sp.name:'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${styOf(sp.id).n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col)+'</div>'; }).join(''); }
+      return `<div class="dexrow" data-a="dex" data-v="${sp.id}"><img class="dexth" data-th="${sp.id}" alt="" src="${DEXV.cached(sp.id,!!d)||DEXV.BLANK}">`+row(d?sp.name+(window.__VAR?' '+window.__VAR.dots(sp.id):''):'？？？',`${r.name}，LVL ${sp.lvl[0]}–${sp.lvl[1]}，${styOf(sp.id).n}`,d?`${d.n} 尾<br><small>最大 ${fmtW(d.bw)}</small>`:'<small>未釣獲</small>',r.col)+'</div>'; }).join(''); }
   }
   } else if(cur==='home'){
     const HM=window.__HOME, hd=HM.data(), t=HM.tank(), nm=id=>(SPECIES.find(s=>s.id===id)||{}).name||id, dt=d=>new Date(d).toLocaleDateString('zh-TW');
@@ -484,6 +484,7 @@ function dexPage(sp){ const d=save.dex[sp.id], r=RAR[sp.rar], wh=dexWhere(sp), t
   if(!d){ h+='<div class="dexsec dim">還沒釣到這種魚，釣到後會解鎖外觀、介紹與完整資料。</div>'; return `<div style="--rc:${r.col}">${h}</div>`; }
   const W=x=>sp.k*Math.pow(x/100,3), wl=W(sp.len[0])*.9, wu=W(sp.len[1])*1.12, val=w=>Math.round(sp.price*Math.pow(w+.3,.85)*r.mult*.4);
   h+=`<div class="dexsec">${sp.desc||''}</div>`;
+  if(window.__VAR&&!sp.special&&!sp.noSell) h+=window.__VAR.dexRow(sp.id);
   if(window.__layerOf&&!sp.special) h+=`<div class="dexsec" style="opacity:.85">🎚️ 常在水層：${window.__LAYER_N[window.__layerOf(sp)]}</div>`;
   h+=`<div class="dexgrid"><span>體長</span><b>${sp.len[0]}–${sp.len[1]} 公分</b><span>體重</span><b>${fmtW(wl)}–${fmtW(wu)}</b><span>等級</span><b>LVL ${sp.lvl[0]}–${sp.lvl[1]}</b><span>參考售價</span><b>${sp.noSell?'保育類・不可販售':'🪙 '+val(wl).toLocaleString()+'–'+val(wu).toLocaleString()}</b><span>拉扯型態</span><b>${styOf(sp.id).n}</b></div>`;
   if(sp.f){ h+='<div class="dexsec">'+STAT_N.map(([k,n])=>{ const mx=Math.max(...SPECIES.map(s=>s.f?s.f[k]||0:0),.01), v=Math.min(1,(sp.f[k]||0)/mx);
